@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+# Los extractos de prueba son archivos del banco, byte por byte: normalizar
+# sus finales de línea los convertiría en otra cosa, y usarlos reales es el
+# único motivo por el que están acá.
+tests/Fixtures/** -text
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+CHANGELOG.md export-ignore
+README.md export-ignore
+.github/workflows/browser-tests.yml export-ignore

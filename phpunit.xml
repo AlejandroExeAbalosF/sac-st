@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Arch">
+            <directory>tests/Arch</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- Los tests de arquitectura reflejan todas las clases de
+             `app/Modules` de una vez para verificar las fronteras entre
+             módulos, y eso crece con el sistema: al entrar Banking, los
+             128 MB por defecto de PHP dejaron de alcanzar. No es una fuga:
+             es el costo de que las fronteras se verifiquen de verdad. -->
+        <ini name="memory_limit" value="512M"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- Los tests corren contra PostgreSQL real, nunca SQLite: lo que se
+             prueba son constraints, triggers append-only, numeric(19,2),
+             timestamptz y jsonb. En SQLite ninguna de esas garantias existe. -->
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <!-- Host y puerto NO se fuerzan: PHPUnit respeta lo que ya venga del
+             entorno, y es lo que permite que adentro de Docker la conexión
+             salga al servicio `db` sin tocar este archivo. Fuera de Docker no
+             hay nada definido y valen estos. -->
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="5433"/>
+        <!-- El nombre de la base se fuerza, y esa asimetría con las dos líneas
+             de arriba es deliberada: los tests corren con RefreshDatabase, que
+             vacía lo que encuentre, así que apuntar sin querer a la base de
+             desarrollo se lleva puestos los datos del área.
+
+             `force` no alcanza por sí solo. PHPUnit escribe sus `<env>` en
+             `$_ENV` y con `putenv()`, pero nunca en `$_SERVER`, y Laravel
+             resuelve `env()` leyendo `$_SERVER` primero. Cualquier
+             `DB_DATABASE` que venga del entorno del proceso —un `docker run
+             -e`, un `environment:` de compose— le gana igual a este archivo.
+             Por eso docker-compose.yml deja el nombre de la base fuera de su
+             bloque de variables; está explicado ahí. -->
+        <env name="DB_DATABASE" value="sacst_test" force="true"/>
+        <env name="DB_URL" value=""/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

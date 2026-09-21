@@ -1,0 +1,183 @@
+# Entorno de desarrollo completo: PostgreSQL, PHP, la cola y Vite.
+#
+# Requisito único en la máquina: Docker. Ni PHP, ni Node, ni PostgreSQL.
+#
+#     docker compose up
+#
+# La base vive en un volumen del propio Docker y no toca ninguna instancia
+# de PostgreSQL que haya en la máquina.
+name: sacst
+
+# Configuración compartida por los cuatro servicios de aplicación.
+#
+# Estas variables se inyectan como variables de entorno y no por `.env`
+# a propósito: en Laravel el entorno del proceso le gana al archivo, así que
+# un `.env` que el desarrollador ya tenga —apuntando a un PostgreSQL local,
+# por ejemplo— sigue sirviendo para trabajar fuera de Docker sin que haya
+# que editarlo para entrar y salir.
+x-env: &env
+  # Dónde está el motor: eso sí va por entorno, porque es lo único que cambia
+  # entre correr en Docker y correr en la máquina.
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_USERNAME: sacst
+  DB_PASSWORD: sacst
+
+  # `DB_DATABASE` NO se define acá, y no es un olvido. Laravel resuelve `env()`
+  # leyendo `$_SERVER` antes que nada, y lo que se declara en este bloque
+  # termina justamente ahí. PHPUnit, en cambio, escribe sus `<env>` en `$_ENV`
+  # y con `putenv()`, nunca en `$_SERVER`: ni siquiera con `force="true"`.
+  #
+  # O sea que un `DB_DATABASE: sacst_dev` acá le gana al `sacst_test` de
+  # phpunit.xml, y como los tests corren con RefreshDatabase, la primera
+  # corrida de Pest vacía la base de desarrollo. Pasó, y el síntoma es una
+  # base vacía sin un solo error a la vista.
+  #
+  # El nombre de la base sale del `.env` —donde dice `sacst_dev`— y phpunit.xml
+  # lo pisa para los tests, exactamente igual que fuera de Docker.
+
+  APP_URL: http://localhost:8000
+
+  # Vite escucha en todas las interfaces —si se quedara en `localhost` sería
+  # el localhost del contenedor y el navegador no llegaría— pero anuncia
+  # `localhost:5173`, que es la dirección por la que el navegador sí lo
+  # alcanza. Ese anuncio es el que Vite escribe en `public/hot` y del que la
+  # CSP saca el origen que habilita; con `0.0.0.0` ahí, la política bloquea
+  # todos los módulos y la pantalla queda en blanco.
+  VITE_DEV_HOST: 0.0.0.0
+  VITE_DEV_ORIGIN: http://localhost:5173
+
+  # Los eventos de cambio de archivo del sistema anfitrión no cruzan un bind
+  # mount de Docker Desktop: sin sondeo, el HMR nunca se entera de que algo
+  # cambió y hay que recargar a mano.
+  VITE_DEV_POLLING: ${SACST_VITE_POLLING:-1}
+
+x-app: &app
+  image: sacst-dev
+  # Quien construye la imagen es `init`, y solo él. Los cuatro servicios usan
+  # la misma, pero si los cuatro declaran `build`, el constructor los arma en
+  # paralelo y los cuatro exportan a `sacst-dev:latest` al mismo tiempo: el
+  # primero que termina se queda con el nombre y los otros tres cortan con
+  # «image already exists». Como todos esperan a que `init` termine, para
+  # cuando arrancan la imagen ya está hecha.
+  pull_policy: never
+  volumes:
+    - .:/var/www/html
+    # Dependencias fuera del bind mount: las de Linux no pisan las que el
+    # host pueda tener compiladas para Windows o macOS, y no arrastran el
+    # I/O de un directorio montado, que con `node_modules` se nota.
+    - vendor:/var/www/html/vendor
+    - node-modules:/var/www/html/node_modules
+    - composer-cache:/home/sacst/.composer
+    # `public/storage` se monta en lugar de enlazarse. `artisan storage:link`
+    # crearía un enlace con una ruta del contenedor —`/var/www/html/...`—
+    # adentro del bind mount, o sea en el árbol del proyecto, y ese enlace
+    # queda roto para quien trabaja en la máquina: Windows no sabe qué es
+    # `/var/www/html`. Montando el directorio, cada lado ve lo suyo y el
+    # enlace del host no se toca.
+    - ./storage/app/public:/var/www/html/public/storage
+  environment:
+    <<: *env
+  networks: [sacst]
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: sacst
+      POSTGRES_PASSWORD: sacst
+      POSTGRES_DB: sacst_dev
+      # La segunda base, la de tests, la crea el script de init.
+      POSTGRES_TEST_DB: sacst_test
+      # Explícito y en un subdirectorio: así el punto de montaje no depende
+      # de dónde ubique PGDATA cada versión de la imagen.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    ports:
+      # Publicado para poder mirar la base con un cliente de escritorio. El
+      # 5434 evita el 5432 y el 5433, que en las máquinas del equipo ya
+      # tienen instancias propias.
+      - "${SACST_DB_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sacst -d sacst_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks: [sacst]
+
+  # Corre una vez y termina. Deja el proyecto instalado, migrado y sembrado
+  # antes de que arranque nada más.
+  init:
+    <<: *app
+    build:
+      context: ./docker
+      args:
+        UID: ${SACST_UID:-1000}
+        GID: ${SACST_GID:-1000}
+    pull_policy: build
+    command: sacst-setup
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    <<: *app
+    # El servidor embebido de PHP, y no `artisan serve`, por una razón que
+    # cuesta descubrir desde el síntoma: `ServeCommand` **vacía el entorno
+    # del proceso hijo** y solo le deja pasar las variables de su lista
+    # blanca —APP_ENV, PATH, las de Xdebug y poco más—. `DB_HOST` no está en
+    # esa lista, así que el servidor no vería nada de lo que define compose y
+    # caería al `.env`, que apunta al PostgreSQL de la máquina. El error que
+    # sale de ahí es un "connection refused" al 127.0.0.1 del contenedor, que
+    # no se parece en nada a la causa.
+    #
+    # `server.php` es el mismo router que usa `artisan serve` por dentro.
+    # El `cd public` va en el comando y no en `working_dir` del servicio:
+    # `server.php` resuelve con `getcwd()` el `index.php` que incluye, así
+    # que el servidor necesita arrancar ahí —es lo mismo que hace
+    # `artisan serve` con su subproceso—, pero un `working_dir` a nivel de
+    # servicio también se lo aplicaría a `docker compose exec`, y entonces
+    # `php artisan` no encuentra el `artisan` de la raíz.
+    command: sh -c "cd public && exec php -S 0.0.0.0:8000 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
+    environment:
+      <<: *env
+      # El servidor embebido atiende de a un pedido por vez. Alcanza hasta
+      # que una pantalla abre el visor de comprobantes: el `<iframe>` pide su
+      # PDF mientras la página que lo contiene todavía se está sirviendo, y
+      # los dos se quedan esperando. Acá la variable sí tiene efecto: PHP la
+      # lee directo y hace fork de sus workers.
+      PHP_CLI_SERVER_WORKERS: 4
+    ports:
+      - "${SACST_APP_PORT:-8000}:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  queue:
+    <<: *app
+    command: php artisan queue:listen --tries=1
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  vite:
+    <<: *app
+    command: pnpm run dev
+    ports:
+      - "${SACST_VITE_PORT:-5173}:5173"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:
+  vendor:
+  node-modules:
+  composer-cache:
+
+networks:
+  sacst:

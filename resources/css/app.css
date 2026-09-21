@@ -1,0 +1,614 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    /* Inter, la tipografía del design system del área. */
+    --font-sans:
+        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /*
+     * Monoespaciada para importes, CUIT, CBU y números de comprobante.
+     * Que los dígitos alineen en columna no es estética: es lo que
+     * permite detectar de un vistazo que un importe tiene un cero de más.
+     */
+    --font-mono:
+        'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'Consolas', 'SF Mono',
+        Menlo, monospace;
+
+    /*
+     * Sombra de dos capas: un filo de 1 px que despega la tarjeta del
+     * fondo, y una difusa muy tenue que le da profundidad. Una sola capa
+     * o se ve dura o se ve sucia.
+     */
+    --shadow-raised:
+        0 1px 1px oklch(0.24 0.047 249 / 0.04),
+        0 10px 30px oklch(0.24 0.047 249 / 0.06);
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    /*
+     * Ritmo vertical del sistema.
+     *
+     * El espaciado no está tokenizado todavía: son utilidades de Tailwind
+     * en el marcado. Esta tabla es la referencia de qué valor va dónde, y
+     * el registro de la densidad anterior por si alguna vez se ofrece
+     * alternar entre las dos.
+     *
+     *                        compacta (hasta b4cbdf9)   actual
+     *   página                p-4      16px             p-6      24px
+     *   entre bloques         gap-4    16px             gap-6    24px
+     *   tarjeta               p-4      16px             p-5      20px
+     *   cabecera de tarjeta   px-4 py-3                 px-5 py-4
+     *   fila de tabla         py-2      8px             py-3     12px
+     *   encabezado de tabla   py-2      8px             py-2.5   10px
+     *   grilla de campos      p-4 / gap-x-6 gap-y-4     p-5 / gap-x-8 gap-y-6
+     *   tablero: tarjetas     gap-3    12px             gap-4    16px
+     *   tablero: columnas     gap-4    16px             gap-6    24px
+     *   lista de haberes      px-4 py-3 / px-3 py-2.5   px-5 py-4 / px-4 py-3.5
+     *   accesos recientes     px-4 py-2.5               px-5 py-3.5
+     *
+     * Ojo si alguna vez se implementa la densidad compacta: el alto de la
+     * tabla de expedientes usa `calc(100svh-20rem)`, y ese 20rem está
+     * derivado del encabezado con el espaciado actual.
+     */
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    /*
+     * Acentos de marca (ver el bloque en `:root`). No son colores
+     * semánticos: no dicen "salió bien" ni "revisá esto", solo firman.
+     */
+    --color-brand-accent: var(--brand-accent);
+    --color-brand-maroon: var(--brand-maroon);
+
+    /*
+     * Colores semánticos que shadcn no trae.
+     *
+     * shadcn define únicamente `destructive`, y este sistema necesita
+     * distinguir "salió bien", "requiere tu acción" y "dato informativo".
+     * Cada uno tiene su variante `-soft`, que es la que usan los badges de
+     * estado: fondo tenue con el texto en el color pleno.
+     */
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-success-soft: var(--success-soft);
+    --color-success-strong: var(--success-strong);
+
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-warning-soft: var(--warning-soft);
+    --color-warning-strong: var(--warning-strong);
+
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-info-soft: var(--info-soft);
+    --color-info-strong: var(--info-strong);
+
+    --color-destructive-soft: var(--destructive-soft);
+    --color-destructive-strong: var(--destructive-strong);
+
+    /*
+     * El rotulo de un campo de formulario.
+     *
+     * Morado tirando a azul: pariente del azul institucional —34 grados de
+     * matiz lo separan— y con casi la misma luminosidad, asi que conviven
+     * sin que uno grite sobre el otro. Existe como token propio y no como
+     * una clase suelta porque toca todos los formularios del sistema.
+     */
+    --color-field-label: var(--field-label);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-brand: var(--sidebar-brand);
+}
+
+/*
+ * Identidad institucional — Secretaría de Trabajo, Ministerio de Gobierno
+ * y Justicia de Salta.
+ *
+ * Los valores vienen del design system del área. El hexadecimal original
+ * queda anotado al lado de cada uno porque es el que figura en el Figma y
+ * el que va a citar quien revise el diseño; en la hoja se usa OKLCH, que
+ * es lo que Tailwind 4 espera y lo que permite derivar variantes sin que
+ * el color se ensucie.
+ *
+ * Los neutros NO son grises puros: llevan un sesgo hacia el azul
+ * institucional (matiz 258). Un gris neutro al lado de este azul se ve
+ * sucio, y es exactamente lo que hacía que el tema de fábrica pareciera
+ * apagado.
+ */
+:root {
+    --background: oklch(0.975 0.005 258.3); /* #F5F7FA */
+    --foreground: oklch(0.245 0.028 258);
+    --card: oklch(1 0 0); /* #FFFFFF */
+    --card-foreground: oklch(0.245 0.028 258);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.245 0.028 258);
+
+    --primary: oklch(0.346 0.074 256); /* #1E3A5F */
+    --primary-foreground: oklch(0.985 0.003 258);
+
+    --secondary: oklch(0.955 0.008 258);
+    --secondary-foreground: oklch(0.346 0.074 256);
+    --muted: oklch(0.955 0.008 258);
+    --muted-foreground: oklch(0.53 0.024 258);
+    --accent: oklch(0.93 0.018 256);
+    --accent-foreground: oklch(0.346 0.074 256);
+
+    /*
+     * Acentos de marca, sacados del logo: la tonalidad 249.6 es la de la
+     * cara superior de la caja (#02477C) y la 8.2 es la de la moneda
+     * (#731C35). Lo que NO se puede hacer es usar esos dos colores tal
+     * cual sobre el panel de acceso: medidos contra su azul #1E3A5F dan
+     * 1.20:1 y 1.07:1, o sea que desaparecen. El logo está dibujado para
+     * fondo blanco.
+     *
+     * Así que se conserva la tonalidad y se sube la luminosidad. Cuánto,
+     * depende de para qué es cada uno, y los dos casos salieron distintos:
+     *
+     *   brand-accent  #81AFDF  5.00:1 contra el panel — pasa AA, es texto.
+     *
+     *   brand-maroon  #9A1743  1.18:1 contra la tarjeta del membrete.
+     *
+     * El bordo se queda deliberadamente abajo. Subirlo hasta separarse por
+     * luminosidad lo vuelve rosa —a 0.62 de luminosidad ya no se lee como
+     * el bordo del logo, se lee como frutilla— y el bordo es lo único rojo
+     * de la identidad: si deja de reconocerse, el acento no sirve. Se
+     * elige fidelidad y se compensa con grosor: el filete va a 3 px en vez
+     * de 2. Lo que lo hace visible es la distancia de tono contra el azul,
+     * no el brillo.
+     *
+     * Vale porque es un filete decorativo, sin información. **Para texto no
+     * sirve**: ahí hay que aclararlo primero y aceptar que se vuelva rosa.
+     *
+     * Hoy no lo usa nadie: el filete del membrete terminó en el acento
+     * azul. Queda definido porque es el único rojo de la identidad y esta
+     * nota es el registro de por qué no se puede aclarar; el día que haga
+     * falta un acento cálido, ya está resuelto.
+     */
+    --brand-accent: oklch(0.74 0.085 249.6); /* #81AFDF */
+    --brand-maroon: oklch(0.45 0.165 8.2); /* #9A1743 */
+
+    /*
+     * Cada color semántico tiene tres piezas:
+     *   base    → relleno pleno, con `-foreground` encima
+     *   -soft   → fondo tenue de los badges
+     *   -strong → el texto que va SOBRE ese fondo tenue
+     *
+     * `-strong` existe porque el color de marca no siempre contrasta
+     * contra su propio fondo tenue. El verde #16A34A sobre su `-soft` da
+     * 2.9:1, que es ilegible; el `-strong` está calculado para superar
+     * 4.5:1, el mínimo AA para texto normal.
+     */
+    --destructive: oklch(0.577 0.215 27.3); /* #DC2626 */
+    --destructive-foreground: oklch(0.985 0.003 258);
+    --destructive-soft: oklch(0.955 0.026 27.3);
+    --destructive-strong: oklch(0.53 0.17 27.3); /* 4.9:1 sobre -soft */
+
+    --success: oklch(0.627 0.17 149.2); /* #16A34A */
+    --success-foreground: oklch(0.99 0.003 149);
+    --success-soft: oklch(0.955 0.032 149.2);
+    --success-strong: oklch(0.5 0.14 149.2); /* 5.0:1 sobre -soft */
+
+    --warning: oklch(0.769 0.165 70.1); /* #F59E0B */
+    --warning-foreground: oklch(0.27 0.05 70);
+    --warning-soft: oklch(0.965 0.042 70.1);
+    --warning-strong: oklch(0.52 0.11 70.1); /* 4.9:1 sobre -soft */
+
+    --info: oklch(0.52 0.11 250);
+    --info-foreground: oklch(0.99 0.003 258);
+    --info-soft: oklch(0.955 0.026 250);
+    --info-strong: oklch(0.52 0.11 250); /* 4.5:1 sobre -soft */
+
+    /* #42396C — 10.3:1 sobre la tarjeta, 9.6:1 sobre el fondo. */
+    --field-label: oklch(0.38 0.085 290);
+
+    --border: oklch(0.905 0.01 258);
+    --input: oklch(0.905 0.01 258);
+    --ring: oklch(0.346 0.074 256);
+
+    /* Serie para gráficos, derivada del azul institucional. */
+    --chart-1: oklch(0.346 0.074 256);
+    --chart-2: oklch(0.48 0.09 235);
+    --chart-3: oklch(0.6 0.1 200);
+    --chart-4: oklch(0.627 0.17 149.2);
+    --chart-5: oklch(0.769 0.165 70.1);
+
+    --radius: 0.5rem;
+
+    /*
+     * La barra lateral es oscura sobre una aplicación clara: es la firma
+     * visual del diseño del área y lo que hace que la pantalla se lea de
+     * un vistazo como "sistema del Ministerio".
+     */
+    --sidebar: oklch(0.352 0.043 263); /* #2F3B52 */
+    --sidebar-foreground: oklch(0.93 0.012 258);
+    --sidebar-primary: oklch(0.985 0.003 258);
+    --sidebar-primary-foreground: oklch(0.346 0.074 256);
+    --sidebar-accent: oklch(0.42 0.045 263);
+    --sidebar-accent-foreground: oklch(0.99 0.003 258);
+    --sidebar-border: oklch(0.43 0.04 263);
+    --sidebar-ring: oklch(0.72 0.06 258);
+
+    /*
+     * El acento de marca en la barra. Es el mismo `--brand-accent` del
+     * membrete de la pantalla de acceso, y por el mismo motivo: las dos
+     * son superficies oscuras. Medido, da 4.89:1 contra el azul de la
+     * barra, así que sigue pasando AA para la bajada en versalitas.
+     */
+    --sidebar-brand: var(--brand-accent);
+}
+
+/*
+ * Tema oscuro — funcional, no prioritario.
+ *
+ * El diseño del área es claro y ese es el modo por defecto. Este bloque
+ * existe para que quien lo active no se encuentre con una pantalla rota,
+ * pero todavía no recibió una pasada de ajuste fino: los contrastes están
+ * verificados, la jerarquía visual no está pulida.
+ *
+ * Mantiene los mismos matices que el tema claro —azul 256/263, verde 149,
+ * ámbar 70— e invierte la luminosidad, de modo que la identidad se
+ * reconoce igual.
+ */
+.dark {
+    --background: oklch(0.19 0.022 258);
+    --foreground: oklch(0.93 0.008 258);
+    --card: oklch(0.235 0.024 258);
+    --card-foreground: oklch(0.93 0.008 258);
+    --popover: oklch(0.235 0.024 258);
+    --popover-foreground: oklch(0.93 0.008 258);
+
+    --primary: oklch(0.72 0.09 256);
+    --primary-foreground: oklch(0.19 0.022 258);
+
+    /*
+     * El azul se invierte: en oscuro el panel de acceso pasa a azul claro y
+     * la versión clara se le perdería encima (3.97:1 así, contra 1.3:1 si
+     * se heredara). El bordo casi no se mueve —ya era profundo— y sobre el
+     * panel claro rinde 4.64:1, que es más de lo que consigue en el tema
+     * por defecto. Queda prácticamente en el de la moneda del logo.
+     */
+    --brand-accent: oklch(0.42 0.105 249.6); /* #134F83 */
+    --brand-maroon: oklch(0.4 0.135 8.2); /* #7F1B39 */
+
+    --secondary: oklch(0.29 0.026 258);
+    --secondary-foreground: oklch(0.93 0.008 258);
+    --muted: oklch(0.29 0.026 258);
+    --muted-foreground: oklch(0.68 0.018 258);
+    --accent: oklch(0.33 0.032 258);
+    --accent-foreground: oklch(0.95 0.006 258);
+
+    /* En oscuro el texto de los badges va MÁS claro que el fondo tenue,
+       así que `-strong` sube de luminosidad en vez de bajar. */
+    --destructive: oklch(0.68 0.17 27.3);
+    --destructive-foreground: oklch(0.19 0.022 258);
+    --destructive-soft: oklch(0.3 0.06 27.3);
+    --destructive-strong: oklch(0.78 0.14 27.3);
+
+    --success: oklch(0.72 0.15 149.2);
+    --success-foreground: oklch(0.19 0.022 258);
+    --success-soft: oklch(0.29 0.05 149.2);
+    --success-strong: oklch(0.8 0.13 149.2);
+
+    --warning: oklch(0.8 0.14 70.1);
+    --warning-foreground: oklch(0.19 0.022 258);
+    --warning-soft: oklch(0.31 0.05 70.1);
+    --warning-strong: oklch(0.85 0.12 70.1);
+
+    --info: oklch(0.7 0.1 250);
+    --info-foreground: oklch(0.19 0.022 258);
+    --info-soft: oklch(0.29 0.045 250);
+    --info-strong: oklch(0.8 0.09 250);
+
+    /* En oscuro sube de luminosidad, como el resto de la paleta: 8.1:1. */
+    --field-label: oklch(0.75 0.08 292);
+
+    --border: oklch(0.32 0.028 258);
+    --input: oklch(0.32 0.028 258);
+    --ring: oklch(0.72 0.09 256);
+
+    --chart-1: oklch(0.72 0.09 256);
+    --chart-2: oklch(0.68 0.1 235);
+    --chart-3: oklch(0.7 0.1 200);
+    --chart-4: oklch(0.72 0.15 149.2);
+    --chart-5: oklch(0.8 0.14 70.1);
+
+    --sidebar: oklch(0.235 0.03 263);
+    --sidebar-foreground: oklch(0.9 0.01 258);
+    --sidebar-primary: oklch(0.72 0.09 256);
+    --sidebar-primary-foreground: oklch(0.19 0.022 258);
+    --sidebar-accent: oklch(0.31 0.034 263);
+    --sidebar-accent-foreground: oklch(0.96 0.005 258);
+    --sidebar-border: oklch(0.33 0.03 263);
+    --sidebar-ring: oklch(0.6 0.06 258);
+
+    /*
+     * Acá NO se hereda `--brand-accent`: en tema oscuro ese token se
+     * oscurece porque el panel de acceso se invierte a azul claro, pero la
+     * barra lateral sigue siendo oscura en los dos temas. Heredarlo dejaría
+     * la bajada en 1.4:1 contra la barra. Se repite el valor claro, que acá
+     * da 7.26:1.
+     *
+     * Es el mismo motivo por el que la barra tiene toda su paleta aparte:
+     * es una superficie oscura dentro de una aplicación clara.
+     */
+    --sidebar-brand: oklch(0.74 0.085 249.6); /* #81AFDF */
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+/*
+ * Halo del logo sobre fondo oscuro (ver AppLogoMark / AppLogoIcon con `halo`).
+ *
+ * Reemplaza a la placa clara: el logo está dibujado para fondo claro y sus
+ * azules oscuros se confunden con el azul del panel y con el de la barra
+ * lateral, así que necesita algo que lo despegue. Tres sombras apiladas y no
+ * una: la más cerrada hace de contorno, las otras dos son el resplandor. Una
+ * sola sombra ancha se ve sucia; una sola angosta, dura.
+ *
+ * `drop-shadow` sigue el alfa real del dibujo —silueta, moneda y huecos
+ * incluidos—, cosa que un `box-shadow` no puede hacer.
+ *
+ * Los radios van en variables porque `drop-shadow` mide en píxeles de
+ * pantalla, no en unidades del dibujo: el mismo halo que envuelve al logo de
+ * 176 px es una niebla alrededor del isotipo de 32 px. `.sac-halo-chico` los
+ * baja a escala del isotipo de la barra lateral.
+ */
+.sac-halo {
+    --sac-halo-borde: 1px;
+    --sac-halo-cerca: 7px;
+    --sac-halo-lejos: 24px;
+
+    filter: drop-shadow(0 0 var(--sac-halo-borde) rgba(255, 255, 255, 0.9))
+        drop-shadow(0 0 var(--sac-halo-cerca) rgba(255, 255, 255, 0.4))
+        drop-shadow(0 0 var(--sac-halo-lejos) rgba(255, 255, 255, 0.2));
+}
+
+/*
+ * A 32 px el contorno es casi todo el efecto: se cierra y se sube su opacidad,
+ * y el resplandor queda apenas como separación del fondo.
+ */
+.sac-halo-chico {
+    --sac-halo-borde: 0.5px;
+    --sac-halo-cerca: 2px;
+    --sac-halo-lejos: 5px;
+}
+
+/*
+ * Animación de entrada del logo (ver AppLogoMark).
+ *
+ * Se escriben los renglones del comprobante, crecen las barras y cae la
+ * moneda: el mismo recorrido que hace el dinero en el sistema. Solo corre
+ * si el sistema operativo no pidió menos movimiento; en ese caso el logo
+ * aparece quieto y completo, no degradado.
+ *
+ * `backwards` es lo que evita el parpadeo: sin él, las piezas con retardo
+ * se ven un instante en su posición final antes de arrancar.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    [data-sac-animado] .sac-renglon,
+    [data-sac-animado] .sac-barra,
+    [data-sac-animado] .sac-moneda {
+        /* Cada pieza se escala respecto de su propio dibujo, no del lienzo. */
+        transform-box: fill-box;
+        animation-fill-mode: backwards;
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    [data-sac-animado] .sac-renglon {
+        transform-origin: left center;
+        animation-name: sac-escribir;
+        animation-duration: 420ms;
+    }
+
+    [data-sac-animado] .sac-renglon:nth-of-type(1) {
+        animation-delay: 260ms;
+    }
+    [data-sac-animado] .sac-renglon:nth-of-type(2) {
+        animation-delay: 340ms;
+    }
+    [data-sac-animado] .sac-renglon:nth-of-type(3) {
+        animation-delay: 420ms;
+    }
+
+    [data-sac-animado] .sac-barra {
+        transform-origin: bottom;
+        animation-name: sac-crecer;
+        animation-duration: 560ms;
+    }
+
+    [data-sac-animado] .sac-barra:nth-of-type(1) {
+        animation-delay: 540ms;
+    }
+    [data-sac-animado] .sac-barra:nth-of-type(2) {
+        animation-delay: 640ms;
+    }
+    [data-sac-animado] .sac-barra:nth-of-type(3) {
+        animation-delay: 740ms;
+    }
+
+    [data-sac-animado] .sac-moneda {
+        transform-origin: center;
+        /* La moneda es lo último que entra y desacelera sin rebote. */
+        animation: sac-moneda 620ms cubic-bezier(0.16, 1, 0.3, 1) 860ms
+            backwards;
+    }
+}
+
+@keyframes sac-escribir {
+    from {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+}
+
+@keyframes sac-crecer {
+    from {
+        opacity: 0;
+        transform: scaleY(0);
+    }
+}
+
+@keyframes sac-moneda {
+    from {
+        opacity: 0;
+        transform: scale(0.35);
+    }
+}
+
+/*
+ * Entrada escalonada de bloques (pantalla de acceso). El retardo se pasa
+ * por `--sac-retardo` desde el componente, así el orden de aparición se
+ * lee ahí y no acá.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    .sac-entra {
+        animation: sac-entra 700ms cubic-bezier(0.22, 1, 0.36, 1)
+            var(--sac-retardo, 0ms) backwards;
+    }
+}
+
+@keyframes sac-entra {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+
+/*
+ * Confirmaciones globales: flotan sobre la interfaz y no cambian el alto de
+ * la página. Sonner resuelve apilado, pausa al pasar el mouse y gesto de
+ * descarte; acá se alinea su acabado con las superficies del sistema.
+ */
+[data-sonner-toaster] [data-sonner-toast].sac-toast {
+    /* Sonner inyecta su CSS al montar; estos tres valores son del sistema. */
+    padding: 14px 48px 14px 16px !important;
+    border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-raised) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast].sac-toast[data-type='success'],
+[data-sonner-toaster] [data-sonner-toast].sac-toast[data-type='info'],
+[data-sonner-toaster] [data-sonner-toast].sac-toast[data-type='warning'],
+[data-sonner-toaster] [data-sonner-toast].sac-toast[data-type='error'] {
+    border-color: color-mix(in oklch, currentColor 30%, transparent) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast].sac-toast [data-icon] {
+    margin-inline: 0 4px !important;
+}
+
+[data-sonner-toaster]
+    [data-sonner-toast].sac-toast
+    [data-close-button].sac-toast-cerrar {
+    top: 8px !important;
+    right: 8px !important;
+    left: auto !important;
+    width: 32px !important;
+    height: 32px !important;
+    transform: none !important;
+    color: currentColor !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    opacity: 0.7;
+    transition:
+        opacity 160ms cubic-bezier(0.25, 1, 0.5, 1),
+        background-color 160ms cubic-bezier(0.25, 1, 0.5, 1),
+        border-color 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+[data-sonner-toaster]
+    [data-sonner-toast].sac-toast
+    [data-close-button].sac-toast-cerrar:hover {
+    color: currentColor !important;
+    background: color-mix(in oklch, currentColor 10%, transparent) !important;
+    border-color: color-mix(in oklch, currentColor 15%, transparent) !important;
+    opacity: 1;
+}
+
+[data-sonner-toaster]
+    [data-sonner-toast].sac-toast
+    [data-close-button].sac-toast-cerrar:focus-visible {
+    opacity: 1;
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+    box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    [data-sonner-toaster] [data-sonner-toast].sac-toast {
+        transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+        transition-duration: 240ms;
+    }
+}
+
+@media (pointer: coarse) {
+    [data-sonner-toaster] [data-sonner-toast].sac-toast {
+        padding-right: 56px !important;
+    }
+
+    [data-sonner-toaster]
+        [data-sonner-toast].sac-toast
+        [data-close-button].sac-toast-cerrar {
+        top: 2px !important;
+        right: 2px !important;
+        width: 44px !important;
+        height: 44px !important;
+    }
+}

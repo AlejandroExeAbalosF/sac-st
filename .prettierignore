@@ -1,0 +1,6 @@
+resources/js/components/ui/*
+resources/views/mail/*
+
+# Lo regenera `composer types:ts` en cada corrida: no es codigo que se
+# edite, y exigirle formato convierte una regeneracion en un fallo de CI.
+resources/js/types/typescript-transformer-manifest.json

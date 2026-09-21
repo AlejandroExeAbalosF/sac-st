@@ -1,0 +1,41 @@
+/.phpunit.cache
+/bootstrap/ssr
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+
+# Pruebas de impresión: los PDF que se generan para mirarlos y descartarlos.
+/output
+
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+/vendor
+/.claude
+.claude
+
+# Material de diseño y prototipos: viven en ../Prototipos, fuera de la
+# aplicación. Se ignoran acá por si alguna herramienta los vuelve a
+# escribir en la raíz del proyecto.
+/.impeccable.md
+/prototypes
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
