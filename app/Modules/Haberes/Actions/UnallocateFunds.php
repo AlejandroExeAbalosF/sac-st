@@ -18,6 +18,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -130,7 +131,7 @@ final class UnallocateFunds
                         ->from($receipt->depositor_id)
                         ->onCashBox($receipt->cash_box_id),
                 ],
-                date: now(),
+                date: BusinessDate::today(),
                 cashBoxId: $receipt->cash_box_id,
                 description: $notes,
                 actorId: $actorId,

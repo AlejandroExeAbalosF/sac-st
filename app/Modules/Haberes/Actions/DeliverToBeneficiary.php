@@ -19,6 +19,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -87,7 +88,7 @@ final class DeliverToBeneficiary
         /** @var DisbursementMethod $metodo */
         $metodo = $estado->method;
         $importe = $estado->amount;
-        $fecha = $paymentDate ?? now();
+        $fecha = $paymentDate ?? BusinessDate::today();
         $caja = $this->cajaDeLaCuota->for($installment);
 
         return DB::transaction(function () use (

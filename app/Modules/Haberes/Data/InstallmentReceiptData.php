@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Data;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -64,7 +65,7 @@ final class InstallmentReceiptData extends Data
             issueMode: $receipt->issue_mode,
             issuedByName: $receipt->issuedBy?->name,
             voidReason: $receipt->void_reason,
-            voidedAt: $receipt->voided_at?->format('Y-m-d'),
+            voidedAt: $receipt->voided_at === null ? null : BusinessDate::fromInstant($receipt->voided_at)->toDateString(),
             voidedByName: $receipt->voidedBy?->name,
         );
     }

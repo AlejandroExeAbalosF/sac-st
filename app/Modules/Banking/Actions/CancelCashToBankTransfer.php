@@ -11,6 +11,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -82,7 +83,7 @@ final class CancelCashToBankTransfer
                         ->onBankAccount($bloqueado->bank_account_id)
                         ->onCashBox($bloqueado->cash_box_id),
                 ],
-                date: now(),
+                date: BusinessDate::today(),
                 cashBoxId: $bloqueado->cash_box_id,
                 description: $reason,
                 actorId: $actorId,

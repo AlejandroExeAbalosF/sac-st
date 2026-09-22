@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Data;
 
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -64,8 +65,8 @@ final class UnconfirmedTransferRowData extends Data
             installmentLabel: sprintf('Haber %d · Cuota %d', $haber->haber_number, $cuota->installment_number),
             amount: $egreso->amount,
             paymentOrderNumber: $orden?->formatted_number,
-            reportedAt: $egreso->report_received_at?->format('Y-m-d'),
-            debitObservedAt: $egreso->bank_debit_observed_at?->format('Y-m-d'),
+            reportedAt: $egreso->report_received_at === null ? null : BusinessDate::fromInstant($egreso->report_received_at)->toDateString(),
+            debitObservedAt: $egreso->bank_debit_observed_at === null ? null : BusinessDate::fromInstant($egreso->bank_debit_observed_at)->toDateString(),
             status: $egreso->status,
             missingStep: $missingStep,
             waitingDays: $waitingDays,

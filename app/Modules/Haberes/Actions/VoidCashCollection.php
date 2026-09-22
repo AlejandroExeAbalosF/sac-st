@@ -18,6 +18,7 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -252,7 +253,7 @@ final class VoidCashCollection
                 EntryLine::credit($origen, $importe)
                     ->onCashBox($recepcion->cash_box_id),
             ],
-            date: now(),
+            date: BusinessDate::today(),
             cashBoxId: $recepcion->cash_box_id,
             description: $reason,
             actorId: $actorId,

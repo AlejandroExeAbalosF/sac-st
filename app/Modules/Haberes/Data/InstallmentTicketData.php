@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Data;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -98,7 +99,7 @@ final class InstallmentTicketData extends Data
             bankTransactionId: $ticket->bank_transaction_id,
             fundReceiptId: $fundReceipts[$ticket->id] ?? null,
             editable: $ticket->status === DepositTicketStatus::Waiting,
-            waitingDays: (int) $ticket->deposited_at->diffInDays(now(), false),
+            waitingDays: (int) $ticket->deposited_at->diffInDays(BusinessDate::today(), false),
         );
     }
 

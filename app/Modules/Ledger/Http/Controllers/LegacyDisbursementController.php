@@ -16,6 +16,7 @@ use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -82,7 +83,7 @@ final class LegacyDisbursementController extends Controller
             'personId' => ['required', 'integer', Rule::exists('people', 'id')->where('is_active', true)],
             'amount' => ['required', 'numeric', 'gt:0'],
             'legacyReference' => ['required', 'string', 'max:60'],
-            'paymentDate' => ['required', 'date', 'before_or_equal:today'],
+            'paymentDate' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'medium' => ['required', Rule::enum(PaymentMedium::class)],
             /*
              * Obligatoria solo cuando el dinero sale del banco. El Action

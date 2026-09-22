@@ -37,7 +37,7 @@ final class FundingAllocationListItemData extends Data
             id: $allocation->id,
             amount: $allocation->amount,
             kind: $allocation->allocation_kind,
-            allocatedAt: $allocation->allocated_at->format('Y-m-d H:i'),
+            allocatedAt: $allocation->allocated_at->toISOString(),
             allocatedByName: $allocation->allocatedBy?->name,
             installmentId: $cuota->id,
             installmentNumber: $cuota->installment_number,

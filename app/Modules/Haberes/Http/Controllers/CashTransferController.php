@@ -18,6 +18,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -103,7 +104,7 @@ final class CashTransferController extends Controller
     ): RedirectResponse {
         $validado = $request->validate([
             'bankAccountId' => ['required', 'integer', 'exists:bank_accounts,id'],
-            'depositDate' => ['required', 'date', 'before_or_equal:today'],
+            'depositDate' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'depositTime' => ['nullable', 'date_format:H:i'],
             'operationNumber' => ['nullable', 'string', 'max:40'],
             'terminal' => ['nullable', 'string', 'max:40'],

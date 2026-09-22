@@ -14,6 +14,7 @@ use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RecordCashCountRequest;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -78,7 +79,7 @@ final class CashCountController extends Controller
     /** La fecha desde la que se llegó, limitada a la jornada actual. */
     private function selectedDate(Request $request): CarbonImmutable
     {
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = BusinessDate::today();
         $pedida = $request->query('fecha');
 
         if (! is_string($pedida) || $pedida === '') {

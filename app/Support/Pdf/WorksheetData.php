@@ -52,6 +52,6 @@ final class WorksheetData
 
     public function filename(): string
     {
-        return sprintf('%s-%s.pdf', $this->slug, $this->generatedAt->format('Y-m-d'));
+        return sprintf('%s-%s.pdf', $this->slug, $this->generatedAt->copy()->timezone((string) config('app.display_timezone'))->format('Y-m-d'));
     }
 }

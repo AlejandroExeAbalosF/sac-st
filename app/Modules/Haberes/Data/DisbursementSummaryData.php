@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Data;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -76,7 +77,7 @@ final class DisbursementSummaryData extends Data
             paymentDate: $disbursement->payment_date?->format('Y-m-d'),
             deliveredByName: $disbursement->cashDeliveredBy?->name,
             notes: $disbursement->notes,
-            reportedAt: $disbursement->report_received_at?->format('Y-m-d'),
+            reportedAt: $disbursement->report_received_at === null ? null : BusinessDate::fromInstant($disbursement->report_received_at)->toDateString(),
             transferReference: $disbursement->transfer_reference,
             beneficiaryCbu: $disbursement->beneficiary_cbu_snapshot,
             debitTransactionId: $debito?->id,
@@ -84,7 +85,7 @@ final class DisbursementSummaryData extends Data
             debitOperationId: $debito?->operation_id,
             debitDescription: $debito->description ?? $debito?->counterparty_name,
             validatedByName: $disbursement->validatedBy?->name,
-            validatedAt: $disbursement->validated_at?->format('Y-m-d'),
+            validatedAt: $disbursement->validated_at === null ? null : BusinessDate::fromInstant($disbursement->validated_at)->toDateString(),
         );
     }
 }

@@ -31,6 +31,7 @@ use App\Modules\Shared\Data\RecentAccessData;
 use App\Modules\Shared\Data\WorkQueueData;
 use App\Modules\Shared\Enums\QueueTone;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -81,9 +82,7 @@ final class InicioController extends Controller
 
         abort_unless($user instanceof User, 401);
 
-        $fecha = CarbonImmutable::now()
-            ->timezone((string) config('app.display_timezone'))
-            ->startOfDay();
+        $fecha = BusinessDate::today();
 
         $verCaja = $user->can('caja.ver');
         $verExpedientes = $user->can('expedientes.ver');

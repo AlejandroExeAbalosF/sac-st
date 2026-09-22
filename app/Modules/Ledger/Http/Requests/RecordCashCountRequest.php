@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Http\Requests;
 
 use App\Modules\Ledger\Enums\Currency;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,7 +28,7 @@ final class RecordCashCountRequest extends FormRequest
     {
         return [
             'cashBoxId' => ['required', 'integer', Rule::exists('cash_boxes', 'id')->where('is_active', true)],
-            'countedOn' => ['required', 'date', 'before_or_equal:today'],
+            'countedOn' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'currency' => ['required', Rule::enum(Currency::class)],
 
             /*

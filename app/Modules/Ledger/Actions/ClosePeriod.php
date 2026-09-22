@@ -17,6 +17,7 @@ use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -350,7 +351,7 @@ final class ClosePeriod
          * que faltan**. Es la diferencia entre un cierre equivocado —que
          * se reabre— y una caja que no admite trabajar.
          */
-        if ($to->greaterThan(CarbonImmutable::now()->startOfDay())) {
+        if ($to->greaterThan(BusinessDate::today())) {
             throw ValidationException::withMessages([
                 'period' => sprintf(
                     'El cierre %s va hasta el %s, y esa fecha todavía no llegó. Un período se cierra cuando termina.',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
+use App\Support\BusinessDate;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -41,7 +42,7 @@ final class CompletePaymentOrderDataRequest extends FormRequest
              * cuándo entró el expediente, y un expediente que todavía no
              * llegó no tiene fondos en custodia.
              */
-            'custodyStartDate' => ['nullable', 'date', 'before_or_equal:today'],
+            'custodyStartDate' => ['nullable', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
         ];
     }
 

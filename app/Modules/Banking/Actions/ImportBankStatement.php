@@ -143,7 +143,7 @@ final class ImportBankStatement
 
         throw new RuntimeException(sprintf(
             'Este archivo ya se importó el %s como «%s».',
-            $previous->created_at?->format('d/m/Y H:i') ?? 'antes',
+            $previous->created_at?->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y H:i') ?? 'antes',
             $previous->original_filename,
         ));
     }

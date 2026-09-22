@@ -18,6 +18,7 @@ use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\ReceiptFormData;
 use App\Modules\Haberes\Support\TransferDebitCandidate;
 use App\Modules\Shared\Pdf\ExpenseReceiptPdf;
+use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -76,21 +77,21 @@ final class DisbursementController extends Controller
             'paymentDate' => [
                 'nullable',
                 'date',
-                'before_or_equal:today',
+                'before_or_equal:'.BusinessDate::today()->toDateString(),
                 /*
                  * Y no antes del alta de la cuota. El sistema no sabe nada
                  * de ese dinero antes de que el expediente llegara: una
                  * fecha anterior sería afirmar un pago que el expediente
                  * no respalda, y quedaría asentada en el libro.
                  */
-                'after_or_equal:'.$installment->created_at->toDateString(),
+                'after_or_equal:'.BusinessDate::fromInstant($installment->created_at)->toDateString(),
             ],
             'notes' => ['nullable', 'string', 'max:500'],
             'idempotencyKey' => ['required', 'string', 'max:120'],
         ], [
             'paymentDate.before_or_equal' => 'La fecha de la entrega no puede ser futura.',
             'paymentDate.after_or_equal' => 'La fecha de la entrega no puede ser anterior al alta de la cuota ('
-                .$installment->created_at->format('d/m/Y').'), que es cuando llegó el expediente.',
+                .$installment->created_at->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y').'), que es cuando llegó el expediente.',
         ]);
 
         $recibo = $pagarYEmitir->handle(
@@ -125,7 +126,7 @@ final class DisbursementController extends Controller
         RegisterTransferReport $informar,
     ): RedirectResponse {
         $validado = $request->validate([
-            'reportedAt' => ['nullable', 'date', 'before_or_equal:today'],
+            'reportedAt' => ['nullable', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'reference' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:500'],
         ], [
@@ -135,7 +136,7 @@ final class DisbursementController extends Controller
         $informar->handle(
             installment: $installment,
             reportedAt: isset($validado['reportedAt'])
-                ? CarbonImmutable::parse((string) $validado['reportedAt'])
+                ? BusinessDate::startOfDay((string) $validado['reportedAt'])
                 : null,
             reference: $validado['reference'] ?? null,
             actorId: $request->user()?->id,

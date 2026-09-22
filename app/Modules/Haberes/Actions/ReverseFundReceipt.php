@@ -16,6 +16,7 @@ use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -88,7 +89,7 @@ final class ReverseFundReceipt
                 type: FinancialEventType::Reversal,
                 idempotencyKey: $idempotencyKey,
                 lines: $this->inversoDe($bloqueada),
-                date: now(),
+                date: BusinessDate::today(),
                 cashBoxId: $bloqueada->cash_box_id,
                 description: $reason,
                 actorId: $actorId,

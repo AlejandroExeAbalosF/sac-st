@@ -49,6 +49,7 @@ use App\Modules\Shared\Pdf\IncomeReceiptPdf;
 use App\Modules\Shared\Pdf\ReceiptPdfFactory;
 use App\Modules\Shared\Support\LastChanges;
 use App\Modules\Shared\Support\TalonarioSequence;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -219,14 +220,14 @@ final class HaberController extends Controller
             'receivedDate' => [
                 'nullable',
                 'date',
-                'before_or_equal:today',
+                'before_or_equal:'.BusinessDate::today()->toDateString(),
                 /*
                  * Y no antes del alta de la cuota. El sistema no sabe nada
                  * de ese dinero antes de que el expediente llegara: una
                  * fecha anterior seria afirmar un cobro que el expediente
                  * no respalda, y quedaria asentada en el libro.
                  */
-                'after_or_equal:'.$installment->created_at->toDateString(),
+                'after_or_equal:'.BusinessDate::fromInstant($installment->created_at)->toDateString(),
             ],
             'notes' => ['nullable', 'string', 'max:500'],
             'chequeNumber' => ['nullable', 'string', 'max:50'],
@@ -236,7 +237,7 @@ final class HaberController extends Controller
         ], [
             'receivedDate.before_or_equal' => 'La fecha del pago no puede ser futura.',
             'receivedDate.after_or_equal' => 'La fecha del pago no puede ser anterior al alta de la cuota ('
-                .$installment->created_at->format('d/m/Y').'), que es cuando llego el expediente.',
+                .$installment->created_at->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y').'), que es cuando llego el expediente.',
         ]);
 
         $cobra = $cobrarYEmitir->cobraAlEmitir($installment);

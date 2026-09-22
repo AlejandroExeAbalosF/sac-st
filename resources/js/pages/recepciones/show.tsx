@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { date, money } from '@/lib/format';
+import { date, dateTime, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { allocate, reverse, show } from '@/routes/recepciones';
 
@@ -247,7 +247,7 @@ export default function RecepcionShow({
                                                 {money(a.amount)}
                                             </td>
                                             <td className="p-3 text-xs text-muted-foreground">
-                                                {a.allocatedAt}
+                                                {dateTime(a.allocatedAt)}
                                                 {a.allocatedByName
                                                     ? ` · ${a.allocatedByName}`
                                                     : ''}

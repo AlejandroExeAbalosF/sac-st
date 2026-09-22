@@ -20,6 +20,7 @@ use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -90,8 +91,8 @@ final class PeriodClosingController extends Controller
              */
             'pendingDaysByMonth' => $this->calendario->pendingDaysByMonth(
                 (int) $caja->id,
-                CarbonImmutable::now()->subMonths(13)->startOfMonth(),
-                CarbonImmutable::now()->endOfMonth(),
+                BusinessDate::today()->subMonths(13)->startOfMonth(),
+                BusinessDate::today()->endOfMonth(),
                 $moneda,
             ),
             'closings' => $cierres
@@ -133,7 +134,7 @@ final class PeriodClosingController extends Controller
     /** La fecha desde la que se llegó, limitada a la jornada actual. */
     private function selectedDate(Request $request): CarbonImmutable
     {
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = BusinessDate::today();
         $pedida = $request->query('fecha');
 
         if (! is_string($pedida) || $pedida === '') {
@@ -153,7 +154,7 @@ final class PeriodClosingController extends Controller
     {
         $datos = $request->validate([
             'cashBoxId' => ['required', 'integer', Rule::exists('cash_boxes', 'id')->where('is_active', true)],
-            'date' => ['required', 'date', 'before_or_equal:today'],
+            'date' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'periodType' => ['required', Rule::enum(PeriodType::class)],
             'currency' => ['required', Rule::enum(Currency::class)],
             'notes' => ['nullable', 'string', 'max:1000'],

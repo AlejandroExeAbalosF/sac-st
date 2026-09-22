@@ -20,6 +20,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -89,7 +90,9 @@ final class ValidateTransferDisbursement
              * libro tiene que decir es cuándo salió el dinero, y eso lo
              * fija el banco.
              */
-            $fecha = $movimiento->transaction_date ?? $egreso->report_received_at ?? now();
+            $fecha = $movimiento->transaction_date
+                ?? ($egreso->report_received_at === null ? null : BusinessDate::fromInstant($egreso->report_received_at))
+                ?? BusinessDate::today();
 
             /*
              * La caja, aunque el dinero no pase por el cajón.

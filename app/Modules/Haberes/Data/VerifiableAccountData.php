@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Data;
 
 use App\Modules\Shared\Models\PersonBankAccount;
 use App\Modules\Shared\Support\Cbu;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -79,7 +80,7 @@ final class VerifiableAccountData extends Data
             checksumValid: Cbu::isValid($account->cbu),
             isVirtualWallet: Cbu::isVirtualWallet($account->cbu),
             entityCode: Cbu::entityCode($account->cbu),
-            verifiedAt: $account->verified_at?->format('Y-m-d'),
+            verifiedAt: $account->verified_at === null ? null : BusinessDate::fromInstant($account->verified_at)->toDateString(),
             forcedReason: $account->forced_verification_reason,
             forcedBypass: $account->forced_verification_bypass,
         );

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import AppLogoMark from '@/components/app-logo-mark';
 import SaltaLogo from '@/components/salta-logo';
+import { businessToday } from '@/lib/format';
 import type { AuthLayoutProps } from '@/types';
 
 /**
@@ -32,7 +33,7 @@ export default function AuthSplitLayout({
     title,
     description,
 }: AuthLayoutProps) {
-    const anio = new Date().getFullYear();
+    const anio = businessToday().slice(0, 4);
     const pie = `Ministerio de Gobierno y Justicia · Secretaría de Trabajo`;
 
     return (

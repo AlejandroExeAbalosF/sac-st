@@ -1,3 +1,5 @@
+import { businessToday } from '@/lib/format';
+
 export type DestinoDeCalendario = { anio: number; mes?: number };
 
 /**
@@ -42,9 +44,13 @@ export function pasoDeCalendario(
  * Un destino sin mes es un año entero, y alcanza con que haya empezado.
  */
 export function yaEmpezo(destino: DestinoDeCalendario, hoy: Date): boolean {
-    if (destino.anio !== hoy.getFullYear()) {
-        return destino.anio < hoy.getFullYear();
+    const fechaLocal = businessToday(hoy);
+    const anioLocal = Number(fechaLocal.slice(0, 4));
+    const mesLocal = Number(fechaLocal.slice(5, 7));
+
+    if (destino.anio !== anioLocal) {
+        return destino.anio < anioLocal;
     }
 
-    return (destino.mes ?? 1) <= hoy.getMonth() + 1;
+    return (destino.mes ?? 1) <= mesLocal;
 }

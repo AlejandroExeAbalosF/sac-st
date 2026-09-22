@@ -22,6 +22,7 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -223,7 +224,7 @@ final class CashController extends Controller
      */
     private function selectedDate(Request $request): CarbonImmutable
     {
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = BusinessDate::today();
         $pedida = $request->query('fecha');
 
         if (! is_string($pedida) || $pedida === '') {

@@ -67,23 +67,17 @@ return [
     |
     */
 
-    /*
-     * La fecha operativa de Caja, Haberes y los comprobantes es la de la
-     * Secretaría, no la del servidor. UTC sigue siendo válido para integrar
-     * instantes con otros sistemas, pero no para decidir qué día se puede
-     * cerrar o registrar.
-     */
-    'timezone' => env('APP_TIMEZONE', 'America/Argentina/Salta'),
+    /* Los instantes se generan y procesan en UTC. Las fechas operativas
+     * siguen el calendario de Salta mediante BusinessDate. */
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
     |--------------------------------------------------------------------------
     | Zona horaria de presentación
     |--------------------------------------------------------------------------
     |
-    | Todo se almacena en UTC (`timestamptz`) y se muestra en la hora de
-    | Salta. Separar ambas cosas es lo que permite que la fecha operativa
-    | de un cierre de caja sea la que vivió el operador y no la del
-    | servidor.
+    | Los instantes se almacenan en UTC (`timestamptz`) y se presentan en
+    | la hora de Salta. Las fechas operativas son días de calendario.
     |
     */
 

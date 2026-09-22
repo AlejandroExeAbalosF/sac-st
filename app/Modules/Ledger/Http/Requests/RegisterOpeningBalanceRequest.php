@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Http\Requests;
 
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -98,7 +99,7 @@ final class RegisterOpeningBalanceRequest extends FormRequest
              * puede ser futura, y tampoco tiene por qué ser hoy — la carga
              * suele hacerse unos días después de la fecha que declara.
              */
-            'date' => ['required', 'date', 'before_or_equal:today'],
+            'date' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'balances' => ['present', 'array'],
             'balances.*' => ['nullable', 'numeric', 'min:0'],
             /*
@@ -123,7 +124,7 @@ final class RegisterOpeningBalanceRequest extends FormRequest
             'cheques' => ['sometimes', 'array'],
             'cheques.*.number' => ['required', 'string', 'max:40'],
             'cheques.*.bank' => ['required', 'string', 'max:80'],
-            'cheques.*.issueDate' => ['required', 'date', 'before_or_equal:today'],
+            'cheques.*.issueDate' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'cheques.*.amount' => ['required', 'numeric', 'gt:0'],
             'cheques.*.expediente' => ['nullable', 'string', 'max:40'],
             'cheques.*.company' => ['nullable', 'string', 'max:160'],

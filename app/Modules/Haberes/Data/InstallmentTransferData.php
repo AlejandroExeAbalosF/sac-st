@@ -8,6 +8,7 @@ use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Shared\Models\AuditEvent;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -55,7 +56,7 @@ final class InstallmentTransferData extends Data
             status: $transfer->status,
             operationNumber: $transfer->deposit_operation_number,
             bankTransactionId: $imputacion?->bank_transaction_id,
-            creditedDate: $imputacion?->allocated_at?->format('Y-m-d'),
+            creditedDate: $imputacion?->allocated_at === null ? null : BusinessDate::fromInstant($imputacion->allocated_at)->toDateString(),
             cancelledAt: $baja?->occurred_at->toIso8601String(),
             cancelledByName: $baja?->user?->name,
             cancelReason: $transfer->notes,

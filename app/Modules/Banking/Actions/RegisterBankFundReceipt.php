@@ -17,6 +17,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -123,7 +124,7 @@ final class RegisterBankFundReceipt
                         ->from($depositorId)
                         ->onCashBox($cashBoxId),
                 ],
-                date: $transaction->transaction_date ?? now(),
+                date: $transaction->transaction_date ?? BusinessDate::today(),
                 cashBoxId: $cashBoxId,
                 description: $notes,
                 actorId: $actorId,
@@ -135,7 +136,7 @@ final class RegisterBankFundReceipt
                 'depositor_id' => $depositorId,
                 'medium' => PaymentMedium::Bank,
                 'amount' => $importe,
-                'received_date' => $transaction->transaction_date ?? now(),
+                'received_date' => $transaction->transaction_date ?? BusinessDate::today(),
                 'received_by' => $actorId,
                 'notes' => $notes,
             ]);

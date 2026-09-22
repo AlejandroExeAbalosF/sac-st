@@ -166,8 +166,8 @@
             Secretaría de Trabajo
         </td>
         <td class="generacion">
-            Generada el {{ $planilla->generatedAt->format('d/m/Y') }}
-            a las {{ $planilla->generatedAt->format('H:i') }}
+            Generada el {{ $planilla->generatedAt->copy()->timezone(config('app.display_timezone'))->format('d/m/Y') }}
+            a las {{ $planilla->generatedAt->copy()->timezone(config('app.display_timezone'))->format('H:i') }}
             @if ($planilla->generatedBy)
                 <br>por {{ $planilla->generatedBy }}
             @endif

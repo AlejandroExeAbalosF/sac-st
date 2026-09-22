@@ -17,6 +17,7 @@ use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -295,7 +296,7 @@ final class IssueIncomeReceipt
             'expediente_number_snapshot' => $expediente->display_number,
             'installment_label_snapshot' => 'Cuota '.$installment->installment_number,
             'amount' => $this->financiacion->allocated($installment),
-            'issue_date' => $issueDate ?? now(),
+            'issue_date' => $issueDate ?? BusinessDate::today(),
             'status' => ReceiptStatus::Issued,
             /*
              * Si trae número de talonario, el papel se escribió a mano y

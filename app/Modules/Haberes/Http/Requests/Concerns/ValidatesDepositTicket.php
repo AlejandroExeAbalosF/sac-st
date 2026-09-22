@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests\Concerns;
 
+use App\Support\BusinessDate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -38,7 +39,7 @@ trait ValidatesDepositTicket
              * un rango razonable sin impedir la migración de un expediente
              * de hace años.
              */
-            'depositedAt' => ['required', 'date', 'before_or_equal:today', 'after:2015-01-01'],
+            'depositedAt' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString(), 'after:2015-01-01'],
             'depositedTime' => ['nullable', 'date_format:H:i'],
             'operationNumber' => ['nullable', 'string', 'max:40'],
             'terminal' => ['nullable', 'string', 'max:40'],

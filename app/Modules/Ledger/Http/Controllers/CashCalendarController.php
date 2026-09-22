@@ -21,6 +21,7 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -51,7 +52,7 @@ final class CashCalendarController extends Controller
         $caja = $this->cashBox();
         $moneda = $this->selectedCurrency($request);
 
-        $hoy = CarbonImmutable::now();
+        $hoy = BusinessDate::today();
 
         /*
          * El día del que se viene, si alguien lo dijo. La caja del día manda
@@ -123,8 +124,8 @@ final class CashCalendarController extends Controller
              */
             'pendingDaysByMonth' => $this->calendario->pendingDaysByMonth(
                 (int) $caja->id,
-                CarbonImmutable::now()->subMonths(13)->startOfMonth(),
-                CarbonImmutable::now()->endOfMonth(),
+                BusinessDate::today()->subMonths(13)->startOfMonth(),
+                BusinessDate::today()->endOfMonth(),
                 $moneda,
             ),
         ]);

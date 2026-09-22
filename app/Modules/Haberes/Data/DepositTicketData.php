@@ -9,6 +9,7 @@ use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -82,7 +83,7 @@ final class DepositTicketData extends Data
                 ->forSubject(AttachmentSubject::DepositTicket, $ticket->id)
                 ->latest('id')
                 ->value('id'),
-            waitingDays: (int) $ticket->deposited_at->diffInDays(now(), false),
+            waitingDays: (int) $ticket->deposited_at->diffInDays(BusinessDate::today(), false),
         );
     }
 }

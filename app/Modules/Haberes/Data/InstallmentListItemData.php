@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -238,7 +239,7 @@ final class InstallmentListItemData extends Data
             cashTransfer: $cashTransfer === null
                 ? null
                 : InstallmentTransferData::fromModel($cashTransfer),
-            createdAt: $cuota->created_at->format('Y-m-d'),
+            createdAt: BusinessDate::fromInstant($cuota->created_at)->toDateString(),
             updatedAt: $cuota->updated_at->toISOString(),
             stage: $stage,
         );

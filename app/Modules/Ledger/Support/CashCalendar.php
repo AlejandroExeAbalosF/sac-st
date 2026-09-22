@@ -15,6 +15,7 @@ use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ final class CashCalendar
         $arqueos = $this->counts($cashBoxId, $desde, $hasta, $currency);
         $conPlanilla = $this->sheets($this->idsOf($cierres));
 
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = BusinessDate::today();
         $dias = [];
 
         for ($dia = $desde; $dia->lessThanOrEqualTo($hasta); $dia = $dia->addDay()) {
@@ -113,7 +114,7 @@ final class CashCalendar
         $conMovimiento = array_keys($this->activityByDay($cashBoxId, $desde, $hasta, $currency));
 
         $conPlanilla = $this->sheets($this->idsOf($mensuales));
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = BusinessDate::today();
 
         $meses = [];
 

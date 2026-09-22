@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Http\Requests;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Support\ExpedienteNumber;
 use App\Modules\Shared\Models\Person;
+use App\Support\BusinessDate;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -37,7 +38,7 @@ final class StoreExpedienteRequest extends FormRequest
             // La carátula ayuda a reconocerlo, pero hay expedientes que
             // llegan sin ella y esperar a tenerla frena la carga.
             'subject' => ['nullable', 'string', 'max:255'],
-            'receivedDate' => ['required', 'date', 'before_or_equal:today'],
+            'receivedDate' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'employerId' => ['required', 'integer'],
             'employerRepresentative' => ['nullable', 'string', 'max:160'],
 

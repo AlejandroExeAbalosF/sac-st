@@ -53,4 +53,11 @@ describe('yaEmpezo', () => {
     it('el año corriente ya empezó', () => {
         expect(yaEmpezo({ anio: 2026 }, hoy)).toBe(true);
     });
+
+    it('usa el día de Salta cerca de la medianoche UTC', () => {
+        const instante = new Date('2027-01-01T02:30:00Z');
+
+        expect(yaEmpezo({ anio: 2027 }, instante)).toBe(false);
+        expect(yaEmpezo({ anio: 2026, mes: 12 }, instante)).toBe(true);
+    });
 });

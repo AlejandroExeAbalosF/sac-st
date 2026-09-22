@@ -27,6 +27,7 @@ use App\Modules\Shared\Actions\TakeNextDocumentNumber;
 use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Support\BusinessDate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -249,7 +250,7 @@ final class IssuePaymentOrder
         $cheque = $this->chequeDeLaCuota($installment);
 
         return [
-            'order_date' => now()->toDateString(),
+            'order_date' => BusinessDate::today()->toDateString(),
             'beneficiary_installment_id' => $installment->id,
             /*
              * El importe es lo que la cuota tiene financiado y por lo tanto
