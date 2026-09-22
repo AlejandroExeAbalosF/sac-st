@@ -441,6 +441,16 @@ class TrasladoDeEfectivoTest extends TestCase
                 ->where('haber.installments.0.cashTransfer.status', 'bank_confirmed')
                 ->where('haber.installments.0.cashTransfer.bankTransactionId', $credito->id),
             );
+
+        $this->actingAs($this->operador())
+            ->get(route('haberes.installments.history', $cuota))
+            ->assertOk()
+            ->assertJsonPath('events.0.action', 'traslado.acreditado')
+            ->assertJsonFragment([
+                'field' => 'Movimiento del extracto',
+                'before' => null,
+                'after' => 'Movimiento n.º '.$credito->id,
+            ]);
     }
 
     /**

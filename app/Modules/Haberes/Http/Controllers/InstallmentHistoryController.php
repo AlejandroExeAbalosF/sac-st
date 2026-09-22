@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
@@ -58,6 +59,7 @@ final class InstallmentHistoryController extends Controller
         // Del traslado del efectivo al banco.
         'amount' => 'Importe',
         'bank_account_id' => 'Cuenta',
+        'bank_transaction_id' => 'Movimiento del extracto',
         'deposit_date' => 'Fecha del depósito',
         'motivo' => 'Motivo',
     ];
@@ -97,6 +99,7 @@ final class InstallmentHistoryController extends Controller
             'events' => $this->linea->shape($eventos, self::CAMPOS, [
                 'expected_medium' => self::MEDIOS,
                 'bank_account_id' => $this->etiquetasDeCuenta($eventos),
+                'bank_transaction_id' => $this->etiquetasDeMovimiento($eventos),
             ]),
         ]);
     }
@@ -157,6 +160,31 @@ final class InstallmentHistoryController extends Controller
             ->whereIn('id', $ids)
             ->pluck('label', 'id')
             ->all();
+
+        return $etiquetas;
+    }
+
+    /**
+     * Una referencia bancaria legible sin perder el ID cuando el banco no
+     * informó número de operación.
+     *
+     * @param  Collection<int, AuditEvent>  $eventos
+     * @return array<int, string>
+     */
+    private function etiquetasDeMovimiento($eventos): array
+    {
+        $ids = $this->linea->idsMencionados($eventos, 'bank_transaction_id');
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $etiquetas = [];
+        foreach (BankTransaction::query()->whereIn('id', $ids)->get(['id', 'operation_id']) as $movimiento) {
+            $etiquetas[$movimiento->id] = $movimiento->operation_id
+                ? 'Operación '.$movimiento->operation_id
+                : 'Movimiento n.º '.$movimiento->id;
+        }
 
         return $etiquetas;
     }
