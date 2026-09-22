@@ -13,16 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * No confundir con `person_bank_accounts`: aquella es el CBU del
  * beneficiario, el destino de un pago. Esta es la cuenta institucional,
  * contra la que se importan extractos y se concilia el saldo.
- *
- * Hoy hay una sola —la cuenta corriente 2693 del Banco Macro—, pero el
- * modelo trabaja por cuenta desde el principio porque el libro banco del
- * área ya muestra movimientos hacia y desde otras cuentas del organismo,
- * y porque se prevé una cuenta en dólares.
- *
- * **Acá se establece la moneda.** §4.4 del DER define que la moneda vive
- * donde se fija y se hereda hacia abajo: los movimientos de esta cuenta no
- * llevan columna propia, son de la moneda de la cuenta. Eso deja la cuenta
- * en dólares como una fila más, sin nada de conversión.
  */
 return new class extends Migration
 {

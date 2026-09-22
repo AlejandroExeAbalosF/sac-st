@@ -14,22 +14,6 @@ use Illuminate\Support\Facades\Schema;
  * ese efectivo a la cuenta del organismo. **Es un traslado interno, no un
  * ingreso nuevo** (§2.1, punto 145): el dinero sigue siendo del mismo
  * beneficiario y sigue imputado a la misma cuota, solo cambia de lugar.
- *
- * Por eso el recibo de ingreso no se toca: sigue diciendo «Efectivo»,
- * porque eso fue lo que pasó y el empleador tiene su copia firmada. El
- * traslado es un hecho nuevo, no una corrección del anterior.
- *
- * **Los dos eventos y la ventana que los separa.** Entre que el efectivo
- * sale de la caja y el banco lo acredita, ese dinero no está en ninguno de
- * los dos lugares, y por eso son dos asientos con `CASH_IN_TRANSIT` en el
- * medio. Postear directo a `BANK_ACCOUNT` haría que el libro afirme que el
- * banco tiene una plata que el banco todavía no confirmó.
- *
- * **Desvío del §9.5.** No lleva `decision_date`, `decided_by`,
- * `decision_reason` ni el estado `decided`. El DER modela una decisión
- * previa al depósito; acá el traslado se registra cuando ya ocurrió —el
- * operador vuelve del banco con el ticket— y un estado «decidido»
- * describiría un trámite que el área no tiene.
  */
 return new class extends Migration
 {

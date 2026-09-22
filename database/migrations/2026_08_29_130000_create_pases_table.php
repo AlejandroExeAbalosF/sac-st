@@ -13,19 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * **La nota formal que acompaña a la Orden hacia el organismo superior.**
  * El expediente no viaja: al SAF se remiten únicamente la Orden de Pago y
  * el Pase, y se generan juntos para una cuota ya financiada.
- *
- * Es 1:1 con la Orden y lo impone un índice único. Su estado describe el
- * ciclo documental de la nota; el ciclo de envío y devolución vive en
- * `remisiones`, que llega con la tanda siguiente, porque lo que se repite
- * ante una devolución es el **viaje**, no el documento.
- *
- * ── Desvío respecto del DER, anotado en Correcciones §34 ───────────────
- *
- * **El Pase no lleva número propio.** El DER lo prevé —`reference_number`,
- * con el ejemplo «Pase 41/2026»— pero el área confirmó que la nota real no
- * lo tiene: *«en todo caso sería el número de la orden de pago»*. La
- * columna se conserva nula por si el área decide asignarle uno, que es
- * exactamente el escenario para el que el DER la había previsto.
  */
 return new class extends Migration
 {

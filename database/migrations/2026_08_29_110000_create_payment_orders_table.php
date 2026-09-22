@@ -13,38 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * **El papel con el que el área le pide al SAF que transfiera.** Se emite
  * por una sola cuota, ya completamente financiada y con su recibo de
  * ingreso vigente, y viaja al organismo junto con su Pase.
- *
- * Vive en `Haberes` y no en `Shared` —al revés que `receipts`— porque sabe
- * de cuotas, de expedientes y de empleadores: es dominio, no
- * infraestructura de comprobantes. Por eso acá las foráneas hacia la cuota
- * sí existen.
- *
- * ── Desvíos respecto del DER, todos anotados en Correcciones §34 ───────
- *
- * 1. **`order_kind`.** El DER asume que la Orden siempre se titula
- *    «VALORES EN CUSTODIA». El formulario real tiene también «CHEQUES
- *    PROPIOS», y el área confirmó que sirve para los dos: el tipo se elige
- *    antes de generarla.
- * 2. **`organism_bank_account_id`.** El formulario trae las cuentas del
- *    organismo preimpresas y se marca la que corresponde. El DER no
- *    modelaba cuál. El sistema la deriva de dónde está el dinero.
- * 3. **`income_receipt_number_source`.** Cuál de los dos números del
- *    recibo se imprime —el del sistema o el del talonario—. Es la misma
- *    decisión que `receipts.prints_talonario_number` y por el mismo
- *    motivo: la reimpresión tiene que salir igual que el original.
- * 4. **`cbu_folio_snapshot`.** La foja donde el expediente informa el CBU.
- *    Es lo que el Pase redacta —«a la CBU informada en fs. 19»— y sin ese
- *    número la nota no se puede escribir.
- * 5. **`income_receipt_id` es NOT NULL.** El DER lo pide «obligatorio
- *    antes de aprobar». Acá la Orden no se genera sin recibo de ingreso,
- *    así que la base lo exige desde el principio en vez de confiarlo a un
- *    estado posterior.
- *
- * **Lo que no está y el DER sí tiene:** `reviewed_by`, `approved_by`,
- * `approved_at` y `sent_at`. Son del circuito de aprobación y envío, que
- * viaja con `remisiones` en la tanda siguiente. Los estados sí quedan
- * declarados en el `CHECK`, porque un juego de estados se define entero o
- * queda a medias.
  */
 return new class extends Migration
 {
@@ -73,7 +41,6 @@ return new class extends Migration
             $table->string('formatted_number', 40);
 
             $table->date('order_date');
-            $table->string('order_kind', 30)->default('custody_values');
 
             $table->foreignId('beneficiary_installment_id')
                 ->constrained('beneficiary_installments')
@@ -163,9 +130,6 @@ return new class extends Migration
             FOREIGN KEY (beneficiary_bank_account_id, beneficiary_person_id)
             REFERENCES person_bank_accounts (id, person_id)');
 
-        DB::statement("ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_kind_check
-            CHECK (order_kind IN ('custody_values', 'own_cheques'))");
-
         DB::statement('ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_status_check
             CHECK (status IN ('.self::ACTIVE_STATUSES.", 'completed', 'rejected', 'voided'))");
 
@@ -185,19 +149,13 @@ return new class extends Migration
          * *hacia* la del beneficiario. Sin una de las dos puntas no hay
          * nada que pedir, y el Pase no se puede redactar.
          *
-         * `own_cheques` queda fuera a propósito: el área todavía no
-         * confirmó qué significa esa casilla del formulario, y exigirle
-         * datos que quizá no lleve sería inventar la regla.
          */
-        DB::statement("ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_custody_accounts_check
+        DB::statement('ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_accounts_check
             CHECK (
-                order_kind <> 'custody_values'
-                OR (
-                    beneficiary_bank_account_id IS NOT NULL
-                    AND beneficiary_cbu_snapshot IS NOT NULL
-                    AND organism_bank_account_id IS NOT NULL
-                )
-            )");
+                beneficiary_bank_account_id IS NOT NULL
+                AND beneficiary_cbu_snapshot IS NOT NULL
+                AND organism_bank_account_id IS NOT NULL
+            )');
 
         /* La cuenta y su dueño viajan juntos o no viajan. */
         DB::statement('ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_account_pair_check
@@ -248,7 +206,6 @@ return new class extends Migration
                     OR NEW.number IS DISTINCT FROM OLD.number
                     OR NEW.formatted_number IS DISTINCT FROM OLD.formatted_number
                     OR NEW.order_date IS DISTINCT FROM OLD.order_date
-                    OR NEW.order_kind IS DISTINCT FROM OLD.order_kind
                     OR NEW.beneficiary_installment_id IS DISTINCT FROM OLD.beneficiary_installment_id
                     OR NEW.amount IS DISTINCT FROM OLD.amount
                     OR NEW.beneficiary_bank_account_id IS DISTINCT FROM OLD.beneficiary_bank_account_id

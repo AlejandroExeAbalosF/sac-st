@@ -15,19 +15,6 @@ use Illuminate\Support\Facades\Schema;
  * están congelados como columnas de `payment_orders`; acá vive el renglón
  * que el área le muestra al organismo para decir *«esta plata vino de
  * acá»*:
- *
- * ```text
- * DEPÓSITO U OPERACIÓN N° | FECHA      | CTA. CTE. | IMPORTE
- * 83690105                | 28/5/2026  | 23456789  | $2.892.402,00
- * ```
- *
- * El DER la marca como **entidad en revisión** porque su contenido es
- * derivable mientras nada cambie. Se conserva por los tres escenarios en
- * los que deja de serlo: una reversión posterior a `completed`, una
- * reinterpretación del extracto que mueva el número de operación, y
- * asignaciones que entren a la cuota después de emitida la Orden. En
- * cualquiera de los tres, recalcular daría algo distinto de lo que el
- * Tesorero firmó.
  */
 return new class extends Migration
 {

@@ -15,17 +15,6 @@ use Illuminate\Support\Facades\Schema;
  * datos, y cada tanto revisa el extracto buscando ese movimiento. Ese
  * estado intermedio —«cargado y todavía no encontrado en el banco»— hoy
  * vive en la cabeza de la contadora.
- *
- * **No es una recepción.** No financia ninguna cuota, no emite recibo y no
- * genera evento contable. Registra lo que el expediente informó, y espera.
- * Por eso no contradice §2.1.13: *«hasta que el crédito no figura en el
- * extracto no hay recepción»*. Sigue siendo así; esto es lo que hay antes.
- *
- * **Por qué es imprescindible y no un lujo.** La foto que aportó el área
- * es un `DEPÓSITO EFECTIVO EN CUENTA`: en el extracto aparece como
- * `995979830 - Numero de Operacion`, sin CUIT ni nombre. Sin el ticket ese
- * crédito es un número anónimo que nadie puede atribuir a un expediente.
- * El ticket no es evidencia opcional: es el índice de búsqueda.
  */
 return new class extends Migration
 {

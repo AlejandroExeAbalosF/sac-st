@@ -20,7 +20,6 @@ return new class extends Migration
         Schema::create('people', function (Blueprint $table): void {
             $table->id();
             $table->string('type', 20);
-            $table->string('name', 160);
             // Puede faltar: hay expedientes que traen solo el nombre de la
             // empresa. La unicidad se resuelve más abajo, con dos índices
             // parciales, porque cambia según haya documento o no.
@@ -28,6 +27,18 @@ return new class extends Migration
             $table->boolean('is_active')->default(true)->index();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestampsTz();
+
+            $table->string('address', 300)->nullable();
+            $table->string('phone', 40)->nullable();
+
+            /*
+             * Las partes del nombre. Una persona fisica lleva las dos
+             * primeras; una organizacion, la razon social. Nunca las dos
+             * cosas: lo impone `people_name_by_type_check`.
+             */
+            $table->string('first_name', 80)->nullable();
+            $table->string('last_name', 80)->nullable();
+            $table->string('legal_name', 160)->nullable();
         });
 
         Schema::create('person_roles', function (Blueprint $table): void {
@@ -64,9 +75,31 @@ return new class extends Migration
                 AS $$ SELECT unaccent('unaccent', $1) $$;
         SQL);
 
-        DB::statement('ALTER TABLE people
-            ADD COLUMN search_name text
-            GENERATED ALWAYS AS (lower(f_unaccent(name))) STORED');
+        /*
+         * El nombre para mostrar y el de busqueda los calcula la base, no
+         * PHP: son columnas generadas sobre las partes, asi que ninguna via
+         * de escritura puede dejarlas desincronizadas.
+         *
+         * La expresion depende del tipo: una persona fisica se muestra
+         * «Apellido, Nombre»; una organizacion, por su razon social.
+         */
+        DB::statement(<<<'SQL'
+            ALTER TABLE people ADD COLUMN name text GENERATED ALWAYS AS (
+                CASE WHEN type = 'individual'
+                     THEN last_name || ', ' || first_name
+                     ELSE legal_name
+                END
+            ) STORED
+        SQL);
+
+        DB::statement(<<<'SQL'
+            ALTER TABLE people ADD COLUMN search_name text GENERATED ALWAYS AS (lower(f_unaccent(
+                CASE WHEN type = 'individual'
+                     THEN last_name || ', ' || first_name
+                     ELSE legal_name
+                END
+            ))) STORED
+        SQL);
 
         DB::statement("ALTER TABLE people ADD CONSTRAINT people_type_check CHECK (type IN ('individual', 'company'))");
         DB::statement("ALTER TABLE person_roles ADD CONSTRAINT person_roles_role_check CHECK (role IN ('employer', 'beneficiary'))");
@@ -102,6 +135,58 @@ return new class extends Migration
          */
         DB::statement('CREATE UNIQUE INDEX people_document_unique
             ON people (document) WHERE document IS NOT NULL');
+        /*
+         * Los dos juegos de columnas no se mezclan y ninguno puede faltar:
+         * `name` es generada sobre ellas, asi que una ficha incompleta
+         * dejaria sin nombre a la persona entera.
+         */
+        DB::statement(<<<'SQL'
+            ALTER TABLE people ADD CONSTRAINT people_name_by_type_check CHECK (
+                (type = 'individual'
+                    AND first_name IS NOT NULL AND last_name IS NOT NULL AND legal_name IS NULL)
+             OR (type = 'company'
+                    AND legal_name IS NOT NULL AND first_name IS NULL AND last_name IS NULL)
+            )
+        SQL);
+
+        /* El CUIT, cuando lo hay: once digitos, sin guiones. */
+        Schema::table('people', function (Blueprint $table): void {
+            $table->string('tax_identifier', 11)->nullable();
+        });
+
+        DB::statement(<<<'SQL'
+            ALTER TABLE people ADD CONSTRAINT people_tax_identifier_check CHECK (
+                tax_identifier IS NULL
+                OR (
+                    type = 'individual'
+                    AND tax_identifier ~ '^(20|23|24|27)[0-9]{9}$'
+                    AND document IS NOT NULL
+                    AND ltrim(substring(tax_identifier from 3 for 8), '0') = document
+                )
+            )
+        SQL);
+
+        /*
+         * El titular de una organizacion es otra ficha, no tres columnas
+         * sueltas: asi se lo puede buscar, corregir en un solo lugar y
+         * reutilizar si aparece en otro expediente.
+         */
+        Schema::table('people', function (Blueprint $table): void {
+            $table->foreignId('owner_person_id')->nullable();
+        });
+
+        DB::statement("ALTER TABLE people ADD COLUMN owner_person_type varchar(20)
+            GENERATED ALWAYS AS ('individual'::varchar(20)) STORED");
+
+        DB::statement('ALTER TABLE people ADD CONSTRAINT people_owner_person_fk
+            FOREIGN KEY (owner_person_id, owner_person_type) REFERENCES people (id, type)
+            ON DELETE RESTRICT');
+
+        DB::statement("ALTER TABLE people ADD CONSTRAINT people_owner_person_check
+            CHECK (owner_person_id IS NULL OR type = 'company')");
+
+        DB::statement('CREATE INDEX people_owner_person_id_index ON people (owner_person_id)');
+
         DB::statement('CREATE UNIQUE INDEX people_search_name_unique
             ON people (search_name) WHERE document IS NULL');
 

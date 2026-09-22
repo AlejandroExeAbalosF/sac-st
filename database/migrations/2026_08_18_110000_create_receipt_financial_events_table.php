@@ -15,11 +15,6 @@ use Illuminate\Support\Facades\Schema;
  * cuota pudo financiarse con más de un ingreso (§2.1.9). Un único
  * comprobante puede entonces documentar varias asignaciones, y esta tabla
  * es la que deja ver cuáles.
- *
- * Vive en `Ledger` y no en `Shared` con `receipts`, y la razón es la
- * dirección de las dependencias: referencia `financial_events`, que es de
- * Ledger. Desde Shared esa foránea apuntaría hacia arriba; desde Ledger
- * apunta a Shared, que es el sentido permitido.
  */
 return new class extends Migration
 {

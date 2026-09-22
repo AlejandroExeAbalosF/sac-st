@@ -13,23 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * El reverso de la planilla, que la contadora escribe a mano desde
  * siempre: se cuentan los billetes por denominación y el total se compara
  * con lo que dice el libro.
- *
- * ```text
- * CANTIDAD | BILLETES  | PESOS
- *    101   | 20.000    | 2.020.000
- *      1   | 10.000    |    10.000
- *      4   |  1.000    |     4.000
- * ```
- *
- * **Los cheques no se cuentan acá.** El reverso los inventaría uno por
- * uno —número, banco, importe— y ese listado sale de `fund_receipts` con
- * `cheque_status = 'in_custody'`. El efectivo se cuenta; los cheques se
- * listan. En la planilla de junio de 2026 el total de esa lista
- * —673.804,70— es exactamente la columna `CHEQUES` del anverso.
- *
- * **El saldo teórico no se almacena como contador** (§5.1). `expected_amount`
- * es un snapshot del arqueo, congelado en el momento de contar y calculado
- * desde `journal_lines` sobre `CASH_ON_HAND` de esa caja y esa moneda.
  */
 return new class extends Migration
 {

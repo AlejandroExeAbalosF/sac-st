@@ -15,10 +15,9 @@ use Illuminate\Support\Facades\Schema;
  * hay en caja, cuánto en el banco, cuánto sin identificar, cuánto tiene
  * asignado cada beneficiario.
  *
- * **Ningún saldo se guarda** (§5.1: *«Los saldos se calculan; no son
- * contadores editables»*). Un contador puede desincronizarse y nadie se
- * entera hasta que el arqueo no cierra; una suma sobre líneas inmutables,
- * no.
+ * **Ningún saldo se guarda**: todos se calculan sumando estas líneas. Un
+ * contador editable se desincroniza y nadie se entera hasta que el arqueo
+ * no cierra.
  */
 return new class extends Migration
 {
@@ -215,6 +214,130 @@ return new class extends Migration
         DB::statement('CREATE TRIGGER journal_lines_append_only
             BEFORE UPDATE OR DELETE ON journal_lines
             FOR EACH ROW EXECUTE FUNCTION journal_lines_append_only()');
+
+        /*
+         * La moneda de la linea. El saldo de caja se pregunta siempre igual
+         * --que hay en esta cuenta, de esta caja, en esta moneda-- y el
+         * indice sigue esa forma.
+         */
+        Schema::table('journal_lines', function (Blueprint $table): void {
+            $table->char('currency', 3)->default('ARS');
+            $table->index(['cash_box_id', 'account_code', 'currency']);
+        });
+
+        DB::statement("ALTER TABLE journal_lines ADD CONSTRAINT journal_lines_currency_check
+            CHECK (currency IN ('ARS', 'USD'))");
+
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION journal_entry_must_balance() RETURNS trigger AS $$
+            DECLARE
+                evento_id BIGINT;
+                estado TEXT;
+                lineas INT;
+                desbalance RECORD;
+            BEGIN
+                evento_id := COALESCE(NEW.financial_event_id, OLD.financial_event_id);
+
+                SELECT status INTO estado FROM financial_events WHERE id = evento_id;
+
+                IF estado IS NULL OR estado = 'draft' THEN
+                    RETURN NULL;
+                END IF;
+
+                SELECT COUNT(*) INTO lineas
+                  FROM journal_lines WHERE financial_event_id = evento_id;
+
+                IF lineas = 0 THEN
+                    RAISE EXCEPTION 'El evento % quedo posteado sin asiento.', evento_id
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT currency, SUM(debit) AS d, SUM(credit) AS c
+                  INTO desbalance
+                  FROM journal_lines
+                 WHERE financial_event_id = evento_id
+                 GROUP BY currency
+                HAVING SUM(debit) <> SUM(credit)
+                 LIMIT 1;
+
+                IF FOUND THEN
+                    RAISE EXCEPTION
+                        'El asiento del evento % no balancea en %: debitos %, creditos %.',
+                        evento_id, desbalance.currency, desbalance.d, desbalance.c
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION posted_event_must_balance() RETURNS trigger AS $$
+            DECLARE
+                lineas INT;
+                desbalance RECORD;
+            BEGIN
+                IF NEW.status <> 'posted' THEN
+                    RETURN NULL;
+                END IF;
+
+                SELECT COUNT(*) INTO lineas
+                  FROM journal_lines WHERE financial_event_id = NEW.id;
+
+                IF lineas = 0 THEN
+                    RAISE EXCEPTION 'No se puede postear el evento % sin asiento.', NEW.id
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT currency, SUM(debit) AS d, SUM(credit) AS c
+                  INTO desbalance
+                  FROM journal_lines
+                 WHERE financial_event_id = NEW.id
+                 GROUP BY currency
+                HAVING SUM(debit) <> SUM(credit)
+                 LIMIT 1;
+
+                IF FOUND THEN
+                    RAISE EXCEPTION
+                        'El asiento del evento % no balancea en %: debitos %, creditos %.',
+                        NEW.id, desbalance.currency, desbalance.d, desbalance.c
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION journal_lines_bank_currency() RETURNS trigger AS $$
+            DECLARE
+                moneda_cuenta CHAR(3);
+            BEGIN
+                IF NEW.bank_account_id IS NULL THEN
+                    RETURN NEW;
+                END IF;
+
+                SELECT currency INTO moneda_cuenta
+                  FROM bank_accounts WHERE id = NEW.bank_account_id;
+
+                IF moneda_cuenta IS DISTINCT FROM NEW.currency THEN
+                    RAISE EXCEPTION
+                        'La linea esta en % y la cuenta bancaria % opera en %.',
+                        NEW.currency, NEW.bank_account_id, moneda_cuenta
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+        DB::statement('CREATE TRIGGER journal_lines_bank_currency
+            BEFORE INSERT OR UPDATE ON journal_lines
+            FOR EACH ROW EXECUTE FUNCTION journal_lines_bank_currency()');
+
     }
 
     public function down(): void

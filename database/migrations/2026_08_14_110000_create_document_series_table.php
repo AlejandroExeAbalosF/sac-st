@@ -15,17 +15,6 @@ use Illuminate\Support\Facades\Schema;
  * `receipt_series` y `receipt_internal_sequences`, que en la v4.2 eran dos
  * numeraciones en pie de igualdad y obligaban a decidir cuál mandaba en
  * los reportes.
- *
- * **El número lo genera siempre el sistema**, incluso para los
- * comprobantes confeccionados en papel: el código de serie distingue el
- * origen (`0010` sistema / `0011` talonario) y el número preimpreso queda
- * como referencia opcional en `receipts.talonario_number`. Es el
- * invariante 19 del DER.
- *
- * Formato `CCCC/NNNNNNNN`, siguiendo la convención de AFIP —cuatro
- * dígitos de punto de venta y ocho de comprobante—. Ocho dígitos dan
- * margen de sobra: el talonario actual lleva unos 76.000 comprobantes en
- * ocho años.
  */
 return new class extends Migration
 {

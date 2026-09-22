@@ -14,11 +14,6 @@ use Illuminate\Support\Facades\Schema;
  * los ítems, depositar efectivo perdería el vínculo con el beneficiario y
  * la cuota, y el dinero volvería a ser anónimo justo después de haber
  * dejado de serlo (§2.1, punto 146).
- *
- * **Hoy la pantalla carga uno solo** —el área deposita de a una cuota— y
- * la tabla existe igual: retrofitearla después sería migrar una tabla
- * append-only que para entonces tendría hechos reales, y un viaje al banco
- * con varias cuotas en un mismo ticket es cuestión de tiempo.
  */
 return new class extends Migration
 {

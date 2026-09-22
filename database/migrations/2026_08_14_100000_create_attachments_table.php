@@ -10,18 +10,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Archivos adjuntos — §9.10 del DER.
  *
- * Toda la evidencia del sistema pasa por acá: el ticket que llega con el
- * expediente, el extracto que se importó, el Pase firmado, la Orden en
- * PDF. Una sola tabla para todos porque el archivo se comporta igual sea
- * cual sea su sujeto —se guarda, se descarga, no se edita— y separarlos
- * por tipo obligaría a repetir la misma lógica en cada módulo.
- *
- * **Los archivos son inmutables**, impuesto por trigger. Es textual del
- * DER: *«Cada reenvío de Pase o documento firmado genera otro
- * attachment»*. Corregir un adjunto no es editarlo: es subir el nuevo y
- * que el anterior siga ahí. Un comprobante que se puede reescribir no
- * prueba nada, que es el mismo motivo por el que `audit_events` y
- * `bank_transactions` son append-only.
+ * Toda la evidencia del sistema en una sola tabla —el ticket del
+ * expediente, el extracto importado, el Pase firmado— porque un archivo se
+ * comporta igual sea cual sea su sujeto.
  */
 return new class extends Migration
 {
@@ -75,7 +66,8 @@ return new class extends Migration
         DB::statement("ALTER TABLE attachments ADD CONSTRAINT attachments_subject_type_check
             CHECK (subject_type IN (
                 'expediente', 'import', 'receipt', 'payment_order',
-                'pase', 'disbursement', 'cash_transfer', 'deposit_ticket'
+                'pase', 'disbursement', 'cash_transfer', 'deposit_ticket',
+                'period_closing'
             ))");
         DB::statement("ALTER TABLE attachments ADD CONSTRAINT attachments_source_check
             CHECK (source IN ('generated', 'uploaded', 'scanned'))");

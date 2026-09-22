@@ -13,16 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * **El dinero entró.** Todavía no se sabe de quién es —eso lo dice la
  * asignación— pero ya está bajo custodia del organismo y tiene que
  * aparecer en los saldos.
- *
- * Cada recepción es exactamente un evento financiero (`UNIQUE` sobre
- * `financial_event_id`): la recepción es la cara legible del hecho y el
- * evento es su asiento. Duplicar uno sin el otro rompería el equilibrio
- * entre el libro y lo que el área ve en pantalla.
- *
- * **No guarda el remanente no asignado.** El §5.1 es terminante: *«Los
- * saldos se calculan; no son contadores editables»*. Lo que sí guarda es
- * `residual_status`, que no es un importe sino una declaración: alguien
- * miró ese sobrante y lo dio por cerrado.
  */
 return new class extends Migration
 {
@@ -157,6 +147,88 @@ return new class extends Migration
         DB::statement('CREATE TRIGGER fund_receipts_append_only
             BEFORE UPDATE OR DELETE ON fund_receipts
             FOR EACH ROW EXECUTE FUNCTION fund_receipts_append_only()');
+
+        /* La moneda de lo recibido: pesos y dolares no se suman. */
+        Schema::table('fund_receipts', function (Blueprint $table): void {
+            $table->char('currency', 3)->default('ARS');
+        });
+
+        DB::statement("ALTER TABLE fund_receipts ADD CONSTRAINT fund_receipts_currency_check
+            CHECK (currency IN ('ARS', 'USD'))");
+
+        /*
+         * La reversion. Las cuatro columnas van juntas o no va ninguna:
+         * media reversion no es un estado del que se pueda decir nada.
+         */
+        Schema::table('fund_receipts', function (Blueprint $table): void {
+            $table->foreignId('reversal_event_id')->nullable()->unique()
+                ->constrained('financial_events')->restrictOnDelete();
+            $table->timestampTz('reversed_at')->nullable();
+            $table->foreignId('reversed_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('reversal_reason')->nullable();
+        });
+
+        DB::statement('ALTER TABLE fund_receipts ADD CONSTRAINT fund_receipts_reversal_check
+            CHECK (
+                (reversal_event_id IS NULL) = (reversed_at IS NULL)
+                AND (reversal_event_id IS NULL) = (reversal_reason IS NULL)
+            )');
+
+        /*
+         * Lo que el reverso del cheque necesita para identificarlo. Solo
+         * tienen sentido sobre un cheque: en cualquier otra recepcion
+         * competirian con los snapshots del recibo, que son la fuente buena.
+         */
+        Schema::table('fund_receipts', function (Blueprint $table): void {
+            $table->string('expediente_number_snapshot', 40)->nullable();
+            $table->string('counterparty_name_snapshot', 160)->nullable();
+            $table->string('beneficiary_name_snapshot', 160)->nullable();
+        });
+
+        DB::statement(<<<'SQL'
+            ALTER TABLE fund_receipts ADD CONSTRAINT fund_receipts_paper_snapshots_are_for_cheques
+            CHECK (
+                medium = 'cheque'
+                OR (
+                    expediente_number_snapshot IS NULL
+                    AND counterparty_name_snapshot IS NULL
+                    AND beneficiary_name_snapshot IS NULL
+                )
+            )
+        SQL);
+
+        /* Una reversion, una vez hecha, tampoco se edita. */
+        DB::unprepared(<<<'SQL'
+        CREATE OR REPLACE FUNCTION fund_receipts_append_only() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    RAISE EXCEPTION 'Una recepcion de fondos no se borra: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+                IF NEW.financial_event_id IS DISTINCT FROM OLD.financial_event_id
+                    OR NEW.amount IS DISTINCT FROM OLD.amount
+                    OR NEW.medium IS DISTINCT FROM OLD.medium
+                    OR NEW.received_date IS DISTINCT FROM OLD.received_date
+                    OR NEW.cash_box_id IS DISTINCT FROM OLD.cash_box_id
+                    OR NEW.cheque_number IS DISTINCT FROM OLD.cheque_number
+                    OR NEW.cheque_bank IS DISTINCT FROM OLD.cheque_bank
+                    OR NEW.cheque_issue_date IS DISTINCT FROM OLD.cheque_issue_date
+                THEN
+                    RAISE EXCEPTION 'Los datos de una recepcion no se editan: se revierte y se registra de nuevo.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+                IF OLD.reversal_event_id IS NOT NULL
+                    AND NEW.reversal_event_id IS DISTINCT FROM OLD.reversal_event_id
+                THEN
+                    RAISE EXCEPTION 'Una reversion no se deshace: se registra la recepcion de nuevo.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+                RETURN NEW;
+            END;
+            $$;
+        SQL);
     }
 
     public function down(): void

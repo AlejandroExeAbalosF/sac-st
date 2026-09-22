@@ -14,11 +14,6 @@ use Illuminate\Support\Facades\Schema;
  * evento: una recepción, una asignación, un egreso, un traslado. Cada uno
  * lleva su asiento en `journal_lines`, y ninguno se edita después
  * (invariante 15).
- *
- * `Ledger` no sabe que existen expedientes ni cuotas. Un evento conoce su
- * caja y nada más del dominio: eso es lo que permite que Aranceles y
- * Multas reutilicen este motor sin arrastrar el modelo jurídico de
- * Haberes.
  */
 return new class extends Migration
 {

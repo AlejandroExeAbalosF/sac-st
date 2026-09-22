@@ -14,10 +14,6 @@ use Illuminate\Support\Facades\Schema;
  * Haberes de Aranceles y de Multas. El §4.4 lo dice al descartar una caja
  * por moneda: *«`cash_boxes` sigue siendo la clasificación contable y el
  * cajón físico guarda las dos monedas»*.
- *
- * Es lo que permite que Ledger se reutilice. Un evento financiero sabe a
- * qué caja pertenece sin saber si detrás hay un expediente, un arancel o
- * una multa — y por eso el motor contable puede servir a los tres.
  */
 return new class extends Migration
 {

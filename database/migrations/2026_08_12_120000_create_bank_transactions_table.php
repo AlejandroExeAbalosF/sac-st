@@ -14,23 +14,9 @@ use Illuminate\Support\Facades\Schema;
  * en tres descargas distintas. Es la contracara de `bank_statement_rows`:
  * la fila es lo que decía un archivo, esto es lo que pasó en el banco.
  *
- * **`operation_id` no es único, y ya no es una pregunta abierta.** §4.3
- * del DER dejaba la unicidad en suspenso hasta ver muestras reales. El
- * extracto del área la responde: las referencias `86934222`, `85761672` y
- * `85634410` aparecen dos veces cada una —la transferencia y su comisión
- * comparten referencia—. Queda indexada para búsqueda y nada más.
- *
- * Dos desvíos respecto del DER, ambos por los archivos reales:
- *
- * - **`causal_code`.** MacroOnline lo trae en los dos formatos: 3913
- *   transferencia, 3914 comisión, 3861/3862 entre cuentas propias, 4397 y
- *   493 créditos de terceros. Es el mejor discriminador que da el banco y
- *   el DER lo descarta; sin él hay que adivinar por el texto del concepto.
- * - **`balance_after` dentro del `fingerprint`.** Dos comisiones de $121
- *   el mismo día son indistinguibles por fecha, importe y concepto, pero
- *   su saldo posterior difiere porque la cadena de saldos es estrictamente
- *   creciente en el tiempo. Eso convierte la deduplicación entre
- *   descargas solapadas de asistida a exacta.
+ * **`operation_id` no es único**, aunque lo parezca: en el extracto real una
+ * transferencia y su comisión comparten referencia. Está indexado para
+ * buscar, nada más.
  */
 return new class extends Migration
 {
@@ -169,6 +155,32 @@ return new class extends Migration
         DB::statement('CREATE TRIGGER bank_transactions_append_only
             BEFORE UPDATE OR DELETE ON bank_transactions
             FOR EACH ROW EXECUTE FUNCTION bank_transactions_append_only()');
+
+        /*
+         * Una cuenta con movimientos importados no cambia de moneda:
+         * reinterpretaria todos sus importes. La guarda vive aca porque
+         * recien ahora hay movimientos que proteger.
+         */
+        DB::unprepared(<<<'SQL'
+        CREATE OR REPLACE FUNCTION freeze_bank_account_currency() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                IF NEW.currency IS DISTINCT FROM OLD.currency
+                    AND EXISTS (SELECT 1 FROM bank_transactions WHERE bank_account_id = OLD.id)
+                THEN
+                    RAISE EXCEPTION
+                        'La cuenta ya tiene movimientos importados: cambiar su moneda reinterpretaria todos sus importes.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+                RETURN NEW;
+            END;
+            $$;
+        SQL);
+
+        DB::statement('CREATE TRIGGER bank_accounts_freeze_currency
+            BEFORE UPDATE ON bank_accounts
+            FOR EACH ROW EXECUTE FUNCTION freeze_bank_account_currency()');
     }
 
     public function down(): void

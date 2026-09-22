@@ -14,18 +14,9 @@ use Illuminate\Support\Facades\Schema;
  * dice de quién es. Es el acto que financia una cuota y el que habilita,
  * más adelante, la Orden de Pago.
  *
- * El asiento que la acompaña mueve una atribución a otra:
- *
- * ```text
- *   Débito   UNASSIGNED_FUNDS    deja de estar sin identificar
- *   Crédito  BENEFICIARY_FUNDS   y pasa a ser de este beneficiario
- * ```
- *
- * **Vive en Haberes y no en Ledger, contra lo que dice el DER.** Referencia
- * `haber_id` y `beneficiary_installment_id`, que son el modelo jurídico de
- * Haberes; en Ledger haría fallar `tests/Arch/ModuleBoundariesTest.php`, y
- * con razón: Aranceles no tiene haberes. El desvío está anotado en el
- * punto 26 de `Correcciones-al-DER-pendientes.md`.
+ * **Vive en Haberes y no en Ledger, contra lo que dice el DER** (Correcciones
+ * §26): referencia cuotas y haberes, y en Ledger haría fallar
+ * `tests/Arch/ModuleBoundariesTest.php`.
  */
 return new class extends Migration
 {
@@ -249,6 +240,60 @@ return new class extends Migration
         DB::statement('CREATE TRIGGER funding_allocations_append_only
             BEFORE UPDATE OR DELETE ON funding_allocations
             FOR EACH ROW EXECUTE FUNCTION funding_allocations_append_only()');
+
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION funding_allocations_same_currency() RETURNS trigger AS $$
+            DECLARE
+                moneda_recepcion CHAR(3);
+                moneda_haber CHAR(3);
+            BEGIN
+                SELECT currency INTO moneda_recepcion
+                  FROM fund_receipts WHERE id = NEW.fund_receipt_id;
+
+                SELECT currency INTO moneda_haber
+                  FROM haberes WHERE id = NEW.haber_id;
+
+                IF moneda_recepcion IS DISTINCT FROM moneda_haber THEN
+                    RAISE EXCEPTION
+                        'No se puede imputar una recepcion en % a un haber en %.',
+                        moneda_recepcion, moneda_haber
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+        DB::statement('CREATE TRIGGER funding_allocations_currency
+            BEFORE INSERT OR UPDATE ON funding_allocations
+            FOR EACH ROW EXECUTE FUNCTION funding_allocations_same_currency()');
+
+        /*
+         * Lo revertido no se vuelve a repartir: una imputacion desde una
+         * recepcion revertida seria dinero que el libro ya dijo que no entro.
+         */
+        DB::unprepared(<<<'SQL'
+        CREATE OR REPLACE FUNCTION funding_allocations_receipt_live() RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM fund_receipts
+                    WHERE id = NEW.fund_receipt_id
+                      AND reversal_event_id IS NOT NULL
+                ) THEN
+                    RAISE EXCEPTION 'Esa recepcion esta revertida: su dinero no se puede imputar.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+                RETURN NEW;
+            END;
+            $$;
+        SQL);
+
+        DB::statement('CREATE TRIGGER funding_allocations_receipt_live
+            BEFORE INSERT ON funding_allocations
+            FOR EACH ROW EXECUTE FUNCTION funding_allocations_receipt_live()');
     }
 
     public function down(): void

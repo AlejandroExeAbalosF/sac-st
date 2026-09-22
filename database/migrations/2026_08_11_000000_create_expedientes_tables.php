@@ -13,22 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * Es el derecho reconocido, no el dinero: acá no se registra ni un peso.
  * La recepción, la Orden y el egreso viven en sus propias tablas, y esa
  * separación es la primera regla del DER.
- *
- * Desvíos respecto del DER, todos anotados en
- * `Relevamiento/Correcciones-al-DER-pendientes.md`:
- *
- * - `depositor_id` se llama `employer_id`: el área confirmó que el
- *   depositante es el empleador (punto 8).
- * - `employer_representative` no existe en el DER (punto 10).
- * - `haberes.expected_installment_count` tampoco (punto 1). Sin él no se
- *   puede distinguir «faltan cuotas por cargar» de «las cuotas cargadas no
- *   cierran», que son dos situaciones distintas para el operador.
- * - `canonical_number` lleva UNIQUE. El DER prefiere
- *   `(source_system, external_id)`; van los dos, porque el número
- *   canónico es el que el operador tipea y por el que el alta avisa que el
- *   expediente ya está cargado (punto 4bis).
- * - `cash_box_id` y `default_bank_account_id` no se crean todavía: sus
- *   tablas son de la etapa siguiente y una FK a nada no aporta.
  */
 return new class extends Migration
 {
@@ -38,6 +22,10 @@ return new class extends Migration
         $this->createExpedientes();
         $this->createHaberes();
         $this->createInstallments();
+
+        // Va al final: la guarda mira las dos tablas y necesita que ambas
+        // existan.
+        $this->sumaDeCuotasNoSuperaElHaber();
     }
 
     public function down(): void
@@ -160,13 +148,18 @@ return new class extends Migration
         // El comodín va de los dos lados, así que btree no sirve.
         DB::statement('CREATE INDEX expedientes_search_text_trgm
             ON expedientes USING gin (search_text gin_trgm_ops)');
+
+        /* Lo que el expediente dice y no entra en ningun campo. */
+        Schema::table('expedientes', function (Blueprint $table): void {
+            $table->text('notes')->nullable();
+        });
     }
 
     private function createHaberes(): void
     {
         Schema::create('haberes', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('expediente_id')->constrained('expedientes')->cascadeOnDelete();
+            $table->foreignId('expediente_id')->constrained('expedientes')->restrictOnDelete();
 
             $table->foreignId('beneficiary_id');
             $table->string('beneficiary_role', 24);
@@ -213,13 +206,88 @@ return new class extends Migration
         // desbloquear con criterio.
         DB::statement("ALTER TABLE haberes ADD CONSTRAINT haberes_block_reason_check
             CHECK ((workflow_status = 'blocked') = (block_reason IS NOT NULL))");
+
+        /*
+         * El concepto del haber. Las cuotas lo heredan: son fracciones del
+         * mismo derecho, y repetirlo por cuota permitiria que dos digan
+         * cosas distintas sobre lo mismo.
+         */
+        Schema::table('haberes', function (Blueprint $table): void {
+            $table->string('concept', 255)->nullable();
+
+            /*
+             * La cuenta a la que se le paga por defecto. Va la columna sola:
+             * su FK compuesta apunta a `person_bank_accounts`, que todavia no
+             * existe, y la agrega esa migracion.
+             */
+            $table->unsignedBigInteger('default_bank_account_id')->nullable();
+        });
+
+        /*
+         * La moneda del derecho, no de la cuota: sus cuotas son fracciones
+         * del mismo derecho y la heredan. Una columna por cuota permitiria
+         * un haber en pesos con una cuota en dolares.
+         */
+        Schema::table('haberes', function (Blueprint $table): void {
+            $table->char('currency', 3)->default('ARS');
+        });
+
+        DB::statement("ALTER TABLE haberes ADD CONSTRAINT haberes_currency_check
+            CHECK (currency IN ('ARS', 'USD'))");
+
+        /*
+         * El ordinal del haber dentro de su expediente: es como el area lo
+         * nombra --«haber 2 del 125957»-- y por lo que las pantallas y las
+         * rutas lo buscan, no por su id global.
+         */
+        Schema::table('haberes', function (Blueprint $table): void {
+            $table->unsignedSmallInteger('haber_number');
+        });
+
+        DB::statement('ALTER TABLE haberes ADD CONSTRAINT haberes_number_positive_check
+            CHECK (haber_number >= 1)');
+
+        DB::statement('CREATE UNIQUE INDEX haberes_expediente_number_unique
+            ON haberes (expediente_id, haber_number)');
+    }
+
+    private function sumaDeCuotasNoSuperaElHaber(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION check_haber_amount_against_installments() RETURNS trigger AS $$
+            DECLARE
+                suma numeric(19,2);
+            BEGIN
+                SELECT COALESCE(SUM(expected_amount), 0) INTO suma
+                  FROM beneficiary_installments
+                 WHERE haber_id = NEW.id
+                   AND workflow_status <> 'cancelled';
+
+                IF suma > NEW.assigned_amount THEN
+                    RAISE EXCEPTION
+                        'La suma de las cuotas (%) supera el importe del haber (%).', suma, NEW.assigned_amount
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+        DB::unprepared(<<<'SQL'
+            CREATE CONSTRAINT TRIGGER haber_assigned_amount_sum
+                AFTER UPDATE OF assigned_amount ON haberes
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION check_haber_amount_against_installments();
+        SQL);
+
     }
 
     private function createInstallments(): void
     {
         Schema::create('beneficiary_installments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('haber_id')->constrained('haberes')->cascadeOnDelete();
+            $table->foreignId('haber_id')->constrained('haberes')->restrictOnDelete();
             $table->unsignedSmallInteger('installment_number');
             $table->decimal('expected_amount', 19, 2);
             $table->foreignId('management_label_id')->nullable()
@@ -233,7 +301,7 @@ return new class extends Migration
              * primera en efectivo por mostrador, el resto por
              * transferencia— y no para autorizar nada.
              */
-            $table->string('expected_medium', 20)->nullable();
+            $table->string('expected_medium', 20);
             // Observaciones libres de esta cuota. Distinto de `description`,
             // que es el concepto que se imprime en el comprobante.
             $table->text('notes')->nullable();
@@ -249,7 +317,7 @@ return new class extends Migration
         DB::statement('ALTER TABLE beneficiary_installments ADD CONSTRAINT installments_amount_check
             CHECK (expected_amount > 0)');
         DB::statement("ALTER TABLE beneficiary_installments ADD CONSTRAINT installments_medium_check
-            CHECK (expected_medium IS NULL OR expected_medium IN ('cash', 'cheque', 'bank'))");
+            CHECK (expected_medium IN ('cash', 'cheque', 'bank'))");
         DB::statement("ALTER TABLE beneficiary_installments ADD CONSTRAINT installments_workflow_status_check
             CHECK (workflow_status IN ('active', 'suspended', 'blocked', 'cancelled', 'paid'))");
         DB::statement("ALTER TABLE beneficiary_installments ADD CONSTRAINT installments_block_reason_check
@@ -308,5 +376,23 @@ return new class extends Migration
                 DEFERRABLE INITIALLY DEFERRED
                 FOR EACH ROW EXECUTE FUNCTION check_installments_sum();
         SQL);
+        /*
+         * La ventana para editar una cuota ya en circuito. Una ventana
+         * abierta sin motivo no es una ventana justificada: es un bloqueo
+         * apagado, y por eso los tres campos van juntos o no van.
+         */
+        Schema::table('beneficiary_installments', function (Blueprint $table): void {
+            $table->timestampTz('edit_unlocked_at')->nullable();
+            $table->string('edit_unlock_reason', 300)->nullable();
+            $table->foreignId('edit_unlocked_by')->nullable()
+                ->constrained('users')->nullOnDelete();
+        });
+
+        DB::statement('ALTER TABLE beneficiary_installments
+            ADD CONSTRAINT beneficiary_installments_edit_unlock_check
+            CHECK (
+                (edit_unlocked_at IS NULL AND edit_unlock_reason IS NULL AND edit_unlocked_by IS NULL)
+                OR (edit_unlocked_at IS NOT NULL AND edit_unlock_reason IS NOT NULL)
+            )');
     }
 };

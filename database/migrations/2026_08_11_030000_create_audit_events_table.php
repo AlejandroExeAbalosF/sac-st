@@ -14,13 +14,6 @@ use Illuminate\Support\Facades\Schema;
  * porque la edición de cuotas ya está habilitada: se puede corregir el
  * importe de una cuota, su etiqueta y su medio, y hasta este momento eso
  * no dejaba ningún rastro.
- *
- * La auditoría NO sustituye los eventos monetarios. Un asiento contable es
- * el hecho; esto es el registro de quién lo provocó. Cuando exista
- * `journal_lines`, esa sigue siendo la fuente de verdad de la plata.
- *
- * Append-only, impuesto por trigger: un registro de auditoría que se puede
- * editar no es un registro de auditoría.
  */
 return new class extends Migration
 {

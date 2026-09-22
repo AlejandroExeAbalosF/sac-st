@@ -35,6 +35,16 @@ return new class extends Migration
             $table->boolean('is_active')->default(true)->index();
             $table->timestampsTz();
 
+            /*
+             * La marca de una verificación forzada: `super-admin` puede dar
+             * por buena una cuenta que no pasa el dígito verificador del
+             * BCRA o el CVU de billetera. Nulo es lo normal; su presencia
+             * **es** la marca, y por eso no reusa `rejection_reason`, que
+             * significa lo contrario y vive bajo su propio CHECK.
+             */
+            $table->string('forced_verification_reason', 300)->nullable();
+            $table->string('forced_verification_bypass', 40)->nullable();
+
             $table->unique(['person_id', 'cbu']);
             // Permite que la FK compuesta del haber garantice que la cuenta
             // elegida pertenece al mismo beneficiario.
@@ -53,10 +63,26 @@ return new class extends Migration
         DB::statement('ALTER TABLE person_bank_accounts ADD CONSTRAINT person_bank_accounts_validity_check
             CHECK (valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from)');
 
-        Schema::table('haberes', function (Blueprint $table): void {
-            $table->foreignId('default_bank_account_id')->nullable()->after('beneficiary_role');
-        });
+        /* Forzar es una forma de verificar: la marca sólo vale sobre una
+           cuenta verificada, y sus dos columnas viajan juntas o no viajan. */
+        DB::statement("ALTER TABLE person_bank_accounts ADD CONSTRAINT person_bank_accounts_forced_check
+            CHECK (
+                forced_verification_reason IS NULL
+                OR (verification_status = 'verified' AND forced_verification_bypass IS NOT NULL)
+            )");
+        DB::statement('ALTER TABLE person_bank_accounts ADD CONSTRAINT person_bank_accounts_forced_pair_check
+            CHECK ((forced_verification_reason IS NULL) = (forced_verification_bypass IS NULL))');
+        DB::statement("ALTER TABLE person_bank_accounts ADD CONSTRAINT person_bank_accounts_forced_bypass_check
+            CHECK (
+                forced_verification_bypass IS NULL
+                OR forced_verification_bypass IN ('checksum', 'virtual_wallet', 'checksum+virtual_wallet')
+            )");
 
+        /*
+         * La columna ya existe --nace con `haberes`--; lo que se agrega aca
+         * es su FK compuesta, que exige que la cuenta elegida pertenezca al
+         * mismo beneficiario.
+         */
         DB::statement('ALTER TABLE haberes ADD CONSTRAINT haberes_default_bank_account_fk
             FOREIGN KEY (default_bank_account_id, beneficiary_id)
             REFERENCES person_bank_accounts (id, person_id)');
@@ -64,11 +90,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Solo la FK: la columna nace con `haberes` y se va con ella.
         DB::statement('ALTER TABLE haberes DROP CONSTRAINT IF EXISTS haberes_default_bank_account_fk');
-
-        Schema::table('haberes', function (Blueprint $table): void {
-            $table->dropColumn('default_bank_account_id');
-        });
 
         Schema::dropIfExists('person_bank_accounts');
     }

@@ -12,22 +12,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * Cada archivo que se descarga del banco y entra al sistema. Existe para
  * que una importación se pueda auditar y deshacer sin tocar los
- * movimientos que ya venían de otra.
- *
- * Desvíos respecto del DER, todos por lo que mostraron los archivos
- * reales del área (puntos 17-20 de `Correcciones-al-DER-pendientes.md`):
- *
- * - `source_format`, `account_number_in_file`, `currency_in_file`,
- *   `downloaded_at` y `operator_in_file`: MacroOnline exporta en dos
- *   formatos y solo el `.xls` trae la cabecera que identifica la cuenta.
- *   Sin guardarla no hay forma de rechazar el extracto de otra cuenta
- *   subido por error, ni de saber con qué parser se leyó una importación
- *   vieja cuando el banco cambie el formato.
- * - `stored_path` en lugar de `attachments(subject_type='import')`: esa
- *   tabla es de Shared y todavía no existe. Mover la ruta a `attachments`
- *   más adelante es un `UPDATE`; frenar la ingesta hasta tenerla, no.
- *   **Ya se movió**: la columna la elimina
- *   `2026_08_14_120000_migrate_bank_statement_files_to_attachments`.
+ * movimientos que ya venían de otra. El archivo en sí vive en
+ * `attachments`.
  */
 return new class extends Migration
 {
@@ -39,7 +25,6 @@ return new class extends Migration
             $table->foreignId('imported_by')->constrained('users')->restrictOnDelete();
 
             $table->string('original_filename', 255);
-            $table->string('stored_path', 255);
             $table->unsignedBigInteger('file_size');
             $table->char('file_sha256', 64);
 
@@ -81,6 +66,14 @@ return new class extends Migration
 
             $table->timestampTz('imported_at')->nullable();
             $table->timestampsTz();
+
+            /*
+             * Lo que el importador no puede decidir solo: un salto de
+             * saldo entre un extracto y el siguiente puede ser un
+             * archivo faltante o un rango que se pisa. Se avisa y lo
+             * resuelve quien mira.
+             */
+            $table->string('continuity_warning', 300)->nullable();
 
             // El mismo archivo no se importa dos veces contra la misma
             // cuenta. No alcanza para evitar duplicados —el operador baja

@@ -11,6 +11,9 @@
 # Pruebas de impresión: los PDF que se generan para mirarlos y descartarlos.
 /output
 
+# Scratch: volcados de esquema, respaldos y comparaciones de trabajo.
+/tmp
+
 /resources/js/actions
 /resources/js/routes
 /resources/js/wayfinder

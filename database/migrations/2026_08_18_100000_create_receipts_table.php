@@ -15,17 +15,9 @@ use Illuminate\Support\Facades\Schema;
  * ingreso parcial no genera comprobante de ningún tipo para el
  * empleador»*.
  *
- * Y se emite **al recibir**, sin esperar la acreditación de nada (§2.5.4).
- * Eso es lo que ordena el circuito del efectivo: entra por mostrador, se
- * emite el recibo, y recién si el beneficiario no aparece la contadora
- * deposita ese efectivo en la cuenta del organismo.
- *
- * Vive en `Shared` junto a `document_series`: un comprobante es
- * infraestructura institucional, no dominio de Haberes —Aranceles va a
- * emitir los suyos con esta misma tabla—. Por eso
- * `beneficiary_installment_id` va **sin foránea**: Shared no puede
- * depender de Haberes, que es el módulo más alto de la pila. La
- * integridad la garantiza el Action que emite.
+ * `beneficiary_installment_id` va **sin foránea, a propósito**: esta tabla
+ * es de Shared y no puede depender de Haberes. La integridad la garantiza
+ * el Action que emite.
  */
 return new class extends Migration
 {
@@ -181,6 +173,28 @@ return new class extends Migration
         DB::statement('CREATE TRIGGER receipts_append_only
             BEFORE UPDATE OR DELETE ON receipts
             FOR EACH ROW EXECUTE FUNCTION receipts_append_only()');
+
+        /*
+         * Quien firma el comprobante, con su nombre y cargo congelados: el
+         * papel esta en manos de alguien y no puede cambiar porque despues
+         * se corrija el legajo.
+         */
+        Schema::table('receipts', function (Blueprint $table): void {
+            $table->foreignId('signed_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('signed_by_name_snapshot', 200)->nullable();
+            $table->string('signed_by_title_snapshot', 120)->nullable();
+
+            /*
+             * Si se imprime el numero del talonario preimpreso en lugar del
+             * que lleva el sistema. La reimpresion tiene que salir igual que
+             * el original.
+             */
+            $table->boolean('prints_talonario_number')->default(false);
+        });
+
+        DB::statement('ALTER TABLE receipts
+            ADD CONSTRAINT receipts_prints_talonario_requires_number
+            CHECK (NOT prints_talonario_number OR talonario_number IS NOT NULL)');
     }
 
     public function down(): void

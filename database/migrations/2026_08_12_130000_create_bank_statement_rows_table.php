@@ -13,12 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * Cada fila tal como vino, en `raw_data`, junto a lo que el parser
  * entendió de ella. Es la evidencia: si mañana se descubre que el parser
  * interpretaba mal una columna, el original sigue acá y se puede rehacer.
- *
- * La separación entre esto y `bank_transactions` es lo que resuelve el
- * problema real del área: el operador descarga «Últimos movimientos» con
- * rangos que se pisan, así que el mismo crédito llega en dos archivos
- * distintos. La fila se guarda las dos veces —son dos hechos, dos
- * archivos—; el movimiento existe una sola.
  */
 return new class extends Migration
 {

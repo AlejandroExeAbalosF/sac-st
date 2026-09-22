@@ -13,12 +13,6 @@ use Illuminate\Support\Facades\Schema;
  * La quinta y última tabla del bloque de banco. Es la costura entre lo que
  * el banco informó y lo que el sistema asentó: vincula una porción de un
  * movimiento con el evento financiero que ese movimiento explica.
- *
- * **Por qué una porción y no el movimiento entero.** Un crédito de
- * $150.000 puede ser el depósito de dos expedientes distintos. Cada uno es
- * su propia recepción, con su propio asiento, y ambos apuntan al mismo
- * movimiento. Lo que el sistema garantiza es que entre todos no reclamen
- * más plata de la que el banco informó.
  */
 return new class extends Migration
 {
