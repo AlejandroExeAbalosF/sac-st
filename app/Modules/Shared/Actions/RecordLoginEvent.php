@@ -37,8 +37,15 @@ final class RecordLoginEvent
     ): ?UserLoginEvent {
         $request ??= request();
 
+        if ($request->attributes->has('audit_request_id')) {
+            $request->attributes->set('audit_auth_event', $type->value);
+            if ($reason !== null) {
+                $request->attributes->set('audit_auth_reason', $reason->value);
+            }
+        }
+
         try {
-            return UserLoginEvent::query()->create([
+            $event = UserLoginEvent::query()->create([
                 'user_id' => $user?->id,
                 'username_attempted' => $usernameAttempted,
                 'event_type' => $type,
@@ -50,6 +57,11 @@ final class RecordLoginEvent
                 'meta' => $meta === [] ? null : $meta,
                 'created_at' => now(),
             ]);
+            if ($request->attributes->has('audit_request_id')) {
+                $request->attributes->set('audit_login_event_id', $event->getKey());
+            }
+
+            return $event;
         } catch (Throwable $exception) {
             Log::channel('security')->error('No se pudo registrar el evento de acceso', [
                 'event_type' => $type->value,

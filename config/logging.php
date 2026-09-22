@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Logging\AuditJsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -87,6 +88,30 @@ return [
             'level' => 'info',
             'days' => env('LOG_SECURITY_DAYS', 365),
             'replace_placeholders' => true,
+        ],
+
+        'audit' => [
+            'driver' => 'stack',
+            'channels' => env('AUDIT_LOG_CONSOLE', env('APP_ENV', 'production') === 'local')
+                ? ['audit_file', 'audit_stderr']
+                : ['audit_file'],
+            'ignore_exceptions' => false,
+        ],
+
+        'audit_file' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit/audit.log'),
+            'level' => 'info',
+            'days' => (int) env('AUDIT_LOG_RETENTION_DAYS', 365),
+            'formatter' => AuditJsonFormatter::class,
+        ],
+
+        'audit_stderr' => [
+            'driver' => 'monolog',
+            'level' => 'info',
+            'handler' => StreamHandler::class,
+            'handler_with' => ['stream' => 'php://stderr'],
+            'formatter' => AuditJsonFormatter::class,
         ],
 
         'monthly' => [

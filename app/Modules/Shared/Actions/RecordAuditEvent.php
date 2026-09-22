@@ -36,7 +36,7 @@ final class RecordAuditEvent
         array $metadata = [],
         ?int $actorId = null,
     ): AuditEvent {
-        return AuditEvent::query()->create([
+        $event = AuditEvent::query()->create([
             // Los Actions reciben al actor explícitamente porque también
             // pueden ejecutarse fuera de una petición HTTP. La sesión es
             // solo el respaldo para los casos interactivos más simples.
@@ -54,6 +54,26 @@ final class RecordAuditEvent
             'user_agent' => substr((string) Request::userAgent(), 0, 500) ?: null,
             'occurred_at' => now(),
         ]);
+
+        // El archivo de acceso referencia este evento sin duplicar valores
+        // contables ni datos personales del diff.
+        $request = request();
+        if ($request->attributes->has('audit_request_id')) {
+            $changes = $request->attributes->get('audit_changes', []);
+            $changes[] = [
+                'audit_id' => $event->getKey(),
+                'action' => $action,
+                'subject_type' => class_basename($subject),
+                'subject_id' => $subject->getKey(),
+                'changed' => array_values(array_unique(array_merge(
+                    array_keys($before ?? []),
+                    array_keys($after ?? []),
+                ))),
+            ];
+            $request->attributes->set('audit_changes', $changes);
+        }
+
+        return $event;
     }
 
     /**

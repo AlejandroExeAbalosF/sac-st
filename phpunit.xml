@@ -28,6 +28,7 @@
              es el costo de que las fronteras se verifiquen de verdad. -->
         <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
+        <env name="AUDIT_LOG_CONSOLE" value="false" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
