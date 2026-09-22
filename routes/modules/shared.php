@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Shared\Http\Controllers\AccessAuditController;
 use App\Modules\Shared\Http\Controllers\AttachmentController;
+use App\Modules\Shared\Http\Controllers\OperationAuditController;
 use App\Modules\Shared\Http\Controllers\PersonController;
 use App\Modules\Shared\Http\Controllers\RoleController;
 use App\Modules\Shared\Http\Controllers\UserController;
@@ -98,5 +99,19 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::delete('sesiones', [AccessAuditController::class, 'destroySession'])
             ->middleware('can:auditoria.sesiones.revocar')
             ->name('sesiones.destroy');
+
+        /*
+         * La auditoría de operaciones. El Excel pide además su propio
+         * permiso: mirar es consultar, bajar es sacar datos personales del
+         * sistema.
+         */
+        Route::middleware('can:auditoria.operaciones.ver')->group(function (): void {
+            Route::get('auditoria', [OperationAuditController::class, 'index'])
+                ->name('auditoria.index');
+
+            Route::get('auditoria/exportar', [OperationAuditController::class, 'export'])
+                ->middleware('can:auditoria.operaciones.exportar')
+                ->name('auditoria.exportar');
+        });
     });
 });

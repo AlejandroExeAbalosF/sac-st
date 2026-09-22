@@ -233,6 +233,11 @@ legible; el trigger impide el desastre.
 Contar es trabajo de mostrador; revisar y mover plata contra una cuenta de
 diferencias, no.
 
+Todo lo que deshace o fuerza algo —imputar una diferencia, reabrir un período,
+rehacer una planilla, cancelar un traslado— queda en `audit_events` como acción
+crítica, y se busca de punta a punta en **Configuración › Auditoría**
+(`/configuracion/auditoria`), sin tener que saber de qué día era.
+
 ---
 
 ## Pendiente con el área

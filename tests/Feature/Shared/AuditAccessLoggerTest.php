@@ -91,7 +91,7 @@ class AuditAccessLoggerTest extends TestCase
         Route::post('/audit-test-change', function (): Response {
             $user = User::factory()->create();
             app(RecordAuditEvent::class)->handle(
-                'usuario.prueba',
+                'usuario.activado',
                 $user,
                 after: ['is_active' => true],
             );
@@ -102,7 +102,7 @@ class AuditAccessLoggerTest extends TestCase
         $this->post('/audit-test-change')->assertNoContent();
 
         $change = $this->events()[0]['context']['changes'][0];
-        $this->assertSame('usuario.prueba', $change['action']);
+        $this->assertSame('usuario.activado', $change['action']);
         $this->assertSame('User', $change['subject_type']);
         $this->assertSame(['is_active'], $change['changed']);
         $this->assertIsInt($change['audit_id']);

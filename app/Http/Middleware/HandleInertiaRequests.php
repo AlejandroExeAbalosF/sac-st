@@ -97,6 +97,7 @@ class HandleInertiaRequests extends Middleware
                     'usuarios.ver' => $user->can('usuarios.ver'),
                     'roles.gestionar' => $user->can('roles.gestionar'),
                     'auditoria.accesos.ver' => $user->can('auditoria.accesos.ver'),
+                    'auditoria.operaciones.ver' => $user->can('auditoria.operaciones.ver'),
                     /*
                      * «Egresos» es el único ítem de Operación que no le
                      * corresponde a todos los roles: el de consulta no

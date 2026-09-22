@@ -38,6 +38,7 @@ const RUTAS_SIN_PANTALLA = [
     'adjuntos.download',
     'adjuntos.preview',
     'caja.cierres.sheet',
+    'configuracion.auditoria.exportar',
 
     // Acceso anterior a la caja del día; ahora redirige a su URL canónica.
     'caja.index',

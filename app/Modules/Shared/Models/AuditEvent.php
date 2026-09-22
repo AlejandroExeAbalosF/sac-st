@@ -24,6 +24,8 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $old_values
  * @property array<string, mixed>|null $new_values
  * @property array<string, mixed>|null $metadata
+ * @property string|null $ip_address
+ * @property string|null $user_agent
  * @property Carbon $occurred_at
  */
 final class AuditEvent extends Model

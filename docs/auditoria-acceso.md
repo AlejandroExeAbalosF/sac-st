@@ -8,11 +8,62 @@ El canal `audit` es independiente de `laravel.log` y de `security.log`.
 
 Esta capa complementa las fuentes de auditoría existentes:
 
-| Fuente | Qué responde |
-| --- | --- |
-| `audit_events` | Qué operación de negocio ocurrió, sobre qué entidad y con qué cambios |
-| `user_login_events` | Qué pasó con las credenciales, el segundo factor y las sesiones |
-| Archivo `audit` | Qué solicitud HTTP llegó, quién la hizo, resultado y duración |
+| Fuente              | Qué responde                                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `audit_events`      | Qué operación de negocio ocurrió, sobre qué entidad y con qué cambios. Se mira en **Configuración › Auditoría** y en el historial de cada expediente, haber y cuota |
+| `user_login_events` | Qué pasó con las credenciales, el segundo factor y las sesiones. Se mira en **Configuración › Accesos y sesiones**                                                                 |
+| Archivo `audit`     | Qué solicitud HTTP llegó, quién la hizo, resultado y duración                                                                                                                      |
+
+## Auditoría de operaciones
+
+`/configuracion/auditoria` lee `audit_events` de punta a punta: qué se hizo,
+sobre qué, quién y cuándo, sin tener que saber de antemano en qué expediente
+mirar. Es de solo lectura; la tabla es append-only y la base lo impone.
+
+**Catálogo.** Qué significa cada código lo dice `AuditCatalog`
+(`app/Modules/Shared/Audit`), el mismo para esta pantalla y para los
+historiales. Cada módulo registra el suyo en su `*AuditCatalog`:
+
+- el rótulo, la **categoría** (un concepto del área) y la **severidad**:
+  `critical` para lo que deshace, fuerza o reabre algo;
+- qué claves de `metadata` se muestran. El motivo sale siempre; el resto de
+  la metadata queda en la tabla y no se vuelca;
+- quién describe y enlaza cada tipo de sujeto, y quién traduce cada id que
+  apunta a otra fila.
+
+Un código nuevo **se registra en el catálogo en el mismo cambio** que lo
+emite. Fuera de producción `RecordAuditEvent` rechaza un código sin
+registrar, y `tests/Unit/Shared/AuditCatalogTest.php` recorre el código
+fuente en las dos direcciones. En producción el evento se graba igual y el
+error se reporta; la pantalla lo muestra con su código.
+
+**Enlaces.** El sujeto se enlaza solo si el registro todavía existe y quien
+mira puede abrir su pantalla. Si no, se describe como «Cuota #123».
+
+**Filtros.** Fechas como días de Salta (rango semiabierto sobre el instante),
+usuario o «el sistema» (`user_id` nulo), acción, entidad y «solo críticas».
+Un filtro inválido vuelve a la pantalla sin filtros y con el error.
+
+**Excel.** `auditoria.operaciones.exportar`, un permiso aparte de
+`auditoria.operaciones.ver` porque saca del sistema datos personales. Baja
+lo que se está mirando, una fila por cambio, en el mismo orden que la
+pantalla. Se recorre por cursor `(occurred_at, id)` sobre una foto del id
+más alto al empezar: lo que se registre durante la descarga no entra.
+
+**Habilitación en una instalación existente.** El seeder crea
+`auditoria.operaciones.ver` y `auditoria.operaciones.exportar`, pero no
+modifica un rol que ya tenga permisos: esa matriz pudo haberse ajustado
+desde Configuración y no se pisa al desplegar. Después de sembrar los
+permisos, hay que otorgar ambos al contador desde **Configuración › Roles**.
+El administrador ya puede entrar por su acceso global.
+
+**Cruce con este archivo.** El **n.º de evento** que muestra la pantalla es
+el `audit_id` que aparece en `context.changes` de la línea HTTP que lo
+provocó. El cruce se hace por ese número, no por `X-Request-Id`:
+
+```bash
+jq 'select(.context.changes[]?.audit_id == 1234)' storage/logs/audit/audit-*.log
+```
 
 ## Formato
 
@@ -42,12 +93,12 @@ directorio de logs y respaldarlo según la política del organismo.
 
 La rotación diaria conserva 365 archivos por defecto. Se configura con:
 
-| Variable | Valor inicial | Uso |
-| --- | --- | --- |
-| `AUDIT_LOG_ENABLED` | `true` | Activar el registro de acceso |
-| `AUDIT_LOG_CONSOLE` | `true` en local, `false` en otros entornos | Reflejar cada línea en `stderr` (`composer dev` o logs del contenedor) |
-| `AUDIT_LOG_RETENTION_DAYS` | `365` | Días de archivos diarios en disco |
-| `AUDIT_LOG_SLOW_MS` | `1000` | Umbral de lentitud; `0` lo desactiva |
+| Variable                   | Valor inicial                              | Uso                                                                    |
+| -------------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
+| `AUDIT_LOG_ENABLED`        | `true`                                     | Activar el registro de acceso                                          |
+| `AUDIT_LOG_CONSOLE`        | `true` en local, `false` en otros entornos | Reflejar cada línea en `stderr` (`composer dev` o logs del contenedor) |
+| `AUDIT_LOG_RETENTION_DAYS` | `365`                                      | Días de archivos diarios en disco                                      |
+| `AUDIT_LOG_SLOW_MS`        | `1000`                                     | Umbral de lentitud; `0` lo desactiva                                   |
 
 La retención local no sustituye los respaldos. Si hay varios servidores,
 hay que recopilar los archivos de cada instancia para tener el historial

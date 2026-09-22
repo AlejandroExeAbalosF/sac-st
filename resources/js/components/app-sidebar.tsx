@@ -12,6 +12,7 @@ import {
     LayoutGrid,
     Lock,
     Scale,
+    ScrollText,
     Settings,
     ShieldCheck,
     Users,
@@ -34,6 +35,7 @@ import { calendario, dia as caja } from '@/routes/caja';
 import { index as arqueos } from '@/routes/caja/arqueos';
 import { index as cierres } from '@/routes/caja/cierres';
 import { index as accesos } from '@/routes/configuracion/accesos';
+import { index as auditoria } from '@/routes/configuracion/auditoria';
 import { index as roles } from '@/routes/configuracion/roles';
 import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
@@ -162,6 +164,12 @@ const navGroups: NavGroup[] = [
                         href: accesos(),
                         icon: History,
                         permission: 'auditoria.accesos.ver',
+                    },
+                    {
+                        title: 'Auditoría',
+                        href: auditoria(),
+                        icon: ScrollText,
+                        permission: 'auditoria.operaciones.ver',
                     },
                 ],
             },

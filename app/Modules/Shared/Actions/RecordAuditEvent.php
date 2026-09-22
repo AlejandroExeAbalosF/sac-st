@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Shared\Actions;
 
+use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Models\AuditEvent;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
+use LogicException;
 
 /**
  * Deja registrado un cambio del dominio.
@@ -23,6 +25,8 @@ use Illuminate\Support\Facades\Request;
  */
 final class RecordAuditEvent
 {
+    public function __construct(private readonly AuditCatalog $catalog) {}
+
     /**
      * @param  array<string, mixed>|null  $before
      * @param  array<string, mixed>|null  $after
@@ -36,6 +40,8 @@ final class RecordAuditEvent
         array $metadata = [],
         ?int $actorId = null,
     ): AuditEvent {
+        $this->guardRegistered($action);
+
         $event = AuditEvent::query()->create([
             // Los Actions reciben al actor explícitamente porque también
             // pueden ejecutarse fuera de una petición HTTP. La sesión es
@@ -74,6 +80,32 @@ final class RecordAuditEvent
         }
 
         return $event;
+    }
+
+    /**
+     * Un código que el catálogo no conoce es un evento que ninguna pantalla
+     * sabe nombrar.
+     *
+     * Fuera de producción se rechaza, para que el test del Action que lo
+     * emite falle en CI. En producción se reporta y se graba igual: perder
+     * el rastro de lo que alguien hizo sería peor que mostrarlo con su
+     * código.
+     */
+    private function guardRegistered(string $action): void
+    {
+        if ($this->catalog->has($action)) {
+            return;
+        }
+
+        $error = new LogicException(
+            "La acción de auditoría «{$action}» no está en el catálogo: registrala en el AuditCatalogContributor de su módulo.",
+        );
+
+        if (! app()->isProduction()) {
+            throw $error;
+        }
+
+        report($error);
     }
 
     /**

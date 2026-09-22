@@ -33,6 +33,7 @@
         "laravel/pint": "^1.27",
         "laravel/sail": "^1.53",
         "mockery/mockery": "^1.6",
+        "nikic/php-parser": "5.8",
         "nunomaduro/collision": "^8.9.3",
         "pestphp/pest": "^5.0",
         "pestphp/pest-plugin-drift": "^5.0",

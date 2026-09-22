@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
-use App\Modules\Haberes\Support\AuditTimeline;
 use App\Modules\Shared\Models\AuditEvent;
+use App\Modules\Shared\Support\AuditTimeline;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
 
 /**
  * Qué le pasó a esta cuota, quién y cuándo.
@@ -24,10 +21,10 @@ use Illuminate\Support\Collection;
  * leerlo. Un registro que nadie puede consultar no es auditoría: es un
  * archivo que crece.
  *
- * Va acotado a una cuota y no a una pantalla general de auditoría porque
- * es la pregunta que aparece en el momento: «esta cuota decía otra cosa la
- * semana pasada, ¿quién la cambió?». La pantalla general es otra cosa, y
- * es de la etapa de reportes.
+ * Va acotado a una cuota porque es la pregunta que aparece en el momento:
+ * «esta cuota decía otra cosa la semana pasada, ¿quién la cambió?». La
+ * mirada transversal está en la auditoría de operaciones; cómo se nombra
+ * cada campo lo dice el catálogo de auditoría, el mismo para las dos.
  *
  * **Incluye lo que le pasó a su efectivo camino al banco.** El traslado se
  * audita con el traslado como sujeto, no con la cuota, así que quedaba
@@ -38,39 +35,6 @@ use Illuminate\Support\Collection;
  */
 final class InstallmentHistoryController extends Controller
 {
-    /**
-     * Los nombres de los campos como los ve el operador.
-     *
-     * La columna se llama `expected_amount` y en la pantalla dice
-     * «Importe». Mostrar el nombre técnico obligaría a traducir de memoria
-     * justo cuando alguien está tratando de entender qué pasó.
-     *
-     * @var array<string, string>
-     */
-    private const CAMPOS = [
-        'expected_amount' => 'Importe',
-        'management_label_id' => 'Etiqueta de gestión',
-        'due_date' => 'Vencimiento',
-        'description' => 'Concepto',
-        'expected_medium' => 'Medio previsto',
-        'notes' => 'Observaciones',
-        'workflow_status' => 'Estado',
-        'block_reason' => 'Motivo del bloqueo',
-        // Del traslado del efectivo al banco.
-        'amount' => 'Importe',
-        'bank_account_id' => 'Cuenta',
-        'bank_transaction_id' => 'Movimiento del extracto',
-        'deposit_date' => 'Fecha del depósito',
-        'motivo' => 'Motivo',
-    ];
-
-    /** @var array<string, string> */
-    private const MEDIOS = [
-        'cash' => 'Efectivo',
-        'cheque' => 'Cheque',
-        'bank' => 'Depósito en cuenta',
-    ];
-
     public function __construct(private readonly AuditTimeline $linea) {}
 
     public function __invoke(BeneficiaryInstallment $installment): JsonResponse
@@ -96,11 +60,7 @@ final class InstallmentHistoryController extends Controller
             ->get();
 
         return response()->json([
-            'events' => $this->linea->shape($eventos, self::CAMPOS, [
-                'expected_medium' => self::MEDIOS,
-                'bank_account_id' => $this->etiquetasDeCuenta($eventos),
-                'bank_transaction_id' => $this->etiquetasDeMovimiento($eventos),
-            ]),
+            'events' => $this->linea->shape($eventos),
         ]);
     }
 
@@ -130,62 +90,5 @@ final class InstallmentHistoryController extends Controller
             ->all();
 
         return $ids;
-    }
-
-    /**
-     * El nombre de las cuentas que nombran los eventos.
-     *
-     * El registro guarda el id, que es lo correcto —la etiqueta de la
-     * cuenta puede cambiar y el historial tiene que seguir señalando a la
-     * misma—, pero un número en pantalla no le dice nada a nadie.
-     *
-     * @param  Collection<int, AuditEvent>  $eventos
-     * @return array<int, string>
-     */
-    private function etiquetasDeCuenta($eventos): array
-    {
-        $ids = $eventos
-            ->map(fn (AuditEvent $e): mixed => ($e->new_values['bank_account_id'] ?? null))
-            ->filter()
-            ->map(fn (mixed $id): int => (int) $id)
-            ->unique()
-            ->all();
-
-        if ($ids === []) {
-            return [];
-        }
-
-        /** @var array<int, string> $etiquetas */
-        $etiquetas = BankAccount::query()
-            ->whereIn('id', $ids)
-            ->pluck('label', 'id')
-            ->all();
-
-        return $etiquetas;
-    }
-
-    /**
-     * Una referencia bancaria legible sin perder el ID cuando el banco no
-     * informó número de operación.
-     *
-     * @param  Collection<int, AuditEvent>  $eventos
-     * @return array<int, string>
-     */
-    private function etiquetasDeMovimiento($eventos): array
-    {
-        $ids = $this->linea->idsMencionados($eventos, 'bank_transaction_id');
-
-        if ($ids === []) {
-            return [];
-        }
-
-        $etiquetas = [];
-        foreach (BankTransaction::query()->whereIn('id', $ids)->get(['id', 'operation_id']) as $movimiento) {
-            $etiquetas[$movimiento->id] = $movimiento->operation_id
-                ? 'Operación '.$movimiento->operation_id
-                : 'Movimiento n.º '.$movimiento->id;
-        }
-
-        return $etiquetas;
     }
 }

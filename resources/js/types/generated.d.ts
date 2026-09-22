@@ -786,6 +786,11 @@ declare namespace App {
                     lastActivityAt: string;
                     isCurrent: boolean;
                 };
+                export type AuditChangeData = {
+                    field: string;
+                    before: string | null;
+                    after: string | null;
+                };
                 export type CashBoxSummaryData = {
                     code: string;
                     name: string;
@@ -796,6 +801,22 @@ declare namespace App {
                 export type LastChangeData = {
                     at: string;
                     by: string | null;
+                };
+                export type OperationAuditEventData = {
+                    id: number;
+                    occurredAt: string;
+                    userName: string | null;
+                    action: string;
+                    label: string;
+                    critical: boolean;
+                    category: string;
+                    subjectType: string;
+                    subjectId: number;
+                    subjectLabel: string;
+                    subjectDescription: string;
+                    subjectUrl: string | null;
+                    changes: App.Modules.Shared.Data.AuditChangeData[];
+                    ipAddress: string | null;
                 };
                 export type PermissionGroupData = {
                     key: string;
@@ -862,6 +883,7 @@ declare namespace App {
                     | 'cash_transfer'
                     | 'deposit_ticket'
                     | 'period_closing';
+                export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =
                     'receipt_income' | 'receipt_expense' | 'payment_order';

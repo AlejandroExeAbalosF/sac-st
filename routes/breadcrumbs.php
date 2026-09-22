@@ -283,3 +283,8 @@ Breadcrumbs::for('configuracion.accesos.index', fn (): array => [
     Crumb::make('Configuración'),
     Crumb::make('Accesos y sesiones'),
 ]);
+
+Breadcrumbs::for('configuracion.auditoria.index', fn (): array => [
+    Crumb::make('Configuración'),
+    Crumb::make('Auditoría'),
+]);

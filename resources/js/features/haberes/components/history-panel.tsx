@@ -1,10 +1,4 @@
-import {
-    ArrowRight,
-    Check,
-    History,
-    RotateCcw,
-    TriangleAlert,
-} from 'lucide-react';
+import { Check, History, RotateCcw, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
     SheetDescription,
@@ -12,52 +6,26 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { AuditChange } from '@/features/auditoria/components/change-list';
+import ChangeList from '@/features/auditoria/components/change-list';
 import { dateTime, DISPLAY_TIME_ZONE } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-type Cambio = {
-    field: string;
-    before: string | null;
-    after: string | null;
-};
-
+/**
+ * Un evento, con su rótulo ya traducido.
+ *
+ * El rótulo viene del catálogo de auditoría del servidor. Antes había acá
+ * un mapa propio que se desfasó: traducía códigos que el servidor no
+ * emitía y dejaba en crudo otros que sí.
+ */
 type Evento = {
     id: number;
     action: string;
+    label: string;
+    critical: boolean;
     at: string;
     by: string | null;
-    changes: Cambio[];
-};
-
-/**
- * Qué dice cada acción, en palabras del área.
- *
- * Un solo mapa para los tres sujetos: los nombres vienen con su prefijo,
- * así que no se pisan, y tenerlos juntos evita que la misma acción se
- * traduzca distinto según desde dónde se abra el panel.
- */
-const ACCIONES: Record<string, string> = {
-    'cuota.corregida': 'Se corrigió la cuota',
-    'cuota.creada': 'Se cargó la cuota',
-    'cuota.anulada': 'Se anuló la cuota',
-    'cuota.reactivada': 'Se reactivó la cuota',
-    'cuota.medio-alineado':
-        'Se alineó el medio con el comprobante bancario cargado',
-    // Del efectivo de esta cuota, camino al banco.
-    'traslado.depositado': 'Se depositó el efectivo en el banco',
-    'traslado.acreditado': 'Se acreditó el depósito en el extracto',
-    'traslado.cancelado':
-        'Se canceló el depósito y el efectivo volvió a la caja',
-    // Del haber.
-    'haber.reconocido': 'Se reconoció el haber',
-    'haber.anulado': 'Se anuló el haber',
-    'haber.reactivado': 'Se reactivó el haber',
-    // Del expediente.
-    'expediente.registrado': 'Se registró el expediente',
-    'expediente.corregido': 'Se corrigió la ficha del expediente',
-    'expediente.anulado': 'Se anuló el expediente',
-    'expediente.reactivado': 'Se reactivó el expediente',
-    'expediente.fecha-ingreso-corregida': 'Se corrigió la fecha de ingreso',
+    changes: AuditChange[];
 };
 
 export type HistorySubject = 'installment' | 'expediente' | 'haber';
@@ -117,12 +85,8 @@ function agruparPorDia(eventos: Evento[]): DiaDeActividad[] {
  * Un registro que nadie puede consultar no es auditoría: es un archivo que
  * crece.
  *
- * **Se muestra el antes y el después**, no solo que «hubo un cambio». La
- * pregunta real nunca es si alguien tocó la cuota, es qué decía antes.
- *
- * Salvo cuando no hubo un antes. Un alta o un depósito no corrigen nada, y
- * dibujarlos como «— → valor», con la raya tachada, hacía leer un cambio
- * donde solo hay un hecho.
+ * **Se muestra el antes y el después**, no solo que «hubo un cambio»: lo
+ * dibuja `ChangeList`, el mismo que usa la auditoría de operaciones.
  *
  * Vive en el panel lateral y ya no en un diálogo: la pregunta aparece
  * mirando la cosa, y un diálogo modal tapaba justo lo que se estaba
@@ -301,42 +265,13 @@ export default function HistoryPanel({
                                             )}
                                         </div>
                                         <p className="mt-1 text-sm leading-snug font-semibold text-foreground">
-                                            {ACCIONES[e.action] ?? e.action}
+                                            {e.label}
                                         </p>
 
-                                        {e.changes.length > 0 && (
-                                            <dl className="mt-2 divide-y divide-border/60 rounded-md bg-muted/45 px-3 py-1">
-                                                {e.changes.map((c) => (
-                                                    <div
-                                                        key={c.field}
-                                                        className="grid grid-cols-[minmax(0,6.5rem)_minmax(0,1fr)] gap-x-2 py-1 text-sm"
-                                                    >
-                                                        <dt className="text-xs leading-5 text-field-label">
-                                                            {c.field}
-                                                        </dt>
-                                                        <dd className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-5">
-                                                            {c.before !==
-                                                                null && (
-                                                                <>
-                                                                    <span className="min-w-0 break-words text-muted-foreground line-through">
-                                                                        {
-                                                                            c.before
-                                                                        }
-                                                                    </span>
-                                                                    <ArrowRight
-                                                                        className="size-3 shrink-0 text-muted-foreground"
-                                                                        aria-hidden="true"
-                                                                    />
-                                                                </>
-                                                            )}
-                                                            <span className="min-w-0 font-medium break-words">
-                                                                {c.after ?? '—'}
-                                                            </span>
-                                                        </dd>
-                                                    </div>
-                                                ))}
-                                            </dl>
-                                        )}
+                                        <ChangeList
+                                            changes={e.changes}
+                                            className="mt-2"
+                                        />
                                     </li>
                                 );
                             })}

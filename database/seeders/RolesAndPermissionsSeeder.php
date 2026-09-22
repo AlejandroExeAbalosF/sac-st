@@ -53,6 +53,12 @@ class RolesAndPermissionsSeeder extends Seeder
         'auditoria.accesos.ver' => ['administrador', 'contador'],
         'auditoria.sesiones.ver' => ['administrador', 'contador'],
         'auditoria.sesiones.revocar' => ['administrador'],
+        // La auditoría de operaciones: quién anuló, revirtió, reabrió o
+        // forzó qué. La mira quien controla, no quien opera.
+        'auditoria.operaciones.ver' => ['administrador', 'contador'],
+        // Exportar saca del sistema datos personales —nombres, CBU— en un
+        // archivo que después nadie controla adónde va.
+        'auditoria.operaciones.exportar' => ['administrador', 'contador'],
 
         // Maestro de personas — Fase 2
         // El alta ocurre a mitad de otro trámite, desde el buscador del

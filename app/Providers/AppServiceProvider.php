@@ -7,6 +7,12 @@ namespace App\Providers;
 use App\Listeners\ConfirmPasswordOnLogin;
 use App\Listeners\RecordAuthEvent;
 use App\Models\User;
+use App\Modules\Banking\Audit\BankingAuditCatalog;
+use App\Modules\Haberes\Audit\HaberesAuditCatalog;
+use App\Modules\Ledger\Audit\LedgerAuditCatalog;
+use App\Modules\Shared\Audit\AuditCatalog;
+use App\Modules\Shared\Audit\AuditCatalogContributor;
+use App\Modules\Shared\Audit\SharedAuditCatalog;
 use App\Modules\Shared\Enums\SystemRole;
 use App\Support\Navigation\Breadcrumbs;
 use Carbon\CarbonImmutable;
@@ -30,7 +36,37 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->registerAuditCatalog();
+    }
+
+    /**
+     * El catálogo de auditoría, armado con lo que aporta cada módulo.
+     *
+     * Vive acá porque es el único lugar que puede nombrar a todos: Shared
+     * define el catálogo y no puede conocer a los demás. El orden sigue la
+     * dependencia de abajo hacia arriba, porque un módulo usa categorías
+     * que registró otro más abajo.
+     *
+     * Se arma la primera vez que alguien lo pide, no en cada arranque.
+     */
+    protected function registerAuditCatalog(): void
+    {
+        $this->app->singleton(AuditCatalog::class, function (): AuditCatalog {
+            $catalog = new AuditCatalog;
+
+            foreach ([
+                SharedAuditCatalog::class,
+                LedgerAuditCatalog::class,
+                BankingAuditCatalog::class,
+                HaberesAuditCatalog::class,
+            ] as $contributor) {
+                /** @var AuditCatalogContributor $aporte */
+                $aporte = $this->app->make($contributor);
+                $aporte->register($catalog);
+            }
+
+            return $catalog;
+        });
     }
 
     /**
