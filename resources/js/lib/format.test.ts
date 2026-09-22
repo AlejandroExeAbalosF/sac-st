@@ -165,9 +165,7 @@ describe('businessToday', () => {
 
 describe('dateTime', () => {
     it('convierte el instante UTC a la hora de Salta incluso cerca de medianoche', () => {
-        expect(dateTime('2026-09-23T02:30:00.000Z')).toBe(
-            '22/09/2026 23:30',
-        );
+        expect(dateTime('2026-09-23T02:30:00.000Z')).toBe('22/09/2026 23:30');
     });
 });
 
