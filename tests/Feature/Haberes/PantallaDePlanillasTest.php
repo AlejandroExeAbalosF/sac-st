@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\HaberManagementLabel;
+use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -276,7 +277,7 @@ class PantallaDePlanillasTest extends TestCase
     {
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
-                'receivedDate' => now()->toDateString(),
+                'receivedDate' => BusinessDate::today()->toDateString(),
                 'idempotencyKey' => 'cobro-'.Str::random(10),
                 ...$extra,
             ])

@@ -14,6 +14,7 @@ use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -203,7 +204,7 @@ class PantallasDeDepositosTest extends TestCase
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.ticket', $this->cuota()), [
                 'bankAccountId' => $cuenta->id,
-                'depositedAt' => now()->addDay()->toDateString(),
+                'depositedAt' => BusinessDate::today()->addDay()->toDateString(),
             ])
             ->assertSessionHasErrors('depositedAt');
     }

@@ -30,6 +30,7 @@ use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\PersonBankAccount;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Query\Builder;
@@ -633,7 +634,7 @@ class EgresoPorTransferenciaTest extends TestCase
     {
         return $this->actingAs($this->operador())
             ->post(route('haberes.installments.disbursement.report', $cuota), [
-                'reportedAt' => now()->toDateString(),
+                'reportedAt' => BusinessDate::today()->toDateString(),
                 'reference' => '83690105',
             ]);
     }

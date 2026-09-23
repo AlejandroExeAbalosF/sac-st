@@ -20,6 +20,7 @@ use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -73,8 +74,8 @@ class PantallasDeCajaTest extends TestCase
     {
         $this->abrirLibros();
 
-        $manana = CarbonImmutable::now()->addDay()->toDateString();
-        $hoy = CarbonImmutable::now()->toDateString();
+        $manana = BusinessDate::today()->addDay()->toDateString();
+        $hoy = BusinessDate::today()->toDateString();
 
         $this->actingAs($this->operador('administrativo'))
             ->get("/caja/dia?fecha={$manana}")
@@ -90,7 +91,7 @@ class PantallasDeCajaTest extends TestCase
             ->get('/caja/dia?fecha=el-martes-pasado')
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('selected.date', CarbonImmutable::now()->toDateString())
+                ->where('selected.date', BusinessDate::today()->toDateString())
             );
     }
 
@@ -379,7 +380,7 @@ class PantallasDeCajaTest extends TestCase
         $this->actingAs($this->operador('administrativo'))
             ->post('/caja/arqueos', [
                 'cashBoxId' => $this->caja(),
-                'countedOn' => CarbonImmutable::now()->addDay()->toDateString(),
+                'countedOn' => BusinessDate::today()->addDay()->toDateString(),
                 'currency' => 'ARS',
                 'denominations' => [],
             ])

@@ -16,6 +16,7 @@ use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,7 +90,7 @@ class EgresoPorMostradorTest extends TestCase
         $recibo = $this->recibosDeEgreso()->firstOrFail();
 
         $this->actingAs($this->operador('administrativo'))
-            ->get('/caja/dia?fecha='.now()->toDateString())
+            ->get('/caja/dia?fecha='.BusinessDate::today()->toDateString())
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->has('book.expense', 1)
@@ -280,7 +281,7 @@ class EgresoPorMostradorTest extends TestCase
             'beneficiary_installment_id' => $cuota->id,
             'medium_snapshot' => 'cash',
             'amount' => $cuota->importeEsperado(),
-            'issue_date' => now()->toDateString(),
+            'issue_date' => BusinessDate::today()->toDateString(),
             'status' => ReceiptStatus::Issued->value,
             'issue_mode' => 'online',
             'created_at' => now(),
@@ -322,7 +323,7 @@ class EgresoPorMostradorTest extends TestCase
     /** La fecha de la entrega no puede ser futura. */
     public function test_la_fecha_de_la_entrega_no_puede_ser_futura(): void
     {
-        $this->entregar($this->cuotaCobrada(), ['paymentDate' => now()->addDay()->toDateString()])
+        $this->entregar($this->cuotaCobrada(), ['paymentDate' => BusinessDate::today()->addDay()->toDateString()])
             ->assertSessionHasErrors('paymentDate');
 
         $this->assertSame(0, Disbursement::query()->count());
@@ -394,7 +395,7 @@ class EgresoPorMostradorTest extends TestCase
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
-                'receivedDate' => now()->toDateString(),
+                'receivedDate' => BusinessDate::today()->toDateString(),
                 'idempotencyKey' => 'cobro-'.Str::random(10),
                 ...($cheque ? ['chequeNumber' => '12345678', 'chequeBank' => 'Banco Nación'] : []),
             ])
@@ -426,7 +427,7 @@ class EgresoPorMostradorTest extends TestCase
     private function datos(): array
     {
         return [
-            'paymentDate' => now()->toDateString(),
+            'paymentDate' => BusinessDate::today()->toDateString(),
             'idempotencyKey' => 'egreso-'.Str::random(10),
         ];
     }

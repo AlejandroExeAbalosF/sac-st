@@ -36,6 +36,7 @@ use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderReadiness;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1309,7 +1310,7 @@ class OrdenDePagoTest extends TestCase
         $eventoId = DB::table('financial_events')->insertGetId([
             'public_id' => (string) Str::ulid(),
             'event_type' => 'funds_allocated',
-            'event_date' => now()->toDateString(),
+            'event_date' => BusinessDate::today()->toDateString(),
             'status' => 'posted',
             'idempotency_key' => 'excedente-'.Str::random(10),
             'created_at' => now(),

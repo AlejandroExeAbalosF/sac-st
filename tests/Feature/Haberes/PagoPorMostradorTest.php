@@ -11,6 +11,7 @@ use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -193,7 +194,11 @@ class PagoPorMostradorTest extends TestCase
     public function test_la_fecha_del_pago_no_puede_ser_anterior_al_alta_de_la_cuota(): void
     {
         $cuota = $this->cuotaEnEfectivo();
-        $vispera = $cuota->created_at->subDay()->toDateString();
+        // El día del alta en Salta, que es el piso que valida el servidor:
+        // `created_at` es un instante UTC y su fecha en UTC puede ser la
+        // del día siguiente.
+        $alta = BusinessDate::fromInstant($cuota->created_at)->toDateString();
+        $vispera = BusinessDate::fromInstant($cuota->created_at)->subDay()->toDateString();
 
         $this->pagar($cuota, ['receivedDate' => $vispera])
             ->assertSessionHasErrors('receivedDate');
@@ -202,11 +207,11 @@ class PagoPorMostradorTest extends TestCase
         $this->assertSame(0, Receipt::query()->count());
 
         // El día del alta sí, que es lo que el formulario propone.
-        $this->pagar($cuota, ['receivedDate' => $cuota->created_at->toDateString()])
+        $this->pagar($cuota, ['receivedDate' => $alta])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(
-            $cuota->created_at->toDateString(),
+            $alta,
             FundReceipt::query()->firstOrFail()->received_date->toDateString(),
         );
     }
@@ -214,7 +219,7 @@ class PagoPorMostradorTest extends TestCase
     /** Tampoco después de hoy: no se cobra lo que todavía no pasó. */
     public function test_la_fecha_del_pago_no_puede_ser_futura(): void
     {
-        $this->pagar($this->cuotaEnEfectivo(), ['receivedDate' => now()->addDay()->toDateString()])
+        $this->pagar($this->cuotaEnEfectivo(), ['receivedDate' => BusinessDate::today()->addDay()->toDateString()])
             ->assertSessionHasErrors('receivedDate');
 
         $this->assertSame(0, FundReceipt::query()->count());
@@ -307,7 +312,7 @@ class PagoPorMostradorTest extends TestCase
     private function datos(): array
     {
         return [
-            'receivedDate' => now()->toDateString(),
+            'receivedDate' => BusinessDate::today()->toDateString(),
             'idempotencyKey' => 'pago-'.Str::random(10),
         ];
     }

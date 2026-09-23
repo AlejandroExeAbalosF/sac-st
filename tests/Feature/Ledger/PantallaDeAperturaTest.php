@@ -8,6 +8,7 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -215,7 +216,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
-                'date' => now()->addDay()->toDateString(),
+                'date' => BusinessDate::today()->addDay()->toDateString(),
                 'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
             ])
             ->assertSessionHasErrors('date');

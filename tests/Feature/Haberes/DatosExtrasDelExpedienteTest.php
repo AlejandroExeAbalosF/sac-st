@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Haberes;
 
 use App\Modules\Haberes\Models\Expediente;
+use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -36,7 +37,7 @@ class DatosExtrasDelExpedienteTest extends TestCase
         $this->actingAs($operador)->post(route('expedientes.store'), [
             'number' => '0030064-222222/2026-0',
             'subject' => 'Acta acuerdo — García Claudio Adrián c/ CIACSA',
-            'receivedDate' => now()->subDay()->toDateString(),
+            'receivedDate' => BusinessDate::today()->subDay()->toDateString(),
             'employerId' => 101,
             'declaredTotalAmount' => '1204500.00',
             'externalId' => 'EXP-2026-000123',
@@ -93,7 +94,7 @@ class DatosExtrasDelExpedienteTest extends TestCase
         // no tiene autor, así que no serviría para ver el del nuevo.
         $this->actingAs($operador)->post(route('expedientes.store'), [
             'number' => '0030064-222222/2026-0',
-            'receivedDate' => now()->subDay()->toDateString(),
+            'receivedDate' => BusinessDate::today()->subDay()->toDateString(),
             'employerId' => 101,
         ])->assertSessionHasNoErrors();
 
