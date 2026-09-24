@@ -14,6 +14,7 @@ use App\Modules\Shared\Data\UserListItemData;
 use App\Modules\Shared\Http\Requests\StoreUserRequest;
 use App\Modules\Shared\Http\Requests\UpdateUserRequest;
 use App\Modules\Shared\Support\UserManagementGuard;
+use App\Support\Database\Like;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -41,11 +42,11 @@ final class UserController extends Controller
             ->with('roles')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
-                    $inner->where('last_name', 'ilike', '%'.$search.'%')
-                        ->orWhere('first_name', 'ilike', '%'.$search.'%')
-                        ->orWhere('username', 'ilike', '%'.$search.'%')
-                        ->orWhere('document_number', 'ilike', '%'.$search.'%')
-                        ->orWhere('email', 'ilike', '%'.$search.'%');
+                    $inner->where('last_name', 'ilike', Like::contains($search))
+                        ->orWhere('first_name', 'ilike', Like::contains($search))
+                        ->orWhere('username', 'ilike', Like::contains($search))
+                        ->orWhere('document_number', 'ilike', Like::contains($search))
+                        ->orWhere('email', 'ilike', Like::contains($search));
                 });
             })
             // Los inactivos al final: siguen estando, pero no son con

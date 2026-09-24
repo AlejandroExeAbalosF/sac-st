@@ -32,6 +32,27 @@ final class SpreadsheetReader
      */
     private const NUMERIC_PRECISION = 6;
 
+    /*
+     * El tamaño máximo de hoja que se lee.
+     *
+     * Un extracto trae cientos de filas y once columnas. Sin tope, un
+     * archivo de pocos KB con una celda en la última fila y la última
+     * columna de la hoja obligaba a recorrer diecisiete mil millones de
+     * celdas vacías, y cada subida mataba un proceso del servidor. Las
+     * columnas de más se descartan sin decir nada —son las que Excel
+     * formateó alguna vez—; las filas con datos más allá del tope, no:
+     * eso ya no es un extracto.
+     */
+    public const MAX_ROWS = 20_000;
+
+    public const MAX_COLUMNS = 60;
+
+    /**
+     * @param  int  $maxRows  El tope de filas. Se inyecta para que los tests
+     *                        lo prueben sin armar una planilla de veinte mil.
+     */
+    public function __construct(private readonly int $maxRows = self::MAX_ROWS) {}
+
     /**
      * Filas de un archivo delimitado —CSV o TSV—, como texto.
      *
@@ -142,12 +163,19 @@ final class SpreadsheetReader
          * filas, no millones; la memoria no es el problema, confundir una
          * fecha con un importe sí.
          */
-        $sheet = $reader->load($path)->getActiveSheet();
+        // Una fila de más que el tope: si trae datos, el archivo lo excede.
+        $reader->setReadFilter(new BoundedReadFilter($this->maxRows + 1, self::MAX_COLUMNS));
+
+        $book = $reader->load($path);
+        $sheet = $book->getActiveSheet();
+
+        $lastRow = $sheet->getHighestRow();
+        $lastColumn = $sheet->getHighestColumn();
 
         $rows = [];
 
-        foreach ($sheet->getRowIterator() as $row) {
-            $cells = $row->getCellIterator();
+        foreach ($sheet->getRowIterator(1, $lastRow) as $row) {
+            $cells = $row->getCellIterator('A', $lastColumn);
             // Las columnas vacías importan: son la posición de las que no
             // lo están, y el extracto usa celdas combinadas.
             $cells->setIterateOnlyExistingCells(false);
@@ -161,7 +189,18 @@ final class SpreadsheetReader
             $rows[] = $this->trimTrailingEmpty($values);
         }
 
-        return $rows;
+        // Las hojas y las celdas se referencian entre sí: sin cortar ese
+        // ciclo, un worker que importa varios extractos no libera ninguno.
+        $book->disconnectWorksheets();
+
+        if (count($rows) > $this->maxRows && $rows[$this->maxRows] !== []) {
+            throw new RuntimeException(sprintf(
+                'El archivo tiene más de %s filas con datos: no parece un extracto bancario.',
+                number_format($this->maxRows, 0, ',', '.'),
+            ));
+        }
+
+        return array_slice($rows, 0, $this->maxRows);
     }
 
     /**

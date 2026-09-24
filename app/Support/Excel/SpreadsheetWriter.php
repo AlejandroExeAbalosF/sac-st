@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Excel;
 
+use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -42,7 +44,13 @@ final class SpreadsheetWriter
             $writer->close();
         }, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            // Symfony arma la cabecera: escapa comillas y agrega el nombre
+            // en UTF-8. Concatenado, un nombre con `"` o con tildes la rompía.
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_ATTACHMENT,
+                $filename,
+                Str::ascii($filename),
+            ),
             'Cache-Control' => 'no-store',
         ]);
     }

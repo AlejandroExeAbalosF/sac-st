@@ -13,6 +13,7 @@ use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Http\Requests\IgnoreBankTransactionRequest;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Support\Database\Like;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,10 +40,10 @@ final class BankTransactionController extends Controller
             ->when($direction !== null, fn ($query) => $query->where('direction', $direction?->value))
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
-                    $inner->where('description', 'ilike', '%'.$search.'%')
-                        ->orWhere('operation_id', 'ilike', '%'.$search.'%')
-                        ->orWhere('counterparty_identifier', 'ilike', '%'.$search.'%')
-                        ->orWhere('counterparty_name', 'ilike', '%'.$search.'%');
+                    $inner->where('description', 'ilike', Like::contains($search))
+                        ->orWhere('operation_id', 'ilike', Like::contains($search))
+                        ->orWhere('counterparty_identifier', 'ilike', Like::contains($search))
+                        ->orWhere('counterparty_name', 'ilike', Like::contains($search));
                 });
             })
             ->orderByDesc('transaction_date')

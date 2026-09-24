@@ -277,6 +277,30 @@ class PantallasDeRecepcionesTest extends TestCase
             );
     }
 
+    /**
+     * Una búsqueda ambigua no ofrece las cuotas de un expediente cualquiera.
+     *
+     * Antes se tomaba el primero que contuviera lo tipeado, y `%` era un
+     * comodín: cualquier búsqueda así terminaba ofreciendo las cuotas del
+     * primer expediente de la tabla para imputarles dinero.
+     */
+    public function test_una_busqueda_ambigua_no_ofrece_cuotas(): void
+    {
+        $recepcion = $this->recepcion($this->cuota()->importeEsperado());
+
+        $this->assertGreaterThan(1, Expediente::query()->count());
+
+        foreach (['%', '_', '/'] as $buscado) {
+            $this->actingAs($this->operador())
+                ->get(route('recepciones.show', [
+                    'receipt' => $recepcion->id,
+                    'expediente' => $buscado,
+                ]))
+                ->assertOk()
+                ->assertInertia(fn (AssertableInertia $page) => $page->where('candidates', []));
+        }
+    }
+
     public function test_asignar_desde_la_pantalla_financia_la_cuota(): void
     {
         $cuota = $this->cuota();

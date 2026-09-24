@@ -12,6 +12,7 @@ use App\Modules\Shared\Http\Requests\StorePersonRequest;
 use App\Modules\Shared\Http\Requests\UpdatePersonRequest;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Support\Database\Like;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -43,10 +44,10 @@ final class PersonController extends Controller
             ->with(['roles:person_id,role', 'owner'])
             ->when($texto !== '', function ($query) use ($texto, $digitos): void {
                 $query->where(function ($persona) use ($texto, $digitos): void {
-                    $persona->where('search_name', 'like', "%{$texto}%");
+                    $persona->where('search_name', 'like', Like::contains($texto));
 
                     if ($digitos !== '') {
-                        $persona->orWhere('document', 'like', "%{$digitos}%");
+                        $persona->orWhere('document', 'like', Like::contains($digitos));
                     }
                 });
             })
@@ -99,10 +100,10 @@ final class PersonController extends Controller
 
         if ($search !== '') {
             $query->where(function ($people) use ($search, $document): void {
-                $people->where('search_name', 'like', "%{$search}%");
+                $people->where('search_name', 'like', Like::contains($search));
 
                 if ($document !== '') {
-                    $people->orWhere('document', 'like', "%{$document}%");
+                    $people->orWhere('document', 'like', Like::contains($document));
                 }
             });
         }

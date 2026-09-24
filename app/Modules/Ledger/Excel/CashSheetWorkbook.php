@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Excel;
 
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Support\Money\Decimal;
+use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -95,6 +96,26 @@ final class CashSheetWorkbook
 
         $libro = new Spreadsheet;
         $libro->removeSheetByIndex(0);
+
+        /*
+         * Todo texto entra como texto, aunque empiece con `=`.
+         *
+         * El binder de fábrica convierte en fórmula cualquier cadena que lo
+         * parezca, y a esta planilla llegan textos tipeados: la explicación
+         * de la diferencia del arqueo, el banco, la empresa y el
+         * beneficiario de cada cheque. Un `=HYPERLINK(...)` escrito ahí
+         * quedaba vivo en un documento oficial que circula y se archiva.
+         *
+         * Los números siguen siendo números —el `false` suprime solo esa
+         * conversión—, y una cadena numérica, como el número de un cheque,
+         * ahora queda como texto: ya no pierde los ceros de la izquierda.
+         */
+        $libro->setValueBinder(
+            (new StringValueBinder)
+                ->setNullConversion(false)
+                ->setBooleanConversion(false)
+                ->setNumericConversion(false),
+        );
 
         foreach ($sheets as $planilla) {
             $this->anverso($libro, $planilla);

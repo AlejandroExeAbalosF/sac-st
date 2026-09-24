@@ -83,11 +83,18 @@ final class BankStatementImportController extends Controller
             throw ValidationException::withMessages(['file' => $e->getMessage()]);
         }
 
+        // Un archivo que no se puede leer como extracto —demasiado
+        // grande, por ejemplo— vuelve al formulario con su motivo, igual
+        // que en la importación.
+        try {
+            $vistaPrevia = $parse->handle($path, $account, $format);
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['file' => $e->getMessage()]);
+        }
+
         return Inertia::render('banco/extractos/create', [
             'accounts' => $this->activeAccounts(),
-            'preview' => StatementPreviewData::fromPreview(
-                $parse->handle($path, $account, $format),
-            ),
+            'preview' => StatementPreviewData::fromPreview($vistaPrevia),
             'previewFilename' => $file->getClientOriginalName(),
             'previewAccountId' => $account->id,
         ]);

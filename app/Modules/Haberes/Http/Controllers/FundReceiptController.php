@@ -23,6 +23,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\ReceiptOrigin;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Support\Database\Like;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Illuminate\Database\Eloquent\Builder;
@@ -133,9 +134,9 @@ final class FundReceiptController extends Controller
                     ->join('expedientes as e', 'e.id', '=', 'dt.expediente_id')
                     ->whereColumn('bta.financial_event_id', 'fund_receipts.financial_event_id')
                     ->whereNull('bta.reversal_of_id')
-                    ->where('e.display_number', 'ilike', '%'.$busqueda.'%'))
+                    ->where('e.display_number', 'ilike', Like::contains($busqueda)))
                 ->orWhereHas('depositor', fn (Builder $persona) => $persona
-                    ->where('search_name', 'like', '%'.$texto.'%'));
+                    ->where('search_name', 'like', Like::contains($texto)));
 
             // Solo cuando lo escrito es un importe: «240000» no tiene por
             // qué buscarse contra un nombre.
@@ -227,6 +228,34 @@ final class FundReceiptController extends Controller
     }
 
     /**
+     * El expediente que el operador buscó, solo si no hay dudas de cuál es.
+     *
+     * Antes se tomaba el primero que contuviera lo tipeado. Con un número
+     * incompleto —o con `%`, que era un comodín— aparecían las cuotas de
+     * un expediente cualquiera, listas para recibir dinero de un tercero.
+     * Ahora manda la coincidencia exacta; si no la hay, una parcial sirve
+     * solo cuando es única. Si hay varias, no se ofrece nada y el operador
+     * afina la búsqueda.
+     */
+    private function expedienteBuscado(string $buscado): ?int
+    {
+        $exacto = Expediente::query()
+            ->whereRaw('lower(display_number) = lower(?)', [$buscado])
+            ->value('id');
+
+        if ($exacto !== null) {
+            return (int) $exacto;
+        }
+
+        $parciales = Expediente::query()
+            ->where('display_number', 'ilike', Like::contains($buscado))
+            ->limit(2)
+            ->pluck('id');
+
+        return $parciales->count() === 1 ? (int) $parciales->first() : null;
+    }
+
+    /**
      * Las cuotas a las que se puede imputar esta recepción.
      *
      * Si el ticket llegó a vincularse, el expediente ya se conoce y sus
@@ -242,9 +271,7 @@ final class FundReceiptController extends Controller
         $buscado = trim((string) $request->query('expediente', ''));
 
         if ($buscado !== '') {
-            $expedienteId = Expediente::query()
-                ->where('display_number', 'ilike', '%'.$buscado.'%')
-                ->value('id');
+            $expedienteId = $this->expedienteBuscado($buscado);
         }
 
         if ($expedienteId === null) {

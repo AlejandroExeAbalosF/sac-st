@@ -10,6 +10,7 @@ use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentTerms;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Support\Database\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -152,16 +153,16 @@ final class Haber extends Model
         return $query->where(function (Builder $haber) use ($texto, $digitos): void {
             $haber
                 ->whereHas('beneficiary', function (Builder $persona) use ($texto, $digitos): void {
-                    $persona->where('search_name', 'like', "%{$texto}%");
+                    $persona->where('search_name', 'like', Like::contains($texto));
 
                     if ($digitos !== '') {
-                        $persona->orWhere('document', 'like', "%{$digitos}%");
+                        $persona->orWhere('document', 'like', Like::contains($digitos));
                     }
                 })
                 ->orWhereHas('expediente', function (Builder $expediente) use ($texto): void {
                     $expediente
-                        ->where('search_text', 'like', "%{$texto}%")
-                        ->orWhereHas('employer', fn (Builder $persona) => $persona->where('search_name', 'like', "%{$texto}%"));
+                        ->where('search_text', 'like', Like::contains($texto))
+                        ->orWhereHas('employer', fn (Builder $persona) => $persona->where('search_name', 'like', Like::contains($texto)));
                 });
         });
     }

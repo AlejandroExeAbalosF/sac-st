@@ -271,6 +271,11 @@ con recibo, expediente, empresa, beneficiario, número, banco, fecha e importe.
 En el cierre mensual la rendición no se repite —el arqueo es un acto del día—
 pero el inventario sí: es una posición de cierre.
 
+Lo tipeado —la explicación de la diferencia, el banco, la empresa y el
+beneficiario de cada cheque— entra siempre como **texto**, aunque empiece con
+`=`: la planilla circula, y una fórmula escondida en un dato quedaría viva al
+abrirla. Por lo mismo, el número de un cheque conserva sus ceros a la izquierda.
+
 **Es un adjunto, no una descarga**: se guarda con su sha256, y si el cierre ya
 tiene la suya se devuelve esa, para que el papel firmado y el archivo del sistema
 sean el mismo objeto. Rehacerla es de administrador
