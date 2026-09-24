@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
+import FormError from '@/components/form-error';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -99,6 +100,15 @@ export default function UserFormDialog({
         return null;
     }
 
+    /*
+     * Lo que el servidor no va a dejar cambiar llega con el motivo, desde
+     * UserManagementGuard: el campo se deshabilita y lo dice, en vez de
+     * aceptar la edición y rechazarla al guardar.
+     */
+    const bloqueoCorreo =
+        mode.kind === 'edit' ? mode.user.credentialsLockedReason : null;
+    const bloqueoRol = mode.kind === 'edit' ? mode.user.roleLockedReason : null;
+
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -134,6 +144,10 @@ export default function UserFormDialog({
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="grid gap-5">
+                    <FormError
+                        message={(errors as Record<string, string>).user}
+                    />
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
                             <Label htmlFor="lastName">Apellido</Label>
@@ -211,6 +225,7 @@ export default function UserFormDialog({
                             <Label htmlFor="role">Rol</Label>
                             <Select
                                 value={data.role}
+                                disabled={bloqueoRol !== null}
                                 onValueChange={(valor) =>
                                     setData('role', valor)
                                 }
@@ -237,6 +252,11 @@ export default function UserFormDialog({
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.role} />
+                            {bloqueoRol !== null && (
+                                <p className="text-xs text-muted-foreground">
+                                    {bloqueoRol}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -247,11 +267,17 @@ export default function UserFormDialog({
                             type="email"
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
+                            disabled={bloqueoCorreo !== null}
                             autoComplete="off"
                             placeholder="nombre@salta.gob.ar"
                             aria-invalid={Boolean(errors.email)}
                         />
                         <InputError message={errors.email} />
+                        {bloqueoCorreo !== null && (
+                            <p className="text-xs text-muted-foreground">
+                                {bloqueoCorreo}
+                            </p>
+                        )}
                     </div>
 
                     <div className="grid gap-2">

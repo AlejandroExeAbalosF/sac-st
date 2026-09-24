@@ -7,7 +7,10 @@ namespace Tests\Feature\Configuracion;
 use App\Models\User;
 use App\Modules\Shared\Models\AuditEvent;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -129,5 +132,55 @@ class RolesTest extends TestCase
         $this->assertTrue($permisos->contains('egresos.validar'));
         $this->assertTrue($permisos->contains('cierres.cerrar'));
         $this->assertGreaterThan(1, $permisos->count());
+    }
+
+    /**
+     * `dev.forzar-cbu` en manos de un contador es una Orden de Pago a un
+     * CBU sin verificar. Las capacidades de desarrollo no se otorgan.
+     */
+    public function test_las_capacidades_de_desarrollo_no_se_otorgan(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.roles.index'))
+            ->put(route('configuracion.roles.update', $contador), [
+                'permissions' => ['dev.forzar-cbu'],
+            ])
+            ->assertSessionHasErrors([
+                'permissions' => 'Las capacidades de desarrollo (dev.forzar-cbu) no se otorgan a ningún rol.',
+            ]);
+
+        $this->assertFalse($contador->refresh()->hasPermissionTo('dev.forzar-cbu'));
+    }
+
+    /** Y la base lo impide aunque se escriba en la tabla por otro camino. */
+    public function test_la_base_rechaza_dev_para_otro_rol_que_super_admin(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+        $permiso = Permission::findByName('dev.forzar-cbu', 'web');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('solo las tiene el rol super-admin');
+
+        DB::table('role_has_permissions')->insert([
+            'permission_id' => $permiso->id,
+            'role_id' => $contador->id,
+        ]);
+    }
+
+    public function test_la_pantalla_no_ofrece_las_capacidades_de_desarrollo(): void
+    {
+        $this
+            ->actingAs($this->administrador())
+            ->get(route('configuracion.roles.index'))
+            ->assertOk()
+            ->assertInertia(function (AssertableInertia $page): void {
+                $grupos = json_encode($page->toArray()['props']['permissionGroups']);
+
+                $this->assertIsString($grupos);
+                $this->assertStringNotContainsString('dev.', $grupos);
+            });
     }
 }

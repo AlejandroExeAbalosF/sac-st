@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Http\Requests;
 
 use App\Concerns\ProfileValidationRules;
-use App\Modules\Shared\Enums\SystemRole;
+use App\Modules\Shared\Support\UserManagementGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,7 +29,11 @@ final class StoreUserRequest extends FormRequest
         return [
             ...$this->profileRules(),
             'position' => ['nullable', 'string', 'max:120'],
-            'role' => ['required', Rule::enum(SystemRole::class)],
+            // Los roles que quien carga puede asignar: `super-admin` solo
+            // lo da otro super-admin (ver UserManagementGuard).
+            'role' => ['required', Rule::in(array_keys(
+                app(UserManagementGuard::class)->assignableRoles($this->user()),
+            ))],
         ];
     }
 

@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Events\TwoFactorAuthenticationFailed;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -174,5 +175,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Logout::class, [RecordAuthEvent::class, 'onLogout']);
         Event::listen(Lockout::class, [RecordAuthEvent::class, 'onLockout']);
         Event::listen(PasswordReset::class, [RecordAuthEvent::class, 'onPasswordReset']);
+        Event::listen(TwoFactorAuthenticationFailed::class, [RecordAuthEvent::class, 'onTwoFactorFailed']);
     }
 }

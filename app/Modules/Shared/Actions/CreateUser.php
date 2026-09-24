@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
+use App\Modules\Shared\Support\UserManagementGuard;
 use App\Support\TemporaryPassword;
 use Illuminate\Support\Facades\DB;
 
@@ -23,14 +24,19 @@ use Illuminate\Support\Facades\DB;
  */
 final class CreateUser
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly RecordAuditEvent $auditar,
+        private readonly UserManagementGuard $guard,
+    ) {}
 
     /**
      * @param  array{first_name: string, last_name: string, username: string, document_number: string, email: string, position?: string|null}  $attributes
      * @return array{user: User, password: string} La clave en claro no se guarda ni se vuelve a mostrar.
      */
-    public function handle(array $attributes, string $role): array
+    public function handle(array $attributes, string $role, ?User $actor = null): array
     {
+        $this->guard->assert($this->guard->denyRole($role, null, $actor));
+
         $password = TemporaryPassword::generate();
 
         $user = DB::transaction(function () use ($attributes, $role, $password): User {

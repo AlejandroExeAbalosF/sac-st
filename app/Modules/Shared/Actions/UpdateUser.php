@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
+use App\Modules\Shared\Support\UserManagementGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,13 +20,24 @@ use Illuminate\Support\Facades\DB;
  */
 final class UpdateUser
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly RecordAuditEvent $auditar,
+        private readonly UserManagementGuard $guard,
+    ) {}
 
     /**
      * @param  array{first_name: string, last_name: string, document_number: string, email: string, position?: string|null}  $attributes
      */
-    public function handle(User $user, array $attributes, string $role): User
+    public function handle(User $user, array $attributes, string $role, ?User $actor = null): User
     {
+        $this->guard->assert($this->guard->denyManaging($user, $actor));
+
+        if ($attributes['email'] !== $user->email) {
+            $this->guard->assert($this->guard->denyCredentialChange($user, $actor));
+        }
+
+        $this->guard->assert($this->guard->denyRole($role, $user, $actor));
+
         $before = [
             'first_name' => $user->first_name,
             'last_name' => $user->last_name,
@@ -69,6 +81,7 @@ final class UpdateUser
                 subject: $user,
                 before: $antes,
                 after: $despues,
+                actorId: $actor?->id,
             );
         }
 

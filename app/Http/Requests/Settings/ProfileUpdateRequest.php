@@ -7,6 +7,7 @@ namespace App\Http\Requests\Settings;
 use App\Concerns\ProfileValidationRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
@@ -28,6 +29,31 @@ class ProfileUpdateRequest extends FormRequest
             'firstName' => $this->firstNameRules(),
             'lastName' => $this->lastNameRules(),
             'email' => $this->emailRules($this->user()->id),
+            /*
+             * Cambiar el correo exige la contraseña actual.
+             *
+             * El correo es a donde llega el enlace de recuperación: quien
+             * se encuentra una sesión abierta y lo cambia por el suyo,
+             * después pide «olvidé mi contraseña» y se queda con la cuenta.
+             * El resto del perfil se sigue editando sin pedirla.
+             */
+            'currentPassword' => [
+                Rule::requiredIf(fn (): bool => $this->changesEmail()),
+                'nullable',
+                'string',
+                'current_password',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'currentPassword.required' => 'Para cambiar el correo, confirmá tu contraseña actual.',
+            'currentPassword.current_password' => 'La contraseña no es correcta.',
         ];
     }
 
@@ -40,7 +66,13 @@ class ProfileUpdateRequest extends FormRequest
             'firstName' => 'nombre',
             'lastName' => 'apellido',
             'email' => 'correo electrónico',
+            'currentPassword' => 'contraseña actual',
         ];
+    }
+
+    private function changesEmail(): bool
+    {
+        return $this->input('email') !== $this->user()->email;
     }
 
     /**

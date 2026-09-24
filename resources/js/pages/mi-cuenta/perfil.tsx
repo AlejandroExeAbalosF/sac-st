@@ -1,8 +1,10 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { CircleCheck } from 'lucide-react';
+import { useState } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
+import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +40,15 @@ type PageProps = {
  */
 export default function Perfil({ mustVerifyEmail, status, assigned }: Props) {
     const { auth } = usePage<PageProps>().props;
+    const [correo, setCorreo] = useState(auth.user.email);
+
+    /*
+     * El correo es a donde llega la recuperación de la contraseña: cambiarlo
+     * pide la contraseña actual. El campo aparece solo cuando hace falta,
+     * para no pedirla al corregir un apellido.
+     */
+    const cambiaCorreo =
+        correo.trim().toLowerCase() !== auth.user.email.toLowerCase();
 
     return (
         <>
@@ -124,7 +135,10 @@ export default function Perfil({ mustVerifyEmail, status, assigned }: Props) {
                                             id="email"
                                             type="email"
                                             name="email"
-                                            defaultValue={auth.user.email}
+                                            value={correo}
+                                            onChange={(event) =>
+                                                setCorreo(event.target.value)
+                                            }
                                             required
                                             autoComplete="email"
                                             placeholder="nombre@salta.gob.ar"
@@ -138,6 +152,33 @@ export default function Perfil({ mustVerifyEmail, status, assigned }: Props) {
                                             recuperar la contraseña.
                                         </p>
                                     </div>
+
+                                    {cambiaCorreo && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="currentPassword">
+                                                Contraseña actual
+                                            </Label>
+
+                                            <PasswordInput
+                                                id="currentPassword"
+                                                name="currentPassword"
+                                                required
+                                                autoComplete="current-password"
+                                                aria-invalid={Boolean(
+                                                    errors.currentPassword,
+                                                )}
+                                            />
+
+                                            <InputError
+                                                message={errors.currentPassword}
+                                            />
+
+                                            <p className="text-xs text-muted-foreground">
+                                                Para cambiar el correo hace
+                                                falta confirmar que sos vos.
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {mustVerifyEmail &&
                                         auth.user.email_verified_at ===

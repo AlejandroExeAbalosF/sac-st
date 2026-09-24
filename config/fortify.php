@@ -105,7 +105,11 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // `password-reset` solo actúa sobre el pedido del enlace de
+    // recuperación y el alta de la clave nueva; en el resto de las rutas de
+    // Fortify el limitador devuelve `Limit::none()`. Ver
+    // FortifyServiceProvider::configureRateLimiting().
+    'middleware' => ['web', 'throttle:password-reset'],
 
     /*
     |--------------------------------------------------------------------------

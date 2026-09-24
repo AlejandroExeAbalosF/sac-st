@@ -268,27 +268,34 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                 {can.edit && (
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                aria-label={`Corregir la ficha de ${usuario.name}`}
-                                                                onClick={() =>
-                                                                    setFormulario(
-                                                                        {
-                                                                            kind: 'edit',
-                                                                            user: usuario,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil
-                                                                    className="size-4"
-                                                                    aria-hidden="true"
-                                                                />
-                                                            </Button>
+                                                            <span className="inline-flex">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    disabled={
+                                                                        usuario.lockedReason !==
+                                                                        null
+                                                                    }
+                                                                    aria-label={`Corregir la ficha de ${usuario.name}`}
+                                                                    onClick={() =>
+                                                                        setFormulario(
+                                                                            {
+                                                                                kind: 'edit',
+                                                                                user: usuario,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil
+                                                                        className="size-4"
+                                                                        aria-hidden="true"
+                                                                    />
+                                                                </Button>
+                                                            </span>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            Corregir la ficha
+                                                            {usuario.lockedReason ??
+                                                                'Corregir la ficha'}
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 )}
@@ -301,7 +308,8 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     disabled={
-                                                                        esUnoMismo
+                                                                        usuario.credentialsLockedReason !==
+                                                                        null
                                                                     }
                                                                     aria-label={`Restablecer la contraseña de ${usuario.name}`}
                                                                     onClick={() =>
@@ -318,9 +326,8 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                             </span>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            {esUnoMismo
-                                                                ? 'Tu contraseña se cambia desde Mi cuenta › Seguridad'
-                                                                : 'Restablecer la contraseña y cerrar sus sesiones'}
+                                                            {usuario.credentialsLockedReason ??
+                                                                'Restablecer la contraseña y cerrar sus sesiones'}
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 )}
@@ -334,7 +341,9 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                                         usuario.isActive
                                                                     }
                                                                     disabled={
-                                                                        esUnoMismo
+                                                                        esUnoMismo ||
+                                                                        usuario.lockedReason !==
+                                                                            null
                                                                     }
                                                                     onCheckedChange={() =>
                                                                         cambiarEstado(
@@ -348,9 +357,12 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                         <TooltipContent>
                                                             {esUnoMismo
                                                                 ? 'No podés desactivar tu propio usuario'
-                                                                : usuario.isActive
-                                                                  ? 'Desactivar: no podrá entrar y se cierran sus sesiones'
-                                                                  : 'Activar: vuelve a poder entrar'}
+                                                                : usuario.lockedReason !==
+                                                                    null
+                                                                  ? usuario.lockedReason
+                                                                  : usuario.isActive
+                                                                    ? 'Desactivar: no podrá entrar y se cierran sus sesiones'
+                                                                    : 'Activar: vuelve a poder entrar'}
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 )}

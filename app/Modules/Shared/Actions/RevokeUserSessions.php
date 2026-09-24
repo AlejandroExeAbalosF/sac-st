@@ -8,14 +8,18 @@ use App\Models\User;
 use App\Modules\Shared\Enums\LoginEventType;
 use App\Support\DeviceLabel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Cierra sesiones abiertas de un usuario.
  *
- * Con el driver `database` alcanza con borrar la fila: el request
- * siguiente no encuentra la sesión y el usuario vuelve al login. No hace
- * falta rotar el `remember_token` ni pedirle la contraseña a nadie, que es
- * lo que exige `logoutOtherDevices`.
+ * Con el driver `database`, borrar la fila deja al request siguiente sin
+ * sesión. **Pero eso solo no alcanza**: si el navegador guarda una cookie
+ * de «recordarme», el guard la usa para loguearlo de nuevo sin preguntar.
+ * Por eso además se rota el `remember_token`, que invalida toda cookie de
+ * recordatorio emitida hasta ahora. Durante un tiempo esto no se hizo, con
+ * la idea de que borrar la fila bastaba, y la baja de un usuario no lo
+ * sacaba del sistema.
  *
  * Cada sesión cerrada deja su propio evento en el historial. Uno solo por
  * lote diría «se cerraron sesiones» sin decir cuáles, y el historial existe
@@ -31,6 +35,8 @@ final class RevokeUserSessions
      */
     public function handle(User $user, ?string $exceptSessionId = null, ?string $reason = null): int
     {
+        $user->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
+
         $sessions = DB::table('sessions')
             ->where('user_id', $user->id)
             ->when($exceptSessionId !== null, fn ($query) => $query->where('id', '!=', $exceptSessionId))

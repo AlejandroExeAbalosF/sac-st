@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use App\Modules\Shared\Actions\RecordLoginEvent;
+use App\Modules\Shared\Actions\RevokeUserSessions;
 use App\Modules\Shared\Enums\LoginEventType;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
@@ -65,8 +66,11 @@ class SecurityController extends Controller
     /**
      * Update the user's password.
      */
-    public function update(PasswordUpdateRequest $request, RecordLoginEvent $recordLoginEvent): RedirectResponse
-    {
+    public function update(
+        PasswordUpdateRequest $request,
+        RecordLoginEvent $recordLoginEvent,
+        RevokeUserSessions $revokeUserSessions,
+    ): RedirectResponse {
         $user = $request->user();
         $eraObligatorio = $user->must_change_password;
 
@@ -85,6 +89,17 @@ class SecurityController extends Controller
             type: LoginEventType::PasswordChanged,
             user: $user,
             meta: $eraObligatorio ? ['reason' => 'cambio obligatorio'] : [],
+        );
+
+        /*
+         * Cambiar la clave es lo primero que hace quien sospecha que otro
+         * la conoce. Si las otras sesiones siguieran abiertas, el cambio no
+         * lo sacaría a ese otro. La de esta pantalla se conserva.
+         */
+        $revokeUserSessions->handle(
+            $user,
+            exceptSessionId: $request->session()->getId(),
+            reason: 'contraseña cambiada',
         );
 
         Toast::success(__('Contraseña actualizada.'));

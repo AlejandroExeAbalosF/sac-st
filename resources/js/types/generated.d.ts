@@ -866,6 +866,9 @@ declare namespace App {
                     isActive: boolean;
                     mustChangePassword: boolean;
                     lastLoginAt: string | null;
+                    lockedReason: string | null;
+                    credentialsLockedReason: string | null;
+                    roleLockedReason: string | null;
                 };
                 export type WorkQueueData = {
                     key: string;

@@ -6,6 +6,7 @@ namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
 use App\Modules\Shared\Enums\LoginEventType;
+use App\Modules\Shared\Support\UserManagementGuard;
 use App\Support\TemporaryPassword;
 use RuntimeException;
 
@@ -35,6 +36,7 @@ final class ResetUserPassword
         private readonly RecordAuditEvent $auditar,
         private readonly RecordLoginEvent $registrarAcceso,
         private readonly RevokeUserSessions $revocarSesiones,
+        private readonly UserManagementGuard $guard,
     ) {}
 
     /**
@@ -47,6 +49,8 @@ final class ResetUserPassword
                 'No podés restablecer tu propia contraseña: cambiala desde Mi cuenta › Seguridad.'
             );
         }
+
+        $this->guard->assert($this->guard->denyCredentialChange($user, $actor));
 
         $password = TemporaryPassword::generate();
 

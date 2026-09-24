@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\AuditAccessLogger;
+use App\Http\Middleware\EnsureAccountIsUsable;
 use App\Http\Middleware\ForcePasswordChange;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -27,6 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
+            /*
+             * Primero: si la cuenta ya no está habilitada, nada de lo que
+             * sigue tiene que ejecutarse con su sesión.
+             */
+            EnsureAccountIsUsable::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

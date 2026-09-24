@@ -11,9 +11,9 @@ use App\Modules\Shared\Actions\ResetUserPassword;
 use App\Modules\Shared\Actions\SetUserActive;
 use App\Modules\Shared\Actions\UpdateUser;
 use App\Modules\Shared\Data\UserListItemData;
-use App\Modules\Shared\Enums\SystemRole;
 use App\Modules\Shared\Http\Requests\StoreUserRequest;
 use App\Modules\Shared\Http\Requests\UpdateUserRequest;
+use App\Modules\Shared\Support\UserManagementGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -31,8 +31,10 @@ use RuntimeException;
  */
 final class UserController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, UserManagementGuard $guard): Response
     {
+        $viewer = $request->user();
+
         $search = trim((string) $request->query('buscar', ''));
 
         $users = User::query()
@@ -51,13 +53,15 @@ final class UserController extends Controller
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->get()
-            ->map(UserListItemData::fromModel(...))
+            ->map(fn (User $user): UserListItemData => UserListItemData::fromModel($user, $viewer, $guard))
             ->values()
             ->all();
 
         return Inertia::render('configuracion/usuarios', [
             'users' => $users,
-            'roles' => SystemRole::catalog(),
+            // Solo los que quien mira puede asignar: `super-admin` no
+            // aparece para un administrador.
+            'roles' => $guard->assignableRoles($viewer),
             'filters' => ['buscar' => $search === '' ? null : $search],
             'can' => [
                 'create' => $request->user()?->can('usuarios.crear') ?? false,
@@ -70,10 +74,15 @@ final class UserController extends Controller
 
     public function store(StoreUserRequest $request, CreateUser $createUser): RedirectResponse
     {
-        ['user' => $user, 'password' => $password] = $createUser->handle(
-            $request->userAttributes(),
-            (string) $request->validated('role'),
-        );
+        try {
+            ['user' => $user, 'password' => $password] = $createUser->handle(
+                $request->userAttributes(),
+                (string) $request->validated('role'),
+                $request->user(),
+            );
+        } catch (RuntimeException $e) {
+            return back()->withErrors(['role' => $e->getMessage()]);
+        }
 
         return back()->with('temporaryPassword', [
             'username' => $user->username,
@@ -84,7 +93,16 @@ final class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user, UpdateUser $updateUser): RedirectResponse
     {
-        $updateUser->handle($user, $request->userAttributes(), (string) $request->validated('role'));
+        try {
+            $updateUser->handle(
+                $user,
+                $request->userAttributes(),
+                (string) $request->validated('role'),
+                $request->user(),
+            );
+        } catch (RuntimeException $e) {
+            return back()->withErrors(['user' => $e->getMessage()]);
+        }
 
         return back()->with('status', 'Ficha de usuario actualizada.');
     }

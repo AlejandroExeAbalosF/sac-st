@@ -13,6 +13,7 @@ use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\PasswordReset;
+use Laravel\Fortify\Events\TwoFactorAuthenticationFailed;
 use Laravel\Fortify\Fortify;
 
 /**
@@ -105,6 +106,25 @@ final class RecordAuthEvent
             type: LoginEventType::PasswordReset,
             user: $user,
             usernameAttempted: $user->username,
+        );
+    }
+
+    /**
+     * Un código del segundo factor rechazado.
+     *
+     * El tipo existía en el historial desde el principio y nadie lo
+     * escribía: la contraseña ya era correcta, así que un ataque contra el
+     * segundo factor pasaba sin dejar rastro.
+     */
+    public function onTwoFactorFailed(TwoFactorAuthenticationFailed $event): void
+    {
+        $user = $event->user;
+
+        $this->record->handle(
+            type: LoginEventType::TwoFactorFailed,
+            user: $user,
+            usernameAttempted: $user->username,
+            reason: LoginFailureReason::InvalidTwoFactorCode,
         );
     }
 

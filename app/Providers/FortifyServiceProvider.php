@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Modules\Shared\Actions\RecordLoginEvent;
 use App\Modules\Shared\Enums\LoginEventType;
 use App\Modules\Shared\Enums\LoginFailureReason;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -20,8 +21,12 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Responses\SuccessfulPasswordResetLinkRequestResponse;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\Passkeys;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -30,7 +35,20 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /*
+         * «Olvidé mi contraseña» responde lo mismo exista o no la cuenta.
+         *
+         * Fortify devuelve un error cuando el correo no está registrado, y
+         * eso convierte la pantalla en un oráculo: cualquiera averigua qué
+         * casillas tienen usuario. El texto ya era neutro; la forma de la
+         * respuesta no.
+         */
+        $this->app->bind(
+            FailedPasswordResetLinkRequestResponse::class,
+            fn (): SuccessfulPasswordResetLinkRequestResponse => new SuccessfulPasswordResetLinkRequestResponse(
+                PasswordBroker::RESET_LINK_SENT,
+            ),
+        );
     }
 
     /**
@@ -94,6 +112,28 @@ class FortifyServiceProvider extends ServiceProvider
 
             return $user;
         });
+
+        /*
+         * La passkey no pasa por `authenticateUsing`, así que el bloqueo de
+         * arriba no la alcanza: un usuario dado de baja volvía a entrar con
+         * la suya. `EnsureAccountIsUsable` lo sacaría en el pedido
+         * siguiente; esto evita que llegue a entrar.
+         */
+        Passkeys::authorizeLoginUsing(function (Request $request, PasskeyUser $user): bool {
+            if ($user instanceof User && $user->isActive()) {
+                return true;
+            }
+
+            app(RecordLoginEvent::class)->handle(
+                type: LoginEventType::LoginFailed,
+                user: $user instanceof User ? $user : null,
+                usernameAttempted: $user instanceof User ? $user->username : null,
+                reason: LoginFailureReason::AccountDisabled,
+                request: $request,
+            );
+
+            return false;
+        });
     }
 
     /**
@@ -138,6 +178,29 @@ class FortifyServiceProvider extends ServiceProvider
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
+        });
+
+        /*
+         * Pedir el enlace de recuperación manda un correo: sin tope, sirve
+         * para inundar una casilla o para probar correos a ciegas. Se
+         * engancha a todas las rutas de Fortify (ver `config/fortify.php`)
+         * y solo actúa sobre las dos de recuperación.
+         */
+        RateLimiter::for('password-reset', function (Request $request) {
+            if (! $request->isMethod('POST') || ! $request->routeIs('password.email', 'password.update')) {
+                return Limit::none();
+            }
+
+            $limites = [Limit::perMinute(5)->by('ip:'.$request->ip())];
+
+            // Por casilla, solo el pedido del enlace: al elegir la clave
+            // nueva, tres errores de tipeo no deberían dejar a nadie
+            // esperando un cuarto de hora.
+            if ($request->routeIs('password.email')) {
+                $limites[] = Limit::perMinutes(15, 3)->by('email:'.Str::lower((string) $request->input('email')));
+            }
+
+            return $limites;
         });
 
         RateLimiter::for('passkeys', function (Request $request) {

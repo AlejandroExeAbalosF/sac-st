@@ -65,6 +65,48 @@ provocó. El cruce se hace por ese número, no por `X-Request-Id`:
 jq 'select(.context.changes[]?.audit_id == 1234)' storage/logs/audit/audit-*.log
 ```
 
+## Sesiones y credenciales
+
+Lo que decide quién puede estar adentro, y lo que deja en
+`user_login_events`:
+
+- **No hay «recordarme».** La sesión dura lo que la actividad. Un ingreso
+  por cookie de recordatorio —una que alguien haya conservado de antes— se
+  rechaza y queda como `session_revoked`.
+- **Usuario activo en cada pedido.** `EnsureAccountIsUsable` saca en el
+  pedido siguiente a quien se dio de baja, entre por donde haya entrado
+  (contraseña, passkey o una sesión que ya estaba abierta). La passkey de un
+  inactivo, además, ni siquiera entra: queda como `login_failed` con
+  `account_disabled`.
+- **Cerrar sesiones rota el `remember_token`.** Lo hacen la baja, el
+  restablecimiento desde Usuarios, el cambio de clave propio (conserva la
+  sesión actual) y la recuperación por correo.
+- **Segundo factor.** Un código rechazado queda como `two_factor_failed`.
+- **Recuperación por correo.** Responde lo mismo exista o no la casilla, y
+  tiene tope: 5 pedidos por minuto por IP y 3 cada 15 minutos por correo.
+- **Cambiar el propio correo** pide la contraseña actual: es a donde llega
+  la recuperación.
+
+**Entre administradores** no se restablecen claves ni se cambian correos o
+roles: con la temporal en la mano, uno entraría como el otro y sus actos
+quedarían a nombre ajeno. Sí se corrige la ficha y se desactiva. Nadie cambia
+su propio rol, al último administrador activo no se le quita, y a un
+`super-admin` solo lo gestiona otro super-admin, que es también el único que
+asigna ese rol. Las reglas viven en `UserManagementGuard`; la pantalla
+deshabilita con el mismo motivo que el servidor devolvería. Las capacidades
+`dev.*` no se otorgan a ningún rol: `UpdateRolePermissions` lo rechaza y un
+trigger sobre `role_has_permissions` lo impide en la base.
+
+El administrador que pierde su clave la recupera por correo. Si el correo no
+funciona, desde el servidor:
+
+```bash
+php artisan usuarios:restablecer-clave <usuario>
+```
+
+Muestra la temporal una sola vez, obliga a cambiarla al entrar y deja el
+restablecimiento firmado por «sistema».
+
 ## Formato
 
 Campos principales: `channel`, `ts` (zona horaria de visualización), `event`,

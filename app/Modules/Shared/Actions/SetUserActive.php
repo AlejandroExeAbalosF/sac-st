@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
+use App\Modules\Shared\Support\UserManagementGuard;
 use RuntimeException;
 
 /**
@@ -25,6 +26,7 @@ final class SetUserActive
     public function __construct(
         private readonly RecordAuditEvent $auditar,
         private readonly RevokeUserSessions $revocarSesiones,
+        private readonly UserManagementGuard $guard,
     ) {}
 
     public function handle(User $user, bool $active, ?User $actor = null): User
@@ -32,6 +34,8 @@ final class SetUserActive
         if ($user->is_active === $active) {
             return $user;
         }
+
+        $this->guard->assert($this->guard->denyManaging($user, $actor));
 
         if (! $active) {
             $this->guardAgainstSelfDeactivation($user, $actor);
@@ -66,17 +70,7 @@ final class SetUserActive
 
     private function guardAgainstLastAdministrator(User $user): void
     {
-        if (! $user->hasRole('administrador')) {
-            return;
-        }
-
-        $otros = User::query()
-            ->where('is_active', true)
-            ->whereKeyNot($user->id)
-            ->whereHas('roles', fn ($query) => $query->where('name', 'administrador'))
-            ->exists();
-
-        if (! $otros) {
+        if ($this->guard->isLastActiveAdministrator($user)) {
             throw new RuntimeException(
                 'Es el único administrador activo: designá otro antes de desactivarlo.'
             );

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Shared\Actions\UpdateRolePermissions;
 use App\Modules\Shared\Data\PermissionGroupData;
 use App\Modules\Shared\Data\RoleData;
+use App\Modules\Shared\Enums\SystemRole;
 use App\Modules\Shared\Http\Requests\UpdateRolePermissionsRequest;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -35,6 +36,9 @@ final class RoleController extends Controller
 
         $permissions = array_values(
             Permission::query()
+                // Las de desarrollo no se otorgan desde acá: mostrarlas
+                // como casillas sería ofrecer algo que se va a rechazar.
+                ->where('name', 'not like', SystemRole::DEVELOPER_ABILITY_PREFIX.'%')
                 ->orderBy('name')
                 ->get()
                 ->map(fn (Permission $permission): string => $permission->name)
