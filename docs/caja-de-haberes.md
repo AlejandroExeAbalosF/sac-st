@@ -179,8 +179,11 @@ cosas el sistema podría calcular además una composición teórica, hoy imposib
 
 La aritmética del arqueo no cambia: esos billetes están en el cajón, así que
 suman a `counted_amount` como cualquier otro. Las columnas nuevas son atribución,
-no un segundo cálculo. La planilla los imprime sumados por denominación, porque
-el papel lista lo que hay en el cajón y no de dónde vino cada billete.
+no un segundo cálculo. En la planilla, el cuadro por denominación muestra solo
+la recaudación del día, tal como ocurre en los veinte reversos de junio. El saldo
+anterior queda en una fila separada: `SALDO DIA ANTERIOR (recontado)` muestra lo
+encontrado al abrir el fajo; si no se abrió, conserva el rótulo
+`SALDO DIA ANTERIOR (no recontado)` y muestra el importe calculado por el libro.
 
 El cálculo sale de `CashDayTakings`, que resuelve la cadena
 `journal_lines` → `funding_allocations` → `fund_receipts` sin salir de Ledger: la

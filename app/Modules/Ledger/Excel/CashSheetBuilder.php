@@ -94,7 +94,7 @@ final class CashSheetBuilder
     private function cashCount(PeriodClosing $closing): ?CashCount
     {
         return CashCount::query()
-            ->with('allLines')
+            ->with('lines')
             ->where('cash_box_id', $closing->cash_box_id)
             ->where('currency', $closing->currency)
             ->whereDate('counted_on', $closing->period_to)

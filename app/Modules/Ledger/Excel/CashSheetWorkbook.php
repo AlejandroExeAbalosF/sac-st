@@ -61,8 +61,11 @@ final class CashSheetWorkbook
      * `6`: el renglón del motivo sale del reverso. Declarar un saldo sin
      * recontar dejó de exigirlo: en la planilla del área lo arrastran los
      * veinte días, así que el campo se llenaba igual todas las tardes.
+     *
+     * `7`: el reverso separa la recaudación del día del saldo anterior
+     * recontado, también en el cuadro de billetes.
      */
-    public const VERSION = '6';
+    public const VERSION = '7';
 
     private const AZUL = 'FF1F3864';
 
@@ -225,17 +228,16 @@ final class CashSheetWorkbook
              * del área las tiene preimpresas en cero por ese motivo.
              */
             /*
-              * Los dos conteos van juntos, y sumados por denominación.
+              * El cuadro cuenta únicamente la recaudación del día.
               *
-              * El papel lista **lo que hay en el cajón**: no le interesa si
-              * un billete de diez mil vino de la recaudación de hoy o del
-              * fajo que se abrió esta tarde. Separarlos acá daría dos
-              * renglones de la misma denominación y un cuadro que no suma
-              * el total contado.
+              * Es la convención de la planilla del área: en los veinte
+              * reversos de junio la suma por denominación coincide con
+              * «RECAUDACION DEL DIA», y el saldo anterior queda como un
+              * importe separado aunque ese día se lo haya recontado.
               */
             $contadas = [];
 
-            foreach ($arqueo->allLines as $linea) {
+            foreach ($arqueo->lines as $linea) {
                 $denominacion = (string) (int) $linea->denomination;
                 $contadas[$denominacion] = ($contadas[$denominacion] ?? 0) + (int) $linea->quantity;
             }
@@ -264,8 +266,20 @@ final class CashSheetWorkbook
                     ->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
             }
 
+            /*
+             * `counted_amount` es todo lo contado: recaudación más fajo
+             * cuando se lo abrió. La planilla necesita separar ambos
+             * conceptos igual que el cuadro de billetes, así que la
+             * recaudación se obtiene quitando el importe atribuido al fajo.
+             */
+            $recaudacionDelDia = bcsub(
+                $arqueo->counted_amount,
+                $arqueo->carry_counted_amount ?? '0.00',
+                2,
+            );
+
             $fila++;
-            $this->reverseTotal($hoja, $fila, 'RECAUDACION DEL DIA', $arqueo->counted_amount);
+            $this->reverseTotal($hoja, $fila, 'RECAUDACION DEL DIA', $recaudacionDelDia);
 
             /*
              * El renglón que el papel llama «SALDO DIA ANTERIOR».
@@ -275,15 +289,21 @@ final class CashSheetWorkbook
              * con los dos nombres —el suyo y el nuestro— y va siempre,
              * aunque dé cero, porque en el papel es una fila fija.
              *
-             * El motivo se aclara debajo solo cuando hay algo declarado:
-             * un renglón en cero no tiene nada que explicar.
+             * Si el fajo se abrió, el renglón muestra lo efectivamente
+             * encontrado y lo dice en el rótulo. Poner cero escondía el
+             * saldo anterior dentro de «RECAUDACION DEL DIA».
              */
+            $saldoAnteriorRecontado = $arqueo->carry_counted_amount !== null;
             $fila++;
             $this->reverseTotal(
                 $hoja,
                 $fila,
-                'SALDO DIA ANTERIOR (no recontado)',
-                $arqueo->uncounted_amount,
+                $saldoAnteriorRecontado
+                    ? 'SALDO DIA ANTERIOR (recontado)'
+                    : 'SALDO DIA ANTERIOR (no recontado)',
+                $saldoAnteriorRecontado
+                    ? $arqueo->carry_counted_amount
+                    : $arqueo->uncounted_amount,
             );
 
             $fila++;

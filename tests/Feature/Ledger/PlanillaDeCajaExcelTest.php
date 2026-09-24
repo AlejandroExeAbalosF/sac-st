@@ -178,16 +178,8 @@ class PlanillaDeCajaExcelTest extends TestCase
         $this->assertSame(743050.0, (float) $hoja->getCell('C'.$filas[$rotulo])->getValue());
     }
 
-    /**
-     * Con el fajo recontado, el cuadro suma los dos conteos.
-     *
-     * El papel lista **lo que hay en el cajón**: no le interesa si un
-     * billete de veinte mil vino de la recaudación de hoy o del fajo que se
-     * abrió esta tarde. Si los renglones salieran separados habría dos
-     * filas de la misma denominación y el cuadro no sumaría el total
-     * contado, que es lo único que la rendición tiene que cerrar.
-     */
-    public function test_el_reverso_suma_los_billetes_del_fajo_recontado(): void
+    /** El cuadro de billetes corresponde solo a la recaudación del día. */
+    public function test_el_reverso_separa_del_cuadro_el_fajo_recontado(): void
     {
         $cierre = $this->cierreDel30DeJunioConFajoRecontado();
 
@@ -197,27 +189,31 @@ class PlanillaDeCajaExcelTest extends TestCase
 
         $this->assertNotNull($hoja);
 
-        // 101 del día más 37 del fajo, en un solo renglón.
-        $this->assertSame(138, (int) $hoja->getCell('A8')->getValue());
-        $this->assertSame(2760000.0, (float) $hoja->getCell('C8')->getValue());
+        // Los 37 billetes del fajo no se mezclan con los 101 del día.
+        $this->assertSame(101, (int) $hoja->getCell('A8')->getValue());
+        $this->assertSame(2020000.0, (float) $hoja->getCell('C8')->getValue());
 
-        // 4 del día más 3 del fajo.
-        $this->assertSame(7, (int) $hoja->getCell('A11')->getValue());
-        $this->assertSame(7000.0, (float) $hoja->getCell('C11')->getValue());
+        // Lo mismo para los tres billetes de mil del saldo anterior.
+        $this->assertSame(4, (int) $hoja->getCell('A11')->getValue());
+        $this->assertSame(4000.0, (float) $hoja->getCell('C11')->getValue());
 
-        // Y uno que solo estaba en el fajo.
-        $this->assertSame(1, (int) $hoja->getCell('A15')->getValue());
-        $this->assertSame(50.0, (float) $hoja->getCell('C15')->getValue());
+        // El billete de 50 estaba solo en el fajo y no aparece en el cuadro.
+        $this->assertSame('', (string) $hoja->getCell('A15')->getValue());
+        $this->assertSame(0.0, (float) $hoja->getCell('C15')->getValue());
 
         $filas = $this->rotulos($hoja);
 
-        $this->assertSame(2777850.0, (float) $hoja->getCell('C'.$filas['RECAUDACION DEL DIA'])->getValue());
-
-        // Y ya no queda nada sin recontar: se recontó.
+        // Los importes conservan la misma separación que el cuadro.
+        $this->assertSame(2034800.0, (float) $hoja->getCell('C'.$filas['RECAUDACION DEL DIA'])->getValue());
         $this->assertSame(
-            0.0,
-            (float) $hoja->getCell('C'.$filas['SALDO DIA ANTERIOR (no recontado)'])->getValue(),
+            743050.0,
+            (float) $hoja->getCell('C'.$filas['SALDO DIA ANTERIOR (recontado)'])->getValue(),
         );
+        $this->assertSame(
+            2777850.0,
+            (float) $hoja->getCell('C'.$filas['TOTAL CAJA HABERES EN CONSIGNACIÓN'])->getValue(),
+        );
+        $this->assertArrayNotHasKey('SALDO DIA ANTERIOR (no recontado)', $filas);
     }
 
     /**
