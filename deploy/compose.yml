@@ -1,0 +1,159 @@
+# Stack de producción de SAC-ST. Se opera con deploy/bin/sacst, que le pasa
+# a compose el archivo de variables del servidor:
+#
+#     sudo deploy/bin/sacst pull
+#     sudo deploy/bin/sacst up -d
+#
+#   proxy del data center ─▶ web (nginx) ─▶ app (php-fpm) ─▶ PostgreSQL del host
+#
+# Las imágenes las publica GitHub Actions en GHCR; el servidor no compila
+# nada. Todo lo propio del servidor vive fuera del repo:
+#
+#   /etc/sacst/compose.env   versión, carpeta de datos, IP y puerto (este archivo)
+#   /etc/sacst/app.env       entorno de Laravel, con el rol de la aplicación
+#   /etc/sacst/migrate.env   credenciales del rol dueño del esquema
+#   SACST_STORAGE_PATH       adjuntos, logs de auditoría y caché
+#
+# El entorno del proyecto va en el env_file y no en el .env: las variables de
+# entorno reales le ganan al archivo y siguen valiendo con la configuración
+# cacheada.
+
+name: sacst
+
+# Endurecimiento común a todos los servicios:
+#
+# - no-new-privileges: ningún proceso gana privilegios al ejecutar un binario
+#   setuid, aunque la imagen trajera alguno.
+# - cap_drop ALL: sin capacidades del kernel. php-fpm, la cola y las
+#   migraciones corren como www-data y no necesitan ninguna; nginx recupera
+#   las cuatro que usa para arrancar.
+# - read_only: el sistema de archivos de la imagen no se puede escribir. Lo
+#   que sí se escribe va a tmpfs (se pierde al reiniciar, a propósito) o al
+#   storage del servidor.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+
+x-app: &app
+  <<: *hardening
+  image: ${SACST_IMAGE:-ghcr.io/alejandroexeabalosf/sac-st}:${SACST_VERSION:?falta SACST_VERSION en compose.env}
+  env_file: ${SACST_CONFIG_DIR:-/etc/sacst}/app.env
+  volumes:
+    - ${SACST_STORAGE_PATH:?falta SACST_STORAGE_PATH en compose.env}:/var/www/html/storage
+  # - /tmp: las subidas de PHP y los temporales (fotos normalizadas, PDF).
+  # - bootstrap/cache: la configuración y las rutas cacheadas que el
+  #   entrypoint arma al arrancar, con el entorno del servidor.
+  tmpfs:
+    - /tmp
+    - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0755
+  restart: unless-stopped
+  logging:
+    driver: journald
+    options:
+      tag: "{{.Name}}"
+
+services:
+  # Migraciones y catálogo. Corre y termina; app espera a que salga bien.
+  #
+  # Es el único servicio que entra con el rol dueño del esquema: migrate.env
+  # pisa DB_USERNAME y DB_PASSWORD de app.env. El resto del stack usa el rol
+  # de la aplicación, que no puede alterar tablas ni apagar triggers.
+  #
+  # El catálogo (permisos, series, cajas, etiquetas) se siembra en cada
+  # despliegue: es idempotente y no pisa los permisos que el área haya
+  # editado desde Configuración, así que un permiso nuevo aparece solo.
+  migrate:
+    <<: *app
+    env_file:
+      - ${SACST_CONFIG_DIR:-/etc/sacst}/app.env
+      - ${SACST_CONFIG_DIR:-/etc/sacst}/migrate.env
+    command:
+      - sh
+      - -c
+      - php artisan migrate --force --no-ansi && php artisan db:seed --class=CatalogosSeeder --force --no-ansi
+    restart: "no"
+
+  app:
+    <<: *app
+    environment:
+      SACST_OPTIMIZE: "true"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Hoy ningún proceso encola trabajos, pero QUEUE_CONNECTION=database: el
+  # día que alguno lo haga sin un worker corriendo, los trabajos se
+  # acumularían en la tabla sin que nadie se entere.
+  queue:
+    <<: *app
+    environment:
+      SACST_OPTIMIZE: "true"
+    command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600", "--sleep=3", "--no-ansi"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # El único puerto publicado, atado a la IP de la LAN: ni 0.0.0.0, que lo
+  # abriría en todas las interfaces, ni 127.0.0.1, adonde el proxy del data
+  # center —otra máquina— no llega.
+  web:
+    <<: *hardening
+    image: ${SACST_IMAGE:-ghcr.io/alejandroexeabalosf/sac-st}-web:${SACST_VERSION:?falta SACST_VERSION en compose.env}
+    # Solo de esta dirección se acepta X-Forwarded-Proto (ver la plantilla
+    # de nginx). Tiene que coincidir con la que figura en TRUSTED_PROXIES.
+    environment:
+      SACST_DC_PROXY_IP: ${SACST_DC_PROXY_IP:?falta SACST_DC_PROXY_IP en compose.env}
+    # El maestro de nginx arranca como root: cambia de dueño sus carpetas,
+    # baja a su usuario y escucha en el 80.
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    # Lo único que nginx escribe: la configuración que arma la plantilla al
+    # arrancar, su caché, el pid y los temporales.
+    tmpfs:
+      - /etc/nginx/conf.d
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${SACST_WEB_BIND:?falta SACST_WEB_BIND en compose.env}:80"
+    restart: unless-stopped
+    healthcheck:
+      # /up recorre nginx, php-fpm y Laravel. 127.0.0.1 y no localhost:
+      # Alpine resuelve localhost a ::1 y este nginx escucha solo en IPv4.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: journald
+      options:
+        tag: "{{.Name}}"
+
+# Red creada a mano, con subred fija (deploy/README.md):
+#
+#   docker network create --subnet 10.200.1.0/24 --gateway 10.200.1.1 sacst_net
+#
+# - El gateway es la IP por la que los contenedores llegan a PostgreSQL:
+#   fija, pg_hba.conf autoriza este /24 y nada más.
+# - Externa, sobrevive a un `down`. Si compose la recreara, PostgreSQL
+#   perdería la interfaz en la que escucha.
+networks:
+  default:
+    name: sacst_net
+    external: true

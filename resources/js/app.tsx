@@ -9,7 +9,9 @@ import AuthLayout from '@/layouts/auth-layout';
 import { applyCspNonce } from '@/lib/csp-nonce';
 import type { Auth } from '@/types';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+// Vite lo fija al compilar, y la imagen de producción se compila sin `.env`:
+// sin este valor, las pestañas del navegador decían «Laravel».
+const appName = import.meta.env.VITE_APP_NAME || 'SAC-ST';
 
 // Antes de montar: los diálogos de Radix lo leen al abrirse.
 const nonce = applyCspNonce();

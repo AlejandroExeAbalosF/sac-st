@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Configuración para el PROXY DEL DATA CENTER.
+#
+# ESTE ARCHIVO NO SE INSTALA EN EL SERVIDOR DE SAC-ST. Se le entrega al
+# equipo del data center para que lo monte en su nginx de borde, el que
+# resuelve el dominio del sistema.
+#
+# El repo es público: los valores reales van solo en la copia que se entrega.
+# Reemplazar:
+#   <DOMINIO>            el dominio del sistema (el mismo que APP_URL)
+#   <IP_DEL_SERVIDOR>    la IP de la LAN del servidor de SAC-ST
+#
+# Y del lado del servidor, la IP desde la que este proxy se conecta tiene que
+# figurar en TRUSTED_PROXIES (app.env) y en SACST_DC_PROXY_IP (compose.env).
+#
+# IMPORTANTE: este proxy NO agrega Content-Security-Policy, X-Frame-Options,
+# X-Content-Type-Options ni Strict-Transport-Security. Los emite la app, que
+# es la única que sabe qué pantallas pueden mostrarse en un <iframe> y lleva
+# un nonce distinto en cada respuesta. Duplicarlos es el hallazgo de ZAP
+# «Multiple X-Frame-Options Header Entries», y uno agregado acá con DENY deja
+# en blanco los visores de comprobantes.
+# ─────────────────────────────────────────────────────────────────────────
+
+upstream sacst_backend {
+    server <IP_DEL_SERVIDOR>:8080;
+    keepalive 16;
+}
+
+# ===== FASE 1: HTTP (acceso por VPN, hasta que se instale el certificado).
+server {
+    listen 80;
+    server_name <DOMINIO>;
+
+    # Los extractos bancarios llegan en planillas de hasta 32 MB: el nginx
+    # del servidor acepta 33M y este tiene que dejar pasar lo mismo.
+    client_max_body_size 33M;
+    server_tokens off;
+
+    location / {
+        proxy_pass http://sacst_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection        "";
+
+        # El Host tiene que ser el dominio: la app solo atiende pedidos
+        # dirigidos a APP_URL y responde 400 a cualquier otro. Sin esta
+        # línea, nginx manda la IP del backend.
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # En HTTP, $scheme = http: la app no marca las cookies como seguras
+        # ni anuncia HSTS.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+
+        # La app manda cabeceras grandes: CSP con nonce, Link de precarga,
+        # cookies.
+        proxy_buffer_size       32k;
+        proxy_buffers           8 32k;
+        proxy_busy_buffers_size 64k;
+
+        # Los exportes y los PDF largos tardan más que una pantalla.
+        proxy_read_timeout 180s;
+        proxy_send_timeout 60s;
+    }
+
+    # Defensa extra: la app no los expone, pero no cuesta nada.
+    location ~ /\.(git|env|htaccess|DS_Store|bak|old|swp)$ {
+        deny all;
+        return 404;
+    }
+}
+
+# ===== FASE 2: HTTPS (activar cuando el data center instale el certificado).
+#
+# 1) Descomentar los dos bloques de abajo y comentar el de la fase 1.
+# 2) En el servidor, app.env: APP_URL=https://<DOMINIO> y
+#    SESSION_SECURE_COOKIE=true. Después: sudo deploy/bin/sacst up -d
+# 3) La app empieza a emitir Strict-Transport-Security y cookies seguras sola,
+#    en cuanto recibe X-Forwarded-Proto: https desde este proxy.
+#
+# server {
+#     listen 80;
+#     server_name <DOMINIO>;
+#     return 301 https://$host$request_uri;
+# }
+#
+# server {
+#     listen 443 ssl;
+#     http2 on;                      # nginx >= 1.25.1; antes: listen 443 ssl http2;
+#     server_name <DOMINIO>;
+#
+#     ssl_certificate     /etc/nginx/ssl/<DOMINIO>.crt;
+#     ssl_certificate_key /etc/nginx/ssl/<DOMINIO>.key;
+#     ssl_protocols       TLSv1.2 TLSv1.3;
+#     ssl_ciphers         HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+#     ssl_session_cache   shared:SSL:10m;
+#     ssl_session_timeout 1d;
+#
+#     client_max_body_size 33M;
+#     server_tokens off;
+#
+#     location / {
+#         proxy_pass http://sacst_backend;
+#         proxy_http_version 1.1;
+#         proxy_set_header Connection        "";
+#         proxy_set_header Host              $host;
+#         proxy_set_header X-Real-IP         $remote_addr;
+#         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+#         # Clave: le dice a la app que el usuario entró por HTTPS.
+#         proxy_set_header X-Forwarded-Proto https;
+#         proxy_set_header X-Forwarded-Host  $host;
+#
+#         proxy_buffer_size       32k;
+#         proxy_buffers           8 32k;
+#         proxy_busy_buffers_size 64k;
+#
+#         proxy_read_timeout 180s;
+#         proxy_send_timeout 60s;
+#     }
+#
+#     location ~ /\.(git|env|htaccess|DS_Store|bak|old|swp)$ {
+#         deny all;
+#         return 404;
+#     }
+# }

@@ -1,0 +1,28 @@
+# Compilar las imágenes en la máquina en vez de bajarlas de GHCR.
+#
+# No es el camino normal: las imágenes de producción las compila GitHub
+# Actions después de que pasan los tests. Esto queda para dos casos: probar
+# el stack en una máquina de desarrollo antes de publicar una versión, y
+# salir del paso si el servidor no llegara a ghcr.io.
+#
+#     sudo deploy/bin/sacst -f deploy/compose.build.yml build
+#
+# Va en un archivo aparte a propósito. Con `build` en compose.yml, un `pull`
+# que falla haría que compose compilara en silencio en el servidor de
+# producción, y la imagen que corre dejaría de ser la que pasó CI.
+#
+# Solo `app` declara el build aunque migrate y queue usen la misma imagen:
+# si los tres lo declararan, se compilarían en paralelo hacia el mismo
+# nombre y dos cortarían con «image already exists».
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: app
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web

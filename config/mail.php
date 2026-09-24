@@ -47,7 +47,25 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            // Acotado para que, si el SMTP del organismo no responde, el
+            // failover pase a Gmail sin dejar al operador esperando.
+            'timeout' => is_numeric(env('MAIL_TIMEOUT')) ? (float) env('MAIL_TIMEOUT') : null,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        /*
+         * La casilla de Gmail con la que el sistema manda correo mientras el
+         * organismo no asigne un SMTP propio, y la que queda de respaldo
+         * después. Va con contraseña de aplicación, no con la de la cuenta.
+         */
+        'gmail' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtp',
+            'host' => 'smtp.gmail.com',
+            'port' => 587,
+            'username' => env('GMAIL_USERNAME'),
+            'password' => env('GMAIL_APP_PASSWORD'),
+            'timeout' => is_numeric(env('MAIL_TIMEOUT')) ? (float) env('MAIL_TIMEOUT') : null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
@@ -81,12 +99,20 @@ return [
             'transport' => 'array',
         ],
 
+        /*
+         * El mailer de producción (`MAIL_MAILER=failover`).
+         *
+         * Con `MAIL_HOST` cargado manda el SMTP del organismo, y Gmail entra
+         * solo si ese falla. Con `MAIL_HOST` vacío va directo a Gmail: poner
+         * `smtp` primero igual haría que cada envío esperara el timeout de un
+         * servidor que no existe antes de caer al respaldo.
+         *
+         * Pasar de Gmail al SMTP propio es cargar `MAIL_HOST` y reiniciar;
+         * no hay que tocar código ni el mailer elegido.
+         */
         'failover' => [
             'transport' => 'failover',
-            'mailers' => [
-                'smtp',
-                'log',
-            ],
+            'mailers' => filled(env('MAIL_HOST')) ? ['smtp', 'gmail'] : ['gmail'],
             'retry_after' => 60,
         ],
 

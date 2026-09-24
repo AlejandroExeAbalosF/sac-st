@@ -1,0 +1,151 @@
+# nginx del contenedor web: sirve public/ y reenvía lo demás a app:9000.
+#
+# Es una plantilla: al arrancar, la imagen oficial de nginx reemplaza las
+# variables de entorno escritas como ${VAR} y deja el resultado en
+# conf.d/default.conf. Las variables propias de nginx ($host, $scheme...)
+# quedan intactas, porque solo se reemplazan las que existen en el entorno.
+#
+# ── Cabeceras de seguridad: una sola fuente por respuesta ─────────────────
+#
+# Lo que pasa por PHP no lleva ningún add_header de nginx. Las cabeceras las
+# pone la app (SecurityHeaders + config/security.php), y es la única que sabe
+# qué rutas pueden mostrarse en un <iframe>: los visores de comprobantes
+# (`same_origin_frame_routes`). Un X-Frame-Options agregado acá saldría
+# duplicado —ZAP lo reporta— y con DENY dejaría el visor en blanco sin un solo
+# error del lado del servidor.
+#
+# Los estáticos, en cambio, no pasan por PHP y saldrían sin cabeceras. Esos
+# sí llevan nosniff y Cross-Origin-Resource-Policy desde acá —los mismos
+# valores que la app—; ZAP los marca en /build/* y /robots.txt.
+
+# Qué X-Forwarded-* manda el proxy del data center. Si falta el esquema,
+# Laravel cree que el pedido llegó por HTTP aunque haya llegado por HTTPS, y
+# no hay fallback a propósito: uno que adivine lo vuelve silencioso.
+#   journalctl CONTAINER_NAME=sacst-web-1 -n 20 | grep xfp=
+# ── Quién puede decir cómo llegó el pedido ─────────────────────────────
+#
+# Solo el proxy del data center. Un cliente de la LAN que entre directo al
+# puerto podía mandar su propio X-Forwarded-Proto: https, y como Laravel
+# confía en este nginx (TRUSTED_PROXIES), le creía. De cualquier otro origen
+# se usa el esquema real de la conexión.
+#
+# SACST_DC_PROXY_IP viene de compose.env: una IP o una red CIDR. Si falta,
+# esta línea queda inválida y nginx no arranca, que es lo que se quiere: el
+# síntoma de adivinarla sería silencioso.
+geo $sacst_from_dc_proxy {
+    default 0;
+    ${SACST_DC_PROXY_IP} 1;
+}
+
+map $sacst_from_dc_proxy $sacst_forwarded_proto {
+    1       $http_x_forwarded_proto;
+    default $scheme;
+}
+
+# xfp es lo que mandó quien se conectó; xfp_app, lo que le llega a la app
+# después del `map`. Si difieren, el pedido no vino de SACST_DC_PROXY_IP.
+log_format proxy_check '$remote_addr "$request" $status '
+                       'xfp="$http_x_forwarded_proto" '
+                       'xfp_app="$sacst_forwarded_proto" '
+                       'xff="$http_x_forwarded_for" '
+                       'host="$host" ua="$http_user_agent"';
+
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/html/public;
+    index index.php;
+
+    # Coordinado con upload_max_filesize/post_max_size del php.ini y con el
+    # proxy del data center, que tiene que dejar pasar lo mismo.
+    client_max_body_size 33M;
+    client_body_timeout 60s;
+    send_timeout 60s;
+
+    server_tokens off;
+
+    access_log /dev/stdout proxy_check;
+    error_log /dev/stderr warn;
+
+    # Assets de Vite: el nombre lleva el hash del contenido, así que una
+    # versión nueva nunca pisa uno viejo en la caché del navegador.
+    location ^~ /build/ {
+        try_files $uri =404;
+        access_log off;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+    }
+
+    # Otros estáticos de public/. PDF, planillas y adjuntos NO están en esta
+    # lista: los entrega la app, con sesión y permisos.
+    #
+    # Cae a index.php y no a =404: si alguna vez una ruta de Laravel termina
+    # en una de estas extensiones, sigue llegando a la app.
+    location ~* \.(css|js|mjs|map|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|eot|xml|webmanifest|txt)$ {
+        try_files $uri /index.php?$query_string;
+        access_log off;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        # Solo por reescritura interna: ningún .php se pide directo.
+        internal;
+
+        include fastcgi_params;
+        fastcgi_pass app:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/public$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT /var/www/html/public;
+
+        # La CSP y las cookies hacen cabeceras de respuesta grandes.
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 8 32k;
+        # Los exportes y los PDF largos tardan más que una pantalla.
+        fastcgi_read_timeout 180s;
+
+        # Laravel lee estos X-Forwarded-* porque confía en este nginx
+        # (TRUSTED_PROXIES), así que acá se decide qué llega:
+        #
+        # - For: con la IP real agregada al final. Laravel descarta las de
+        #   proxies de confianza y se queda con la del cliente; una cadena
+        #   falsificada no cambia la última.
+        # - Proto: solo si el pedido viene del proxy del data center (el
+        #   `map` de arriba). Antes pasaba tal cual y un cliente de la LAN
+        #   podía hacerse pasar por HTTPS.
+        # - Host: tal como llega. Laravel lo valida contra APP_URL
+        #   (trustHosts) y rechaza cualquier otro con un 400.
+        #
+        # X-Forwarded-Port no se reenvía: entrando por IP:puerto llega vacío,
+        # Laravel lo toma como el puerto por defecto y genera URLs sin el
+        # puerto. Sin él, el puerto sale del Host y funciona en los dos casos.
+        fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $sacst_forwarded_proto;
+        fastcgi_param HTTP_X_FORWARDED_HOST $http_host;
+
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    # Dotfiles y extensiones que nunca deberían servirse. Llevan nosniff
+    # porque estos 403 tampoco pasan por PHP.
+    location ~ /\.(?!well-known).* {
+        deny all;
+        access_log off;
+        log_not_found off;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+    }
+    location ~* \.(env|git|bak|old|sql|swp|dist|dump)$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+    }
+}

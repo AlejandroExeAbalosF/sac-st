@@ -1,0 +1,72 @@
+# Contexto de la imagen de producción (deploy/Dockerfile). El entorno de
+# desarrollo construye desde ./docker y no pasa por acá.
+
+# Si entra a la imagen, Laravel cree que Vite está corriendo y pide los
+# assets a un servidor de desarrollo que no existe: pantalla en blanco.
+public/hot
+
+# El enlace de `storage:link` de quien desarrolla. En producción no hay disco
+# público, y en Windows es un enlace que el build ni siquiera puede leer.
+/public/storage
+
+# Se instalan y se compilan dentro del build.
+/vendor
+/node_modules
+/public/build
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+
+# Secretos y entornos locales. En producción el entorno lo inyecta compose
+# desde /etc/sacst; la imagen es pública y no lleva ninguno.
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+*.p12
+*.crt
+
+# Estado que en el servidor vive en el bind-mount de storage/. Pasa solo el
+# esqueleto versionado: cualquier otra cosa que una herramienta de desarrollo
+# deje ahí (inertia-devtools, pail) no tiene por qué viajar en la imagen.
+/storage/*
+!/storage/app
+!/storage/framework
+!/storage/logs
+/storage/app/private/*
+/storage/app/public/*
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/pail
+/bootstrap/cache/*.php
+/bootstrap/ssr
+
+# Repositorio, editores y tooling.
+.git
+.github
+.claude
+.idea
+.vscode
+.zed
+.fleet
+.nova
+.phpactor.json
+/prototypes
+
+# Nada de esto corre en producción.
+/tests
+/docker
+/docs
+/tasks
+/output
+/tmp
+phpunit.xml
+phpstan.neon
+.phpunit.cache
+.phpunit.result.cache
+*.log
