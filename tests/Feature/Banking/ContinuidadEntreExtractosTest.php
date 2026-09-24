@@ -9,7 +9,6 @@ use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -28,13 +27,6 @@ use Tests\TestCase;
 class ContinuidadEntreExtractosTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Storage::fake('local');
-    }
 
     /**
      * Dos extractos contiguos: el saldo encadena y no hay advertencia.

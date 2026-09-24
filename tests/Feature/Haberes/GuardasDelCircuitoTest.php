@@ -25,7 +25,6 @@ use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -46,8 +45,6 @@ class GuardasDelCircuitoTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        Storage::fake('local');
 
         $this->seed(HaberesDemoSeeder::class);
     }

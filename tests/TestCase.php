@@ -18,6 +18,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\CatalogosSeeder;
 use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Support\SessionKey;
 use Laravel\Fortify\Features;
 use RuntimeException;
@@ -38,6 +39,27 @@ abstract class TestCase extends BaseTestCase
      * @var class-string<Seeder>
      */
     protected $seeder = CatalogosSeeder::class;
+
+    /**
+     * Ningún test escribe en el disco de verdad.
+     *
+     * Iba test por test, y donde faltaba —o donde estaba adentro de un
+     * método en vez del `setUp`— los comprobantes terminaban en
+     * `storage/app/private` de desarrollo. Se juntaron **19.248 archivos**:
+     * imágenes falsas de 695 bytes de `UploadedFile::fake()`, planillas de
+     * cierre, tickets de depósito. Unos 67 MB de basura que nadie miró
+     * nunca y que ninguna fila de `attachments` referenciaba.
+     *
+     * Acá vale para toda la suite, incluidos los tests que todavía no se
+     * escribieron: es una garantía del andamiaje, no algo que cada autor
+     * tenga que acordarse de pedir.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake('local');
+    }
 
     /**
      * La confirmación que quedó flasheada, después de una redirección.

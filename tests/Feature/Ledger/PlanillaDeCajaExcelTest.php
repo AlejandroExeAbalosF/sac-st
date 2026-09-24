@@ -60,7 +60,6 @@ class PlanillaDeCajaExcelTest extends TestCase
         parent::setUp();
 
         // Sin series no se puede emitir un comprobante.
-        Storage::fake('local');
     }
 
     public function test_el_anverso_reproduce_la_planilla_del_2_de_junio(): void

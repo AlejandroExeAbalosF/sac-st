@@ -39,12 +39,6 @@ class CierreListoParaCerrarTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();

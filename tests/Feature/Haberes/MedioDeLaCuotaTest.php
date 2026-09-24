@@ -22,7 +22,6 @@ use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -48,8 +47,6 @@ class MedioDeLaCuotaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        Storage::fake('local');
 
         $this->seed(HaberesDemoSeeder::class);
     }

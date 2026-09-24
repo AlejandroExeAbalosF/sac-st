@@ -35,13 +35,6 @@ class ImportarExtractoTest extends TestCase
 
     private const CUENTA = '310000123456789';
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Storage::fake('local');
-    }
-
     public function test_el_csv_doble_comillado_se_interpreta_entero(): void
     {
         $cuenta = $this->cuenta();

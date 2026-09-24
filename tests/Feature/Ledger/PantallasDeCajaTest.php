@@ -24,7 +24,6 @@ use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -42,12 +41,6 @@ use Tests\TestCase;
 class PantallasDeCajaTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
 
     public function test_la_caja_muestra_el_saldo_calculado_desde_el_libro(): void
     {
@@ -505,7 +498,6 @@ class PantallasDeCajaTest extends TestCase
 
     public function test_cerrar_y_bajar_la_planilla(): void
     {
-        Storage::fake('local');
         $this->abrirLibros();
 
         $contador = $this->operador('contador');

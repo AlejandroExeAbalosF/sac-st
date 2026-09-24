@@ -33,7 +33,6 @@ class PantallasDeDepositosTest extends TestCase
     {
         parent::setUp();
 
-        Storage::fake('local');
         $this->seed(HaberesDemoSeeder::class);
     }
 

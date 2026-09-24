@@ -21,7 +21,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -42,13 +41,6 @@ class RecepcionBancariaTest extends TestCase
     use RefreshDatabase;
 
     private const CREDITO = '473191.20';
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Storage::fake('local');
-    }
 
     public function test_registrar_una_recepcion_asienta_el_dinero_en_los_libros(): void
     {

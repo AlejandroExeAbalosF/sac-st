@@ -44,12 +44,6 @@ class ReversionDeRecepcionTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     public function test_el_dinero_sale_de_los_libros(): void
     {
         $movimiento = $this->creditoImportado();

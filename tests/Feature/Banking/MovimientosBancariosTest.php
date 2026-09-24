@@ -13,7 +13,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -25,13 +24,6 @@ use Tests\TestCase;
 class MovimientosBancariosTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Storage::fake('local');
-    }
 
     public function test_el_importe_de_un_movimiento_no_se_puede_editar(): void
     {

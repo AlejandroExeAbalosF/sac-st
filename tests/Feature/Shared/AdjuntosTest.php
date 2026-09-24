@@ -27,13 +27,6 @@ class AdjuntosTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Storage::fake('local');
-    }
-
     public function test_un_adjunto_no_se_puede_editar(): void
     {
         $adjunto = $this->adjunto();

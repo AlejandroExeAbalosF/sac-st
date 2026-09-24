@@ -29,12 +29,6 @@ class HaberAnteriorTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     public function test_el_pago_baja_lo_que_se_debia_y_saca_el_dinero_del_cajon(): void
     {
         $this->abrirLibros('1000000.00');

@@ -15,12 +15,6 @@ class RolesAndPermissionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     /**
      * Los cuatro del area, mas `super-admin`, que no es del area.
      *

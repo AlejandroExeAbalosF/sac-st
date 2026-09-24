@@ -15,7 +15,6 @@ use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
 
@@ -94,7 +93,6 @@ class RecaudacionDelDiaTest extends TestCase
 
     public function test_depositar_en_el_banco_lo_recibido_hoy_lo_quita_de_la_recaudacion(): void
     {
-        Storage::fake('local');
         $this->abrirLibros();
 
         $cuota = $this->cuota('233663/2024', '300000.00');

@@ -23,12 +23,6 @@ class ForcePasswordChangeTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     private function conClaveProvisoria(): User
     {
         $user = User::factory()->create(['must_change_password' => true]);

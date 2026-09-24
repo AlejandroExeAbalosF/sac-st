@@ -20,12 +20,6 @@ class AccesosYSesionesTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     private function administrador(): User
     {
         $user = User::factory()->create();

@@ -21,7 +21,6 @@ use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -47,7 +46,6 @@ class EtapaDeLaCuotaTest extends TestCase
     {
         parent::setUp();
 
-        Storage::fake('local');
         $this->seed(HaberesDemoSeeder::class);
 
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-06-10 09:00'));

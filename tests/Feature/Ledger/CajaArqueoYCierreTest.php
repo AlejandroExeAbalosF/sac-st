@@ -50,12 +50,6 @@ class CajaArqueoYCierreTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     // ─────────────────────────── Apertura ───────────────────────────
 
     public function test_la_apertura_deja_el_saldo_que_habia_en_el_cajon(): void

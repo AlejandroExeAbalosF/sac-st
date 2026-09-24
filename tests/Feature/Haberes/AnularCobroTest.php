@@ -24,7 +24,6 @@ use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
@@ -49,8 +48,6 @@ class AnularCobroTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        Storage::fake('local');
 
         $this->seed(HaberesDemoSeeder::class);
     }

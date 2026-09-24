@@ -29,12 +29,6 @@ class NumeracionDeDocumentosTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
-
     /**
      * Una serie por tipo de comprobante, no dos.
      *
