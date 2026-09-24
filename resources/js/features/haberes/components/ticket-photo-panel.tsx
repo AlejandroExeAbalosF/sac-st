@@ -106,7 +106,7 @@ export default function TicketPhotoPanel({
                 <input
                     ref={inputRef}
                     type="file"
-                    accept="image/*,application/pdf"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
                     capture="environment"
                     className="sr-only"
                     onChange={(e) => onElegir(e.target.files?.[0] ?? null)}

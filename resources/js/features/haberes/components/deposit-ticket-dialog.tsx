@@ -348,7 +348,7 @@ function Formulario({
                 <input
                     ref={inputFoto}
                     type="file"
-                    accept="image/*,application/pdf"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
                     className="hidden"
                     onChange={(e) => {
                         const archivo = e.target.files?.[0] ?? null;

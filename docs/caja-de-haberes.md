@@ -86,6 +86,18 @@ el libro cambió y no hay comprobante que lo respalde —una reversión, por eje
 
 `/caja` redirige acá conservando los filtros.
 
+**El traslado al banco lleva la foto del ticket del cajero**, y es obligatoria:
+es la única prueba de que el efectivo salió de la caja. Se acepta JPG, PNG, WEBP
+o PDF, y se valida **por lo que el archivo es, no por cómo se llama** —un
+ejecutable renombrado a `.jpg` no entra—. Es el mismo criterio que el comprobante
+que trae el expediente.
+
+Las fotos no se guardan como llegan: se **enderezan**, se achican a 2400 px del
+lado mayor y se guardan en **WebP**, sin los metadatos de la cámara —tampoco la
+ubicación donde se sacó—. Una foto de celular de 4 MB queda en unos cientos de
+KB y se lee igual. El sha256 del adjunto es el del archivo guardado; lo que llegó
+del teléfono no se conserva. Un PDF se guarda intacto.
+
 ### Arqueo · `/caja/arqueos`
 
 Contar el cajón por denominación. Dos números:

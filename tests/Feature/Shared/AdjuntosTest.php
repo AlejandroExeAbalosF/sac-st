@@ -93,6 +93,36 @@ class AdjuntosTest extends TestCase
             ->assertNotFound();
     }
 
+    /**
+     * Un SVG no se abre en pantalla aunque sea `image/`.
+     *
+     * Es un documento con scripts: abrirlo en el navegador es ejecutarlo
+     * con la sesión de quien lo mira. Se descarga, como cualquier archivo
+     * que no sea una foto o un PDF.
+     */
+    public function test_un_svg_no_se_abre_en_pantalla(): void
+    {
+        $adjunto = $this->adjunto(filename: 'dibujo.svg', mime: 'image/svg+xml');
+
+        $this->actingAs($this->operador())
+            ->get(route('adjuntos.preview', $adjunto))
+            ->assertNotFound();
+    }
+
+    /** Un nombre con tildes o con ñ llega entero al navegador. */
+    public function test_la_vista_previa_respeta_los_nombres_con_acentos(): void
+    {
+        $adjunto = $this->adjunto(filename: 'comprobante-año.webp', mime: 'image/webp');
+
+        $disposicion = (string) $this->actingAs($this->operador())
+            ->get(route('adjuntos.preview', $adjunto))
+            ->assertOk()
+            ->headers->get('content-disposition');
+
+        $this->assertStringStartsWith('inline;', $disposicion);
+        $this->assertStringContainsString("filename*=utf-8''comprobante-a%C3%B1o.webp", $disposicion);
+    }
+
     public function test_lo_reservado_exige_su_permiso(): void
     {
         $adjunto = $this->adjunto(confidencialidad: Confidentiality::Restricted);

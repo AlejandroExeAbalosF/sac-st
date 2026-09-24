@@ -38,6 +38,20 @@ final class Attachment extends Model
     /** Inmutable: no hay `updated_at` que tenga sentido. */
     public const UPDATED_AT = null;
 
+    /**
+     * Lo único que se abre en el navegador en lugar de descargarse.
+     *
+     * Una lista cerrada y no «todo lo que empiece con `image/`»: eso
+     * incluía SVG, que es un documento con scripts adentro, y abrirlo en
+     * pantalla es ejecutarlo en el origen del sistema.
+     */
+    public const INLINE_MIME_TYPES = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/pdf',
+    ];
+
     protected $fillable = [
         'subject_type',
         'subject_id',
@@ -78,8 +92,7 @@ final class Attachment extends Model
     /** Si conviene mostrarlo en pantalla en lugar de descargarlo. */
     public function isViewableInline(): bool
     {
-        return str_starts_with($this->mime_type, 'image/')
-            || $this->mime_type === 'application/pdf';
+        return in_array($this->mime_type, self::INLINE_MIME_TYPES, true);
     }
 
     /** @return array<string, string> */

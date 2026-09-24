@@ -598,6 +598,28 @@ class TrasladoDeEfectivoTest extends TestCase
         $this->assertSame(0, CashToBankTransfer::query()->count());
     }
 
+    /**
+     * El ticket del cajero se valida con el mismo criterio que el del
+     * expediente: por lo que el archivo es, no por cómo se llama.
+     */
+    public function test_la_pantalla_rechaza_un_archivo_disfrazado_de_ticket(): void
+    {
+        $cuota = $this->cuotaCobrada();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.transfer', $cuota), [
+                'bankAccountId' => $this->cuenta()->id,
+                'depositDate' => '2026-08-25',
+                'ticket' => $this->archivoSubido('ticket.jpg', 'esto no es una foto'),
+                'idempotencyKey' => 'traslado-disfrazado',
+            ])
+            ->assertSessionHasErrors([
+                'ticket' => 'El comprobante puede ser una foto JPG, PNG o WEBP, o un PDF.',
+            ]);
+
+        $this->assertSame(0, CashToBankTransfer::query()->count());
+    }
+
     /** Quien solo consulta no mueve efectivo. */
     public function test_quien_solo_consulta_no_traslada(): void
     {

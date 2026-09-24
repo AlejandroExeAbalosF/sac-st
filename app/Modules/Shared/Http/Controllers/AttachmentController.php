@@ -49,14 +49,18 @@ final class AttachmentController extends Controller
             [
                 'Content-Type' => $attachment->mime_type,
                 /*
-                 * `inline` para que el navegador lo muestre, y
-                 * `nosniff` para que no reinterprete el tipo: un archivo
-                 * subido por un usuario no debería poder ejecutarse como
-                 * otra cosa por el camino.
+                 * `nosniff` para que el navegador no reinterprete el tipo:
+                 * un archivo subido por un usuario no debería poder
+                 * ejecutarse como otra cosa por el camino.
                  */
-                'Content-Disposition' => 'inline; filename="'.addslashes($attachment->original_filename).'"',
                 'X-Content-Type-Options' => 'nosniff',
             ],
+            /*
+             * `inline` para que el navegador lo muestre. La cabecera la
+             * arma Symfony y no una concatenación: un nombre con tildes o
+             * con ñ necesita `filename*` en UTF-8 y un respaldo en ASCII.
+             */
+            'inline',
         );
     }
 

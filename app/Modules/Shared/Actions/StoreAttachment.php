@@ -8,6 +8,7 @@ use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
+use App\Support\Image\ImageNormalizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +33,10 @@ final class StoreAttachment
      */
     private const DISK = 'local';
 
+    public function __construct(
+        private readonly ImageNormalizer $images,
+    ) {}
+
     public function handle(
         UploadedFile $file,
         AttachmentSubject $subject,
@@ -48,6 +53,39 @@ final class StoreAttachment
          * puede enterarse más tarde de cómo se hizo.
          */
         ?string $templateVersion = null,
+    ): Attachment {
+        /*
+         * Lo que trae una persona se normaliza antes de calcular la huella:
+         * el sha256 tiene que ser el del archivo que queda guardado, no el
+         * de uno que se descartó. Lo que dibujó el sistema ya sale como
+         * tiene que salir.
+         */
+        $normalized = $source === AttachmentSource::Generated
+            ? $file
+            : $this->images->normalize($file);
+
+        try {
+            return $this->persist(
+                $normalized, $subject, $subjectId, $documentType, $userId,
+                $title, $source, $confidentiality, $templateVersion,
+            );
+        } finally {
+            if ($normalized !== $file) {
+                @unlink($normalized->getPathname());
+            }
+        }
+    }
+
+    private function persist(
+        UploadedFile $file,
+        AttachmentSubject $subject,
+        int $subjectId,
+        string $documentType,
+        ?int $userId,
+        ?string $title,
+        AttachmentSource $source,
+        Confidentiality $confidentiality,
+        ?string $templateVersion,
     ): Attachment {
         $path = $file->getRealPath();
 

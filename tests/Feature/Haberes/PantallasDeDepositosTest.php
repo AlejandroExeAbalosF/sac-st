@@ -562,6 +562,89 @@ class PantallasDeDepositosTest extends TestCase
             );
     }
 
+    /**
+     * La foto se valida por lo que es, no por cómo se llama.
+     *
+     * Antes bastaba con la extensión: un ejecutable renombrado a `.jpg`
+     * quedaba guardado como comprobante, listo para que otro lo descargue.
+     */
+    public function test_un_archivo_disfrazado_de_foto_no_se_acepta(): void
+    {
+        $this->assertComprobanteRechazado(
+            $this->archivoSubido('ticket.jpg', "MZ\x90\x00 esto no es una foto"),
+            'El comprobante puede ser una foto JPG, PNG o WEBP, o un PDF.',
+        );
+    }
+
+    /**
+     * Un SVG es un documento con scripts, no una foto.
+     *
+     * Renombrado a `.png` pasaba la validación por nombre, y el servidor
+     * después lo reconocía como imagen y lo abría en pantalla.
+     */
+    public function test_un_svg_disfrazado_de_png_no_se_acepta(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
+
+        $this->assertComprobanteRechazado(
+            $this->archivoSubido('ticket.png', $svg),
+            'El comprobante puede ser una foto JPG, PNG o WEBP, o un PDF.',
+        );
+    }
+
+    /**
+     * Una imagen que declara más píxeles de los que se pueden abrir.
+     *
+     * El archivo pesa unos bytes, pero dice medir 40.000×40.000: abrirlo
+     * pediría 6 GB de memoria. Se rechaza leyendo solo el encabezado.
+     */
+    public function test_una_imagen_gigante_se_rechaza_sin_abrirla(): void
+    {
+        $this->assertComprobanteRechazado(
+            $this->archivoSubido('ticket.png', $this->pngQueDiceMedir(40_000, 40_000)),
+            'La imagen tiene demasiada resolución. Sacá la foto de nuevo con la cámara en calidad normal.',
+        );
+    }
+
+    /** Un PDF escaneado sigue entrando, igual que siempre. */
+    public function test_un_pdf_escaneado_se_acepta(): void
+    {
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.ticket', $this->cuota()), [
+                'bankAccountId' => $this->cuenta()->id,
+                'depositedAt' => '2026-04-24',
+                'photo' => $this->archivoSubido('ticket.pdf', "%PDF-1.4\n%%EOF\n"),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(1, DepositTicket::query()->count());
+    }
+
+    private function assertComprobanteRechazado(UploadedFile $foto, string $motivo): void
+    {
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.ticket', $this->cuota()), [
+                'bankAccountId' => $this->cuenta()->id,
+                'depositedAt' => '2026-04-24',
+                'photo' => $foto,
+            ])
+            ->assertSessionHasErrors(['photo' => $motivo]);
+
+        $this->assertSame(0, DepositTicket::query()->count());
+        $this->assertSame(0, Attachment::query()->count());
+    }
+
+    /** Un PNG con solo el encabezado: firma, IHDR con las medidas y IEND. */
+    private function pngQueDiceMedir(int $ancho, int $alto): string
+    {
+        $chunk = static fn (string $tipo, string $datos): string => pack('N', strlen($datos))
+            .$tipo.$datos.pack('N', crc32($tipo.$datos));
+
+        return "\x89PNG\r\n\x1a\n"
+            .$chunk('IHDR', pack('NN', $ancho, $alto)."\x08\x06\x00\x00\x00")
+            .$chunk('IEND', '');
+    }
+
     private function expediente(): Expediente
     {
         return Expediente::query()->whereNotNull('employer_id')->orderBy('id')->firstOrFail();

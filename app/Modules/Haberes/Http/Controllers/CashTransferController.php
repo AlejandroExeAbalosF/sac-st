@@ -21,6 +21,7 @@ use App\Modules\Shared\Models\Receipt;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
+use App\Support\Validation\ScannedDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -109,11 +110,12 @@ final class CashTransferController extends Controller
             'operationNumber' => ['nullable', 'string', 'max:40'],
             'terminal' => ['nullable', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:500'],
-            'ticket' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf,webp', 'max:10240'],
+            'ticket' => ScannedDocument::rules(required: true),
             'idempotencyKey' => ['required', 'string', 'max:120'],
         ], [
             'ticket.required' => 'El ticket del cajero es obligatorio: es la prueba de que el efectivo salió de la caja.',
             'depositDate.before_or_equal' => 'La fecha del depósito no puede ser futura.',
+            ...ScannedDocument::messages('ticket'),
         ]);
 
         $traslado = $depositar->handle(

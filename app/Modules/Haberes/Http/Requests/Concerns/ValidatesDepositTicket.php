@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Http\Requests\Concerns;
 
 use App\Support\BusinessDate;
+use App\Support\Validation\ScannedDocument;
 use Illuminate\Validation\Rule;
 
 /**
@@ -44,7 +45,7 @@ trait ValidatesDepositTicket
             'operationNumber' => ['nullable', 'string', 'max:40'],
             'terminal' => ['nullable', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'photo' => ['nullable', 'file', 'max:10240', 'extensions:jpg,jpeg,png,webp,pdf'],
+            'photo' => ScannedDocument::rules(required: false),
         ];
     }
 
@@ -86,8 +87,7 @@ trait ValidatesDepositTicket
             'amount.regex' => 'El importe va con punto decimal y hasta dos decimales.',
             'installmentId.exists' => 'Esa cuota no pertenece al haber elegido.',
             'haberId.exists' => 'Ese haber no pertenece al expediente.',
-            'photo.extensions' => 'La foto del comprobante puede ser JPG, PNG, WEBP o PDF.',
-            'photo.max' => 'La foto no puede superar los 10 MB.',
+            ...ScannedDocument::messages('photo'),
         ];
     }
 

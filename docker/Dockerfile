@@ -13,6 +13,10 @@ FROM php:8.5-cli
 # - libicu      intl: importes y fechas en es-AR.
 # - libzip      zip: PhpSpreadsheet, para los extractos bancarios.
 # - libpng/jpeg gd: PhpSpreadsheet y DomPDF.
+# - libwebp     gd con WebP: las fotos de comprobantes se guardan en ese
+#               formato (ver `ImageNormalizer`). Sin libwebp, GD compila
+#               igual y la falta recién aparece al subir la primera foto.
+# - exif        para enderezar las fotos del celular antes de convertirlas.
 #
 # `sodium` y OPcache no se instalan: la imagen base ya los trae compilados
 # y pedirlos de nuevo aborta el build con un `cp: cannot stat 'modules/*'`
@@ -27,11 +31,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev \
         libpng-dev \
         libpq-dev \
+        libwebp-dev \
         libzip-dev \
         unzip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
+        exif \
         gd \
         intl \
         pcntl \

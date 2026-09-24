@@ -18,6 +18,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\CatalogosSeeder;
 use Illuminate\Database\Seeder;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Support\SessionKey;
 use Laravel\Fortify\Features;
@@ -181,6 +182,22 @@ abstract class TestCase extends BaseTestCase
         );
 
         return app(ReviewCashCount::class)->handle($arqueo, $reviewer->id);
+    }
+
+    /**
+     * Un archivo subido con estos bytes, como lo recibe el servidor.
+     *
+     * Para probar validaciones de contenido no sirve `UploadedFile::fake()`:
+     * el falso informa el tipo según el nombre, así que un texto llamado
+     * `ticket.jpg` le dice a Laravel que es un JPEG. Este lo deduce de los
+     * bytes, igual que en producción.
+     */
+    protected function archivoSubido(string $nombre, string $bytes): UploadedFile
+    {
+        $ruta = (string) tempnam(sys_get_temp_dir(), 'sacst-test-');
+        file_put_contents($ruta, $bytes);
+
+        return new UploadedFile($ruta, $nombre, null, null, true);
     }
 
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void
