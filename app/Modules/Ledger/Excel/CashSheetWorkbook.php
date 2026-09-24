@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Excel;
 
 use App\Modules\Ledger\Models\CashCountLine;
+use App\Support\Money\Decimal;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -56,8 +57,12 @@ final class CashSheetWorkbook
      * denominaciones que se listan salen de la moneda del arqueo. Una
      * planilla en pesos se dibuja igual que en `4`; sube igual porque el
      * generador dejó de ser el mismo.
+     *
+     * `6`: el renglón del motivo sale del reverso. Declarar un saldo sin
+     * recontar dejó de exigirlo: en la planilla del área lo arrastran los
+     * veinte días, así que el campo se llenaba igual todas las tardes.
      */
-    public const VERSION = '5';
+    public const VERSION = '6';
 
     private const AZUL = 'FF1F3864';
 
@@ -219,18 +224,28 @@ final class CashSheetWorkbook
              * renglón de los diez mil en el mismo lugar que ayer. El papel
              * del área las tiene preimpresas en cero por ese motivo.
              */
+            /*
+              * Los dos conteos van juntos, y sumados por denominación.
+              *
+              * El papel lista **lo que hay en el cajón**: no le interesa si
+              * un billete de diez mil vino de la recaudación de hoy o del
+              * fajo que se abrió esta tarde. Separarlos acá daría dos
+              * renglones de la misma denominación y un cuadro que no suma
+              * el total contado.
+              */
             $contadas = [];
 
-            foreach ($arqueo->lines as $linea) {
-                $contadas[(string) (int) $linea->denomination] = $linea;
+            foreach ($arqueo->allLines as $linea) {
+                $denominacion = (string) (int) $linea->denomination;
+                $contadas[$denominacion] = ($contadas[$denominacion] ?? 0) + (int) $linea->quantity;
             }
 
             foreach (CashCountLine::suggestedDenominations($arqueo->currency) as $denominacion) {
                 $fila++;
-                $linea = $contadas[(string) $denominacion] ?? null;
+                $cantidad = $contadas[(string) $denominacion] ?? 0;
 
-                if ($linea !== null) {
-                    $hoja->setCellValue('A'.$fila, $linea->quantity);
+                if ($cantidad > 0) {
+                    $hoja->setCellValue('A'.$fila, $cantidad);
                 }
 
                 // La cantidad de billetes va centrada, como en el papel:
@@ -240,7 +255,11 @@ final class CashSheetWorkbook
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                 $hoja->setCellValueExplicit('B'.$fila, (string) $denominacion, 'n');
-                $hoja->setCellValueExplicit('C'.$fila, $linea->subtotal ?? '0.00', 'n');
+                $hoja->setCellValueExplicit(
+                    'C'.$fila,
+                    Decimal::scale((string) ($denominacion * $cantidad)),
+                    'n',
+                );
                 $hoja->getStyle("B{$fila}:C{$fila}")
                     ->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
             }
@@ -266,13 +285,6 @@ final class CashSheetWorkbook
                 'SALDO DIA ANTERIOR (no recontado)',
                 $arqueo->uncounted_amount,
             );
-
-            if (! $arqueo->wasFullyCounted() && $arqueo->uncounted_reason !== null) {
-                $fila++;
-                $hoja->setCellValue('A'.$fila, 'Motivo: '.$arqueo->uncounted_reason);
-                $hoja->mergeCells("A{$fila}:C{$fila}");
-                $hoja->getStyle('A'.$fila)->getFont()->setItalic(true);
-            }
 
             $fila++;
             $total = bcadd($arqueo->counted_amount, $arqueo->uncounted_amount, 2);

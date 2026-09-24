@@ -8,6 +8,7 @@ use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\ExportCashSheet;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Actions\RecordCashCount;
+use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Data\PeriodClosingListItemData;
@@ -60,6 +61,28 @@ class PantallasDeCajaTest extends TestCase
                 ->where('state.cash', '9852300.00')
                 ->where('state.cheques', '673804.70')
                 ->where('selected.date', '2026-06-01')
+            );
+    }
+
+    public function test_la_caja_y_el_calendario_exponen_el_ultimo_conteo_completo(): void
+    {
+        $this->abrirLibros(efectivo: '2000000.00');
+        $usuario = $this->operador('administrativo');
+
+        $this->actingAs($usuario)
+            ->get('/caja/dia?fecha=2026-06-01')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('compositionReference.countedOn', '2026-05-31')
+                ->has('compositionReference.lines', 1)
+            );
+
+        $this->actingAs($usuario)
+            ->get('/caja/calendario?dia=2026-06-01')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('dayDetail.compositionReference.countedOn', '2026-05-31')
+                ->has('dayDetail.compositionReference.lines', 1)
             );
     }
 
@@ -116,8 +139,8 @@ class PantallasDeCajaTest extends TestCase
                 'cashBoxId' => $this->caja(),
                 'countedOn' => '2026-06-02',
                 'currency' => 'ARS',
-                // Suma exacta del saldo de apertura: 9.852.300.
-                'denominations' => [100_000 => 98, 50_000 => 1, 2_000 => 1, 200 => 1, 100 => 1],
+                // No hubo recaudación: el saldo de apertura queda en el fajo.
+                'denominations' => [],
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect('/caja/dia?fecha=2026-06-02');
@@ -150,6 +173,30 @@ class PantallasDeCajaTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, PeriodClosing::query()->where('status', 'closed')->count());
+    }
+
+    public function test_el_formulario_no_puede_elegir_el_saldo_que_queda_sin_recontar(): void
+    {
+        $this->abrirLibros();
+
+        $this->actingAs($this->operador('contador'))
+            ->post('/caja/arqueos', [
+                'cashBoxId' => $this->caja(),
+                'countedOn' => '2026-06-01',
+                'currency' => 'ARS',
+                'denominations' => [],
+                // Dato viejo o manipulado: el servidor debe ignorarlo.
+                'uncountedAmount' => '0.00',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('cash_counts', [
+            'cash_box_id' => $this->caja(),
+            'counted_on' => '2026-06-01',
+            'uncounted_amount' => '9852300.00',
+            'expected_amount' => '9852300.00',
+            'difference_amount' => '0.00',
+        ]);
     }
 
     /** La caja del día lleva lo que el arqueo necesita para cargarse ahí. */
@@ -236,15 +283,18 @@ class PantallasDeCajaTest extends TestCase
                 'cashBoxId' => $this->caja(),
                 'countedOn' => '2026-06-01',
                 'currency' => 'USD',
-                'denominations' => [100 => 3, 20 => 1],
+                'denominations' => [],
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
-        $arqueo = CashCount::query()->firstOrFail();
+        $arqueo = CashCount::query()
+            ->whereDate('counted_on', '2026-06-01')
+            ->firstOrFail();
 
         $this->assertSame(Currency::Usd, $arqueo->currency);
-        $this->assertSame('320.00', $arqueo->counted_amount);
+        $this->assertSame('0.00', $arqueo->counted_amount);
+        $this->assertSame('320.00', $arqueo->uncounted_amount);
         // Los dos libros dan lo mismo: no hay diferencia que explicar.
         $this->assertSame('0.00', $arqueo->difference_amount);
     }
@@ -330,7 +380,8 @@ class PantallasDeCajaTest extends TestCase
 
     public function test_registrar_un_arqueo_desde_la_pantalla(): void
     {
-        $this->abrirLibros(efectivo: '2034800.00');
+        $this->abrirLibros(efectivo: '743050.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-01');
 
         $this->actingAs($this->operador('administrativo'))
             ->post('/caja/arqueos', [
@@ -354,8 +405,67 @@ class PantallasDeCajaTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('2034800.00', $arqueo->counted_amount);
+        $this->assertSame('743050.00', $arqueo->uncounted_amount);
+        $this->assertSame('2777850.00', $arqueo->expected_amount);
         $this->assertSame(CashCountStatus::Draft, $arqueo->status);
         $this->assertSame(6, $arqueo->lines()->count());
+    }
+
+    /**
+     * El recuento del fajo viaja aparte del conteo del día.
+     *
+     * Son dos conteos distintos y la pantalla los manda separados: los
+     * billetes del día por un lado, los del fajo por otro, con el motivo
+     * por el que se lo abrió. Fundirlos acá sería perder lo único que la
+     * separación compra.
+     */
+    public function test_el_recuento_del_fajo_viaja_desde_la_pantalla(): void
+    {
+        $this->abrirLibros(efectivo: '2000000.00');
+
+        $this->actingAs($this->operador('administrativo'))
+            ->post('/caja/arqueos', [
+                'cashBoxId' => $this->caja(),
+                'countedOn' => '2026-06-01',
+                'currency' => 'ARS',
+                'denominations' => [],
+                'carryRecount' => [
+                    'reason' => 'Verificación periódica del fondo.',
+                    'denominations' => [100_000 => 20],
+                ],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $arqueo = CashCount::query()
+            ->whereDate('counted_on', '2026-06-01')
+            ->firstOrFail();
+
+        $this->assertSame('Verificación periódica del fondo.', $arqueo->carry_recount_reason);
+        $this->assertSame('2000000.00', $arqueo->carry_counted_amount);
+        $this->assertSame('2000000.00', $arqueo->counted_amount);
+        $this->assertSame('0.00', $arqueo->difference_amount);
+    }
+
+    /** Y sin motivo no se abre: el error sale al lado del campo. */
+    public function test_el_recuento_del_fajo_sin_motivo_se_rechaza(): void
+    {
+        $this->abrirLibros(efectivo: '2000000.00');
+
+        $this->actingAs($this->operador('administrativo'))
+            ->post('/caja/arqueos', [
+                'cashBoxId' => $this->caja(),
+                'countedOn' => '2026-06-01',
+                'currency' => 'ARS',
+                'denominations' => [],
+                'carryRecount' => ['denominations' => [100_000 => 20]],
+            ])
+            ->assertSessionHasErrors('carryRecount.reason');
+
+        $this->assertSame(
+            0,
+            CashCount::query()->whereDate('counted_on', '2026-06-01')->count(),
+        );
     }
 
     /** La caja del arqueo la pone el servidor, no lo que manda el navegador. */
@@ -497,10 +607,8 @@ class PantallasDeCajaTest extends TestCase
         $ayer = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-06-01'),
-            denominations: [20_000 => 1],
+            denominations: [],
             actorId: $contador->id,
-            uncountedAmount: '9832300.00',
-            uncountedReason: 'Fondo histórico en caja fuerte.',
         );
 
         app(ReviewCashCount::class)->handle($ayer, $contador->id);
@@ -510,8 +618,7 @@ class PantallasDeCajaTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('previousCount.countedOn', '2026-06-01')
-                ->where('previousCount.uncountedAmount', '9832300.00')
-                ->where('previousCount.uncountedReason', 'Fondo histórico en caja fuerte.')
+                ->where('previousCount.uncountedAmount', '9852300.00')
             );
     }
 
@@ -542,10 +649,8 @@ class PantallasDeCajaTest extends TestCase
         app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-06-01'),
-            denominations: [20_000 => 1],
+            denominations: [],
             actorId: $this->operador('contador')->id,
-            uncountedAmount: '9832300.00',
-            uncountedReason: 'Fondo histórico en caja fuerte.',
         );
 
         $this->actingAs($this->operador('contador'))
@@ -679,6 +784,17 @@ class PantallasDeCajaTest extends TestCase
             ],
             date: CarbonImmutable::parse($fecha),
             cashBoxId: $this->caja(),
+        );
+    }
+
+    /** Un ingreso real por mostrador, visible para la recaudación del día. */
+    private function recibirEfectivo(string $importe, string $fecha): void
+    {
+        app(RegisterCashFundReceipt::class)->handle(
+            amount: $importe,
+            idempotencyKey: 'recepcion-'.Str::random(12),
+            cashBoxId: $this->caja(),
+            receivedDate: CarbonImmutable::parse($fecha),
         );
     }
 }

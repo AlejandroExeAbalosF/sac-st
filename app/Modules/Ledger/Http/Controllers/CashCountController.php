@@ -41,7 +41,7 @@ final class CashCountController extends Controller
         $fechaPredeterminada = $this->selectedDate($request);
 
         $arqueos = CashCount::query()
-            ->with(['performedBy', 'reviewedBy', 'lines'])
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
             ->where('cash_box_id', $caja->id)
             ->where('currency', $moneda)
             ->orderByDesc('counted_on')
@@ -103,9 +103,8 @@ final class CashCountController extends Controller
             denominations: $request->denominations(),
             currency: Currency::from((string) $request->validated('currency')),
             actorId: $request->user()?->id,
-            uncountedAmount: $request->uncountedAmount(),
-            uncountedReason: $request->validated('uncountedReason'),
             explanation: $request->validated('explanation'),
+            carryRecount: $request->carryRecount(),
         );
 
         return back()->with('status', sprintf(
@@ -124,16 +123,14 @@ final class CashCountController extends Controller
     public function adjust(Request $request, CashCount $cashCount, AdjustCashDifference $imputar): RedirectResponse
     {
         $datos = $request->validate([
-            'authorization' => ['required', 'string', 'min:5', 'max:300'],
-        ], [
-            'authorization.required' => 'Imputar una diferencia exige dejar asentado quién lo autorizó y con qué.',
+            'authorization' => ['nullable', 'string', 'min:5', 'max:300'],
         ]);
 
-        $imputar->handle($cashCount, (int) $request->user()?->id, $datos['authorization']);
+        $imputar->handle($cashCount, (int) $request->user()?->id, $datos['authorization'] ?? null);
 
         /*
-         * No es un éxito liso: la caja quedó cuadrada porque alguien
-         * autorizó correr el libro, no porque el faltante apareciera.
+         * No es un éxito liso: la caja quedó cuadrada porque se decidió
+         * correr el libro, no porque el faltante apareciera.
          */
         Toast::warning(
             'Diferencia imputada a Diferencia de arqueo.',

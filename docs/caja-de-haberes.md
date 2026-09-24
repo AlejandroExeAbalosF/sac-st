@@ -114,30 +114,94 @@ diferencia = (contado + arrastre) − saldo del libro
 La pantalla muestra las tres líneas y la diferencia que va a quedar **antes** de
 registrar. El total no se puede tipear: sale de las denominaciones.
 
+La **explicación de la diferencia** corresponde únicamente a la recaudación del
+día. Aparece si lo contado hoy no coincide con la recaudación calculada, si la
+pantalla todavía no puede calcularla, si el servidor devuelve un error en ese
+campo o si el operador ya empezó a escribirla. Una diferencia propia del fajo
+se documenta dentro de su modal, en «Motivo u observación del recuento», junto
+con lo que el libro esperaba y lo que efectivamente se encontró.
+
+Si se recontó el cajón entero y un sobrante atribuido al día compensa un faltante
+igual del fajo, el total general da cero. En ese caso no se exige una explicación
+monetaria: el cambio puede ser únicamente otra separación de billetes fungibles.
+El motivo del recuento sigue quedando registrado y la pantalla aclara que la
+diferencia interna se compensa, en lugar de presentarla como dinero faltante.
+
 El arrastre **viene cargado desde el libro**: lo que tiene que haber en el cajón
 menos lo que entró hoy y sigue ahí. Con eso la diferencia se reduce a
 `contado − saldo de hoy` y deja de poder acomodarse: mientras el arrastre lo
 escribía una persona, siempre podía elegir el número que hacía cuadrar.
 
-**El campo no se escribe.** Hay dos caminos y ninguno a mano alzada: confiar en el
-cálculo, o apretar **Recontar**, que abre una ventana aparte para contar el fajo
-billete por billete y comparar contra lo que el libro dice que hay —que es cómo se
-ve *qué* falta, no solo cuánto—. Al confirmar, esos billetes se suman al conteo del
-día y el saldo pasa a cero: lo recontado deja de ser «no recontado», y el arqueo
-verifica el 100 % del efectivo. Escribir un número que nadie contó no sería
-corregir.
+**El campo no se escribe.** Hay dos caminos: usar el cálculo o apretar
+**Recontar**. El servidor vuelve a calcularlo al guardar, de modo que cambiar de
+fecha o manipular el formulario no permite elegir el número contra el que se
+compara el conteo.
 
-Vuelve a escribirse solo cuando el libro no puede dar la cifra —otra fecha, una
-pantalla que no la manda—: es preferible a bloquearlo con un valor que no existe.
+#### Recontar el fajo
 
-El cálculo supone que cada pago se descontó de la recepción que lo financió —lo
-que la planilla de junio cumple 20 de 20 días—, y eso el área todavía no lo
-confirmó. Sale de `CashDayTakings`, que resuelve la cadena
+Abre una ventana aparte —el conteo del día es otra cosa y se hace todas las
+tardes— para contar el fondo histórico billete por billete y compararlo contra lo
+que el libro dice que hay ahí. Es cómo se ve **qué** falta, no solo cuánto. Al
+confirmar, el saldo del día anterior pasa a cero: lo recontado deja de ser «no
+recontado» y el arqueo verifica el 100 % del efectivo.
+
+**Pide un motivo u observación, y es obligatorio.** No es el campo «por qué no
+se recontó» que se sacó del sistema: aquel pedía justificar lo que se hacía todas
+las tardes y terminaba lleno de cualquier cosa. Este se escribe una vez cada
+tanto —una verificación periódica, un cambio de responsable, la sospecha de un
+faltante— y, si el resultado difiere del libro, allí mismo se deja qué se
+encontró o qué medida se tomó.
+
+Y **queda guardado como un hecho aparte**, no fundido con el conteo del día. En
+`cash_counts` van el motivo, lo que el libro decía y lo que se encontró —las tres
+juntas o ninguna, que lo impone un `CHECK`—; en `cash_count_lines`, los billetes
+del fajo con `scope = 'carry'`, separados de los del día. Con eso el sistema puede
+decir tres cosas que antes se perdían:
+
+- que el fajo se abrió, incluso cuando estaba intacto —que es el control que hay
+  que poder mostrar—;
+- **de dónde sale un faltante**: `encontrado − según el libro` atribuye la
+  diferencia al fondo histórico y no a la recaudación de la jornada;
+- con qué billetes estaba armado, que es contra lo que se compara el recuento
+  siguiente —y el de la apertura—.
+
+El detalle compara la composición con el último conteo físico completo que tenga
+denominaciones. Si el importe es el mismo pero cambian las cantidades, lo informa
+como **«mismo importe, distinta composición»**, sin tratarlo como faltante ni
+sobrante. La comparación es entre dos fotos reales; no afirma qué billetes
+deberían quedar, porque los egresos actuales no registran denominaciones.
+
+Si en el futuro el área decide registrar las denominaciones entregadas en cada
+egreso, ese detalle debe guardarse con el movimiento de pago y no dentro del
+arqueo. No entra en conflicto con `cash_count_lines`: los egresos describirían
+qué billetes salieron y los arqueos seguirían siendo fotos físicas. Con ambas
+cosas el sistema podría calcular además una composición teórica, hoy imposible.
+
+La aritmética del arqueo no cambia: esos billetes están en el cajón, así que
+suman a `counted_amount` como cualquier otro. Las columnas nuevas son atribución,
+no un segundo cálculo. La planilla los imprime sumados por denominación, porque
+el papel lista lo que hay en el cajón y no de dónde vino cada billete.
+
+El cálculo sale de `CashDayTakings`, que resuelve la cadena
 `journal_lines` → `funding_allocations` → `fund_receipts` sin salir de Ledger: la
 línea del egreso lleva la cuota y la asignación dice qué recepción la financió.
+También descuenta el efectivo recibido y depositado en el banco durante la misma
+jornada; un depósito de fondos anteriores reduce el fajo, no la recaudación del
+día.
 
-> El arrastre es la parte que el arqueo **no verifica**. Si de ese fajo faltara
-> plata, el total daría igual y nadie lo vería. Por eso revisa otra persona.
+**Esta separación supone una práctica física que todavía debe confirmarse con
+el área.** El libro identifica qué recepción financió cada pago, pero no registra
+de qué montón se tomaron los billetes. La fórmula coincide con la planilla de
+junio, pero solo representa lo que el cajero puede contar como «recaudación del
+día» si ese dinero se mantiene separado o si los pagos respetan el origen de los
+fondos. Si todo el efectivo se mezcla y se paga indistintamente, solo el total
+del cajón es verificable: recontar el fajo trasladaría la diferencia entre ambos
+montones, pero no resolvería el reparto. En ese caso habría que revisar el modelo
+de arqueo antes de imputar diferencias originadas únicamente por esa separación.
+
+> Mientras no se lo recuente, el arrastre es la parte que el arqueo **no
+> verifica**. Si de ese fajo faltara plata, el total daría igual y nadie lo
+> vería. Por eso revisa otra persona, y por eso existe **Recontar**.
 
 **El arqueo cuenta solo efectivo.** Los cheques en cartera no se cuentan por
 cantidad: cada uno es único —número, banco, fecha, beneficiario— y va listado
@@ -156,8 +220,9 @@ siguiente** del mismo día.
 ### Imputar la diferencia (opcional)
 
 `reviewed → adjusted`. Asienta la diferencia contra `CASH_DIFFERENCE` con fecha
-del arqueo, para que el libro describa el cajón real. Exige el respaldo de la
-autorización —una nota, un acta— y el permiso `caja.ajustar-diferencia`.
+del arqueo, para que el libro describa el cajón real. Si existe una nota, acta o
+resolución que respalde la decisión, su referencia puede registrarse. Requiere
+el permiso `caja.ajustar-diferencia`.
 
 **Es opcional a propósito.** Documentar la diferencia sin imputarla es un estado
 final válido; lo único que no se puede es cerrar el día con una diferencia

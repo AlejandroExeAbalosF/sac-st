@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Check, Scissors } from 'lucide-react';
+import { Check, Scissors, Search } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money, { EnMoneda } from '@/components/money';
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import DetalleComposicionDelFajo from '@/features/caja/components/carry-composition';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import { conMoneda } from '@/features/caja/moneda';
 import { date as formatDate } from '@/lib/format';
@@ -197,10 +198,25 @@ function Renglon({
                         {arqueo.balanced && !arqueo.fullyCounted && (
                             <span
                                 className="inline-flex items-center gap-1 text-xs text-warning-strong"
-                                title={arqueo.uncountedReason ?? undefined}
+                                title="Cuadró, pero no se contó todo el cajón"
                             >
                                 <Scissors className="size-3" />
                                 parcial
+                            </span>
+                        )}
+                        {/*
+                         * Abrir el fondo histórico es excepcional, y que
+                         * pasó tiene que verse desde la lista: es el día
+                         * que alguien va a buscar cuando pregunte cuándo
+                         * fue la última vez que se verificó el fajo.
+                         */}
+                        {arqueo.carryRecountReason !== null && (
+                            <span
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                                title={arqueo.carryRecountReason}
+                            >
+                                <Search className="size-3" />
+                                fajo recontado
                             </span>
                         )}
                     </div>
@@ -261,6 +277,19 @@ function Renglon({
                             </p>
                         )}
                     </dl>
+
+                    {/*
+                     * Lo que se encontró en el fajo va antes de la firma.
+                     * Quien revisa tiene que poder ver si la diferencia que
+                     * está por dar por buena viene de la recaudación del
+                     * día o del fondo que hasta hoy nadie había contado.
+                     */}
+                    {arqueo.carryRecountReason !== null && (
+                        <DetalleComposicionDelFajo
+                            arqueo={arqueo}
+                            comparar={false}
+                        />
+                    )}
                     <DialogFooter>
                         <Button
                             variant="outline"
@@ -323,6 +352,12 @@ function DialogoImputacion({
     cerrar: () => void;
 }) {
     const form = useForm({ authorization: '' });
+    const esFaltante = arqueo?.differenceAmount.startsWith('-') ?? false;
+    const importe = arqueo
+        ? esFaltante
+            ? arqueo.differenceAmount.slice(1)
+            : arqueo.differenceAmount
+        : '0';
 
     return (
         <Dialog
@@ -339,10 +374,12 @@ function DialogoImputacion({
                 <DialogHeader>
                     <DialogTitle>Imputar la diferencia</DialogTitle>
                     <DialogDescription>
-                        Asienta{' '}
-                        {arqueo && <Money value={arqueo.differenceAmount} />}{' '}
-                        contra Diferencia de arqueo. Después de esto el libro va
-                        a decir lo que hay en el cajón.
+                        Registra un ajuste contable por{' '}
+                        <Money value={importe} /> correspondiente al{' '}
+                        {esFaltante ? 'faltante' : 'sobrante'}, para que el
+                        saldo del libro coincida con el efectivo contado. No
+                        registra un cobro ni un pago. Tu usuario y la fecha
+                        quedan registrados.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -365,11 +402,13 @@ function DialogoImputacion({
                     }}
                     className="grid gap-2"
                 >
-                    <Label htmlFor="authorization">Autorización</Label>
+                    <Label htmlFor="authorization">
+                        Referencia de autorización (opcional)
+                    </Label>
                     <Textarea
                         id="authorization"
                         rows={3}
-                        placeholder="Nota, resolución o instrucción que autoriza la imputación."
+                        placeholder="Si existe: nota, acta o resolución…"
                         value={form.data.authorization}
                         onChange={(e) =>
                             form.setData('authorization', e.target.value)

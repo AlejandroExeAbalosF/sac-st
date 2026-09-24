@@ -49,13 +49,9 @@ final class AdjustCashDifference
     ) {}
 
     /** @throws ValidationException */
-    public function handle(CashCount $cashCount, int $actorId, string $authorization): CashCount
+    public function handle(CashCount $cashCount, int $actorId, ?string $authorization = null): CashCount
     {
-        if (trim($authorization) === '') {
-            throw ValidationException::withMessages([
-                'authorization' => 'Imputar una diferencia exige asentar con qué se autorizó: una nota, un acta, una resolución. Quién la imputa ya queda registrado.',
-            ]);
-        }
+        $authorization = trim((string) $authorization) ?: null;
 
         return DB::transaction(function () use ($cashCount, $actorId, $authorization): CashCount {
             CashBox::query()->lockForUpdate()->findOrFail($cashCount->cash_box_id);
@@ -111,7 +107,7 @@ final class AdjustCashDifference
                  */
                 date: $cashCount->counted_on,
                 cashBoxId: $cashCount->cash_box_id,
-                description: $authorization,
+                description: $authorization ?? 'Imputación de diferencia de arqueo',
                 actorId: $actorId,
             );
 
@@ -127,7 +123,7 @@ final class AdjustCashDifference
                     'difference_amount' => $cashCount->difference_amount,
                     'adjustment_event_id' => $evento->id,
                 ],
-                metadata: ['autorizacion' => $authorization],
+                metadata: $authorization === null ? [] : ['autorizacion' => $authorization],
                 actorId: $actorId,
             );
 

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Http\Requests;
 
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Support\CarryRecount;
 use App\Support\BusinessDate;
-use App\Support\Money\Decimal;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,9 +39,21 @@ final class RecordCashCountRequest extends FormRequest
             'denominations' => ['present', 'array'],
             'denominations.*' => ['integer', 'min:0', 'max:100000'],
 
-            'uncountedAmount' => ['nullable', 'numeric', 'min:0'],
-            'uncountedReason' => ['nullable', 'string', 'max:300', 'required_with:uncountedAmount'],
             'explanation' => ['nullable', 'string', 'max:500'],
+
+            /*
+             * El recuento del fajo de días anteriores, cuando se lo abrió.
+             * Viaja entero o no viaja: el motivo es obligatorio porque
+             * abrirlo es excepcional, y la lista de billetes puede quedar
+             * vacía —encontrar el fajo vacío es un resultado—.
+             *
+             * Lo que el libro decía que había ahí **no** se manda: lo
+             * calcula el Action, igual que el saldo teórico.
+             */
+            'carryRecount' => ['sometimes', 'nullable', 'array'],
+            'carryRecount.reason' => ['required_with:carryRecount', 'string', 'max:300'],
+            'carryRecount.denominations' => ['required_with:carryRecount', 'array'],
+            'carryRecount.denominations.*' => ['integer', 'min:0', 'max:100000'],
         ];
     }
 
@@ -52,9 +64,9 @@ final class RecordCashCountRequest extends FormRequest
             'cashBoxId' => 'caja',
             'countedOn' => 'fecha del arqueo',
             'denominations' => 'conteo por denominación',
-            'uncountedAmount' => 'importe no recontado',
-            'uncountedReason' => 'motivo de lo no recontado',
             'explanation' => 'explicación de la diferencia',
+            'carryRecount.reason' => 'motivo del recuento',
+            'carryRecount.denominations' => 'billetes del fajo',
         ];
     }
 
@@ -63,8 +75,8 @@ final class RecordCashCountRequest extends FormRequest
     {
         return [
             'countedOn.before_or_equal' => 'No se puede arquear una caja de un día que todavía no pasó.',
-            'uncountedReason.required_with' => 'Declarar un importe sin recontar exige decir por qué no se contó.',
             'denominations.*.max' => 'Cien mil billetes de una misma denominación es un error de tipeo, no un arqueo.',
+            'carryRecount.reason.required_with' => 'Abrir el fajo de días anteriores exige decir por qué.',
         ];
     }
 
@@ -90,23 +102,33 @@ final class RecordCashCountRequest extends FormRequest
     }
 
     /**
-     * El importe no recontado, como cadena decimal.
+     * El recuento del fajo, o null si en este arqueo no se lo abrió.
      *
-     * Nunca pasa por `float`, ni siquiera de ida y vuelta para
-     * normalizarlo: la regla del modelo es que el punto flotante no existe
-     * en ningún punto de la pila, y `739050.10` convertido y vuelto a
-     * convertir es justamente donde aparecería el centavo perdido.
-     *
-     * @return numeric-string
+     * Se arma acá y no en el controlador para que el Action reciba el
+     * objeto que la base exige entero, y no tres datos sueltos que podrían
+     * llegar de a uno.
      */
-    public function uncountedAmount(): string
+    public function carryRecount(): ?CarryRecount
     {
-        $importe = $this->validated('uncountedAmount');
+        /** @var array<string, mixed>|null $crudo */
+        $crudo = $this->validated('carryRecount');
 
-        if ($importe === null || $importe === '') {
-            return '0.00';
+        if (! is_array($crudo)) {
+            return null;
         }
 
-        return Decimal::parse((string) $importe) ?? '0.00';
+        $billetes = [];
+
+        /** @var array<array-key, mixed> $cantidades */
+        $cantidades = $crudo['denominations'] ?? [];
+
+        foreach ($cantidades as $denominacion => $cantidad) {
+            $billetes[(int) $denominacion] = (int) $cantidad;
+        }
+
+        return new CarryRecount(
+            reason: (string) ($crudo['reason'] ?? ''),
+            denominations: $billetes,
+        );
     }
 }

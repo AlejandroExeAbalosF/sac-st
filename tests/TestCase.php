@@ -12,6 +12,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\CashDayTakings;
 use App\Support\Ui\ToastType;
 use Carbon\CarbonImmutable;
 use Database\Seeders\CatalogosSeeder;
@@ -133,9 +134,8 @@ abstract class TestCase extends BaseTestCase
 
         /*
          * El arqueo tiene que cuadrar, porque el cierre ya no acepta una
-         * diferencia sin imputar. Se cuenta un billete de $1 cuando hay con
-         * qué y el resto se declara sin recontar: entre los dos dan el saldo
-         * del libro, que es lo que el cierre exige.
+         * diferencia sin imputar. Se cuenta la recaudación que sigue en el
+         * cajón; el Action deriva el resto como fajo anterior.
          */
         if (bccomp($saldo, '0.00', 2) < 0) {
             throw new RuntimeException(sprintf(
@@ -145,18 +145,17 @@ abstract class TestCase extends BaseTestCase
             ));
         }
 
-        $cuenta = bccomp($saldo, '1.00', 2) >= 0;
-        $noRecontado = $cuenta ? bcsub($saldo, '1.00', 2) : $saldo;
+        $recaudacion = app(CashDayTakings::class)->of(
+            $cashBoxId,
+            $fecha,
+            Currency::Ars,
+        );
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $cashBoxId,
             countedOn: $fecha,
-            denominations: $cuenta ? [1 => 1] : [],
+            denominations: $this->billetesPara($recaudacion),
             actorId: $reviewer->id,
-            uncountedAmount: $noRecontado,
-            uncountedReason: bccomp($noRecontado, '0.00', 2) === 0
-                ? null
-                : 'Saldo declarado en el armado del escenario de prueba.',
         );
 
         return app(ReviewCashCount::class)->handle($arqueo, $reviewer->id);

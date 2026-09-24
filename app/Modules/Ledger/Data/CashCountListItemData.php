@@ -22,6 +22,7 @@ final class CashCountListItemData extends Data
 {
     /**
      * @param  list<array{denomination: numeric-string, quantity: int, subtotal: numeric-string}>  $lines
+     * @param  list<array{denomination: numeric-string, quantity: int, subtotal: numeric-string}>  $carryLines
      */
     public function __construct(
         public int $id,
@@ -34,7 +35,6 @@ final class CashCountListItemData extends Data
         public string $countedAmount,
         /** @var numeric-string */
         public string $uncountedAmount,
-        public ?string $uncountedReason,
         /** @var numeric-string */
         public string $differenceAmount,
         public string $status,
@@ -50,6 +50,28 @@ final class CashCountListItemData extends Data
         public bool $selfReviewed,
         public bool $adjusted,
         public array $lines,
+
+        /*
+         * ─── El recuento del fajo ────────────────────────────────────
+         *
+         * Los cuatro viajan juntos o van todos en null. Abrir el fajo de
+         * días anteriores es excepcional, así que en la enorme mayoría de
+         * los arqueos esto no está —y que no esté también es información:
+         * quiere decir que ese día el fondo histórico no se tocó—.
+         */
+        public ?string $carryRecountReason,
+        /** @var numeric-string|null */
+        public ?string $carryExpectedAmount,
+        /** @var numeric-string|null */
+        public ?string $carryCountedAmount,
+        /**
+         * Lo que faltó en el fajo. Es la parte de la diferencia del día
+         * que no viene de la recaudación sino del fondo histórico.
+         *
+         * @var numeric-string|null
+         */
+        public ?string $carryDifferenceAmount,
+        public array $carryLines,
     ) {}
 
     public static function fromModel(CashCount $count): self
@@ -62,7 +84,6 @@ final class CashCountListItemData extends Data
             expectedAmount: $count->expected_amount,
             countedAmount: $count->counted_amount,
             uncountedAmount: $count->uncounted_amount,
-            uncountedReason: $count->uncounted_reason,
             differenceAmount: $count->difference_amount,
             status: $count->status->value,
             statusLabel: $count->status->label(),
@@ -75,7 +96,12 @@ final class CashCountListItemData extends Data
             reviewedBy: $count->relationLoaded('reviewedBy') ? $count->reviewedBy?->name : null,
             selfReviewed: $count->wasSelfReviewed(),
             adjusted: $count->adjustment_event_id !== null,
-            lines: self::lines($count),
+            lines: self::lines($count, 'lines'),
+            carryRecountReason: $count->carry_recount_reason,
+            carryExpectedAmount: $count->carry_expected_amount,
+            carryCountedAmount: $count->carry_counted_amount,
+            carryDifferenceAmount: $count->carryDifference(),
+            carryLines: self::lines($count, 'carryLines'),
         );
     }
 
@@ -86,17 +112,18 @@ final class CashCountListItemData extends Data
      * `array` borra la forma del arreglo, y con ella la garantía de que
      * cada fila trae exactamente los tres campos que la pantalla espera.
      *
+     * @param  'lines'|'carryLines'  $relacion  Cuál de los dos conteos.
      * @return list<array{denomination: numeric-string, quantity: int, subtotal: numeric-string}>
      */
-    private static function lines(CashCount $count): array
+    private static function lines(CashCount $count, string $relacion): array
     {
-        if (! $count->relationLoaded('lines')) {
+        if (! $count->relationLoaded($relacion)) {
             return [];
         }
 
         $desglose = [];
 
-        foreach ($count->lines as $linea) {
+        foreach ($count->{$relacion} as $linea) {
             $desglose[] = [
                 'denomination' => $linea->denomination,
                 'quantity' => (int) $linea->quantity,

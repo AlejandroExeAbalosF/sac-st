@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Ledger\Models;
 
+use App\Modules\Ledger\Enums\CashCountScope;
 use App\Modules\Ledger\Enums\Currency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $cash_count_id
+ * @property CashCountScope $scope
  * @property numeric-string $denomination
  * @property int $quantity
  * @property numeric-string $subtotal
@@ -30,6 +32,7 @@ final class CashCountLine extends Model
 {
     protected $fillable = [
         'cash_count_id',
+        'scope',
         'denomination',
         'quantity',
     ];
@@ -70,6 +73,7 @@ final class CashCountLine extends Model
     protected function casts(): array
     {
         return [
+            'scope' => CashCountScope::class,
             'denomination' => 'decimal:2',
             'quantity' => 'integer',
             'subtotal' => 'decimal:2',

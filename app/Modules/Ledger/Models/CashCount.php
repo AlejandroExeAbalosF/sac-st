@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Models;
 
 use App\Models\User;
+use App\Modules\Ledger\Enums\CashCountScope;
 use App\Modules\Ledger\Enums\CashCountStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -31,8 +33,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property numeric-string $expected_amount
  * @property numeric-string $counted_amount
  * @property numeric-string $uncounted_amount
- * @property string|null $uncounted_reason
  * @property numeric-string $difference_amount
+ * @property string|null $carry_recount_reason
+ * @property numeric-string|null $carry_expected_amount
+ * @property numeric-string|null $carry_counted_amount
  * @property CashCountStatus $status
  * @property string|null $explanation
  * @property int|null $performed_by
@@ -58,7 +62,9 @@ final class CashCount extends Model
         'expected_amount',
         'counted_amount',
         'uncounted_amount',
-        'uncounted_reason',
+        'carry_recount_reason',
+        'carry_expected_amount',
+        'carry_counted_amount',
         'status',
         'explanation',
         'performed_by',
@@ -73,8 +79,32 @@ final class CashCount extends Model
         return $this->belongsTo(CashBox::class);
     }
 
+    /** Las lineas del conteo del dia: el movimiento de la jornada. */
     /** @return HasMany<CashCountLine, $this> */
     public function lines(): HasMany
+    {
+        return $this->hasMany(CashCountLine::class)
+            ->where('scope', CashCountScope::Day)
+            ->orderByDesc('denomination');
+    }
+
+    /**
+     * Las lineas del fajo, cuando se lo abrio y se lo conto.
+     *
+     * Vacia en la enorme mayoria de los arqueos: recontar es excepcional.
+     *
+     * @return HasMany<CashCountLine, $this>
+     */
+    public function carryLines(): HasMany
+    {
+        return $this->hasMany(CashCountLine::class)
+            ->where('scope', CashCountScope::Carry)
+            ->orderByDesc('denomination');
+    }
+
+    /** Todas las lineas, sin importar de cual de los dos conteos son. */
+    /** @return HasMany<CashCountLine, $this> */
+    public function allLines(): HasMany
     {
         return $this->hasMany(CashCountLine::class)->orderByDesc('denomination');
     }
@@ -135,6 +165,63 @@ final class CashCount extends Model
         return bccomp($this->uncounted_amount, '0', 2) === 0;
     }
 
+    /** Si en este arqueo se abrió el fajo de días anteriores. */
+    public function recountedTheCarry(): bool
+    {
+        return $this->carry_counted_amount !== null;
+    }
+
+    /**
+     * Lo que faltó en el fajo, o null si no se lo abrió.
+     *
+     * Es la parte de la diferencia del día que **no** viene de la
+     * recaudación: plata vieja que el libro daba por presente y no estaba.
+     * Se calcula en vez de guardarse por lo mismo que `difference_amount`
+     * es una columna generada: un derivado almacenado puede quedar
+     * mintiendo.
+     *
+     * @return numeric-string|null
+     */
+    public function carryDifference(): ?string
+    {
+        if ($this->carry_counted_amount === null || $this->carry_expected_amount === null) {
+            return null;
+        }
+
+        return bcsub($this->carry_counted_amount, $this->carry_expected_amount, 2);
+    }
+
+    /** Si la recaudación contada no coincide con la calculada para el día. */
+    public function hasDayDiscrepancy(): bool
+    {
+        $contadoDelDia = Decimal::sub(
+            $this->counted_amount,
+            $this->carry_counted_amount ?? '0.00',
+        );
+
+        $esperadoDelDia = Decimal::sub(
+            $this->expected_amount,
+            Decimal::add(
+                $this->uncounted_amount,
+                $this->carry_expected_amount ?? '0.00',
+            ),
+        );
+
+        return ! Decimal::equals($contadoDelDia, $esperadoDelDia);
+    }
+
+    /**
+     * Si la diferencia atribuida al día necesita una explicación propia.
+     *
+     * Al contar el cajón entero, dos diferencias internas que se compensan
+     * son un cambio de reparto entre montones, no dinero faltante o sobrante.
+     */
+    public function requiresDifferenceExplanation(): bool
+    {
+        return $this->hasDayDiscrepancy()
+            && (! $this->recountedTheCarry() || ! $this->isBalanced());
+    }
+
     /**
      * El último arqueo firme anterior a una fecha.
      *
@@ -165,6 +252,34 @@ final class CashCount extends Model
     }
 
     /**
+     * El último conteo físico completo anterior a una fecha.
+     *
+     * Es la única referencia válida para comparar composiciones: un arqueo
+     * parcial conoce el importe arrastrado, pero no sus billetes. Se exige
+     * además que tenga líneas porque existen aperturas históricas cargadas
+     * antes de que el sistema pidiera el desglose por denominación.
+     *
+     * @param  Builder<$this>  $query
+     * @return Builder<$this>
+     */
+    public function scopeLastFullCountBefore(
+        Builder $query,
+        int $cashBoxId,
+        Currency $currency,
+        CarbonImmutable $date,
+    ): Builder {
+        return $query
+            ->where('cash_box_id', $cashBoxId)
+            ->where('currency', $currency)
+            ->whereDate('counted_on', '<', $date)
+            ->where('status', '!=', CashCountStatus::Draft)
+            ->where('uncounted_amount', '0.00')
+            ->whereHas('allLines')
+            ->orderByDesc('counted_on')
+            ->orderByDesc('sequence');
+    }
+
+    /**
      * @param  Builder<$this>  $query
      * @return Builder<$this>
      */
@@ -187,6 +302,8 @@ final class CashCount extends Model
             'counted_amount' => 'decimal:2',
             'uncounted_amount' => 'decimal:2',
             'difference_amount' => 'decimal:2',
+            'carry_expected_amount' => 'decimal:2',
+            'carry_counted_amount' => 'decimal:2',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];

@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import DetalleComposicionDelFajo from '@/features/caja/components/carry-composition';
 import { date as formatDate } from '@/lib/format';
 import { adjust, review } from '@/routes/caja/arqueos';
 import { store as cerrar } from '@/routes/caja/cierres';
@@ -27,16 +28,18 @@ type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
  */
 export function DialogoDetalle({
     arqueos,
+    referenciaComposicion,
     cerrar,
 }: {
     arqueos: Arqueo[];
+    referenciaComposicion: Arqueo | null;
     cerrar: () => void;
 }) {
     const delMasNuevo = [...arqueos].reverse();
 
     return (
         <Dialog open onOpenChange={(open) => open || cerrar()}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {arqueos.length > 1
@@ -54,6 +57,7 @@ export function DialogoDetalle({
                         <DetalleDeUnArqueo
                             key={item.id}
                             arqueo={item}
+                            referenciaComposicion={referenciaComposicion}
                             vigente={indice === 0}
                         />
                     ))}
@@ -71,9 +75,11 @@ export function DialogoDetalle({
 
 function DetalleDeUnArqueo({
     arqueo,
+    referenciaComposicion,
     vigente,
 }: {
     arqueo: Arqueo;
+    referenciaComposicion: Arqueo | null;
     vigente: boolean;
 }) {
     return (
@@ -116,8 +122,14 @@ function DetalleDeUnArqueo({
                 </div>
             </dl>
 
-            {arqueo.lines.length > 0 && (
-                <table className="mt-3 w-full text-sm">
+            {arqueo.carryRecountReason !== null && (
+                <p className="mt-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Recaudación del día
+                </p>
+            )}
+
+            {arqueo.lines.length > 0 ? (
+                <table className="mt-2 w-full text-sm">
                     <thead>
                         <tr className="text-xs text-muted-foreground">
                             <th className="text-left font-normal">Billete</th>
@@ -141,19 +153,27 @@ function DetalleDeUnArqueo({
                         ))}
                     </tbody>
                 </table>
+            ) : (
+                arqueo.carryRecountReason !== null && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        No se registraron billetes como recaudación del día.
+                    </p>
+                )
+            )}
+
+            {arqueo.carryRecountReason !== null && (
+                <div className="mt-3">
+                    <DetalleComposicionDelFajo
+                        arqueo={arqueo}
+                        referencia={referenciaComposicion}
+                    />
+                </div>
             )}
 
             {/*
-             * Las observaciones son la mitad del arqueo: una diferencia sin
-             * su explicación es un número suelto, y un importe sin recontar
-             * sin su motivo no se distingue de un faltante.
+             * Una diferencia sin su explicación es un número suelto: es la
+             * mitad del arqueo.
              */}
-            {arqueo.uncountedReason && (
-                <Observacion
-                    termino="Por qué no se recontó"
-                    texto={arqueo.uncountedReason}
-                />
-            )}
             {arqueo.explanation && (
                 <Observacion
                     termino="Observaciones"
@@ -192,6 +212,7 @@ function Observacion({ termino, texto }: { termino: string; texto: string }) {
 export function DialogoRevision({
     arqueo,
     anterior,
+    referenciaComposicion,
     cerrar,
     volverAContar,
 }: {
@@ -204,6 +225,7 @@ export function DialogoRevision({
      * a qué número llegar.
      */
     anterior: Arqueo | null;
+    referenciaComposicion: Arqueo | null;
     cerrar: () => void;
     /** Cierra esta revisión y abre el conteo, que es a dónde se vuelve. */
     volverAContar: () => void;
@@ -275,6 +297,13 @@ export function DialogoRevision({
                             </>
                         )}
                     </p>
+                )}
+
+                {arqueo.carryRecountReason !== null && (
+                    <DetalleComposicionDelFajo
+                        arqueo={arqueo}
+                        referencia={referenciaComposicion}
+                    />
                 )}
 
                 {/*
@@ -376,8 +405,8 @@ function FilaRevision({
  *
  * Congela los totales y traba las operaciones retroactivas, así que el
  * diálogo dice qué se está por congelar antes de pedir el botón. Cuando el
- * arqueo quedó con diferencia sin imputar o sin segunda firma, lo avisa:
- * el día se cierra igual —así lo pidió el área— pero no en silencio.
+ * arqueo quedó sin segunda firma, lo avisa. Si tuvo una diferencia, también
+ * distingue si sigue pendiente o si ya quedó regularizada con su asiento.
  */
 export function DialogoCierreDelDia({
     fecha,
@@ -402,7 +431,9 @@ export function DialogoCierreDelDia({
         notes: '',
     });
 
-    const diferencia = arqueo !== null && !arqueo.balanced;
+    const diferenciaPendiente =
+        arqueo !== null && !arqueo.balanced && !arqueo.adjusted;
+    const diferenciaImputada = arqueo?.adjusted ?? false;
     const sinSegundaFirma = arqueo?.selfReviewed ?? false;
 
     return (
@@ -424,7 +455,9 @@ export function DialogoCierreDelDia({
                     <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
                         <p className="flex items-baseline justify-between gap-4">
                             <span className="text-muted-foreground">
-                                Diferencia del arqueo
+                                {diferenciaImputada
+                                    ? 'Diferencia imputada'
+                                    : 'Diferencia del arqueo'}
                             </span>
                             <Money
                                 value={arqueo.differenceAmount}
@@ -432,11 +465,19 @@ export function DialogoCierreDelDia({
                             />
                         </p>
 
-                        {diferencia && (
+                        {diferenciaPendiente && (
                             <p className="mt-2 text-xs text-warning-strong">
-                                El arqueo cerró con diferencia y no se imputó.
-                                El día se cierra igual y la diferencia queda
-                                documentada, para revisarla después.
+                                El arqueo conserva una diferencia sin imputar.
+                                Imputala o volvé a contar el cajón antes de
+                                cerrar el día.
+                            </p>
+                        )}
+
+                        {diferenciaImputada && (
+                            <p className="mt-2 text-xs text-info-strong">
+                                La diferencia ya fue imputada y quedó registrada
+                                en la cuenta de diferencias. El arqueo está
+                                regularizado para cerrar el día.
                             </p>
                         )}
 
@@ -475,7 +516,7 @@ export function DialogoCierreDelDia({
                     </Button>
                     <Button
                         type="button"
-                        disabled={form.processing}
+                        disabled={form.processing || diferenciaPendiente}
                         onClick={() =>
                             form.post(cerrar().url, {
                                 preserveScroll: true,
@@ -500,7 +541,7 @@ export function DialogoCierreDelDia({
     );
 }
 
-/** Imputar la diferencia mueve plata contra `CASH_DIFFERENCE`: exige autorización. */
+/** Imputar la diferencia mueve plata contra `CASH_DIFFERENCE`. */
 export function DialogoImputacion({
     arqueo,
     cerrar: cerrarDialogo,
@@ -509,6 +550,10 @@ export function DialogoImputacion({
     cerrar: () => void;
 }) {
     const form = useForm({ authorization: '' });
+    const esFaltante = arqueo.differenceAmount.startsWith('-');
+    const importe = esFaltante
+        ? arqueo.differenceAmount.slice(1)
+        : arqueo.differenceAmount;
 
     return (
         <Dialog open onOpenChange={(open) => open || cerrarDialogo()}>
@@ -516,16 +561,18 @@ export function DialogoImputacion({
                 <DialogHeader>
                     <DialogTitle>Imputar la diferencia</DialogTitle>
                     <DialogDescription>
-                        Mueve <Money value={arqueo.differenceAmount} /> contra
-                        la cuenta de diferencias, sin que nada haya entrado ni
-                        salido del cajón. Queda registrado que lo hiciste vos;
-                        lo que falta es con qué papel se autorizó.
+                        Registra un ajuste contable por{' '}
+                        <Money value={importe} /> correspondiente al{' '}
+                        {esFaltante ? 'faltante' : 'sobrante'}, para que el
+                        saldo del libro coincida con el efectivo contado. No
+                        registra un cobro ni un pago. Tu usuario y la fecha
+                        quedan registrados.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-2">
                     <Label htmlFor="authorization">
-                        Respaldo de la autorización
+                        Referencia de autorización (opcional)
                     </Label>
                     <Input
                         id="authorization"
@@ -533,7 +580,7 @@ export function DialogoImputacion({
                         onChange={(e) =>
                             form.setData('authorization', e.target.value)
                         }
-                        placeholder="Nota interna 12/2026, acta de arqueo, resolución…"
+                        placeholder="Si existe: nota, acta o resolución…"
                     />
                     <InputError message={form.errors.authorization} />
                 </div>

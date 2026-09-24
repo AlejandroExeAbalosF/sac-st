@@ -72,18 +72,24 @@ final class ReviewCashCount
              * Si el libro dice cero y el conteo concluye cero, contar nada
              * **es** el conteo. Cualquier otro caso sigue trabado.
              */
-            if ($cashCount->lines()->doesntExist() && ! Decimal::equals($cashCount->expected_amount, '0')) {
+            $recaudacionEsperada = Decimal::sub(
+                $cashCount->expected_amount,
+                $cashCount->uncounted_amount,
+            );
+
+            if (
+                $cashCount->allLines()->doesntExist()
+                && $cashCount->carry_recount_reason === null
+                && ! Decimal::equals($recaudacionEsperada, '0')
+            ) {
                 throw ValidationException::withMessages([
                     'lines' => 'Un arqueo sin denominaciones contadas no se puede revisar.',
                 ]);
             }
 
-            if (! $cashCount->isBalanced() && ($cashCount->explanation === null || trim($cashCount->explanation) === '')) {
+            if ($cashCount->requiresDifferenceExplanation() && ($cashCount->explanation === null || trim($cashCount->explanation) === '')) {
                 throw ValidationException::withMessages([
-                    'explanation' => sprintf(
-                        'La diferencia de %s no puede aprobarse sin explicación.',
-                        Decimal::format(Decimal::abs($cashCount->difference_amount)),
-                    ),
+                    'explanation' => 'Una diferencia en la recaudación del día no puede aprobarse sin explicación.',
                 ]);
             }
 

@@ -45,15 +45,15 @@ use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReopenPeriod;
 use App\Modules\Ledger\Actions\ReviewCashCount;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Models\PeriodClosing;
-use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Actions\VerifyPersonBankAccount;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
-use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\SplitsPersonName;
 use Illuminate\Database\Seeder;
@@ -470,13 +470,10 @@ class OperacionDemoSeeder extends Seeder
             );
         });
 
-        // Un arqueo que cuadra pero no contó todo el cajón.
+        // Un arqueo que cuenta la recaudación y arrastra el fondo anterior.
         $this->jornada('2026-07-28', function (): void {
             $this->cobrarEnMostrador('vera-2', '72303');
-        }, [
-            'sinRecontar' => '200000.00',
-            'motivo' => 'El fajo de cincuenta mil quedó sin abrir, precintado del banco.',
-        ]);
+        });
 
         $this->cerrarMes('2026-07-31');
     }
@@ -698,7 +695,7 @@ class OperacionDemoSeeder extends Seeder
      * El arqueo se cuenta contra el libro —se lee el saldo y se desglosa en
      * billetes— así que cuadra siempre, salvo donde se pida lo contrario.
      *
-     * @param  array{sinRecontar?: string, motivo?: string, faltante?: string, explicacion?: string}  $arqueo
+     * @param  array{faltante?: numeric-string, explicacion?: string}  $arqueo
      */
     private function jornada(string $fecha, callable $actos, array $arqueo = [], bool $cerrar = true, bool $ajustar = false): void
     {
@@ -719,22 +716,19 @@ class OperacionDemoSeeder extends Seeder
         }
     }
 
-    /** @param  array{sinRecontar?: string, motivo?: string, faltante?: string, explicacion?: string}  $receta */
+    /** @param  array{faltante?: numeric-string, explicacion?: string}  $receta */
     private function arquear(CarbonImmutable $fecha, array $receta, bool $ajustar = false): void
     {
-        $enCaja = app(CashBalance::class)->of(LedgerAccount::CashOnHand, $this->caja, upTo: $fecha);
-
-        $sinRecontar = $receta['sinRecontar'] ?? '0.00';
+        $recaudacion = app(CashDayTakings::class)->of($this->caja, $fecha, Currency::Ars);
         $faltante = $receta['faltante'] ?? '0.00';
 
-        $aContar = Decimal::sub(Decimal::sub($enCaja, $sinRecontar), $faltante);
+        $aContar = bcsub($recaudacion, $faltante, 2);
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja,
             countedOn: $fecha,
             denominations: $this->desglosar($aContar),
             actorId: $this->cajero->id,
-            uncountedAmount: $sinRecontar,
             explanation: $receta['explicacion'] ?? null,
         );
 

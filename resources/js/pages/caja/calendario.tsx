@@ -39,10 +39,14 @@ type DetalleDia = {
     arqueos: Arqueo[];
     /** El arqueo firme anterior a ese día, como referencia. */
     previousCount: Arqueo | null;
+    /** Último conteo completo con billetes, para comparar composiciones. */
+    compositionReference: Arqueo | null;
     /** Si la caja se movió después de ese día. */
     movedAfter: boolean;
     /** El saldo del libro a ese día, para adelantar la diferencia. */
     expectedCash: string;
+    /** Lo que entró ese día y sigue en el cajón. */
+    dayTakings: string;
     activity: DayActivityEntry[];
     closing: Cierre | null;
 } | null;
@@ -398,8 +402,10 @@ function PanelDelDia({
                 currency={selected.currency}
                 arqueos={detalle.arqueos}
                 anterior={detalle.previousCount}
+                referenciaComposicion={detalle.compositionReference}
                 cajonMovido={detalle.movedAfter}
                 esperado={detalle.expectedCash}
+                recaudacion={detalle.dayTakings}
                 cierre={detalle.closing}
                 denominaciones={denominaciones}
                 sheetVersion={sheetVersion}

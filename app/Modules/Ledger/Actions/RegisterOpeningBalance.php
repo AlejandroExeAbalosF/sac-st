@@ -314,7 +314,7 @@ final class RegisterOpeningBalance
             return;
         }
 
-        $arqueo = $this->contarElCajon->handle(
+        $arqueo = $this->contarElCajon->handleOpening(
             cashBoxId: $cashBoxId,
             countedOn: $date,
             denominations: $denominations,

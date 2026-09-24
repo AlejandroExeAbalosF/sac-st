@@ -77,8 +77,10 @@ export default function FlujoDelDia({
     currency,
     arqueos,
     anterior,
+    referenciaComposicion,
     cajonMovido,
     esperado,
+    recaudacion,
     cierre,
     denominaciones,
     sheetVersion,
@@ -101,10 +103,14 @@ export default function FlujoDelDia({
      * trabajo de quien revisa, no de quien cuenta.
      */
     anterior: Arqueo | null;
+    /** Último conteo completo anterior con composición por billete. */
+    referenciaComposicion: Arqueo | null;
     /** Si la caja se movió después de este día. */
     cajonMovido: boolean;
     /** El saldo del libro para este día, para adelantar la diferencia. */
     esperado: string;
+    /** Lo que entró hoy y sigue en el cajón, según el libro. */
+    recaudacion: string;
     /** La versión con la que dibuja el generador de hoy. */
     sheetVersion: string;
     cierre: Cierre | null;
@@ -171,16 +177,27 @@ export default function FlujoDelDia({
      */
     const pasoQueSigue =
         arqueo?.status === 'draft'
-            ? can.review && (
-                  <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full"
-                      onClick={() => setRevisando(true)}
-                  >
-                      <Check className="size-4" />
-                      Revisar el arqueo
-                  </Button>
+            ? (can.review || !arqueo.balanced) && (
+                  <>
+                      {can.review && (
+                          <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-3 w-full"
+                              onClick={() => setRevisando(true)}
+                          >
+                              <Check className="size-4" />
+                              Revisar el arqueo
+                          </Button>
+                      )}
+                      {!arqueo.balanced && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                              Primero revisá el arqueo. Si confirmás la
+                              diferencia, después se habilita «Imputar la
+                              diferencia».
+                          </p>
+                      )}
+                  </>
               )
             : arqueo?.status === 'reviewed' &&
               !arqueo.balanced &&
@@ -490,6 +507,8 @@ export default function FlujoDelDia({
                     fecha={fecha}
                     denominaciones={denominaciones}
                     esperado={esperado}
+                    recaudacion={recaudacion}
+                    referenciaComposicion={referenciaComposicion}
                     cajonMovido={cajonMovido}
                 />
             )}
@@ -504,6 +523,7 @@ export default function FlujoDelDia({
             {mirando && arqueo !== null && (
                 <DialogoDetalle
                     arqueos={arqueos}
+                    referenciaComposicion={referenciaComposicion}
                     cerrar={() => setMirando(false)}
                 />
             )}
@@ -512,6 +532,7 @@ export default function FlujoDelDia({
                 <DialogoRevision
                     arqueo={arqueo}
                     anterior={anterior}
+                    referenciaComposicion={referenciaComposicion}
                     cerrar={() => setRevisando(false)}
                     volverAContar={() => {
                         setRevisando(false);

@@ -649,7 +649,6 @@ declare namespace App {
                     expectedAmount: string;
                     countedAmount: string;
                     uncountedAmount: string;
-                    uncountedReason: string | null;
                     differenceAmount: string;
                     status: string;
                     statusLabel: string;
@@ -663,6 +662,15 @@ declare namespace App {
                     selfReviewed: boolean;
                     adjusted: boolean;
                     lines: {
+                        denomination: string;
+                        quantity: number;
+                        subtotal: string;
+                    }[];
+                    carryRecountReason: string | null;
+                    carryExpectedAmount: string | null;
+                    carryCountedAmount: string | null;
+                    carryDifferenceAmount: string | null;
+                    carryLines: {
                         denomination: string;
                         quantity: number;
                         subtotal: string;
@@ -724,6 +732,7 @@ declare namespace App {
                 };
             }
             namespace Enums {
+                export type CashCountScope = 'day' | 'carry';
                 export type CashCountStatus =
                     'draft' | 'reviewed' | 'adjusted' | 'closed';
                 export type ChequeStatus =

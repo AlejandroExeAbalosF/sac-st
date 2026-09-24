@@ -19,11 +19,11 @@ use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReviewCashCount;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
-use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Person;
-use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\SplitsPersonName;
 use Illuminate\Database\Seeder;
@@ -441,7 +441,7 @@ final class CajaDemoSeeder extends Seeder
      * falta para reconstruirla: el papel muestra dos columnas de números
      * sin decir cuál paga a cuál.
      *
-     * @return array<string, array{cobros: list<int>, pagos: array<int, int>, arqueo: array{sinRecontar?: numeric-string, motivo?: string, faltante?: numeric-string, explicacion?: string}}>
+     * @return array<string, array{cobros: list<int>, pagos: array<int, int>, arqueo: array{faltante?: numeric-string, explicacion?: string}}>
      */
     private function jornadas(): array
     {
@@ -468,14 +468,7 @@ final class CajaDemoSeeder extends Seeder
             '2026-06-03' => [
                 'cobros' => [72199, 72200, 72251],
                 'pagos' => [],
-                /*
-                 * El arqueo parcial, que es el caso que justifica la
-                 * columna: cuadra sin haberse contado entero.
-                 */
-                'arqueo' => [
-                    'sinRecontar' => '7000000.00',
-                    'motivo' => 'Fajos precintados del día anterior, no recontados.',
-                ],
+                'arqueo' => [],
             ],
             '2026-06-04' => [
                 'cobros' => [72252, 72253, 72254, 72255, 72256, 72257],
@@ -513,7 +506,7 @@ final class CajaDemoSeeder extends Seeder
         ];
     }
 
-    /** @param  array{cobros: list<int>, pagos: array<int, int>, arqueo: array<string, string>}  $jornada */
+    /** @param  array{cobros: list<int>, pagos: array<int, int>, arqueo: array{faltante?: numeric-string, explicacion?: string}}  $jornada */
     private function jornada(CarbonImmutable $fecha, array $jornada): void
     {
         CarbonImmutable::setTestNow($fecha->setTime(10, 0));
@@ -615,32 +608,28 @@ final class CajaDemoSeeder extends Seeder
         );
     }
 
-    /** @param  array<string, string>  $receta */
+    /** @param  array{faltante?: numeric-string, explicacion?: string}  $receta */
     private function arquear(CarbonImmutable $fecha, array $receta): void
     {
-        $enCaja = app(CashBalance::class)->of(
-            LedgerAccount::CashOnHand,
+        $recaudacion = app(CashDayTakings::class)->of(
             $this->caja,
-            upTo: $fecha,
+            $fecha,
+            Currency::Ars,
         );
 
-        $sinRecontar = $receta['sinRecontar'] ?? '0.00';
         $faltante = $receta['faltante'] ?? '0.00';
 
         /*
-         * Lo que se cuenta en billetes es el saldo menos lo que se declara
-         * sin recontar, y menos el faltante si el día tiene uno. Así el
-         * desglose por denominación siempre suma exactamente lo que la
-         * cabecera dice, que es lo que el trigger diferido exige.
+         * Lo que se cuenta es la recaudación que sigue en el cajón, menos el
+         * faltante si el día tiene uno. El arrastre lo deriva el Action.
          */
-        $aContar = Decimal::sub(Decimal::sub($enCaja, $sinRecontar), $faltante);
+        $aContar = bcsub($recaudacion, $faltante, 2);
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja,
             countedOn: $fecha,
             denominations: $this->desglosar($aContar),
             actorId: $this->cajero->id,
-            uncountedAmount: $sinRecontar,
             explanation: $receta['explicacion'] ?? null,
         );
 

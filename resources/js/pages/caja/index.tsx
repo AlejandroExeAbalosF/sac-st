@@ -53,10 +53,14 @@ type Props = {
     };
     state: Estado;
     book: { income: Fila[]; expense: Fila[] };
+    /** Lo que entró hoy y sigue en el cajón, según el libro. */
+    dayTakings: string;
     activity: DayActivityEntry[];
     counts: Arqueo[];
     /** El arqueo firme anterior a este día, como referencia. */
     previousCount: Arqueo | null;
+    /** Último conteo completo con billetes, para comparar composiciones. */
+    compositionReference: Arqueo | null;
     /** Si la caja se movió después del día que se muestra. */
     movedAfter: boolean;
     closing: Cierre | null;
@@ -92,9 +96,11 @@ export default function CajaIndex({
     selected,
     state,
     book,
+    dayTakings,
     activity,
     counts,
     previousCount,
+    compositionReference,
     movedAfter,
     closing,
     needsOpening,
@@ -360,7 +366,9 @@ export default function CajaIndex({
                             currency={selected.currency}
                             arqueos={counts}
                             anterior={previousCount}
+                            referenciaComposicion={compositionReference}
                             esperado={state.cash}
+                            recaudacion={dayTakings}
                             cajonMovido={movedAfter}
                             cierre={closing}
                             denominaciones={suggestedDenominations}

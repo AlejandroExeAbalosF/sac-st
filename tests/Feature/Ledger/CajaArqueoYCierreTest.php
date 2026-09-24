@@ -9,6 +9,7 @@ use App\Modules\Ledger\Actions\AdjustCashDifference;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Actions\RecordCashCount;
+use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReopenPeriod;
 use App\Modules\Ledger\Actions\ReviewCashCount;
@@ -97,21 +98,20 @@ class CajaArqueoYCierreTest extends TestCase
      * El reverso del 30/06/2026, cargado tal cual está en el papel.
      *
      * Es el test que justifica `uncounted_amount`. El área contó 2.034.800
-     * en billetes sueltos y declaró 743.050 sin recontar; los dos números
-     * juntos dan el saldo del libro, y **la diferencia es cero sin que el
-     * conteo haya sido completo**. Sin la columna, esos 743.050 aparecerían
-     * como un faltante.
+     * de la recaudación del día y dejó 743.050 sin recontar; el segundo
+     * número sale del libro, no de lo que escriba el operador. Los dos
+     * juntos dan el saldo y **la diferencia es cero sin que el conteo haya
+     * sido completo**.
      */
     public function test_el_reverso_del_30_de_junio_cuadra_declarando_el_fajo_no_recontado(): void
     {
-        $this->abrirLibros(efectivo: '2777850.00', cheques: '0.00');
+        $this->abrirLibros(efectivo: '743050.00', cheques: '0.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-06-30'),
             denominations: [20_000 => 101, 10_000 => 1, 1_000 => 4, 500 => 1, 200 => 1, 100 => 1],
-            uncountedAmount: '743050.00',
-            uncountedReason: 'Fajos precintados del día anterior, no recontados.',
         );
 
         $this->assertSame('2034800.00', $arqueo->counted_amount);
@@ -131,6 +131,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_el_total_contado_sale_de_las_denominaciones_y_no_de_quien_carga(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
@@ -172,6 +173,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_quien_conto_puede_revisar_y_queda_sin_segunda_firma(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $cajero = User::factory()->create();
 
@@ -192,6 +194,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_revisado_por_otro_no_queda_marcado(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $cajero = User::factory()->create();
         $contador = User::factory()->create();
@@ -211,6 +214,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_el_arqueo_de_dolares_es_su_propia_fila(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
@@ -234,6 +238,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_la_diferencia_se_imputa_a_la_cuenta_de_diferencias(): void
     {
         $this->abrirLibros(efectivo: '2034900.00', cheques: '0.00');
+        $this->recibirEfectivo('2034900.00', '2026-06-30');
 
         $cajero = User::factory()->create();
         $contador = User::factory()->create();
@@ -249,20 +254,20 @@ class CajaArqueoYCierreTest extends TestCase
         $this->assertSame('-100.00', $arqueo->difference_amount);
 
         $arqueo = app(ReviewCashCount::class)->handle($arqueo, $contador->id);
-        $arqueo = app(AdjustCashDifference::class)->handle(
-            $arqueo,
-            $contador->id,
-            'Autorizado por nota interna 12/2026.',
-        );
+        $arqueo = app(AdjustCashDifference::class)->handle($arqueo, $contador->id);
 
         $this->assertSame(CashCountStatus::Adjusted, $arqueo->status);
         $this->assertNotNull($arqueo->adjustment_event_id);
+        $this->assertSame(
+            'Imputación de diferencia de arqueo',
+            FinancialEvent::query()->findOrFail($arqueo->adjustment_event_id)->description,
+        );
 
         $saldos = app(CashBalance::class);
 
         // Después del ajuste el libro dice lo que hay en el cajón, y la
         // explicación se mudó a `CASH_DIFFERENCE`.
-        $this->assertSame('2034800.00', $saldos->of(LedgerAccount::CashOnHand, $this->caja()));
+        $this->assertSame('4069700.00', $saldos->of(LedgerAccount::CashOnHand, $this->caja()));
 
         /*
          * El signo se lee igual en los dos lados: negativo es faltante.
@@ -305,6 +310,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_el_dia_cierra_despues_de_imputar_la_diferencia(): void
     {
         $this->abrirLibros(efectivo: '2034900.00', cheques: '0.00', fecha: '2026-06-01');
+        $this->recibirEfectivo('2034900.00', '2026-06-02');
 
         $cajero = User::factory()->create();
         $contador = User::factory()->create();
@@ -333,7 +339,7 @@ class CajaArqueoYCierreTest extends TestCase
         $this->assertSame(PeriodClosingStatus::Closed, $cierre->status);
 
         // Y el saldo congelado es el que dejó la imputación.
-        $this->assertSame('2034800.00', $cierre->closing_cash);
+        $this->assertSame('4069700.00', $cierre->closing_cash);
     }
 
     public function test_el_cierre_reproduce_el_anverso_de_la_planilla(): void
@@ -423,6 +429,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_no_se_cierra_un_periodo_con_un_arqueo_en_borrador(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00', fecha: '2026-06-01');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
@@ -441,6 +448,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_cerrar_el_dia_congela_su_arqueo(): void
     {
         $this->abrirLibros(efectivo: '2034800.00', cheques: '0.00', fecha: '2026-06-01');
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $cajero = User::factory()->create();
         $contador = User::factory()->create();
@@ -692,27 +700,27 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_un_arqueo_revisado_no_se_pisa_y_el_borrador_si(): void
     {
         $this->abrirLibros(efectivo: '2909750.00', cheques: '0.00', fecha: '2026-09-07');
-        $this->cobrar('50000.00', '2026-09-08');
+        $this->recibirEfectivo('50000.00', '2026-09-08');
 
         $cajero = User::factory()->create();
 
-        // Cuenta solo lo del día: le faltan los 2.909.750 de la apertura.
+        // Cuenta 30.000 de los 50.000 que entraron en el día.
         $incompleto = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-09-08'),
-            denominations: [20_000 => 2, 10_000 => 1],
+            denominations: [20_000 => 1, 10_000 => 1],
             actorId: $cajero->id,
             explanation: 'Conteo parcial mientras se ordena el cajón.',
         );
 
         $this->assertSame(1, $incompleto->sequence);
-        $this->assertSame('-2909750.00', $incompleto->difference_amount);
+        $this->assertSame('-20000.00', $incompleto->difference_amount);
 
         // Todavía es borrador: contar otra vez lo reemplaza.
         $rehecho = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-09-08'),
-            denominations: [20_000 => 3, 10_000 => 1],
+            denominations: [20_000 => 2],
             actorId: $cajero->id,
             explanation: 'Se recontó el cajón completo.',
         );
@@ -727,9 +735,8 @@ class CajaArqueoYCierreTest extends TestCase
         $segundoTurno = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-09-08'),
-            denominations: [20_000 => 147, 10_000 => 1, 1_000 => 9, 500 => 1, 200 => 1, 50 => 1],
+            denominations: [20_000 => 2, 10_000 => 1],
             actorId: $cajero->id,
-            uncountedAmount: '0.00',
         );
 
         $this->assertSame(2, $segundoTurno->sequence);
@@ -754,15 +761,13 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_el_fondo_que_no_se_recuenta_se_declara(): void
     {
         $this->abrirLibros(efectivo: '2909750.00', cheques: '0.00', fecha: '2026-09-07');
-        $this->cobrar('50000.00', '2026-09-08');
+        $this->recibirEfectivo('50000.00', '2026-09-08');
 
         $arqueo = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-09-08'),
             denominations: [20_000 => 2, 10_000 => 1],
             actorId: User::factory()->create()->id,
-            uncountedAmount: '2909750.00',
-            uncountedReason: 'Fondo histórico en caja fuerte: no se recuenta a diario.',
         );
 
         $this->assertSame('50000.00', $arqueo->counted_amount);
@@ -912,6 +917,7 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_con_saldo_en_el_libro_no_se_revisa_un_arqueo_vacio(): void
     {
         $this->abrirLibros(efectivo: '1000.00', cheques: '0.00', fecha: '2026-06-01');
+        $this->recibirEfectivo('1000.00', '2026-06-02');
 
         $contador = User::factory()->create();
 
@@ -1370,6 +1376,17 @@ class CajaArqueoYCierreTest extends TestCase
             ],
             date: CarbonImmutable::parse($fecha),
             cashBoxId: $this->caja(),
+        );
+    }
+
+    /** Un ingreso real por mostrador, visible para la recaudación del día. */
+    private function recibirEfectivo(string $importe, string $fecha): void
+    {
+        app(RegisterCashFundReceipt::class)->handle(
+            amount: $importe,
+            idempotencyKey: 'recepcion-'.Str::random(12),
+            cashBoxId: $this->caja(),
+            receivedDate: CarbonImmutable::parse($fecha),
         );
     }
 

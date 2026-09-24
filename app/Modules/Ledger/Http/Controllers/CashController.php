@@ -21,6 +21,7 @@ use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Ledger\Support\CashDayBook;
+use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
@@ -49,6 +50,7 @@ final class CashController extends Controller
     public function __construct(
         private readonly CashBalance $saldos,
         private readonly CashDayBook $libro,
+        private readonly CashDayTakings $recaudacion,
         private readonly CashDayActivity $actividad,
         private readonly RegisterOpeningBalance $abrir,
     ) {}
@@ -65,7 +67,7 @@ final class CashController extends Controller
         $fecha = $this->selectedDate($request);
 
         $arqueos = CashCount::query()
-            ->with(['performedBy', 'reviewedBy', 'lines'])
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
             ->where('cash_box_id', $caja->id)
             ->where('currency', $moneda)
             ->whereDate('counted_on', $fecha)
@@ -91,6 +93,12 @@ final class CashController extends Controller
                 'cashBoxName' => $caja->name,
             ],
             'state' => $this->state($caja, $moneda, $fecha),
+            /*
+             * Lo que entró hoy y sigue en el cajón, para que el arqueo
+             * pueda comparar el conteo contra algo que el operador no
+             * eligió. El saldo del día anterior se sigue declarando.
+             */
+            'dayTakings' => $this->recaudacion->of((int) $caja->id, $fecha, $moneda),
             'book' => $this->libro->entries((int) $caja->id, $fecha, $fecha, $moneda),
             'activity' => $this->actividad->entries((int) $caja->id, $fecha, $moneda),
             'counts' => $arqueos->map(CashCountListItemData::fromModel(...))->values()->all(),
@@ -100,6 +108,8 @@ final class CashController extends Controller
              * comparar al revisar.
              */
             'previousCount' => $this->previousCount((int) $caja->id, $moneda, $fecha),
+            /* Última foto completa de los billetes, para comparar el recuento del fajo. */
+            'compositionReference' => $this->compositionReference((int) $caja->id, $moneda, $fecha),
             /*
              * Si la caja se movió después del día que se está mirando.
              *
@@ -176,8 +186,22 @@ final class CashController extends Controller
     private function previousCount(int $cashBoxId, Currency $moneda, CarbonImmutable $fecha): ?CashCountListItemData
     {
         $anterior = CashCount::query()
-            ->with(['performedBy', 'reviewedBy', 'lines'])
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
             ->lastFirmBefore($cashBoxId, $moneda, $fecha)
+            ->first();
+
+        return $anterior === null ? null : CashCountListItemData::fromModel($anterior);
+    }
+
+    /** Último conteo completo con denominaciones, nunca un saldo calculado. */
+    private function compositionReference(
+        int $cashBoxId,
+        Currency $moneda,
+        CarbonImmutable $fecha,
+    ): ?CashCountListItemData {
+        $anterior = CashCount::query()
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
+            ->lastFullCountBefore($cashBoxId, $moneda, $fecha)
             ->first();
 
         return $anterior === null ? null : CashCountListItemData::fromModel($anterior);

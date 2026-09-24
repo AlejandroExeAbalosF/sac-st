@@ -20,6 +20,7 @@ use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
 use App\Modules\Ledger\Support\CashDayActivity;
+use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
@@ -44,6 +45,7 @@ final class CashCalendarController extends Controller
     public function __construct(
         private readonly CashCalendar $calendario,
         private readonly CashBalance $saldos,
+        private readonly CashDayTakings $recaudacion,
         private readonly CashDayActivity $actividad,
     ) {}
 
@@ -139,7 +141,7 @@ final class CashCalendarController extends Controller
      * elegido en la grilla. Solo cuando el día cae dentro del mes que se
      * muestra: un día sin mes es la vista del año, que no tiene panel.
      *
-     * @return array{date: string, arqueos: list<array<string, mixed>>, previousCount: array<string, mixed>|null, expectedCash: numeric-string, movedAfter: bool, closing: array<string, mixed>|null, activity: list<array<string, mixed>>}|null
+     * @return array{date: string, arqueos: list<array<string, mixed>>, previousCount: array<string, mixed>|null, compositionReference: array<string, mixed>|null, expectedCash: numeric-string, dayTakings: numeric-string, movedAfter: bool, closing: array<string, mixed>|null, activity: list<array<string, mixed>>}|null
      */
     private function dayDetail(int $cashBoxId, Currency $currency, ?CarbonImmutable $dia, ?int $mes): ?array
     {
@@ -153,7 +155,7 @@ final class CashCalendarController extends Controller
          * puede mirar la historia del conteo.
          */
         $arqueos = CashCount::query()
-            ->with(['performedBy', 'reviewedBy', 'lines'])
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
             ->where('cash_box_id', $cashBoxId)
             ->where('currency', $currency)
             ->whereDate('counted_on', $dia)
@@ -180,8 +182,13 @@ final class CashCalendarController extends Controller
         }
 
         $anterior = CashCount::query()
-            ->with(['performedBy', 'reviewedBy', 'lines'])
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
             ->lastFirmBefore($cashBoxId, $currency, $dia)
+            ->first();
+
+        $referenciaDeComposicion = CashCount::query()
+            ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
+            ->lastFullCountBefore($cashBoxId, $currency, $dia)
             ->first();
 
         return [
@@ -191,6 +198,9 @@ final class CashCalendarController extends Controller
             'previousCount' => $anterior === null
                 ? null
                 : CashCountListItemData::fromModel($anterior)->toArray(),
+            'compositionReference' => $referenciaDeComposicion === null
+                ? null
+                : CashCountListItemData::fromModel($referenciaDeComposicion)->toArray(),
             /* Lo que el libro dice que hay ese día, para adelantar la diferencia. */
             'expectedCash' => $this->saldos->of(
                 LedgerAccount::CashOnHand,
@@ -198,6 +208,7 @@ final class CashCalendarController extends Controller
                 $currency,
                 $dia,
             ),
+            'dayTakings' => $this->recaudacion->of($cashBoxId, $dia, $currency),
             'movedAfter' => FinancialEvent::query()
                 ->where('cash_box_id', $cashBoxId)
                 ->whereIn('status', [FinancialEventStatus::Posted, FinancialEventStatus::Reversed])

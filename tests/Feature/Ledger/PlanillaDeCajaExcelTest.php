@@ -17,6 +17,7 @@ use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\ExportCashSheet;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Actions\RecordCashCount;
+use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReopenPeriod;
 use App\Modules\Ledger\Actions\ReviewCashCount;
@@ -24,6 +25,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Models\PeriodClosing;
+use App\Modules\Ledger\Support\CarryRecount;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -174,6 +176,48 @@ class PlanillaDeCajaExcelTest extends TestCase
 
         $this->assertArrayHasKey($rotulo, $filas);
         $this->assertSame(743050.0, (float) $hoja->getCell('C'.$filas[$rotulo])->getValue());
+    }
+
+    /**
+     * Con el fajo recontado, el cuadro suma los dos conteos.
+     *
+     * El papel lista **lo que hay en el cajón**: no le interesa si un
+     * billete de veinte mil vino de la recaudación de hoy o del fajo que se
+     * abrió esta tarde. Si los renglones salieran separados habría dos
+     * filas de la misma denominación y el cuadro no sumaría el total
+     * contado, que es lo único que la rendición tiene que cerrar.
+     */
+    public function test_el_reverso_suma_los_billetes_del_fajo_recontado(): void
+    {
+        $cierre = $this->cierreDel30DeJunioConFajoRecontado();
+
+        $adjunto = app(ExportCashSheet::class)->handle($cierre);
+
+        $hoja = $this->abrir($adjunto->object_key)->getSheetByName('REVERSO 300626');
+
+        $this->assertNotNull($hoja);
+
+        // 101 del día más 37 del fajo, en un solo renglón.
+        $this->assertSame(138, (int) $hoja->getCell('A8')->getValue());
+        $this->assertSame(2760000.0, (float) $hoja->getCell('C8')->getValue());
+
+        // 4 del día más 3 del fajo.
+        $this->assertSame(7, (int) $hoja->getCell('A11')->getValue());
+        $this->assertSame(7000.0, (float) $hoja->getCell('C11')->getValue());
+
+        // Y uno que solo estaba en el fajo.
+        $this->assertSame(1, (int) $hoja->getCell('A15')->getValue());
+        $this->assertSame(50.0, (float) $hoja->getCell('C15')->getValue());
+
+        $filas = $this->rotulos($hoja);
+
+        $this->assertSame(2777850.0, (float) $hoja->getCell('C'.$filas['RECAUDACION DEL DIA'])->getValue());
+
+        // Y ya no queda nada sin recontar: se recontó.
+        $this->assertSame(
+            0.0,
+            (float) $hoja->getCell('C'.$filas['SALDO DIA ANTERIOR (no recontado)'])->getValue(),
+        );
     }
 
     /**
@@ -571,10 +615,11 @@ class PlanillaDeCajaExcelTest extends TestCase
     {
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
-            balances: [LedgerAccount::CashOnHand->value => '2777850.00'],
-            denominations: $this->billetesPara('2777850.00'),
+            balances: [LedgerAccount::CashOnHand->value => '743050.00'],
+            denominations: $this->billetesPara('743050.00'),
             date: CarbonImmutable::parse('2026-06-01'),
         );
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
 
         $cajero = User::factory()->create();
         $contador = User::factory()->create();
@@ -584,8 +629,40 @@ class PlanillaDeCajaExcelTest extends TestCase
             countedOn: CarbonImmutable::parse('2026-06-30'),
             denominations: [20_000 => 101, 10_000 => 1, 1_000 => 4, 500 => 1, 200 => 1, 100 => 1],
             actorId: $cajero->id,
-            uncountedAmount: '743050.00',
-            uncountedReason: 'Fajos precintados del día anterior, no recontados.',
+        );
+
+        app(ReviewCashCount::class)->handle($arqueo, $contador->id);
+
+        return app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-30'),
+            actorId: $contador->id,
+        );
+    }
+
+    /** El mismo 30/06, pero abriendo el fajo en vez de declararlo. */
+    private function cierreDel30DeJunioConFajoRecontado(): PeriodClosing
+    {
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [LedgerAccount::CashOnHand->value => '743050.00'],
+            denominations: $this->billetesPara('743050.00'),
+            date: CarbonImmutable::parse('2026-06-01'),
+        );
+        $this->recibirEfectivo('2034800.00', '2026-06-30');
+
+        $cajero = User::factory()->create();
+        $contador = User::factory()->create();
+
+        $arqueo = app(RecordCashCount::class)->handle(
+            cashBoxId: $this->caja(),
+            countedOn: CarbonImmutable::parse('2026-06-30'),
+            denominations: [20_000 => 101, 10_000 => 1, 1_000 => 4, 500 => 1, 200 => 1, 100 => 1],
+            actorId: $cajero->id,
+            carryRecount: new CarryRecount(
+                reason: 'Verificación de cierre de mes.',
+                denominations: [20_000 => 37, 1_000 => 3, 50 => 1],
+            ),
         );
 
         app(ReviewCashCount::class)->handle($arqueo, $contador->id);
@@ -608,6 +685,17 @@ class PlanillaDeCajaExcelTest extends TestCase
             ],
             date: CarbonImmutable::parse($fecha),
             cashBoxId: $this->caja(),
+        );
+    }
+
+    /** Un ingreso por mostrador que integra la recaudación calculada del día. */
+    private function recibirEfectivo(string $importe, string $fecha): void
+    {
+        app(RegisterCashFundReceipt::class)->handle(
+            amount: $importe,
+            idempotencyKey: 'recepcion-'.Str::random(12),
+            cashBoxId: $this->caja(),
+            receivedDate: CarbonImmutable::parse($fecha),
         );
     }
 
