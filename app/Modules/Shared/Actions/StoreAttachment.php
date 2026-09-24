@@ -136,8 +136,13 @@ final class StoreAttachment
      *
      * Existe para una sola situación: revertir la importación de un
      * extracto. Si el extracto se borra, su archivo tiene que irse con él
-     * o quedaría un adjunto apuntando a un sujeto que ya no existe. Por
-     * eso la excepción al trigger se declara acá y no en cualquier lado.
+     * o quedaría un adjunto apuntando a un sujeto que ya no existe.
+     *
+     * El borrado lo hace `forget_statement_attachment()`, una función de la
+     * base que corre como dueña de la tabla y solo acepta archivos de
+     * extractos. La app no puede borrar un adjunto por su cuenta: antes le
+     * alcanzaba con `SET LOCAL sacst.allow_attachment_delete`, que cualquier
+     * rol puede fijar, y por ahí se iba el PDF de cualquier recibo.
      *
      * **No borra el archivo**, lo devuelve. Si esta transacción termina
      * volviendo atrás, la fila reaparece y el archivo tiene que seguir
@@ -150,8 +155,14 @@ final class StoreAttachment
     {
         if (DB::transactionLevel() === 0) {
             throw new RuntimeException(
-                'Borrar un adjunto exige una transacción: el permiso para hacerlo se declara con '
-                .'SET LOCAL y muere con ella.'
+                'Borrar un adjunto exige una transacción: el archivo se elimina recién después '
+                .'de confirmarla, y sin ella no hay «después».'
+            );
+        }
+
+        if ($attachment->subject_type !== AttachmentSubject::Import) {
+            throw new RuntimeException(
+                'Solo se borra el archivo de un extracto importado, al revertir la importación.'
             );
         }
 
@@ -160,9 +171,7 @@ final class StoreAttachment
             'key' => $attachment->object_key,
         ];
 
-        DB::statement("SET LOCAL sacst.allow_attachment_delete = 'on'");
-
-        $attachment->delete();
+        DB::select('SELECT forget_statement_attachment(?)', [$attachment->id]);
 
         return $pendiente;
     }

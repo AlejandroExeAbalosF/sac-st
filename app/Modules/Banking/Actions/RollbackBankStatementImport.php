@@ -127,13 +127,6 @@ final class RollbackBankStatementImport
             return;
         }
 
-        /*
-         * Habilita el borrado solo dentro de esta transacción. `SET LOCAL`
-         * se descarta al terminar, así que la excepción al append-only no
-         * sobrevive a la operación que la necesitaba.
-         */
-        DB::statement("SET LOCAL sacst.allow_bank_transaction_delete = 'on'");
-
         foreach ($transactions as $transaction) {
             $heir = $this->otherImportOf($import, $transaction);
 
@@ -145,7 +138,14 @@ final class RollbackBankStatementImport
                 continue;
             }
 
-            $transaction->delete();
+            /*
+             * El borrado lo hace la base: `discard_statement_transaction()`
+             * corre como dueña de la tabla y solo acepta un movimiento sin
+             * conciliar. La app no puede abrir el append-only por su cuenta
+             * —antes le alcanzaba con un `SET LOCAL` que cualquier rol
+             * puede fijar—; `assertUntouched` da el mensaje legible antes.
+             */
+            DB::select('SELECT discard_statement_transaction(?)', [$transaction->id]);
         }
     }
 

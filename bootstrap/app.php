@@ -27,6 +27,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(AuditAccessLogger::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        /*
+         * Solo se atienden pedidos dirigidos al dominio de `APP_URL`.
+         *
+         * El enlace de «olvidé mi contraseña» se arma con el `Host` del
+         * pedido. Sin esto, quien pidiera la recuperación de otro con
+         * `Host: atacante.tld` hacía llegar a la víctima un enlace a su
+         * dominio, y el token con él. `127.0.0.1` y `localhost` quedan
+         * porque el healthcheck de nginx pega a `/up` por la IP local; un
+         * enlace a la propia máquina de la víctima no le sirve a nadie.
+         *
+         * Laravel no lo aplica en `local` ni en los tests.
+         */
+        $middleware->trustHosts(at: ['^127\.0\.0\.1$', '^localhost$']);
+
         $middleware->web(append: [
             /*
              * Primero: si la cuenta ya no está habilitada, nada de lo que
