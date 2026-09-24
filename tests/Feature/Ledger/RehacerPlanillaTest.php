@@ -195,6 +195,7 @@ class RehacerPlanillaTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $caja,
             balances: [LedgerAccount::CashOnHand->value => '100000.00'],
+            denominations: $this->billetesPara('100000.00'),
             date: CarbonImmutable::parse('2026-06-01'),
         );
 

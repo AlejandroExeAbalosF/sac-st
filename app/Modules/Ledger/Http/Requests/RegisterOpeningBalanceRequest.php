@@ -115,6 +115,14 @@ final class RegisterOpeningBalanceRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:300'],
 
             /*
+             * Los billetes del cajón. El efectivo de la apertura sale de
+             * acá: contarlo una vez es lo que le da composición al fajo que
+             * después se arrastra sin recontar.
+             */
+            'denominations' => ['present', 'array'],
+            'denominations.*' => ['integer', 'min:0', 'max:100000'],
+
+            /*
              * La cartera de cheques, uno por renglón. Es opcional: el área
              * puede abrir declarando solo el total, y entonces el
              * inventario del reverso arranca vacío. Que la suma coincida
@@ -141,6 +149,7 @@ final class RegisterOpeningBalanceRequest extends FormRequest
             'balances' => 'saldos',
             'bankAccountId' => 'cuenta bancaria',
             'cheques' => 'cheques en cartera',
+            'denominations' => 'billetes del cajón',
         ];
 
         /*
@@ -165,15 +174,25 @@ final class RegisterOpeningBalanceRequest extends FormRequest
     }
 
     /**
-     * Los saldos como cadenas decimales, indexados por cuenta.
+     * Los billetes contados, sin los renglones en cero.
      *
-     * Nunca pasan por `float`, ni siquiera para normalizarlos: la regla del
-     * modelo es que el punto flotante no existe en ningún punto de la pila.
-     * Los ceros se descartan acá —una cuenta sin saldo no es una pata del
-     * asiento— y el Action los descartaría igual.
-     *
-     * @return array<string, numeric-string>
+     * @return array<int, int>
      */
+    public function denominations(): array
+    {
+        /** @var array<array-key, mixed> $crudas */
+        $crudas = $this->validated('denominations') ?? [];
+        $billetes = [];
+
+        foreach ($crudas as $denominacion => $cantidad) {
+            if ((int) $cantidad > 0) {
+                $billetes[(int) $denominacion] = (int) $cantidad;
+            }
+        }
+
+        return $billetes;
+    }
+
     /**
      * @return list<array{number: string, bank: string, issueDate: string, amount: string, expediente: ?string, company: ?string, beneficiary: ?string}>
      */
@@ -206,6 +225,13 @@ final class RegisterOpeningBalanceRequest extends FormRequest
     }
 
     /**
+     * Los saldos como cadenas decimales, indexados por cuenta.
+     *
+     * Nunca pasan por `float`, ni siquiera para normalizarlos: la regla del
+     * modelo es que el punto flotante no existe en ningún punto de la pila.
+     * Los ceros se descartan acá —una cuenta sin saldo no es una pata del
+     * asiento— y el Action los descartaría igual.
+     *
      * @return array<string, numeric-string>
      */
     public function balances(): array

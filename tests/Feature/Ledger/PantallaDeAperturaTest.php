@@ -28,11 +28,13 @@ class PantallaDeAperturaTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-    }
+    /**
+     * Los 9.852.300 de la planilla, desarmados en billetes.
+     *
+     * El efectivo de la apertura no se escribe: se cuenta. El total sale
+     * de acá, igual que en cualquier arqueo.
+     */
+    private const array NUEVE_MILLONES = [10_000 => 985, 2_000 => 1, 200 => 1, 100 => 1];
 
     /**
      * Solo el administrador abre los libros.
@@ -94,6 +96,7 @@ class PantallaDeAperturaTest extends TestCase
                     // Una cuenta en cero no es una pata del asiento.
                     LedgerAccount::BankAccount->value => '',
                 ],
+                'denominations' => self::NUEVE_MILLONES,
                 'notes' => 'Efectivo existente al arranque.',
             ])
             ->assertRedirect('/caja/dia');
@@ -124,6 +127,7 @@ class PantallaDeAperturaTest extends TestCase
                 'currency' => 'ARS',
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::BankAccount->value => '1902907.01'],
+                'denominations' => [],
             ])
             ->assertSessionHasErrors('bankAccountId');
 
@@ -145,6 +149,7 @@ class PantallaDeAperturaTest extends TestCase
                     LedgerAccount::ChequesInCustody->value => '673804.70',
                     LedgerAccount::BankAccount->value => '1902907.01',
                 ],
+                'denominations' => self::NUEVE_MILLONES,
                 'bankAccountId' => $cuenta,
             ])
             ->assertRedirect('/caja/dia');
@@ -175,6 +180,7 @@ class PantallaDeAperturaTest extends TestCase
             'currency' => 'ARS',
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '100000.00'],
+            'denominations' => [100_000 => 1],
         ];
 
         $admin = $this->operador('administrador');
@@ -198,6 +204,7 @@ class PantallaDeAperturaTest extends TestCase
             'currency' => 'ARS',
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
+            'denominations' => self::NUEVE_MILLONES,
         ]);
 
         $this->actingAs($admin)
@@ -218,6 +225,7 @@ class PantallaDeAperturaTest extends TestCase
                 'currency' => 'ARS',
                 'date' => BusinessDate::today()->addDay()->toDateString(),
                 'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
+                'denominations' => [100 => 1],
             ])
             ->assertSessionHasErrors('date');
     }
@@ -244,6 +252,7 @@ class PantallaDeAperturaTest extends TestCase
             'currency' => 'ARS',
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
+            'denominations' => [100 => 1],
         ]);
 
         $this->actingAs($this->operador('administrativo'))
@@ -274,6 +283,7 @@ class PantallaDeAperturaTest extends TestCase
                 'currency' => 'ARS',
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => $escrito],
+                'denominations' => self::NUEVE_MILLONES,
             ])
             ->assertSessionHasNoErrors();
 
@@ -317,6 +327,7 @@ class PantallaDeAperturaTest extends TestCase
                 'currency' => 'ARS',
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => 'ocho millones'],
+                'denominations' => self::NUEVE_MILLONES,
             ]);
 
         $clave = 'balances.'.LedgerAccount::CashOnHand->value;
@@ -329,6 +340,93 @@ class PantallaDeAperturaTest extends TestCase
         $this->assertStringNotContainsString('CASH_ON_HAND', $mensaje);
 
         $this->assertSame(0, DB::table('journal_lines')->count());
+    }
+
+    /**
+     * El efectivo de la apertura no se declara: se cuenta.
+     *
+     * Es la única vez que contar el cajón sale barato —se hace una sola
+     * vez— y es lo que le da composición al fajo que después se arrastra
+     * sin recontar. Sin el detalle, el sistema sabría cuánto vale el fajo
+     * y no de qué está hecho: el día que alguien lo abra buscando un
+     * faltante no tendría contra qué comparar.
+     */
+    public function test_la_apertura_no_acepta_efectivo_sin_billetes(): void
+    {
+        $this->actingAs($this->operador('administrador'))
+            ->post('/caja/apertura', [
+                'cashBoxId' => $this->caja(),
+                'currency' => 'ARS',
+                'date' => '2026-05-31',
+                'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
+                'denominations' => [],
+            ])
+            ->assertSessionHasErrors('denominations');
+
+        $this->assertSame(0, DB::table('journal_lines')->count());
+    }
+
+    /** Los billetes tienen que dar el importe declarado, como en un arqueo. */
+    public function test_los_billetes_tienen_que_sumar_el_efectivo_declarado(): void
+    {
+        $respuesta = $this->actingAs($this->operador('administrador'))
+            ->post('/caja/apertura', [
+                'cashBoxId' => $this->caja(),
+                'currency' => 'ARS',
+                'date' => '2026-05-31',
+                'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
+                'denominations' => [10_000 => 985],
+            ]);
+
+        $respuesta->assertSessionHasErrors('denominations');
+
+        $mensaje = $respuesta->getSession()->get('errors')->getBag('default')->first('denominations');
+
+        $this->assertStringContainsString('9850000.00', $mensaje);
+        $this->assertStringContainsString('9852300.00', $mensaje);
+
+        $this->assertSame(0, DB::table('journal_lines')->count());
+    }
+
+    /**
+     * Abrir los libros deja el arqueo del fajo, ya revisado.
+     *
+     * Abrir **es** contar el cajón, así que se guarda donde se guardan los
+     * conteos y no en una tabla aparte. Nace revisado por quien abrió:
+     * dejarlo en borrador trabaría el cierre del primer período hasta que
+     * alguien lo revisara, y abrir los libros ya es un acto reservado al
+     * administrador.
+     */
+    public function test_la_apertura_deja_el_fajo_contado_y_revisado(): void
+    {
+        $admin = $this->operador('administrador');
+
+        $this->actingAs($admin)->post('/caja/apertura', [
+            'cashBoxId' => $this->caja(),
+            'currency' => 'ARS',
+            'date' => '2026-05-31',
+            'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
+            'denominations' => self::NUEVE_MILLONES,
+        ])->assertRedirect('/caja/dia');
+
+        $arqueo = DB::table('cash_counts')
+            ->where('cash_box_id', $this->caja())
+            ->whereDate('counted_on', '2026-05-31')
+            ->first();
+
+        $this->assertNotNull($arqueo);
+        $this->assertSame('reviewed', $arqueo->status);
+        $this->assertSame('9852300.00', $arqueo->counted_amount);
+
+        $this->assertSame(
+            [100 => 1, 200 => 1, 2000 => 1, 10000 => 985],
+            DB::table('cash_count_lines')
+                ->where('cash_count_id', $arqueo->id)
+                ->orderBy('denomination')
+                ->pluck('quantity', 'denomination')
+                ->mapWithKeys(fn (int $cantidad, string $denominacion) => [(int) $denominacion => $cantidad])
+                ->all(),
+        );
     }
 
     private function cuentaBancaria(): int

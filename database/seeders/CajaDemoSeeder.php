@@ -607,6 +607,8 @@ final class CajaDemoSeeder extends Seeder
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja,
             balances: [LedgerAccount::CashOnHand->value => self::APERTURA_EFECTIVO],
+            // Los 3.208.250 de la apertura, desarmados como salió del cajón.
+            denominations: [100_000 => 32, 2_000 => 4, 200 => 1, 50 => 1],
             date: CarbonImmutable::parse('2026-05-31'),
             actorId: $this->cajero->id,
             notes: 'Efectivo existente al arranque del sistema.',
@@ -639,7 +641,6 @@ final class CajaDemoSeeder extends Seeder
             denominations: $this->desglosar($aContar),
             actorId: $this->cajero->id,
             uncountedAmount: $sinRecontar,
-            uncountedReason: $receta['motivo'] ?? null,
             explanation: $receta['explicacion'] ?? null,
         );
 

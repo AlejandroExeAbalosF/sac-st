@@ -383,6 +383,8 @@ class OperacionDemoSeeder extends Seeder
                 LedgerAccount::ChequesInCustody->value => '380000.00',
                 LedgerAccount::BankAccount->value => '1200000.00',
             ],
+            // Los 2.450.000 en efectivo, billete por billete.
+            denominations: [100_000 => 24, 50_000 => 1],
             date: CarbonImmutable::parse('2026-06-30'),
             bankAccountId: (int) $this->cuenta->id,
             actorId: $this->contadora->id,
@@ -733,7 +735,6 @@ class OperacionDemoSeeder extends Seeder
             denominations: $this->desglosar($aContar),
             actorId: $this->cajero->id,
             uncountedAmount: $sinRecontar,
-            uncountedReason: $receta['motivo'] ?? null,
             explanation: $receta['explicacion'] ?? null,
         );
 

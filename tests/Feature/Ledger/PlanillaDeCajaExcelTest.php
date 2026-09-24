@@ -166,18 +166,14 @@ class PlanillaDeCajaExcelTest extends TestCase
 
         /*
          * El renglón que el papel llama «SALDO DIA ANTERIOR» sale con ese
-         * nombre y con el nuestro al lado, y abajo el motivo. Es el punto
-         * entero de la columna: el que lea la planilla sabe que esos
-         * 743.050 no se contaron.
+         * nombre y con el nuestro al lado. Es el punto entero de la
+         * columna: el que lea la planilla sabe que esos 743.050 no se
+         * contaron.
          */
         $rotulo = 'SALDO DIA ANTERIOR (no recontado)';
 
         $this->assertArrayHasKey($rotulo, $filas);
         $this->assertSame(743050.0, (float) $hoja->getCell('C'.$filas[$rotulo])->getValue());
-        $this->assertStringContainsString(
-            'Fajos precintados',
-            (string) $hoja->getCell('A'.($filas[$rotulo] + 1))->getValue(),
-        );
     }
 
     /**
@@ -243,6 +239,7 @@ class PlanillaDeCajaExcelTest extends TestCase
                 LedgerAccount::CashOnHand->value => '6852300.00',
                 LedgerAccount::ChequesInCustody->value => '607660.00',
             ],
+            denominations: $this->billetesPara('6852300.00'),
             date: CarbonImmutable::parse('2026-06-01'),
             cheques: [
                 [
@@ -304,6 +301,7 @@ class PlanillaDeCajaExcelTest extends TestCase
                 LedgerAccount::CashOnHand->value => '6852300.00',
                 LedgerAccount::ChequesInCustody->value => '673804.70',
             ],
+            denominations: $this->billetesPara('6852300.00'),
             date: CarbonImmutable::parse('2026-06-01'),
             cheques: [[
                 'number' => '61197677',
@@ -549,6 +547,7 @@ class PlanillaDeCajaExcelTest extends TestCase
                 LedgerAccount::CashOnHand->value => '6852300.00',
                 LedgerAccount::ChequesInCustody->value => '673804.70',
             ],
+            denominations: $this->billetesPara('6852300.00'),
             date: CarbonImmutable::parse($fecha),
         );
     }
@@ -573,6 +572,7 @@ class PlanillaDeCajaExcelTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '2777850.00'],
+            denominations: $this->billetesPara('2777850.00'),
             date: CarbonImmutable::parse('2026-06-01'),
         );
 

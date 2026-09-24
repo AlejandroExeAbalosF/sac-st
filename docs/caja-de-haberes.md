@@ -50,6 +50,19 @@ por caja y moneda**, y solo el administrador (`caja.abrir-saldo-inicial`). Sin
 esto todos los saldos son cero y el primer arqueo daría una diferencia igual a
 todo el saldo histórico.
 
+**El efectivo no se escribe: se cuenta.** La pantalla pide el detalle por
+denominación y el importe sale de ahí. Es la única vez que contar el cajón sale
+barato —se hace una sola vez— y es lo que le da **composición** al fajo que
+después se arrastra sin recontar: sin eso el sistema sabría cuánto vale y no de
+qué está hecho, y el día que alguien lo abra buscando un faltante no tendría
+contra qué comparar.
+
+Ese conteo se guarda donde se guardan todos: como un arqueo del día de apertura,
+con sus líneas. **Nace revisado por quien abrió**, y marcado como sin segunda
+firma. Dejarlo en borrador trabaría el cierre del primer período hasta que
+alguien lo revisara, y abrir los libros ya es un acto reservado al administrador:
+es él quien atestigua ese conteo.
+
 **Los cheques se cargan uno por uno**: número, banco, fecha e importe, más
 expediente, empresa y beneficiario tal como los dice el papel. Cada uno queda
 como una recepción en custodia con su propio asiento —una recepción por hecho,
@@ -78,8 +91,17 @@ el libro cambió y no hay comprobante que lo respalde —una reversión, por eje
 Contar el cajón por denominación. Dos números:
 
 - **Recaudación del día** — lo contado billete por billete.
-- **Saldo del día anterior (no recontado)** — la plata vieja que queda en el
-  cajón y no se recuenta. Exige decir por qué.
+- **Saldo del día anterior (no recontado)** — lo que quedó en el cajón de días
+  anteriores y no se vuelve a contar billete por billete.
+
+Si hoy se rinden 300 y de ayer quedaron 200, el cajón tiene 500. Y es lo que queda
+**al momento de contar**, no lo que cerró ayer: si en el medio se pagó de ese
+dinero, el arrastre es menor. En junio de 2026 bajó de 14.560.450 a 4.326.450 de un
+día al siguiente, porque ese día salieron 10.234.000.
+
+Visto de otro modo: el arrastre es **lo que queda de todo lo que se fue contando en
+días anteriores**, más el fondo con el que se abrieron los libros, que nunca se
+contó. Cada peso se contó una vez, el día que entró —y nunca más—.
 
 **Los dos suman: `contado + arrastre = total en el cajón`.** El arrastre no es
 una nota al margen ni un dato de referencia — es parte del contenido declarado, y
@@ -92,9 +114,30 @@ diferencia = (contado + arrastre) − saldo del libro
 La pantalla muestra las tres líneas y la diferencia que va a quedar **antes** de
 registrar. El total no se puede tipear: sale de las denominaciones.
 
+El arrastre **viene cargado desde el libro**: lo que tiene que haber en el cajón
+menos lo que entró hoy y sigue ahí. Con eso la diferencia se reduce a
+`contado − saldo de hoy` y deja de poder acomodarse: mientras el arrastre lo
+escribía una persona, siempre podía elegir el número que hacía cuadrar.
+
+**El campo no se escribe.** Hay dos caminos y ninguno a mano alzada: confiar en el
+cálculo, o apretar **Recontar**, que abre una ventana aparte para contar el fajo
+billete por billete y comparar contra lo que el libro dice que hay —que es cómo se
+ve *qué* falta, no solo cuánto—. Al confirmar, esos billetes se suman al conteo del
+día y el saldo pasa a cero: lo recontado deja de ser «no recontado», y el arqueo
+verifica el 100 % del efectivo. Escribir un número que nadie contó no sería
+corregir.
+
+Vuelve a escribirse solo cuando el libro no puede dar la cifra —otra fecha, una
+pantalla que no la manda—: es preferible a bloquearlo con un valor que no existe.
+
+El cálculo supone que cada pago se descontó de la recepción que lo financió —lo
+que la planilla de junio cumple 20 de 20 días—, y eso el área todavía no lo
+confirmó. Sale de `CashDayTakings`, que resuelve la cadena
+`journal_lines` → `funding_allocations` → `fund_receipts` sin salir de Ledger: la
+línea del egreso lleva la cuota y la asignación dice qué recepción la financió.
+
 > El arrastre es la parte que el arqueo **no verifica**. Si de ese fajo faltara
-> plata, el total daría igual y nadie lo vería. Por eso el motivo es obligatorio
-> y por eso revisa otra persona.
+> plata, el total daría igual y nadie lo vería. Por eso revisa otra persona.
 
 **El arqueo cuenta solo efectivo.** Los cheques en cartera no se cuentan por
 cantidad: cada uno es único —número, banco, fecha, beneficiario— y va listado

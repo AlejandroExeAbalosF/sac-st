@@ -10,6 +10,7 @@ use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\CashCount;
+use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Support\Ui\ToastType;
 use Carbon\CarbonImmutable;
@@ -78,6 +79,41 @@ abstract class TestCase extends BaseTestCase
         $user->assignRole($role);
 
         return $user;
+    }
+
+    /**
+     * Un importe desarmado en billetes de verdad.
+     *
+     * La apertura exige el detalle del cajón, y a la mayoría de los tests
+     * la composición no les importa —les importa el total—. Repartirlo de
+     * mayor a menor evita el `[1 => 9852300]` que dejaba escenarios con
+     * nueve millones de billetes de un peso: un dato falso que después
+     * alguien lee como si fuera el caso real.
+     *
+     * @return array<int, int>
+     */
+    protected function billetesPara(string $importe): array
+    {
+        $centavos = (int) bcmul($importe, '100', 0);
+        $billetes = [];
+
+        foreach (CashCountLine::suggestedDenominations(Currency::Ars) as $denominacion) {
+            $cuantos = intdiv($centavos, $denominacion * 100);
+
+            if ($cuantos > 0) {
+                $billetes[$denominacion] = $cuantos;
+                $centavos -= $cuantos * $denominacion * 100;
+            }
+        }
+
+        if ($centavos !== 0) {
+            throw new RuntimeException(sprintf(
+                'El importe %s no se puede pagar con los billetes que circulan.',
+                $importe,
+            ));
+        }
+
+        return $billetes;
     }
 
     /** Un arqueo real y revisado para los tests cuyo objeto principal es el cierre. */

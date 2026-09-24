@@ -160,20 +160,6 @@ class CajaArqueoYCierreTest extends TestCase
         );
     }
 
-    public function test_el_fajo_no_recontado_exige_decir_por_que(): void
-    {
-        $this->abrirLibros(efectivo: '2777850.00', cheques: '0.00');
-
-        $this->expectException(ValidationException::class);
-
-        app(RecordCashCount::class)->handle(
-            cashBoxId: $this->caja(),
-            countedOn: CarbonImmutable::parse('2026-06-30'),
-            denominations: [20_000 => 101, 10_000 => 1, 1_000 => 4, 500 => 1, 200 => 1, 100 => 1],
-            uncountedAmount: '743050.00',
-        );
-    }
-
     /**
      * Quien contó puede revisar, y queda dicho que no hubo segunda firma.
      *
@@ -733,7 +719,7 @@ class CajaArqueoYCierreTest extends TestCase
 
         $this->assertSame(1, $rehecho->sequence);
         $this->assertSame($incompleto->id, $rehecho->id);
-        $this->assertSame(1, CashCount::query()->count());
+        $this->assertSame(1, $this->arqueosDel('2026-09-08'));
 
         // Una vez revisado ya es un hecho: el siguiente conteo abre turno.
         app(ReviewCashCount::class)->handle($rehecho, User::factory()->create()->id);
@@ -748,7 +734,7 @@ class CajaArqueoYCierreTest extends TestCase
 
         $this->assertSame(2, $segundoTurno->sequence);
         $this->assertNotSame($rehecho->id, $segundoTurno->id);
-        $this->assertSame(2, CashCount::query()->count());
+        $this->assertSame(2, $this->arqueosDel('2026-09-08'));
 
         // Y el anterior sigue ahí, revisado, como historia del día.
         $this->assertSame(
@@ -1352,8 +1338,24 @@ class CajaArqueoYCierreTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: $saldos,
+            denominations: $this->billetesPara($saldos[LedgerAccount::CashOnHand->value]),
             date: CarbonImmutable::parse($fecha),
         );
+    }
+
+    /**
+     * Cuántos arqueos tiene un día.
+     *
+     * Contar la tabla entera dejo de servir cuando la apertura empezó a
+     * dejar el suyo: ese conteo es de otro día y no tiene nada que ver
+     * con los turnos que estos tests miran.
+     */
+    private function arqueosDel(string $fecha): int
+    {
+        return CashCount::query()
+            ->where('cash_box_id', $this->caja())
+            ->whereDate('counted_on', $fecha)
+            ->count();
     }
 
     /** Un ingreso de efectivo, como los recibos 72190 a 72198 del 02/06. */

@@ -10,6 +10,7 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RegisterOpeningBalanceRequest;
+use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonImmutable;
@@ -62,6 +63,11 @@ final class OpeningBalanceController extends Controller
              * expediente y la cuota que el sistema todavía no tiene, y es
              * justamente el trabajo que `LEGACY_FUNDS` posterga.
              */
+            /*
+             * Los billetes que la pantalla ofrece para contar el cajón. El
+             * efectivo de la apertura se cuenta como cualquier arqueo.
+             */
+            'suggestedDenominations' => CashCountLine::suggestedDenominations($moneda),
             'accounts' => array_map(
                 fn (LedgerAccount $cuenta): array => [
                     'code' => $cuenta->value,
@@ -99,6 +105,7 @@ final class OpeningBalanceController extends Controller
                 : (int) $request->validated('bankAccountId'),
             actorId: $request->user()?->id,
             cheques: $request->cheques(),
+            denominations: $request->denominations(),
             notes: $request->validated('notes'),
         );
 

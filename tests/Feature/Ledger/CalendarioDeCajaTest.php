@@ -449,6 +449,7 @@ class CalendarioDeCajaTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '1000000.00'],
+            denominations: $this->billetesPara('1000000.00'),
             date: CarbonImmutable::parse('2026-06-01'),
         );
     }

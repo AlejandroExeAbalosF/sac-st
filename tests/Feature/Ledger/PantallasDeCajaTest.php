@@ -122,7 +122,9 @@ class PantallasDeCajaTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect('/caja/dia?fecha=2026-06-02');
 
-        $arqueo = CashCount::query()->firstOrFail();
+        $arqueo = CashCount::query()
+            ->whereDate('counted_on', '2026-06-02')
+            ->firstOrFail();
         $this->assertSame(CashCountStatus::Draft, $arqueo->status);
 
         // Con el arqueo en borrador, el cierre todavía no puede.
@@ -224,6 +226,7 @@ class PantallasDeCajaTest extends TestCase
                 'currency' => 'USD',
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => '320.00'],
+                'denominations' => [100 => 3, 20 => 1],
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
@@ -345,7 +348,10 @@ class PantallasDeCajaTest extends TestCase
             ])
             ->assertRedirect();
 
-        $arqueo = CashCount::query()->firstOrFail();
+        // El de la víspera es el de la apertura; este es el del día.
+        $arqueo = CashCount::query()
+            ->whereDate('counted_on', '2026-06-01')
+            ->firstOrFail();
 
         $this->assertSame('2034800.00', $arqueo->counted_amount);
         $this->assertSame(CashCountStatus::Draft, $arqueo->status);
@@ -521,7 +527,14 @@ class PantallasDeCajaTest extends TestCase
             );
     }
 
-    /** Y un borrador no es referencia de nada: no concluyó. */
+    /**
+     * Y un borrador no es referencia de nada: no concluyó.
+     *
+     * El 01/06 queda un conteo sin revisar y el 31/05 está el de la
+     * apertura, que sí cerró. La pantalla del 02/06 tiene que saltear el
+     * borrador y traer el de la víspera de la víspera: un conteo que nadie
+     * dio por bueno no es contra qué comparar.
+     */
     public function test_un_arqueo_en_borrador_no_viaja_como_anterior(): void
     {
         $this->abrirLibros();
@@ -539,7 +552,8 @@ class PantallasDeCajaTest extends TestCase
             ->get('/caja/dia?fecha=2026-06-02')
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('previousCount', null)
+                ->where('previousCount.countedOn', '2026-05-31')
+                ->where('previousCount.status', 'reviewed')
             );
     }
 
@@ -641,7 +655,15 @@ class PantallasDeCajaTest extends TestCase
                 LedgerAccount::CashOnHand->value => $efectivo,
                 LedgerAccount::ChequesInCustody->value => '673804.70',
             ],
-            date: CarbonImmutable::parse('2026-06-01'),
+            denominations: $this->billetesPara($efectivo),
+            /*
+             * La víspera, que es lo que la apertura declara: lo que hay en
+             * el cajón el día anterior al primer movimiento. Abrir deja su
+             * propio arqueo, así que ponerla el 01/06 le sacaba el lugar al
+             * conteo que estos tests miran.
+             */
+            date: CarbonImmutable::parse('2026-05-31'),
+            actorId: $this->operador('administrador')->id,
         );
     }
 

@@ -366,6 +366,8 @@ class HaberAnteriorTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: $saldos,
+            // Sin efectivo declarado no hay fajo que contar.
+            denominations: $efectivo === null ? [] : $this->billetesPara($efectivo),
             date: CarbonImmutable::parse('2026-06-01'),
             bankAccountId: $cuentaBancaria,
         );

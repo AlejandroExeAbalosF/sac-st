@@ -30,6 +30,32 @@ import { index as apertura, store } from '@/routes/caja/apertura';
 
 type Cuenta = { code: string; label: string };
 
+/**
+ * El total de los billetes con un renglón cambiado.
+ *
+ * Se calcula sobre el mapa que va a quedar, no sobre el que hay: dentro de
+ * un `setData` el estado todavía es el anterior, y el efectivo saldría un
+ * billete atrasado.
+ */
+function contadoCon(
+    cantidades: Record<string, number>,
+    denominacion: number,
+    cantidad: number,
+): string {
+    const conElCambio: Record<string, number> = { ...cantidades };
+    conElCambio[denominacion] = cantidad;
+
+    const centavos = Object.entries(conElCambio).reduce(
+        (acumulado, [billete, cuantos]) =>
+            acumulado + BigInt(billete) * BigInt(cuantos || 0) * 100n,
+        0n,
+    );
+
+    const texto = centavos.toString().padStart(3, '0');
+
+    return `${texto.slice(0, -2)}.${texto.slice(-2)}`;
+}
+
 /** Un cheque del cajón al abrir los libros, como lo lista el reverso. */
 type Cheque = {
     number: string;
@@ -42,6 +68,7 @@ type Cheque = {
 };
 
 const CHEQUES = 'CHEQUES_IN_CUSTODY';
+const EFECTIVO = 'CASH_ON_HAND';
 
 const CHEQUE_VACIO: Cheque = {
     number: '',
@@ -81,6 +108,7 @@ type Props = {
         currency: CurrencyCode;
     };
     accounts: Cuenta[];
+    suggestedDenominations: number[];
     bankAccounts: { id: number; label: string }[];
     /** Qué cuenta del plan es la bancaria, para saber cuándo pedir la cuenta. */
     bankAccountCode: string;
@@ -106,6 +134,7 @@ type Props = {
 export default function CajaApertura({
     selected,
     accounts,
+    suggestedDenominations,
     bankAccounts,
     bankAccountCode,
     existing,
@@ -117,6 +146,7 @@ export default function CajaApertura({
         currency: string;
         date: string;
         balances: Record<string, string>;
+        denominations: Record<string, number>;
         cheques: Cheque[];
         bankAccountId: number;
         notes: string;
@@ -125,6 +155,7 @@ export default function CajaApertura({
         currency: selected.currency,
         date: hoy,
         balances: {},
+        denominations: {},
         cheques: [],
         bankAccountId: bankAccounts.length === 1 ? bankAccounts[0].id : 0,
         notes: '',
@@ -147,6 +178,48 @@ export default function CajaApertura({
      * tiene sentido.
      */
     const declaraCheques = /[1-9]/.test(form.data.balances[CHEQUES] ?? '');
+
+    /*
+     * El efectivo se cuenta, no se escribe.
+     *
+     * Es la única vez que contar el cajón sale barato —se hace una sola
+     * vez— y es lo que le da composición al fajo que después se arrastra
+     * sin recontar. Sin esto el sistema sabría cuánto vale y no de qué
+     * está hecho, así que el día que alguien lo abra buscando un faltante
+     * no tendría contra qué comparar.
+     */
+    const contado = useMemo(() => {
+        const centavos = Object.entries(form.data.denominations).reduce(
+            (acumulado, [denominacion, cantidad]) =>
+                acumulado + BigInt(denominacion) * BigInt(cantidad || 0) * 100n,
+            0n,
+        );
+
+        const texto = centavos.toString().padStart(3, '0');
+
+        return `${texto.slice(0, -2)}.${texto.slice(-2)}`;
+    }, [form.data.denominations]);
+
+    const contarBillete = (denominacion: number, valor: string) => {
+        const cantidad = Number.parseInt(valor, 10);
+
+        form.setData({
+            ...form.data,
+            denominations: {
+                ...form.data.denominations,
+                [denominacion]:
+                    Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 0,
+            },
+            balances: {
+                ...form.data.balances,
+                [EFECTIVO]: contadoCon(
+                    form.data.denominations,
+                    denominacion,
+                    Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 0,
+                ),
+            },
+        });
+    };
 
     /*
      * El contraasiento se muestra mientras se carga, y no es adorno: es lo
@@ -293,11 +366,16 @@ export default function CajaApertura({
                                                 id={cuenta.code}
                                                 inputMode="decimal"
                                                 placeholder="0.00"
-                                                className="w-44 text-right font-mono tabular-nums"
+                                                readOnly={
+                                                    cuenta.code === EFECTIVO
+                                                }
+                                                className="w-44 text-right font-mono tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground"
                                                 value={
-                                                    form.data.balances[
-                                                        cuenta.code
-                                                    ] ?? ''
+                                                    cuenta.code === EFECTIVO
+                                                        ? contado
+                                                        : (form.data.balances[
+                                                              cuenta.code
+                                                          ] ?? '')
                                                 }
                                                 onChange={(e) =>
                                                     form.setData('balances', {
@@ -344,6 +422,71 @@ export default function CajaApertura({
                                 </div>
                             </div>
                             <InputError message={form.errors.balances} />
+
+                            {/*
+                             * Contar el cajón. El efectivo de arriba sale de
+                             * acá: es la única vez que se cuenta, y lo que le
+                             * da composición al fajo que después se arrastra.
+                             */}
+                            <div className="overflow-hidden rounded-lg border">
+                                <div className="border-b px-4 py-3">
+                                    <p className="text-sm font-medium">
+                                        Billetes en el cajón
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        De acá sale el efectivo declarado
+                                        arriba.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-[1fr_6rem_1fr] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                    <span>Billete</span>
+                                    <span className="text-center">
+                                        Cantidad
+                                    </span>
+                                    <span className="text-right">Subtotal</span>
+                                </div>
+
+                                <div className="max-h-72 overflow-y-auto">
+                                    {suggestedDenominations.map((billete) => {
+                                        const cantidad =
+                                            form.data.denominations[billete] ??
+                                            0;
+
+                                        return (
+                                            <div
+                                                key={billete}
+                                                className="grid grid-cols-[1fr_6rem_1fr] items-center gap-2 border-b px-4 py-1.5 last:border-b-0"
+                                            >
+                                                <Money
+                                                    value={`${billete}.00`}
+                                                />
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    inputMode="numeric"
+                                                    className="h-8 text-center"
+                                                    value={cantidad || ''}
+                                                    onChange={(e) =>
+                                                        contarBillete(
+                                                            billete,
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    aria-label={`Cantidad de billetes de ${billete}`}
+                                                />
+                                                <span className="text-right">
+                                                    <Money
+                                                        value={`${billete * cantidad}.00`}
+                                                        dimWhenZero
+                                                    />
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <InputError message={errores['denominations']} />
 
                             {declaraCheques && (
                                 <CarteraDeCheques

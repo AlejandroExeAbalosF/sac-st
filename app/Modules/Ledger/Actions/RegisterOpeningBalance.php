@@ -58,12 +58,15 @@ final class RegisterOpeningBalance
 {
     public function __construct(
         private readonly PostJournalEntry $postJournalEntry,
+        private readonly RecordCashCount $contarElCajon,
+        private readonly ReviewCashCount $revisarElConteo,
     ) {}
 
     /**
      * @param  array<string, string>  $balances  Saldo inicial por cuenta, indexado
      *                                           por el valor de `LedgerAccount`. Solo cuentas de ubicación.
      * @param  list<array{number: string, bank: string, issueDate: string, amount: string, expediente?: ?string, company?: ?string, beneficiary?: ?string}>  $cheques
+     * @param  array<int|string, int|string>  $denominations  Los billetes del cajón, por denominación.
      *
      * @throws ValidationException
      */
@@ -76,9 +79,11 @@ final class RegisterOpeningBalance
         ?int $actorId = null,
         ?string $notes = null,
         array $cheques = [],
+        array $denominations = [],
     ): FinancialEvent {
         $saldos = $this->assertUsable($balances, $cashBoxId, $currency, $bankAccountId);
         $carteraDeCheques = $this->assertChequesMatchTheBalance($cheques, $saldos);
+        $billetes = $this->assertCashIsCounted($denominations, $saldos);
 
         $lineas = [];
         $total = '0.00';
@@ -115,13 +120,16 @@ final class RegisterOpeningBalance
             ->describedAs('Fondos del sistema anterior');
 
         return DB::transaction(function () use (
-            $lineas, $cashBoxId, $currency, $date, $notes, $actorId, $carteraDeCheques
+            $lineas, $cashBoxId, $currency, $date, $notes, $actorId,
+            $carteraDeCheques, $billetes
         ): FinancialEvent {
             $evento = $this->postOpeningEntry($lineas, $cashBoxId, $currency, $date, $notes, $actorId);
 
             foreach ($carteraDeCheques as $cheque) {
                 $this->storeCheque($cheque, $cashBoxId, $currency, $date, $actorId);
             }
+
+            $this->countTheDrawer($billetes, $cashBoxId, $currency, $date, $actorId);
 
             return $evento;
         });
@@ -217,6 +225,106 @@ final class RegisterOpeningBalance
             'counterparty_name_snapshot' => $cheque['company'],
             'beneficiary_name_snapshot' => $cheque['beneficiary'],
         ]);
+    }
+
+    /**
+     * El efectivo de la apertura se cuenta billete por billete.
+     *
+     * Es la única vez que sale barato: se hace una sola vez, y de ahí en
+     * más ese fajo se arrastra sin recontarse. Sin su composición, el día
+     * que alguien lo abra para buscar un faltante no tiene contra qué
+     * comparar —el sistema sabría cuánto vale y no de qué está hecho—.
+     *
+     * Se exige el detalle, no un total: el importe declarado tiene que
+     * salir de los billetes, igual que en cualquier arqueo.
+     *
+     * @param  array<int|string, int|string>  $denominations
+     * @param  array<string, numeric-string>  $saldos
+     * @return array<int, int>
+     *
+     * @throws ValidationException
+     */
+    private function assertCashIsCounted(array $denominations, array $saldos): array
+    {
+        $billetes = [];
+        $contado = '0.00';
+
+        foreach ($denominations as $denominacion => $cantidad) {
+            $cuantos = (int) $cantidad;
+
+            if ($cuantos <= 0) {
+                continue;
+            }
+
+            $billetes[(int) $denominacion] = $cuantos;
+            $contado = Decimal::add(
+                $contado,
+                Decimal::scale((string) ((int) $denominacion * $cuantos)),
+            );
+        }
+
+        $efectivo = $saldos[LedgerAccount::CashOnHand->value] ?? null;
+
+        if ($efectivo === null) {
+            return [];
+        }
+
+        if (Decimal::equals($contado, '0')) {
+            throw ValidationException::withMessages([
+                'denominations' => 'El efectivo de la apertura se cuenta por denominación: sin los billetes, el fajo arranca sin composición y después no hay contra qué recontarlo.',
+            ]);
+        }
+
+        if (! Decimal::equals($contado, $efectivo)) {
+            throw ValidationException::withMessages([
+                'denominations' => sprintf(
+                    'Los billetes suman %s y el efectivo declarado es %s. Tienen que coincidir.',
+                    $contado,
+                    $efectivo,
+                ),
+            ]);
+        }
+
+        return $billetes;
+    }
+
+    /**
+     * El arqueo que deja escrita la composición del cajón.
+     *
+     * Abrir los libros **es** contar el cajón, así que se guarda como lo
+     * que es: un arqueo del día de apertura, en las mismas tablas que
+     * cualquier otro. De ahí sale la composición del fajo que después se
+     * arrastra, y contra la que un recuento futuro se puede comparar.
+     *
+     * **Nace revisado por quien abrió**, con la marca de que no hubo
+     * segunda firma. Dejarlo en borrador trabaría el cierre del primer
+     * período hasta que alguien lo revisara, y abrir los libros ya es un
+     * acto reservado al administrador: es él quien atestigua ese conteo.
+     *
+     * @param  array<int, int>  $denominations
+     */
+    private function countTheDrawer(
+        array $denominations,
+        int $cashBoxId,
+        Currency $currency,
+        CarbonInterface $date,
+        ?int $actorId,
+    ): void {
+        if ($denominations === []) {
+            return;
+        }
+
+        $arqueo = $this->contarElCajon->handle(
+            cashBoxId: $cashBoxId,
+            countedOn: $date,
+            denominations: $denominations,
+            currency: $currency,
+            actorId: $actorId,
+        );
+
+        if ($actorId !== null) {
+            $this->revisarElConteo->handle($arqueo, $actorId);
+        }
     }
 
     /**

@@ -420,7 +420,11 @@ class CierreListoParaCerrarTest extends TestCase
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '100000.00'],
+            denominations: $this->billetesPara('100000.00'),
             date: CarbonImmutable::parse('2026-06-01'),
+            // Abrir es contar el cajón: sin quién lo contó, ese arqueo
+            // queda en borrador y traba el cierre del primer período.
+            actorId: $this->operador('administrador')->id,
         );
     }
 
