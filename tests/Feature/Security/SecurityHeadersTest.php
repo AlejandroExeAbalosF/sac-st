@@ -24,6 +24,10 @@ class SecurityHeadersTest extends TestCase
         $response->assertHeader('X-Content-Type-Options', 'nosniff');
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->assertHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=(), payment=(), usb=()');
+        // Aislamiento entre orígenes: ZAP los pide y no rompen nada.
+        $response->assertHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        $response->assertHeader('Cross-Origin-Resource-Policy', 'same-origin');
+        $response->assertHeaderMissing('Cross-Origin-Embedder-Policy');
     }
 
     public function test_the_content_security_policy_is_restrictive()

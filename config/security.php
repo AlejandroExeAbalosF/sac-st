@@ -22,6 +22,23 @@ return [
         ),
 
         /*
+         * Aislamiento entre orígenes.
+         *
+         * - Opener: una pestaña de otro sitio que abra el sistema, o que el
+         *   sistema abra, no conserva una referencia a esta ventana.
+         * - Resource: ningún otro sitio puede incrustar las respuestas del
+         *   sistema —imágenes de comprobantes, PDF, JSON— como recurso
+         *   propio.
+         *
+         * No se manda Cross-Origin-Embedder-Policy: solo hace falta para el
+         * aislamiento total (SharedArrayBuffer), que el sistema no usa, y con
+         * `require-corp` arriesga el visor de PDF dentro del iframe. OWASP
+         * ZAP lo marca como riesgo bajo; la decisión está tomada.
+         */
+        'cross_origin_opener_policy' => env('SECURITY_HEADERS_COOP', 'same-origin'),
+        'cross_origin_resource_policy' => env('SECURITY_HEADERS_CORP', 'same-origin'),
+
+        /*
          * Rutas que si pueden mostrarse dentro de un iframe del mismo
          * origen: la vista previa de comprobantes.
          *

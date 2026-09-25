@@ -52,6 +52,8 @@ final class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', (string) config('security.headers.referrer_policy'));
         $response->headers->set('Permissions-Policy', (string) config('security.headers.permissions_policy'));
+        $response->headers->set('Cross-Origin-Opener-Policy', (string) config('security.headers.cross_origin_opener_policy'));
+        $response->headers->set('Cross-Origin-Resource-Policy', (string) config('security.headers.cross_origin_resource_policy'));
 
         $csp = $this->contentSecurityPolicy($sameOriginFrame, $request->isSecure());
 
