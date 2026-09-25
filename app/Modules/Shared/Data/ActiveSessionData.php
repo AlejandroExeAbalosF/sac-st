@@ -30,10 +30,19 @@ final class ActiveSessionData extends Data
         public string $lastActivityAt,
         /** La sesión desde la que se está mirando la pantalla. */
         public bool $isCurrent,
+        /**
+         * Por qué quien mira no puede cerrarla, o `null` si puede. Sale de
+         * `UserManagementGuard`, el mismo lugar que después lo rechaza.
+         */
+        public ?string $revokeLockedReason = null,
     ) {}
 
-    public static function fromRow(stdClass $row, ?string $currentSessionId, ?string $userName = null): self
-    {
+    public static function fromRow(
+        stdClass $row,
+        ?string $currentSessionId,
+        ?string $userName = null,
+        ?string $revokeLockedReason = null,
+    ): self {
         return new self(
             id: (string) $row->id,
             userName: $userName,
@@ -41,6 +50,7 @@ final class ActiveSessionData extends Data
             ipAddress: $row->ip_address,
             lastActivityAt: Carbon::createFromTimestamp((int) $row->last_activity)->toIso8601String(),
             isCurrent: $currentSessionId !== null && (string) $row->id === $currentSessionId,
+            revokeLockedReason: $revokeLockedReason,
         );
     }
 }

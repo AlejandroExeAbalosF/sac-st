@@ -6,6 +6,7 @@ namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
 use App\Modules\Shared\Enums\LoginEventType;
+use App\Modules\Shared\Support\UserManagementGuard;
 use App\Support\DeviceLabel;
 use Illuminate\Support\Facades\DB;
 
@@ -19,12 +20,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class RevokeSession
 {
-    public function __construct(private readonly RecordLoginEvent $recordLoginEvent) {}
+    public function __construct(
+        private readonly RecordLoginEvent $recordLoginEvent,
+        private readonly UserManagementGuard $guard,
+    ) {}
 
     /**
      * @return bool `false` si la sesión ya no existía.
      */
-    public function handle(string $sessionId, ?string $reason = null): bool
+    public function handle(string $sessionId, ?string $reason = null, ?User $actor = null): bool
     {
         $session = DB::table('sessions')
             ->where('id', $sessionId)
@@ -34,11 +38,18 @@ final class RevokeSession
             return false;
         }
 
-        DB::table('sessions')->where('id', $sessionId)->delete();
-
         $user = $session->user_id === null
             ? null
             : User::query()->whereKey($session->user_id)->first();
+
+        // La misma regla que la administración de usuarios: a un
+        // `super-admin` solo lo gestiona otro, también para cerrarle una
+        // sesión desde la auditoría.
+        if ($user !== null) {
+            $this->guard->assert($this->guard->denyManaging($user, $actor));
+        }
+
+        DB::table('sessions')->where('id', $sessionId)->delete();
 
         $this->recordLoginEvent->handle(
             type: LoginEventType::SessionRevoked,

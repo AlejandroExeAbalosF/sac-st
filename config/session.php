@@ -36,7 +36,16 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
-    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
+    /*
+     * Cerrar el navegador cierra la sesión: la cookie no lleva fecha y el
+     * navegador la descarta. Es el valor por defecto y no un ajuste del
+     * `.env`, para que no dependa de acordarse de ponerlo al desplegar.
+     *
+     * No es una garantía: Chrome y Edge con «continuar donde lo dejaste»
+     * restauran también las cookies de sesión. El control que no depende
+     * del navegador es `lifetime`, la inactividad, que vence en el servidor.
+     */
+    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', true),
 
     /*
     |--------------------------------------------------------------------------

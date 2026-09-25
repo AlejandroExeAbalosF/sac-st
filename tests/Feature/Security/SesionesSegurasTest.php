@@ -71,6 +71,20 @@ class SesionesSegurasTest extends TestCase
         $this->assertGuest();
     }
 
+    /**
+     * Cerrar el navegador cierra la sesión: la cookie sale sin fecha.
+     *
+     * No es una garantía —un navegador que restaura la sesión la conserva—,
+     * pero es el valor por defecto y no depende del `.env` del despliegue.
+     */
+    public function test_la_cookie_de_sesion_no_sobrevive_al_navegador(): void
+    {
+        $cookie = $this->get(route('login'))->getCookie(config('session.cookie'), false);
+
+        $this->assertNotNull($cookie);
+        $this->assertSame(0, $cookie->getExpiresTime());
+    }
+
     public function test_el_login_no_ofrece_recordar_la_sesion(): void
     {
         $this->get(route('login'))

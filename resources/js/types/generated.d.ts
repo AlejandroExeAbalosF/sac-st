@@ -794,6 +794,7 @@ declare namespace App {
                     ipAddress: string | null;
                     lastActivityAt: string;
                     isCurrent: boolean;
+                    revokeLockedReason: string | null;
                 };
                 export type AuditChangeData = {
                     field: string;

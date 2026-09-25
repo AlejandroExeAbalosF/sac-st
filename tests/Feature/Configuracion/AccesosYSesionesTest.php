@@ -116,6 +116,49 @@ class AccesosYSesionesTest extends TestCase
     }
 
     /**
+     * A un `super-admin` solo lo gestiona otro, también para cerrarle una
+     * sesión: la auditoría no es un atajo alrededor de esa regla.
+     */
+    public function test_un_administrador_no_cierra_la_sesion_de_un_super_admin(): void
+    {
+        $superAdmin = $this->operador('super-admin');
+
+        DB::table('sessions')->insert([
+            'id' => 'sesion-del-super-admin',
+            'user_id' => $superAdmin->id,
+            'ip_address' => '10.0.0.9',
+            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0) Chrome/138.0',
+            'payload' => '',
+            'last_activity' => now()->timestamp,
+        ]);
+
+        $admin = $this->administrador();
+
+        $this->actingAs($admin)
+            ->get(route('configuracion.accesos.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where(
+                'sessions',
+                fn ($sesiones): bool => collect($sesiones)
+                    ->firstWhere('id', 'sesion-del-super-admin')['revokeLockedReason']
+                    === 'Un super-admin solo lo gestiona otro super-admin.',
+            ));
+
+        $this->actingAs($admin)
+            ->from(route('configuracion.accesos.index'))
+            ->delete(route('configuracion.sesiones.destroy'), ['sessionId' => 'sesion-del-super-admin'])
+            ->assertSessionHasErrors(['sessionId' => 'Un super-admin solo lo gestiona otro super-admin.']);
+
+        $this->assertDatabaseHas('sessions', ['id' => 'sesion-del-super-admin']);
+
+        $this->actingAs($this->operador('super-admin'))
+            ->from(route('configuracion.accesos.index'))
+            ->delete(route('configuracion.sesiones.destroy'), ['sessionId' => 'sesion-del-super-admin'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('sessions', ['id' => 'sesion-del-super-admin']);
+    }
+
+    /**
      * El controlador se invoca directo: los tests corren con el driver de
      * sesion `array`, que genera un id nuevo en cada request, asi que por
      * HTTP no hay forma de mandarle «el id de esta misma sesion». La

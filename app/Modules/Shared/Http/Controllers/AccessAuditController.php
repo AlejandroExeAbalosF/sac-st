@@ -11,12 +11,14 @@ use App\Modules\Shared\Data\AccessEventData;
 use App\Modules\Shared\Data\ActiveSessionData;
 use App\Modules\Shared\Enums\LoginEventType;
 use App\Modules\Shared\Models\UserLoginEvent;
+use App\Modules\Shared\Support\UserManagementGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 /**
  * Accesos y sesiones de todo el sistema.
@@ -28,13 +30,15 @@ use Inertia\Response;
  */
 final class AccessAuditController extends Controller
 {
+    public function __construct(private readonly UserManagementGuard $guard) {}
+
     public function index(Request $request): Response
     {
         $filters = $this->filters($request);
         $canSeeSessions = $request->user()?->can('auditoria.sesiones.ver') ?? false;
 
         return Inertia::render('configuracion/accesos', [
-            'sessions' => $canSeeSessions ? $this->sessions($request->session()->getId()) : [],
+            'sessions' => $canSeeSessions ? $this->sessions($request->session()->getId(), $request->user()) : [],
             'events' => $this->events($filters),
             'users' => User::query()
                 ->orderBy('name')
@@ -71,7 +75,11 @@ final class AccessAuditController extends Controller
             ]);
         }
 
-        $cerrada = $revoke->handle($sessionId, reason: 'cerrada por un administrador');
+        try {
+            $cerrada = $revoke->handle($sessionId, reason: 'cerrada por un administrador', actor: $request->user());
+        } catch (RuntimeException $e) {
+            return back()->withErrors(['sessionId' => $e->getMessage()]);
+        }
 
         return back()->with(
             'status',
@@ -86,23 +94,30 @@ final class AccessAuditController extends Controller
      *
      * @return list<ActiveSessionData>
      */
-    private function sessions(string $currentSessionId): array
+    private function sessions(string $currentSessionId, ?User $viewer): array
     {
         $rows = DB::table('sessions')
             ->orderByDesc('last_activity')
             ->limit(100)
             ->get(['id', 'user_id', 'ip_address', 'user_agent', 'last_activity']);
 
-        $names = User::query()
+        $users = User::query()
+            ->with('roles')
             ->whereIn('id', $rows->pluck('user_id')->filter()->unique()->all())
-            ->pluck('name', 'id');
+            ->get()
+            ->keyBy('id');
 
         return array_values($rows
-            ->map(fn (object $row): ActiveSessionData => ActiveSessionData::fromRow(
-                $row,
-                $currentSessionId,
-                $row->user_id === null ? null : $names->get($row->user_id),
-            ))
+            ->map(function (object $row) use ($currentSessionId, $users, $viewer): ActiveSessionData {
+                $user = $row->user_id === null ? null : $users->get($row->user_id);
+
+                return ActiveSessionData::fromRow(
+                    $row,
+                    $currentSessionId,
+                    $user?->name,
+                    $user === null ? null : $this->guard->denyManaging($user, $viewer),
+                );
+            })
             ->all());
     }
 

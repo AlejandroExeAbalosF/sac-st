@@ -36,8 +36,6 @@ final class UpdateUser
             $this->guard->assert($this->guard->denyCredentialChange($user, $actor));
         }
 
-        $this->guard->assert($this->guard->denyRole($role, $user, $actor));
-
         $before = [
             'first_name' => $user->first_name,
             'last_name' => $user->last_name,
@@ -47,7 +45,12 @@ final class UpdateUser
             'role' => $user->getRoleNames()->first(),
         ];
 
-        DB::transaction(function () use ($user, $attributes, $role): void {
+        DB::transaction(function () use ($user, $attributes, $role, $actor): void {
+            // El rol se decide con el bloqueo tomado: la guarda del último
+            // administrador cuenta, y dos cambios a la vez contarían mal.
+            $this->guard->lockAdministrators();
+            $this->guard->assert($this->guard->denyRole($role, $user, $actor));
+
             $user->fill($attributes);
 
             // Cambiar el correo vuelve a dejarlo sin verificar: el aviso de

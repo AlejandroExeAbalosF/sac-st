@@ -6,6 +6,7 @@ namespace App\Modules\Shared\Support;
 
 use App\Models\User;
 use App\Modules\Shared\Enums\SystemRole;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -146,6 +147,27 @@ final class UserManagementGuard
             ->whereKeyNot($user->id)
             ->whereHas('roles', fn ($query) => $query->where('name', SystemRole::Administrador->value))
             ->exists();
+    }
+
+    /**
+     * Ordena las operaciones que pueden dejar al sistema sin administrador.
+     *
+     * Comprobar «hay otro administrador activo» y después escribir no
+     * alcanza si dos lo hacen a la vez: cada uno ve al otro activo y pasan
+     * los dos. Con este bloqueo la segunda espera a que la primera termine
+     * y comprueba con el resultado a la vista. Es el mismo que toma el
+     * trigger `ensure_an_active_administrator`, así que el mensaje legible
+     * y el rechazo de la base deciden sobre los mismos datos.
+     *
+     * Dura hasta el final de la transacción, por eso la exige.
+     */
+    public function lockAdministrators(): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new RuntimeException('El bloqueo de administradores exige una transacción.');
+        }
+
+        DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['sacst.active_administrators']);
     }
 
     public function assert(?string $motivo): void

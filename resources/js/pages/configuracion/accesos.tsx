@@ -1,6 +1,7 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { History, MonitorSmartphone } from 'lucide-react';
 import { useState } from 'react';
+import FormError from '@/components/form-error';
 import PageHeader from '@/components/page-header';
 import type { PaginationData } from '@/components/pagination-footer';
 import PaginationFooter from '@/components/pagination-footer';
@@ -59,6 +60,7 @@ export default function Accesos({
     can,
 }: Props) {
     const [borrador, setBorrador] = useState<Filtros>(filters);
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
 
     const aplicar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -115,6 +117,14 @@ export default function Accesos({
                                 vuelve a entrar con su contraseña.
                             </p>
                         </header>
+
+                        {/*
+                         * Los rechazos del cierre —la sesión propia, la de un
+                         * super-admin— son de la acción, no de un campo.
+                         */}
+                        <div className="px-5 pt-3 empty:hidden">
+                            <FormError message={errors.sessionId} />
+                        </div>
 
                         <SessionList
                             sessions={sessions}

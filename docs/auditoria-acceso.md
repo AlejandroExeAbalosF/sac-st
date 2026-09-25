@@ -73,6 +73,10 @@ Lo que decide quién puede estar adentro, y lo que deja en
 - **No hay «recordarme».** La sesión dura lo que la actividad. Un ingreso
   por cookie de recordatorio —una que alguien haya conservado de antes— se
   rechaza y queda como `session_revoked`.
+- **Cerrar el navegador cierra la sesión** (`expire_on_close`, por defecto en
+  `true`). No es una garantía: Chrome y Edge con «continuar donde lo dejaste»
+  restauran las cookies de sesión. Lo que no depende del navegador es la
+  inactividad, `SESSION_LIFETIME`, que vence en el servidor.
 - **Usuario activo en cada pedido.** `EnsureAccountIsUsable` saca en el
   pedido siguiente a quien se dio de baja, entre por donde haya entrado
   (contraseña, passkey o una sesión que ya estaba abierta). La passkey de un
@@ -91,8 +95,14 @@ Lo que decide quién puede estar adentro, y lo que deja en
 roles: con la temporal en la mano, uno entraría como el otro y sus actos
 quedarían a nombre ajeno. Sí se corrige la ficha y se desactiva. Nadie cambia
 su propio rol, al último administrador activo no se le quita, y a un
-`super-admin` solo lo gestiona otro super-admin, que es también el único que
-asigna ese rol. Las reglas viven en `UserManagementGuard`; la pantalla
+`super-admin` solo lo gestiona otro super-admin —también para cerrarle una
+sesión desde esta pantalla—, que es también el único que asigna ese rol.
+
+**Siempre queda un administrador activo**, y lo impone la base: un trigger
+diferido (`ensure_an_active_administrator`) sobre `users.is_active` y
+`model_has_roles`, que cuenta con un bloqueo tomado. Sin el bloqueo, dos
+administradores que se desactivaban uno al otro a la vez pasaban los dos; se
+verificó con dos conexiones reales, con y sin él. Las reglas viven en `UserManagementGuard`; la pantalla
 deshabilita con el mismo motivo que el servidor devolvería. Las capacidades
 `dev.*` no se otorgan a ningún rol: `UpdateRolePermissions` lo rechaza y un
 trigger sobre `role_has_permissions` lo impide en la base.

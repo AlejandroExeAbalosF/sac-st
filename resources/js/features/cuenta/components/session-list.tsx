@@ -87,6 +87,10 @@ export default function SessionList({
                         <Button
                             variant="outline"
                             size="sm"
+                            // El motivo lo da el servidor, el mismo que
+                            // rechazaría el cierre (UserManagementGuard).
+                            disabled={session.revokeLockedReason !== null}
+                            title={session.revokeLockedReason ?? undefined}
                             onClick={() => onRevoke(session)}
                         >
                             Cerrar

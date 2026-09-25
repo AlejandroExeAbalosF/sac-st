@@ -6,6 +6,7 @@ namespace App\Modules\Shared\Actions;
 
 use App\Models\User;
 use App\Modules\Shared\Support\UserManagementGuard;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -37,26 +38,31 @@ final class SetUserActive
 
         $this->guard->assert($this->guard->denyManaging($user, $actor));
 
-        if (! $active) {
-            $this->guardAgainstSelfDeactivation($user, $actor);
-            $this->guardAgainstLastAdministrator($user);
-        }
+        DB::transaction(function () use ($user, $active, $actor): void {
+            if (! $active) {
+                // Antes de contar: si otro administrador se está
+                // desactivando a la vez, esta espera y lo ve.
+                $this->guard->lockAdministrators();
+                $this->guardAgainstSelfDeactivation($user, $actor);
+                $this->guardAgainstLastAdministrator($user);
+            }
 
-        $user->update(['is_active' => $active]);
+            $user->update(['is_active' => $active]);
 
-        // Desactivar sin cerrar sus sesiones no lo saca del sistema: la
-        // sesión abierta sigue funcionando hasta que expire.
-        if (! $active) {
-            $this->revocarSesiones->handle($user, reason: 'usuario desactivado');
-        }
+            // Desactivar sin cerrar sus sesiones no lo saca del sistema: la
+            // sesión abierta sigue funcionando hasta que expire.
+            if (! $active) {
+                $this->revocarSesiones->handle($user, reason: 'usuario desactivado');
+            }
 
-        $this->auditar->handle(
-            action: $active ? 'usuario.activado' : 'usuario.desactivado',
-            subject: $user,
-            before: ['is_active' => ! $active],
-            after: ['is_active' => $active],
-            actorId: $actor?->id,
-        );
+            $this->auditar->handle(
+                action: $active ? 'usuario.activado' : 'usuario.desactivado',
+                subject: $user,
+                before: ['is_active' => ! $active],
+                after: ['is_active' => $active],
+                actorId: $actor?->id,
+            );
+        });
 
         return $user;
     }
