@@ -13,6 +13,34 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    # Los tests corren contra PostgreSQL real: lo que se prueba son
+    # constraints, triggers y tipos que SQLite no tiene. Sin este servicio,
+    # `composer setup` no podía migrar y la suite nunca llegaba a correr.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: sacst
+          POSTGRES_PASSWORD: sacst_ci
+          POSTGRES_DB: sacst_dev
+        ports:
+          # El mismo puerto que en desarrollo (el 5432 es de otro proyecto),
+          # para que `.env.example` y `phpunit.xml` sirvan tal cual.
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U sacst -d sacst_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Pisan lo que trae `.env.example`: el entorno del proceso le gana al
+    # `.env`. `phpunit.xml` fuerza `DB_DATABASE=sacst_test` para los tests.
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5433
+      DB_USERNAME: sacst
+      DB_PASSWORD: sacst_ci
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,7 +50,11 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: '8.3'
+          # La misma versión que la imagen de producción.
+          php-version: '8.5'
+          # `exif` y GD con WebP: las fotos de comprobantes se normalizan
+          # a WebP (ImageNormalizer) y composer.json exige las dos.
+          extensions: bcmath, exif, gd, intl, pdo_pgsql, pgsql, zip
           tools: composer:v2
           coverage: none
 
@@ -30,6 +62,18 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
+
+      # La misma línea de pnpm que la imagen de producción, en versión
+      # exacta: `composer setup` corre `pnpm install` y el runner no lo trae.
+      - name: Setup pnpm
+        run: npm install -g pnpm@10.34.5
+
+      # La base de tests va aparte de la de desarrollo: RefreshDatabase
+      # vacía lo que encuentra.
+      - name: Create test database
+        env:
+          PGPASSWORD: sacst_ci
+        run: psql -h 127.0.0.1 -p 5433 -U sacst -d sacst_dev -c 'CREATE DATABASE sacst_test OWNER sacst'
 
       - name: Setup Application
         run: composer setup
