@@ -125,6 +125,85 @@ class SecurityHeadersTest extends TestCase
         );
     }
 
+    /**
+     * Sin `'unsafe-inline'` en los estilos: es de lo primero que marca un
+     * escaneo de OWASP ZAP, y el data center escanea antes de publicar.
+     *
+     * Los `<style>` propios pasan por el nonce de la respuesta, que tiene
+     * que ser el mismo en la cabecera y en el HTML: si no coinciden, la
+     * pantalla sale sin estilos y ningún test de PHP se entera.
+     */
+    public function test_the_styles_go_by_nonce_and_not_by_unsafe_inline()
+    {
+        $response = $this->get(route('login'))->assertOk();
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertMatchesRegularExpression("/style-src 'self' 'nonce-([^']+)'/", $csp);
+        $this->assertStringNotContainsString("'unsafe-inline'", $csp);
+        $this->assertStringNotContainsString('style-src-attr', $csp);
+
+        preg_match("/'nonce-([^']+)'/", $csp, $nonce);
+        preg_match_all('/<style nonce="([^"]*)"/', (string) $response->getContent(), $estilos);
+
+        $this->assertNotEmpty($estilos[1], 'La página no tiene ningún <style> con nonce.');
+
+        foreach ($estilos[1] as $delHtml) {
+            $this->assertSame($nonce[1], $delHtml);
+        }
+
+        // Y el que publica para lo que inyecta estilos desde JavaScript.
+        $this->assertStringContainsString(
+            '<meta property="csp-nonce" nonce="'.$nonce[1].'">',
+            (string) $response->getContent(),
+        );
+    }
+
+    /** Cada respuesta tiene su nonce: repetido, dejaría de servir. */
+    public function test_each_response_gets_its_own_nonce()
+    {
+        $primera = (string) $this->get(route('login'))->headers->get('Content-Security-Policy');
+        $segunda = (string) $this->get(route('login'))->headers->get('Content-Security-Policy');
+
+        preg_match("/'nonce-([^']+)'/", $primera, $a);
+        preg_match("/'nonce-([^']+)'/", $segunda, $b);
+
+        $this->assertNotSame($a[1], $b[1]);
+    }
+
+    /**
+     * Las vistas previas reproducen formularios preimpresos con atributos
+     * `style="..."`: solo ahí se permiten atributos, y solo atributos.
+     */
+    public function test_only_document_previews_allow_style_attributes()
+    {
+        /** @var list<string> $rutas */
+        $rutas = config('security.headers.same_origin_frame_routes');
+
+        foreach ($rutas as $nombre) {
+            $csp = (string) $this->cabecerasDe($nombre)->headers->get('Content-Security-Policy');
+
+            $this->assertStringContainsString("style-src-attr 'unsafe-inline'", $csp, "La ruta «{$nombre}».");
+            $this->assertDoesNotMatchRegularExpression("/style-src [^;]*'unsafe-inline'/", $csp);
+        }
+    }
+
+    /**
+     * Un 404 sin ruta también es HTML y también sale con su política.
+     *
+     * Colgado del grupo `web`, el middleware no corría para una dirección
+     * que no existe, y esas respuestas salían sin CSP.
+     */
+    public function test_a_page_without_a_route_carries_the_policy_too()
+    {
+        $response = $this->get('/una-direccion-que-no-existe')->assertNotFound();
+
+        $this->assertStringContainsString(
+            "default-src 'self'",
+            (string) $response->headers->get('Content-Security-Policy'),
+        );
+        $response->assertHeader('X-Frame-Options', 'DENY');
+    }
+
     /** Y una pantalla común sigue sin poder enmarcarse. */
     public function test_an_ordinary_screen_can_not_be_framed()
     {
@@ -235,6 +314,11 @@ class SecurityHeadersTest extends TestCase
         }
 
         $this->assertStringContainsString('ws://localhost:5173', $csp);
+
+        // Con un nonce en la directiva, el navegador ignoraría el
+        // `'unsafe-inline'` que necesitan el HMR y React Refresh.
+        $this->assertMatchesRegularExpression("/style-src [^;]*'unsafe-inline'/", $csp);
+        $this->assertDoesNotMatchRegularExpression("/style-src [^;]*'nonce-/", $csp);
     }
 
     /**

@@ -54,7 +54,7 @@
 <head>
     <meta charset="utf-8">
     <title>Orden de Pago {{ $numeroImpreso }}</title>
-    <style>
+    <style nonce="{{ Vite::cspNonce() }}">
         @page { margin: 12mm; size: 210mm 297mm; }
 
         body {

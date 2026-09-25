@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(AuditAccessLogger::class);
+
+        // Global y no del grupo `web`: los 404 sin ruta y las pantallas de
+        // error también tienen que salir con su CSP.
+        $middleware->append(SecurityHeaders::class);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         /*
@@ -50,7 +54,6 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
-            SecurityHeaders::class,
             /*
              * Va al final del grupo `web` y no en el de `auth`: la marca
              * hay que mirarla en toda pantalla con sesion, y el propio

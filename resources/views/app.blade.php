@@ -5,11 +5,15 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        {{-- El nonce de esta respuesta, para lo que inyecta <style> desde
+             JavaScript: la barra de progreso de Inertia y el bloqueo de
+             scroll de los diálogos. Ver resources/js/lib/csp-nonce.ts. --}}
+        <meta property="csp-nonce" nonce="{{ Vite::cspNonce() }}">
 
         {{-- Fondo aplicado antes de que cargue la hoja de estilos, para que
              no haya un destello blanco. Tiene que coincidir con --background
              de resources/css/app.css. --}}
-        <style>
+        <style nonce="{{ Vite::cspNonce() }}">
             html {
                 background-color: oklch(0.975 0.005 258.3);
             }

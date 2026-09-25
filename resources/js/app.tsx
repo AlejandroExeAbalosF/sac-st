@@ -6,11 +6,17 @@ import DrawerHost from '@/features/drawer/drawer-host';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
+import { applyCspNonce } from '@/lib/csp-nonce';
 import type { Auth } from '@/types';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+// Antes de montar: los diálogos de Radix lo leen al abrirse.
+const nonce = applyCspNonce();
+
 createInertiaApp({
+    // La barra de progreso inyecta su `<style>`: sin nonce, la CSP lo bloquea.
+    nonce,
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name, page) => {
         switch (true) {

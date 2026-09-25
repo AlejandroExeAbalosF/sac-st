@@ -31,7 +31,7 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $planilla->title }}</title>
-    <style>
+    <style nonce="{{ Vite::cspNonce() }}">
         @page {
             margin: 10mm 12mm;
             size: {{ $planilla->landscape ? '297mm 210mm' : '210mm 297mm' }};

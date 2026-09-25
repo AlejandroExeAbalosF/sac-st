@@ -17,7 +17,7 @@
         <meta name="robots" content="noindex, nofollow">
         <title>{{ $titulo }} · SAC</title>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <style>
+        <style nonce="{{ Vite::cspNonce() }}">
             :root {
                 --azul: #1e3a5f;
                 --fondo: #f5f7fa;

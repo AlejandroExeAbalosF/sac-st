@@ -2,6 +2,7 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 import * as React from "react"
 
+import { cspNonce } from "@/lib/csp-nonce"
 import { cn } from "@/lib/utils"
 
 function Select({
@@ -76,6 +77,8 @@ function SelectContent({
       >
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
+          // El Viewport inyecta un <style> para ocultar la barra de scroll.
+          nonce={cspNonce()}
           className={cn(
             "p-1",
             position === "popper" &&

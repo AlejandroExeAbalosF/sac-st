@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -16,11 +17,25 @@ use Symfony\Component\HttpFoundation\Response;
  * exposición directa a internet, pero eso protege del exterior, no del
  * navegador: clickjacking, sniffing de tipo y scripts inyectados siguen
  * siendo problemas locales.
+ *
+ * Es middleware **global**, no del grupo `web`: un 404 sin ruta y las
+ * pantallas de error también son HTML y también tienen que salir con su
+ * política. Colgado de `web`, esas respuestas salían sin CSP, que es de lo
+ * primero que marca un escaneo de OWASP ZAP.
  */
 final class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        /*
+         * El nonce se genera antes de armar la respuesta: las vistas lo
+         * leen con `Vite::cspNonce()` para sus `<style>`, y `@vite` y
+         * `@fonts` lo agregan solos a lo que imprimen.
+         */
+        if (config('security.enabled', true) && config('security.csp.enabled', true)) {
+            Vite::useCspNonce();
+        }
+
         /** @var Response $response */
         $response = $next($request);
 
@@ -86,10 +101,21 @@ final class SecurityHeaders
             unset($directives['upgrade-insecure-requests']);
         }
 
+        $directives = $this->withStyleNonce($directives);
         $directives = $this->withViteDevServer($directives);
 
         if ($sameOriginFrame) {
             $directives['frame-ancestors'] = ["'self'"];
+
+            /*
+             * Las vistas previas de documentos reproducen formularios
+             * preimpresos al milímetro con atributos `style="..."`: unos
+             * ciento cuarenta, compartidos con el PDF. Acá se permiten
+             * **atributos**, no bloques `<style>`, y solo en estas rutas: el
+             * HTML se escapa entero y la página no tiene formularios, así
+             * que no hay por dónde colar uno.
+             */
+            $directives['style-src-attr'] = ["'unsafe-inline'"];
         }
 
         $parts = [];
@@ -109,6 +135,35 @@ final class SecurityHeaders
         }
 
         return implode('; ', $parts);
+    }
+
+    /**
+     * Agrega a `style-src` el nonce de esta respuesta y los hashes de los
+     * `<style>` que inyectan librerías sin soporte de nonce.
+     *
+     * @param  array<string, list<string>|bool>  $directives
+     * @return array<string, list<string>|bool>
+     */
+    private function withStyleNonce(array $directives): array
+    {
+        $sources = $directives['style-src'] ?? [];
+
+        if (! is_array($sources)) {
+            return $directives;
+        }
+
+        $nonce = Vite::cspNonce();
+
+        if ($nonce !== null) {
+            $sources[] = "'nonce-{$nonce}'";
+        }
+
+        /** @var array<string, string> $hashes */
+        $hashes = config('security.csp.style_hashes', []);
+
+        $directives['style-src'] = array_values(array_unique([...$sources, ...array_values($hashes)]));
+
+        return $directives;
     }
 
     /**
@@ -180,8 +235,15 @@ final class SecurityHeaders
             }
 
             // React Refresh inyecta su preámbulo como script en línea y
-            // Vite escribe estilos en línea al aplicar HMR.
+            // Vite escribe estilos en línea al aplicar HMR. Con un nonce o
+            // un hash en la misma directiva, el navegador ignora
+            // `'unsafe-inline'`: en desarrollo se sacan.
             if (in_array($directive, ['script-src', 'style-src'], true)) {
+                $sources = array_values(array_filter(
+                    $sources,
+                    fn (string $source): bool => ! str_starts_with($source, "'nonce-")
+                        && ! str_starts_with($source, "'sha256-"),
+                ));
                 $sources[] = "'unsafe-inline'";
             }
 

@@ -73,10 +73,35 @@ return [
             'object-src' => ["'none'"],
             'img-src' => ["'self'", 'data:', 'blob:'],
             'font-src' => ["'self'", 'data:'],
-            'style-src' => ["'self'", "'unsafe-inline'"],
+            /*
+             * Sin `'unsafe-inline'`: OWASP ZAP lo marca como riesgo medio y
+             * es lo que el data center escanea antes de publicar. Los
+             * `<style>` propios llevan el nonce de cada respuesta —lo agrega
+             * `SecurityHeaders`, junto con los hashes de abajo— y las
+             * vistas previas de documentos suman `style-src-attr` (ver
+             * `same_origin_frame_routes`).
+             */
+            'style-src' => ["'self'"],
             'script-src' => ["'self'"],
             'connect-src' => ["'self'"],
             'upgrade-insecure-requests' => true,
+        ],
+
+        /*
+        | Los `<style>` que inyectan librerías sin soporte de nonce.
+        |
+        | Se permiten por su hash, que es el de su contenido exacto: una
+        | versión nueva de la librería cambia el CSS y el hash deja de
+        | coincidir. `resources/js/lib/csp-hashes.test.ts` los recalcula
+        | desde `node_modules` y falla si no coinciden, así que actualizar
+        | la librería rompe un test y no los estilos en silencio.
+        */
+        'style_hashes' => [
+            // sonner 2.0.7: los estilos de los avisos, al cargar el módulo.
+            'sonner' => "'sha256-CIxDM5jnsGiKqXs2v7NKCY5MzdR9gu6TtiMJrDw29AY='",
+            // input-otp: un `<style>` vacío que después llena por CSSOM,
+            // que la CSP no controla. Es el hash de la cadena vacía.
+            'input-otp' => "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='",
         ],
 
         /*

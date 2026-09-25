@@ -21,7 +21,7 @@
 <head>
     <meta charset="utf-8">
     <title>Recibo de egreso {{ $recibo->formatted_number }}</title>
-    <style>
+    <style nonce="{{ Vite::cspNonce() }}">
         @page { margin: 0; size: 210mm 148mm; }
 
         body {

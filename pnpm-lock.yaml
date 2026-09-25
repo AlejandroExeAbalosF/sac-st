@@ -89,6 +89,9 @@ importers:
       concurrently:
         specifier: ^9.0.1
         version: 9.2.4
+      get-nonce:
+        specifier: 1.0.1
+        version: 1.0.1
       globals:
         specifier: ^15.14.0
         version: 15.15.0

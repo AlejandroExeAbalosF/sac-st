@@ -16,7 +16,7 @@
 <head>
     <meta charset="utf-8">
     <title>Pase — Orden de Pago {{ $orden->formatted_number }}</title>
-    <style>
+    <style nonce="{{ Vite::cspNonce() }}">
         @page { margin: 20mm 22mm; size: 210mm 297mm; }
 
         body {
