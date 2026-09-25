@@ -14,6 +14,10 @@
 # Scratch: volcados de esquema, respaldos y comparaciones de trabajo.
 /tmp
 
+# Notas de trabajo: viven fuera del repo, en `SCST PF/tasks/`. El repo es
+# público y ahí se anotan pendientes, incluidos los de seguridad.
+/tasks
+
 /resources/js/actions
 /resources/js/routes
 /resources/js/wayfinder
