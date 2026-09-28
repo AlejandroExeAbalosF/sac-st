@@ -221,7 +221,7 @@ export default function UserFormDialog({
                             <InputError message={errors.documentNumber} />
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="grid min-w-0 gap-2">
                             <Label htmlFor="role">Rol</Label>
                             <Select
                                 value={data.role}
@@ -230,21 +230,44 @@ export default function UserFormDialog({
                                     setData('role', valor)
                                 }
                             >
-                                <SelectTrigger id="role">
-                                    <SelectValue placeholder="Elegí un rol" />
+                                {/*
+                                 * El valor elegido se dibuja a mano, solo con
+                                 * el nombre: sin hijos, Radix copia al botón
+                                 * el contenido entero de la opción —nombre y
+                                 * descripción— y el botón, que no corta el
+                                 * texto, se estiraba más allá del modal.
+                                 */}
+                                <SelectTrigger id="role" className="w-full">
+                                    <SelectValue placeholder="Elegí un rol">
+                                        <span className="capitalize">
+                                            {data.role}
+                                        </span>
+                                    </SelectValue>
                                 </SelectTrigger>
-                                <SelectContent>
+                                {/*
+                                 * En pantalla chica el campo ocupa todo el
+                                 * ancho y la lista lo acompaña; desde `sm`
+                                 * el campo es media columna y la lista se
+                                 * abre hacia la izquierda, para que las
+                                 * descripciones no queden en cinco renglones.
+                                 */}
+                                <SelectContent
+                                    align="end"
+                                    className="w-(--radix-select-trigger-width) sm:w-[22rem]"
+                                >
                                     {Object.entries(roles).map(
                                         ([nombre, descripcion]) => (
                                             <SelectItem
                                                 key={nombre}
                                                 value={nombre}
                                             >
-                                                <span className="capitalize">
-                                                    {nombre}
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    {descripcion}
+                                                <span className="flex flex-col items-start gap-0.5 whitespace-normal">
+                                                    <span className="capitalize">
+                                                        {nombre}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {descripcion}
+                                                    </span>
                                                 </span>
                                             </SelectItem>
                                         ),
@@ -252,11 +275,9 @@ export default function UserFormDialog({
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.role} />
-                            {bloqueoRol !== null && (
-                                <p className="text-xs text-muted-foreground">
-                                    {bloqueoRol}
-                                </p>
-                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {bloqueoRol ?? roles[data.role]}
+                            </p>
                         </div>
                     </div>
 
