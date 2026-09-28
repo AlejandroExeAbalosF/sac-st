@@ -62,8 +62,10 @@ pasaje a HTTPS es un cambio de configuración (sección 8).
 
 ## 2. Preparación del servidor (una sola vez)
 
-La misma que en los otros sistemas del data center: Ubuntu Server 24.04 LTS,
-en la LAN del organismo y detrás de un proxy del data center, en otra máquina.
+La misma que en los otros sistemas del data center: Ubuntu Server LTS (24.04 o
+26.04; los comandos son los mismos, los repositorios toman la versión del sistema
+solos), en la LAN del organismo y detrás de un proxy del data center, en otra
+máquina.
 
 ### 2.1 Sistema, reloj y salida a internet
 
@@ -99,7 +101,28 @@ nc -zv smtp.gmail.com 587                                          # correo
 
 ### 2.2 Docker Engine
 
-Desde el repositorio oficial, para que las actualizaciones entren por
+**Primero la configuración, después la instalación.** El paquete arranca Docker
+apenas se instala, y sin configuración crea su red en `172.17.0.0/16`, su rango
+por defecto. Si la LAN del servidor se superpone con ese rango —es un rango
+privado común en redes de organismos—, parte de la LAN queda inalcanzable, y el
+`pg_hba.conf` tendría que abrirse a toda la red. Con el archivo en su lugar,
+Docker nace directamente en `10.200.x`:
+
+```bash
+sudo install -m 0755 -d /etc/docker
+sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
+{
+  "bip": "10.200.0.1/24",
+  "default-address-pools": [
+    { "base": "10.201.0.0/16", "size": 24 }
+  ],
+  "log-driver": "journald",
+  "live-restore": true
+}
+EOF
+```
+
+Después, desde el repositorio oficial, para que las actualizaciones entren por
 `apt upgrade`:
 
 ```bash
@@ -118,29 +141,14 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_C
 
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
-**Las redes de Docker se sacan de su rango por defecto (`172.17.0.0/16`)
-antes de levantar nada.** Si la LAN del servidor usa ese mismo rango —y en
-redes corporativas es habitual—, el resto de la LAN queda inalcanzable desde
-este servidor, y el `pg_hba.conf` tendría que abrirse a toda la red. Moverlas
-no cuesta nada y evita el problema aunque hoy no haya choque.
-
-```bash
-sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
-{
-  "bip": "10.200.0.1/24",
-  "default-address-pools": [
-    { "base": "10.201.0.0/16", "size": 24 }
-  ],
-  "log-driver": "journald",
-  "live-restore": true
-}
-EOF
 sudo systemctl enable docker
-sudo systemctl restart docker      # restart y no start: el paquete ya lo dejó corriendo
-ip -4 addr show docker0            # DEBE decir 10.200.0.1/24
+sudo docker version --format '{{.Server.Version}}'   # 29.x
+sudo docker compose version                          # v5.x: Compose saltó de la v2 a la v5
+ip -4 addr show docker0                              # DEBE decir 10.200.0.1/24
 ```
+
+Si Docker ya estaba instalado y corriendo con su red por defecto, crear el
+`daemon.json` y hacer `sudo systemctl restart docker`.
 
 **Docker se opera con `sudo`, no con el grupo `docker`.** Estar en ese grupo es
 ser root sin contraseña y sin rastro en el log de auditoría. Para leer logs sin
@@ -168,6 +176,11 @@ ip -4 addr show | grep 10.200.1.1
 > `DB_HOST`/`TRUSTED_PROXIES` en `app.env`.
 
 ### 2.4 PostgreSQL 18
+
+> Puede venir instalado con la VM: la primera instalación lo trajo ya puesto
+> (18.6, del repositorio PGDG, con la configuración de fábrica). Comprobarlo con
+> `pg_lsclusters`; si aparece `18 main online`, saltear este primer bloque y
+> seguir con la configuración.
 
 ```bash
 sudo apt-get install -y postgresql-common
@@ -213,6 +226,10 @@ ss -ltnp | grep 5432     # 127.0.0.1 y 10.200.1.1. Si aparece 0.0.0.0, parar y r
 atraviesan un literal SQL y un `env_file`, y un `'`, `$` o `#` rompe alguno de
 los dos de una forma difícil de diagnosticar. Guardarlas en el gestor de
 contraseñas antes de seguir.
+
+> **Nunca pegarlas en un chat, un ticket o un correo** —tampoco la salida del
+> comando que las genera—. Si pasa, se rotan con el bloque de la sección 7, que
+> las cambia sin mostrarlas.
 
 ```bash
 LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40; echo     # una para cada rol
@@ -313,6 +330,12 @@ sudo deploy/bin/sacst run --rm --no-deps --entrypoint php app artisan key:genera
 sudo nano /etc/sacst/app.env      # pegarla en APP_KEY=
 ```
 
+Comprobarla sin mostrarla: la clave decodificada tiene que medir 32 bytes.
+
+```bash
+sudo sed -n 's/^APP_KEY=base64://p' /etc/sacst/app.env | base64 -d | wc -c   # 32
+```
+
 > `--no-deps` evita que `run` levante `migrate` antes, que sin `APP_KEY` no
 > puede correr. `--entrypoint php` evita el control de permisos de `storage/`,
 > que para esto no hace falta.
@@ -375,6 +398,25 @@ HTTPS lista para descomentar. Lo esencial:
   `TRUSTED_PROXIES` de `app.env` —sin ella, la auditoría registra la IP del
   proxy en lugar de la del usuario— y `SACST_DC_PROXY_IP` de `compose.env`
   —sin ella, nginx no arranca—.
+
+### 3.7 Antes de que exista el proxy: acceso por IP
+
+Mientras el data center no active su proxy y el dominio, se entra directo por
+`http://<IP_DEL_SERVIDOR>:8080`. La app atiende un solo host —el de `APP_URL`— y
+responde 400 a cualquier otro, así que `APP_URL` va con la IP y el puerto:
+
+```bash
+sudo sed -i 's|^APP_URL=.*|APP_URL=http://<IP_DEL_SERVIDOR>:8080|' /etc/sacst/app.env
+sudo deploy/bin/sacst up -d --force-recreate app queue
+```
+
+La IP del proxy tampoco hace falta todavía: `SACST_DC_PROXY_IP` puede quedar en
+una dirección de documentación (`192.0.2.1`), que no coincide con nadie —a
+ningún origen se le cree `X-Forwarded-Proto`, que es lo seguro— y
+`TRUSTED_PROXIES` solo con `10.200.1.0/24`. Cuando el proxy empiece a mandar
+tráfico, su IP es el primer campo de cada línea de
+`journalctl CONTAINER_NAME=sacst-web-1`. Entonces: `APP_URL` al dominio, la IP
+en los dos archivos y `sudo deploy/bin/sacst up -d --force-recreate`.
 
 ---
 
@@ -464,6 +506,10 @@ sudo deploy/bin/sacst up -d                  # migrate corre solo antes que app
 sudo deploy/bin/sacst ps
 ```
 
+> **En la 0.1.0**, recrear `app` dejaba a nginx apuntando a la IP del
+> contenedor viejo: todo respondía 502 hasta `sudo deploy/bin/sacst restart web`.
+> Desde la 0.1.1 nginx vuelve a resolver `app` en cada pedido y no hace falta.
+
 **Volver atrás** es lo mismo con la versión anterior, **salvo que la versión
 nueva haya traído migraciones**. En ese caso el esquema ya avanzó, y el código
 viejo puede no entenderlo. Antes de volver atrás, fijarse si hubo migraciones
@@ -491,6 +537,39 @@ sudo deploy/bin/sacst exec app php artisan up
 > Los comandos destructivos (`migrate:fresh`, `db:wipe`) están prohibidos en
 > producción desde `AppServiceProvider`, y además `sacst_app` no tiene permisos
 > para ejecutarlos.
+
+`deploy/bin/sacst` es una ruta relativa al repo. Para usarlo desde cualquier
+carpeta va un enlace, que sigue pidiendo `sudo` porque es de root. Funciona desde
+la 0.1.1: antes, el script buscaba `compose.yml` al lado del enlace y no del repo.
+
+```bash
+sudo ln -s /opt/sacst/sac-st-web/deploy/bin/sacst /usr/local/bin/sacst
+sudo sacst ps
+```
+
+### Rotar las contraseñas de la base
+
+Cuando se expusieron —pegadas en un chat, un ticket— o al irse alguien que las
+conocía. Genera las dos, las aplica a la base y las escribe en `app.env` y
+`migrate.env` sin mostrarlas nunca. `openssl rand` y no `tr … | head`: con
+`pipefail`, el SIGPIPE normal de esa tubería corta el script en silencio antes de
+cambiar nada, y ya pasó.
+
+```bash
+sudo bash <<'EOF'
+set -eu
+trap 'echo "FALLÓ en la línea $LINENO"' ERR
+OWNER=$(openssl rand -hex 20)
+APP=$(openssl rand -hex 20)
+printf "\\set o '%s'\n\\set a '%s'\nALTER ROLE sacst_owner PASSWORD :'o';\nALTER ROLE sacst_app PASSWORD :'a';\n" "$OWNER" "$APP" \
+    | sudo -u postgres psql -v ON_ERROR_STOP=1 -q -d postgres
+sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$APP/" /etc/sacst/app.env
+sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$OWNER/" /etc/sacst/migrate.env
+echo "Listo: contraseñas cambiadas y guardadas en /etc/sacst."
+EOF
+sudo awk -F= '/^DB_PASSWORD=/{print FILENAME": "length($2)" caracteres"}' /etc/sacst/app.env /etc/sacst/migrate.env
+sudo deploy/bin/sacst up -d --force-recreate
+```
 
 ### Correo
 
@@ -536,4 +615,7 @@ URLs `http://` dentro de una página `https://` y el navegador las bloquea.
 | Visor de comprobantes en blanco | Una ruta de documento no está en `same_origin_frame_routes`, o alguien agregó `X-Frame-Options` en nginx o en el proxy. | Ver `same_origin_frame_routes` en `config/security.php` y el componente `DocumentFrame`, que avisa en desarrollo. |
 | `400 Bad Request` en todas las pantallas | El `Host` que llega no es el de `APP_URL`: el proxy no reenvía `Host $host`, o `APP_URL` tiene la IP. | Corregir el proxy (3.6) o `APP_URL` (3.3). |
 | nginx no arranca: `invalid network "${SACST_DC_PROXY_IP}"` | Falta `SACST_DC_PROXY_IP` en `compose.env`. | Completarla (3.3). |
+| `migrate` sale con `fe_sendauth: no password supplied` | `DB_PASSWORD` vacía en `migrate.env` o `app.env`. | Comprobar el largo sin mostrarla: `sudo awk -F= '/^DB_PASSWORD=/{print FILENAME, length($2)}' /etc/sacst/*.env`. Rotarlas (7). |
+| 502 en todas las pantallas después de recrear `app` (0.1.0) | nginx seguía apuntando a la IP del contenedor viejo. | `sudo deploy/bin/sacst restart web`. Desde la 0.1.1 no pasa. |
+| 400 entrando por `http://<IP_DEL_SERVIDOR>:8080` | `APP_URL` tiene el dominio y se entra por IP. | Mientras no haya proxy, `APP_URL` con la IP (3.7). |
 | Pantallas sin estilos, con errores de CSP en la consola | Un `<style>` sin nonce o una librería que cambió su CSS inyectado. | `composer ci:check` lo detecta: el test de hashes compara con `node_modules`. |
