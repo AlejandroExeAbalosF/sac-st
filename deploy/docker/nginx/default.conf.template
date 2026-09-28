@@ -99,7 +99,14 @@ server {
         internal;
 
         include fastcgi_params;
-        fastcgi_pass app:9000;
+        # `app` se resuelve en cada pedido, contra el DNS interno de Docker,
+        # y no una sola vez al arrancar. Con un nombre fijo, nginx se quedaba
+        # con la IP del primer contenedor: al recrear app —una actualización,
+        # un cambio de app.env— el nuevo recibía otra IP y todo respondía 502
+        # hasta reiniciar web. Pasó en la primera instalación.
+        resolver 127.0.0.11 ipv6=off valid=10s;
+        set $sacst_php_upstream app:9000;
+        fastcgi_pass $sacst_php_upstream;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME /var/www/html/public$fastcgi_script_name;
         fastcgi_param DOCUMENT_ROOT /var/www/html/public;

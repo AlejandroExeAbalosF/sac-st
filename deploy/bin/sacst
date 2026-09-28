@@ -10,7 +10,9 @@
 set -eu
 
 config_dir="${SACST_CONFIG_DIR:-/etc/sacst}"
-deploy_dir="$(cd "$(dirname "$0")/.." && pwd)"
+# readlink -f: llamado por el enlace de /usr/local/bin, $0 es el enlace y
+# el repo quedaría en /usr/local.
+deploy_dir="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 
 exec docker compose \
     --env-file "$config_dir/compose.env" \
