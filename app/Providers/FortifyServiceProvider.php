@@ -8,6 +8,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\User;
 use App\Modules\Shared\Actions\RecordLoginEvent;
+use App\Modules\Shared\Data\PasswordPolicyData;
 use App\Modules\Shared\Enums\LoginEventType;
 use App\Modules\Shared\Enums\LoginFailureReason;
 use Illuminate\Auth\Passwords\PasswordBroker;
@@ -150,6 +151,7 @@ class FortifyServiceProvider extends ServiceProvider
             'email' => $request->email,
             'token' => $request->route('token'),
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            'passwordPolicy' => PasswordPolicyData::fromDefaults(),
         ]));
 
         Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('auth/forgot-password', [

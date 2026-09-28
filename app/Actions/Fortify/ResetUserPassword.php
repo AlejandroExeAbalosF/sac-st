@@ -22,11 +22,18 @@ class ResetUserPassword implements ResetsUserPasswords
     public function reset(User $user, array $input): void
     {
         Validator::make($input, [
-            'password' => $this->passwordRules(),
+            'password' => $this->replacementPasswordRules($user),
         ])->validate();
 
         $user->forceFill([
             'password' => $input['password'],
+            /*
+             * La clave la eligió el titular, desde el enlace que llegó a su
+             * correo: nadie más la conoce. Si todavía tenía puesta la marca
+             * de la temporal, dejarla lo mandaría al primer ingreso a
+             * elegir otra vez lo que acaba de elegir.
+             */
+            'must_change_password' => false,
         ])->save();
 
         /*
