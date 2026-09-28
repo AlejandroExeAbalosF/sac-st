@@ -828,6 +828,15 @@ declare namespace App {
                     changes: App.Modules.Shared.Data.AuditChangeData[];
                     ipAddress: string | null;
                 };
+                export type PasswordPolicyData = {
+                    minLength: number;
+                    maxLength: number | null;
+                    mixedCase: boolean;
+                    letters: boolean;
+                    numbers: boolean;
+                    symbols: boolean;
+                    uncompromised: boolean;
+                };
                 export type PermissionGroupData = {
                     key: string;
                     label: string;

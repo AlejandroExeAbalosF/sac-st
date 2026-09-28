@@ -217,6 +217,10 @@ return [
         'current_password' => [
             'current_password' => 'La contraseña actual no es correcta.',
         ],
+        'password' => [
+            // Ver `replacementPasswordRules()` en PasswordValidationRules.
+            'same_as_current' => 'La contraseña nueva tiene que ser distinta de la que usás ahora.',
+        ],
     ],
 
     /*

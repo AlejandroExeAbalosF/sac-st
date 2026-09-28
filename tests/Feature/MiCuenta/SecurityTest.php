@@ -100,6 +100,53 @@ class SecurityTest extends TestCase
         $this->assertTrue(Hash::check('Contrasena.Nueva.2026', $user->refresh()->password));
     }
 
+    public function test_la_nueva_no_puede_ser_la_misma_que_la_actual(): void
+    {
+        $user = User::factory()->create(['password' => 'Contrasena.Actual.2026']);
+
+        $this->actingAs($user)
+            ->from(route('mi-cuenta.seguridad'))
+            ->put(route('user-password.update'), [
+                'current_password' => 'Contrasena.Actual.2026',
+                'password' => 'Contrasena.Actual.2026',
+                'password_confirmation' => 'Contrasena.Actual.2026',
+            ])
+            ->assertSessionHasErrors([
+                'password' => __('validation.custom.password.same_as_current'),
+            ]);
+    }
+
+    public function test_la_pantalla_trae_la_politica_y_la_ultima_modificacion(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('mi-cuenta.seguridad'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('passwordPolicy.minLength', 12)
+                // Sin cambios en el historial, no hay fecha que inventar.
+                ->where('passwordChangedAt', null)
+                ->missing('mustChangePassword'),
+            );
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put(route('user-password.update'), [
+                'current_password' => 'password',
+                'password' => 'Contrasena.Nueva.2026',
+                'password_confirmation' => 'Contrasena.Nueva.2026',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('mi-cuenta.seguridad'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->whereType('passwordChangedAt', 'string'),
+            );
+    }
+
     public function test_correct_password_must_be_provided_to_update_password()
     {
         $user = User::factory()->create();

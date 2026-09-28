@@ -33,6 +33,7 @@ const RUTAS_SIN_PANTALLA = [
     'verification.notice',
     'password.confirm',
     'password.confirmation',
+    'primer-ingreso',
 
     // Archivos.
     'adjuntos.download',

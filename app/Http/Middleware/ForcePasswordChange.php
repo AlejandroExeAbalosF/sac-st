@@ -17,9 +17,15 @@ use Symfony\Component\HttpFoundation\Response;
  * mismo día que se entrega, y la firma de un recibo deja de identificar a
  * una sola persona.
  *
- * Quedan afuera las rutas que hacen falta para poder cambiarla —la propia
- * pantalla de seguridad, la confirmación de contraseña que la protege— y
- * la salida: encerrar a alguien sin poder cerrar sesión sería un callejón.
+ * Lo lleva al primer ingreso, que es una pantalla aparte y no «Mi cuenta ›
+ * Seguridad»: esa se dibuja con la barra lateral y las secciones de la
+ * cuenta, y con la marca puesta cada uno de esos enlaces lo devolvía al
+ * mismo lugar, como si el sistema no respondiera.
+ *
+ * Quedan afuera la pantalla, su guardado y la salida: encerrar a alguien sin
+ * poder cerrar sesión sería un callejón. La confirmación de contraseña ya no
+ * hace falta —el primer ingreso la pide en su propio formulario cuando
+ * corresponde—, así que tampoco pasa.
  */
 final class ForcePasswordChange
 {
@@ -29,11 +35,8 @@ final class ForcePasswordChange
      * @var list<string>
      */
     private const ALLOWED = [
-        'mi-cuenta.seguridad',
-        'user-password.update',
-        'password.confirm',
-        'password.confirm.store',
-        'password.confirmation',
+        'primer-ingreso',
+        'primer-ingreso.update',
         'logout',
     ];
 
@@ -49,6 +52,6 @@ final class ForcePasswordChange
             return $next($request);
         }
 
-        return redirect()->route('mi-cuenta.seguridad');
+        return redirect()->route('primer-ingreso');
     }
 }

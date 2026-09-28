@@ -85,6 +85,15 @@ Lo que decide quién puede estar adentro, y lo que deja en
 - **Cerrar sesiones rota el `remember_token`.** Lo hacen la baja, el
   restablecimiento desde Usuarios, el cambio de clave propio (conserva la
   sesión actual) y la recuperación por correo.
+- **Primer ingreso.** El alta y el restablecimiento desde Usuarios dejan una
+  clave temporal con `must_change_password`. Mientras esa marca siga puesta,
+  toda pantalla lleva a `/primer-ingreso`: está fuera del sistema, sin barra
+  lateral, y solo deja elegir la clave o cerrar sesión. No pide la temporal
+  si el login fue hace menos de `auth.initial_password_timeout` (15 minutos);
+  pasado ese plazo la pide en el mismo formulario. La nueva no puede ser la
+  temporal. El cambio queda como `password_changed` con motivo «cambio
+  obligatorio» y cierra las demás sesiones, igual que el cambio desde Mi
+  cuenta: los dos pasan por `ChangeOwnPassword`.
 - **Segundo factor.** Un código rechazado queda como `two_factor_failed`.
 - **Recuperación por correo.** Responde lo mismo exista o no la casilla, y
   tiene tope: 5 pedidos por minuto por IP y 3 cada 15 minutos por correo.

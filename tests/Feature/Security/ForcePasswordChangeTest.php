@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Security;
 
 use App\Models\User;
-use App\Modules\Shared\Enums\LoginEventType;
-use App\Modules\Shared\Models\UserLoginEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,6 +16,9 @@ use Tests\TestCase;
  * misma contraseña. Sin esto, la clave temporal se vuelve permanente el día
  * que se entrega, y la firma de un recibo deja de identificar a una sola
  * persona.
+ *
+ * El cambio en sí —qué pide, qué rechaza, qué registra— se prueba en
+ * InitialPasswordTest. Acá, solo la puerta.
  */
 class ForcePasswordChangeTest extends TestCase
 {
@@ -31,12 +32,46 @@ class ForcePasswordChangeTest extends TestCase
         return $user;
     }
 
-    public function test_con_la_marca_puesta_toda_pantalla_lleva_a_seguridad(): void
+    public function test_con_la_marca_puesta_toda_pantalla_lleva_al_primer_ingreso(): void
     {
         $this
             ->actingAs($this->conClaveProvisoria())
             ->get(route('inicio'))
-            ->assertRedirect(route('mi-cuenta.seguridad'));
+            ->assertRedirect(route('primer-ingreso'));
+    }
+
+    public function test_la_seguridad_de_la_cuenta_tampoco_queda_abierta(): void
+    {
+        // Antes era la pantalla del cambio obligatorio. Ahora es una más:
+        // con la barra lateral y las secciones de la cuenta, que con la
+        // marca puesta no llevaban a ningún lado.
+        $user = $this->conClaveProvisoria();
+
+        $this->actingAs($user)
+            ->get(route('mi-cuenta.seguridad'))
+            ->assertRedirect(route('primer-ingreso'));
+
+        // Ni su guardado: el cambio obligatorio tiene una sola puerta.
+        $this->actingAs($user)
+            ->put(route('user-password.update'), [
+                'current_password' => 'password',
+                'password' => 'Contrasena.Nueva.2026',
+                'password_confirmation' => 'Contrasena.Nueva.2026',
+            ])
+            ->assertRedirect(route('primer-ingreso'));
+
+        $this->assertTrue($user->refresh()->must_change_password);
+    }
+
+    public function test_la_confirmacion_de_contrasena_ya_no_hace_falta(): void
+    {
+        // El primer ingreso pide la temporal en su propio formulario cuando
+        // corresponde; la pantalla de confirmación no tiene nada que hacer
+        // con la marca puesta.
+        $this
+            ->actingAs($this->conClaveProvisoria())
+            ->get(route('password.confirm'))
+            ->assertRedirect(route('primer-ingreso'));
     }
 
     public function test_la_salida_sigue_disponible(): void
@@ -47,43 +82,6 @@ class ForcePasswordChangeTest extends TestCase
             ->assertRedirect();
 
         $this->assertGuest();
-    }
-
-    public function test_la_confirmacion_de_contrasena_no_queda_atrapada(): void
-    {
-        // `mi-cuenta.seguridad` está detrás de RequirePassword: si esta
-        // ruta también redirigiera, el usuario quedaría en un ciclo entre
-        // las dos sin poder llegar nunca al formulario.
-        $this
-            ->actingAs($this->conClaveProvisoria())
-            ->get(route('password.confirm'))
-            ->assertOk();
-    }
-
-    public function test_cambiar_la_contrasena_limpia_la_marca_y_deja_el_evento(): void
-    {
-        $user = $this->conClaveProvisoria();
-
-        $this
-            ->actingAs($user)
-            ->put(route('user-password.update'), [
-                'current_password' => 'password',
-                'password' => 'Contrasena.Nueva.2026',
-                'password_confirmation' => 'Contrasena.Nueva.2026',
-            ])
-            ->assertSessionHasNoErrors()
-            // Venía obligado: al terminar se lo lleva al sistema, no de
-            // vuelta a la misma pantalla.
-            ->assertRedirect(route('inicio'));
-
-        $this->assertFalse($user->refresh()->must_change_password);
-
-        $this->assertTrue(
-            UserLoginEvent::query()
-                ->where('user_id', $user->id)
-                ->where('event_type', LoginEventType::PasswordChanged->value)
-                ->exists()
-        );
     }
 
     public function test_sin_la_marca_el_sistema_no_interfiere(): void

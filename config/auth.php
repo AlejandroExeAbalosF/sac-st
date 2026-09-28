@@ -116,4 +116,20 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Primer ingreso
+    |--------------------------------------------------------------------------
+    |
+    | Cuántos segundos después de entrar con la contraseña temporal se puede
+    | elegir la definitiva sin volver a tipearla. Pasado ese plazo, la
+    | pantalla de primer ingreso la pide: es la sesión que quedó abierta y
+    | alguien más encontró, y quien elige la clave se queda con la cuenta.
+    | Es mucho más corta que `password_timeout` porque lo que protege
+    | también es más grave.
+    |
+    */
+
+    'initial_password_timeout' => env('AUTH_INITIAL_PASSWORD_TIMEOUT', 900),
+
 ];
