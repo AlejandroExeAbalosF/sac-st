@@ -55,6 +55,8 @@ class UsuariosTest extends TestCase
         $this->assertIsArray($temporal);
         $this->assertSame('n.achad', $temporal['username']);
         $this->assertTrue(Hash::check($temporal['password'], $creado->password));
+        // Es un alta: el diálogo no tiene que hablar de sesiones cerradas.
+        $this->assertFalse($temporal['isReset']);
 
         $this->assertDatabaseHas('audit_events', [
             'action' => 'usuario.creado',
@@ -270,6 +272,7 @@ class UsuariosTest extends TestCase
         $this->assertNotSame($anterior, $operador->password);
         $this->assertTrue($operador->must_change_password);
         $this->assertDatabaseMissing('sessions', ['id' => 'sesion-a-cerrar']);
+        $this->assertTrue(session('temporaryPassword')['isReset']);
 
         $this->assertTrue(
             UserLoginEvent::query()

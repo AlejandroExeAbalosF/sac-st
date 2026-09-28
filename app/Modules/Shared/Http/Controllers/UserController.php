@@ -89,6 +89,8 @@ final class UserController extends Controller
             'username' => $user->username,
             'name' => $user->name,
             'password' => $password,
+            // El diálogo cambia el título y avisa que se cerraron las sesiones.
+            'isReset' => false,
         ]);
     }
 
@@ -136,6 +138,7 @@ final class UserController extends Controller
             'username' => $user->username,
             'name' => $user->name,
             'password' => $password,
+            'isReset' => true,
         ]);
     }
 }

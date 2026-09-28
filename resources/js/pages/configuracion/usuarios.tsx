@@ -11,12 +11,13 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import ResetPasswordDialog from '@/features/configuracion/components/reset-password-dialog';
 import type { TemporaryPassword } from '@/features/configuracion/components/temporary-password-dialog';
 import TemporaryPasswordDialog from '@/features/configuracion/components/temporary-password-dialog';
 import type { UserFormMode } from '@/features/configuracion/components/user-form-dialog';
 import UserFormDialog from '@/features/configuracion/components/user-form-dialog';
 import { dateTime } from '@/lib/format';
-import { contrasena, estado, index } from '@/routes/configuracion/usuarios';
+import { estado, index } from '@/routes/configuracion/usuarios';
 import type { Auth } from '@/types';
 
 type Usuario = App.Modules.Shared.Data.UserListItemData;
@@ -54,6 +55,7 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
 
     const [termino, setTermino] = useState(filters.buscar ?? '');
     const [formulario, setFormulario] = useState<UserFormMode | null>(null);
+    const [aRestablecer, setARestablecer] = useState<Usuario | null>(null);
 
     /*
      * La contraseña llega en un flash de una sola vista, así que el diálogo
@@ -84,9 +86,6 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
             { isActive: !usuario.isActive },
             { preserveScroll: true },
         );
-
-    const restablecer = (usuario: Usuario) =>
-        router.post(contrasena(usuario.id).url, {}, { preserveScroll: true });
 
     return (
         <>
@@ -313,7 +312,7 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                                                                     }
                                                                     aria-label={`Restablecer la contraseña de ${usuario.name}`}
                                                                     onClick={() =>
-                                                                        restablecer(
+                                                                        setARestablecer(
                                                                             usuario,
                                                                         )
                                                                     }
@@ -392,6 +391,11 @@ export default function Usuarios({ users, roles, filters, can }: Props) {
                 mode={formulario}
                 roles={roles}
                 onClose={() => setFormulario(null)}
+            />
+
+            <ResetPasswordDialog
+                user={aRestablecer}
+                onClose={() => setARestablecer(null)}
             />
 
             <TemporaryPasswordDialog
