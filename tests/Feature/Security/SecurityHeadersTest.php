@@ -41,6 +41,30 @@ class SecurityHeadersTest extends TestCase
     }
 
     /**
+     * La suite no depende de que el desarrollador tenga Vite apagado.
+     *
+     * Mientras Vite corre escribe `public/hot`, y el middleware lo lee para
+     * sumar su origen a la política y cambiar el nonce por
+     * `'unsafe-inline'`. Eso es correcto en desarrollo y es exactamente lo
+     * que los tres tests de nonce de más abajo verifican que **no** pase:
+     * sin la guarda de entorno, fallaban en la máquina de quien estaba
+     * trabajando y pasaban en CI.
+     *
+     * Un test que falla por el estado de otra ventana se aprende a
+     * ignorar, y entonces deja de cuidar lo que vino a cuidar.
+     */
+    public function test_the_policy_under_test_never_carries_the_vite_dev_server()
+    {
+        $csp = (string) $this->get(route('login'))->headers->get('Content-Security-Policy');
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/(https?|wss?):\/\/(localhost|127\.0\.0\.1|\[::1\])/',
+            $csp,
+            'La política de los tests trae el servidor de Vite: se está leyendo `public/hot` bajo test.',
+        );
+    }
+
+    /**
      * Regresión: los nombres de la lista de rutas enmarcables **tienen que
      * existir**.
      *
@@ -350,31 +374,5 @@ class SecurityHeadersTest extends TestCase
         config(['security.enabled' => false]);
 
         $this->get(route('login'))->assertHeaderMissing('Content-Security-Policy');
-    }
-
-    /**
-     * Simula que Vite está corriendo escribiendo `public/hot`, que es de
-     * donde el middleware lee el origen real.
-     */
-    private function givenViteIsRunningAt(string $origin): void
-    {
-        $hotFile = public_path('hot');
-
-        // El archivo puede existir de verdad porque el desarrollador tiene
-        // Vite levantado mientras corre los tests. Se preserva su contenido
-        // y se restaura al terminar: un test no puede tumbarle el entorno.
-        $original = file_exists($hotFile) ? file_get_contents($hotFile) : null;
-
-        file_put_contents($hotFile, $origin);
-
-        $this->beforeApplicationDestroyed(function () use ($hotFile, $original): void {
-            if ($original === null || $original === false) {
-                @unlink($hotFile);
-
-                return;
-            }
-
-            file_put_contents($hotFile, $original);
-        });
     }
 }

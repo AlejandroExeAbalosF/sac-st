@@ -190,7 +190,22 @@ final class SecurityHeaders
          * Preguntar y despues leer no arregla nada; leer y aceptar que
          * falle, si.
          */
-        $contenido = @file_get_contents(public_path('hot'));
+        /*
+         * La ruta es inyectable, y solo por los tests.
+         *
+         * Se resuelve acá y no en el archivo de configuración porque
+         * `public_path()` se evaluaría al cachear la configuración y
+         * quedaría clavada la ruta de la máquina que corrió `config:cache`.
+         *
+         * Lo que esto arregla: `public/hot` es un archivo del árbol de
+         * trabajo, no del entorno, así que la suite leía el Vite que el
+         * desarrollador tuviera levantado en ese momento. Los tests del
+         * nonce fallaban en su máquina y pasaban en CI, y un test que falla
+         * por el estado de otra ventana se aprende a ignorar.
+         */
+        $hotFile = config('security.csp.vite_hot_file') ?? public_path('hot');
+
+        $contenido = @file_get_contents(is_string($hotFile) ? $hotFile : public_path('hot'));
 
         if ($contenido === false) {
             return $directives;

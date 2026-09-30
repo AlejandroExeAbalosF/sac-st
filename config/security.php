@@ -141,6 +141,21 @@ return [
             'img-src',
             'connect-src',
         ],
+
+        /*
+        | Dónde está ese archivo. `null` es `public/hot`, que es lo que
+        | corre siempre fuera de los tests.
+        |
+        | Existe para que la suite pueda decir si Vite está corriendo o no
+        | en vez de heredarlo del árbol de trabajo: con Vite levantado en la
+        | máquina del desarrollador, los tests del nonce leían la política
+        | de desarrollo y fallaban ahí mientras pasaban en CI.
+        |
+        | No se resuelve acá con `public_path()`: al cachear la
+        | configuración quedaría clavada la ruta de la máquina que corrió
+        | `config:cache`. El middleware la resuelve en el momento.
+        */
+        'vite_hot_file' => null,
     ],
 
 ];

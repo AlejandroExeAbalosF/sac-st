@@ -54,12 +54,54 @@ abstract class TestCase extends BaseTestCase
      * Acá vale para toda la suite, incluidos los tests que todavía no se
      * escribieron: es una garantía del andamiaje, no algo que cada autor
      * tenga que acordarse de pedir.
+     *
+     * ── Y Vite arranca apagado ─────────────────────────────────────────
+     *
+     * Por lo mismo. `public/hot` es un archivo del árbol de trabajo: si el
+     * desarrollador tiene Vite levantado mientras corre los tests, la CSP
+     * sale con la política de desarrollo —`'unsafe-inline'`, sin nonce— y
+     * los tests que cuidan la política de producción fallan en su máquina
+     * y pasan en CI. Un test que falla por el estado de otra ventana se
+     * aprende a ignorar, y entonces deja de cuidar lo que vino a cuidar.
+     *
+     * Se apunta a un archivo propio en vez de borrar `public/hot`: un test
+     * no puede tumbarle el entorno a quien lo está corriendo. El que
+     * necesita a Vite encendido lo dice con `givenViteIsRunningAt()`.
      */
     protected function setUp(): void
     {
         parent::setUp();
 
         Storage::fake('local');
+
+        // Si un test anterior se cayó sin limpiar, el suyo seguiría ahí y
+        // el siguiente arrancaría creyendo que Vite está corriendo.
+        @unlink($this->viteHotFile());
+
+        config(['security.csp.vite_hot_file' => $this->viteHotFile()]);
+    }
+
+    /**
+     * Enciende Vite para este test, en el origen indicado.
+     *
+     * Escribe en un archivo temporal propio y no en `public/hot`, así la
+     * suite deja de tocar el entorno de desarrollo para probar esto.
+     */
+    protected function givenViteIsRunningAt(string $origin): void
+    {
+        $hotFile = $this->viteHotFile();
+
+        file_put_contents($hotFile, $origin);
+
+        $this->beforeApplicationDestroyed(static function () use ($hotFile): void {
+            @unlink($hotFile);
+        });
+    }
+
+    /** El `public/hot` de mentira de este proceso de test. */
+    private function viteHotFile(): string
+    {
+        return sys_get_temp_dir().DIRECTORY_SEPARATOR.'sacst-test-vite-hot-'.getmypid();
     }
 
     /**
