@@ -13,6 +13,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Data\LastChangeData;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\Receipt;
+use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -51,7 +52,16 @@ final class HaberRowData extends Data
          * @var numeric-string
          */
         public string $assignedAmount,
-        /** @var numeric-string */
+        /**
+         * Suma neta ya asignada; se calcula desde el diario, no se guarda.
+         *
+         * Es plata que **entró** —el empleador depositó y esa recepción se
+         * imputó contra la cuota—, no plata entregada al beneficiario. La
+         * entrega es la otra punta del circuito y la cuenta `stage`: un
+         * haber puede estar financiado del todo y no haberse pagado.
+         *
+         * @var numeric-string
+         */
         public string $fundedAmount,
         /** Las esperadas, que pueden ser más que las cargadas. */
         public int $installmentCount,
@@ -141,11 +151,11 @@ final class HaberRowData extends Data
             concept: $haber->concept,
             assignedAmount: $haber->importeAsignado(),
             /*
-             * Sale de las asignaciones del diario, que son de la etapa
-             * siguiente. Hasta entonces nada está financiado, y eso es
-             * cierto: todavía no hay por dónde registrar un ingreso.
+             * La suma de lo que tiene cada cuota, tomada de la lista ya
+             * armada: el total de la fila no puede discrepar del detalle
+             * que se despliega debajo porque es ese mismo detalle sumado.
              */
-            fundedAmount: '0.00',
+            fundedAmount: self::financiado($cuotas),
             installmentCount: $haber->expected_installment_count ?? $haber->installments_count,
             loadedInstallmentCount: $haber->installments_count,
             paidInstallmentCount: $haber->paid_installments_count,
@@ -156,5 +166,29 @@ final class HaberRowData extends Data
             lastChange: $lastChange,
             installments: $cuotas,
         );
+    }
+
+    /**
+     * Lo que el haber tiene financiado: la suma de sus cuotas.
+     *
+     * Cada una llega neta de reversiones desde el diario (§5.1); acá no se
+     * recalcula nada, se totaliza. Las anuladas no se descuentan aparte
+     * porque no hace falta: un haber con dinero imputado no se puede
+     * anular —lo impide `CancelHaber`—, así que una cuota anulada aporta
+     * cero por su propio neto. Si alguna vez aportara algo, es plata que
+     * está en la caja y tiene que verse.
+     *
+     * @param  list<InstallmentListItemData>  $cuotas
+     * @return numeric-string
+     */
+    private static function financiado(array $cuotas): string
+    {
+        $total = '0.00';
+
+        foreach ($cuotas as $cuota) {
+            $total = Decimal::add($total, $cuota->fundedAmount);
+        }
+
+        return $total;
     }
 }

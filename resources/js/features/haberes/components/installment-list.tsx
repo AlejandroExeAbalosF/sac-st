@@ -85,7 +85,7 @@ export default function InstallmentList({
     const faltan = Math.max(0, previstas - cuotas.length);
 
     /*
-     * Acá solo se agrega la cuota que llega con su ticket. Corregir una ya
+     * Acá solo se agrega la cuota. Corregir una ya
      * cargada se hace en la pantalla del haber, que es la única que muestra
      * el recibo, las imputaciones y el traslado: son lo que hay que tener a
      * la vista para tocar una cuota, y este renglón no los tiene.
@@ -253,8 +253,8 @@ export default function InstallmentList({
                 >
                     <span>
                         {faltan === 1
-                            ? 'Falta cargar 1 cuota, que llega con su ticket.'
-                            : `Faltan cargar ${faltan} cuotas, que llegan con sus tickets.`}
+                            ? 'Falta cargar 1 cuota.'
+                            : `Faltan cargar ${faltan} cuotas.`}
                     </span>
                     {editable && (
                         <Button

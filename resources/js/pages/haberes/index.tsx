@@ -175,7 +175,7 @@ export default function HaberesIndex({
                  * que el encabezado pueda quedar fijo. Con pocas filas no
                  * se nota —no llega a desplazarse—; con cincuenta, es lo
                  * que evita tener que subir para recordar si esa columna
-                 * era «Reconocido» o «Financiado».
+                 * era «Reconocido» o «Ingresado».
                  */}
                 {pagination.total === 0 ? (
                     <p className="rounded-lg border border-dashed px-5 py-12 text-center text-sm text-muted-foreground">
@@ -239,11 +239,18 @@ export default function HaberesIndex({
                                             >
                                                 Reconocido
                                             </th>
+                                            {/*
+                                             * «Ingresado» y no «Financiado»:
+                                             * es plata que entró y está en
+                                             * la caja, no plata entregada al
+                                             * beneficiario. El rótulo viejo
+                                             * se leía como lo segundo.
+                                             */}
                                             <th
                                                 scope="col"
                                                 className="py-2.5 pr-5 text-right font-medium"
                                             >
-                                                Financiado
+                                                Ingresado
                                             </th>
                                             <th
                                                 scope="col"

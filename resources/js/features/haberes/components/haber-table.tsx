@@ -73,11 +73,16 @@ export default function HaberTable({ haberes }: { haberes: Haber[] }) {
                     >
                         Reconocido
                     </th>
+                    {/*
+                     * «Ingresado» y no «Financiado»: es plata que entró y
+                     * está en la caja, no plata entregada al beneficiario.
+                     * El rótulo viejo se leía como lo segundo.
+                     */}
                     <th
                         scope="col"
                         className="py-2.5 pr-5 text-right font-medium"
                     >
-                        Financiado
+                        Ingresado
                     </th>
                     <th scope="col" className="py-2.5 pr-5 font-medium">
                         Cuotas
@@ -213,7 +218,7 @@ function HaberCard({ haber }: { haber: Haber }) {
                         </dd>
                     </div>
                     <div>
-                        <dt className="text-field-label">Financiado</dt>
+                        <dt className="text-field-label">Ingresado</dt>
                         <dd className="mt-0.5 text-sm">
                             <Money value={haber.fundedAmount} dimWhenZero />
                         </dd>

@@ -164,8 +164,8 @@ export default function InstallmentCards({
                     >
                         <span>
                             {faltan === 1
-                                ? 'Falta cargar 1 cuota, que llega con su ticket.'
-                                : `Faltan cargar ${faltan} cuotas, que llegan con sus tickets.`}
+                                ? 'Falta cargar 1 cuota.'
+                                : `Faltan cargar ${faltan} cuotas.`}
                         </span>
                         {editable && (
                             <Button

@@ -261,7 +261,7 @@ export function ExpedienteCard({ expediente }: { expediente: Expediente }) {
                     </p>
                 </div>
                 <div>
-                    <p className="text-field-label">Financiado</p>
+                    <p className="text-field-label">Ingresado</p>
                     <p className="mt-0.5 text-sm">
                         <Money
                             value={expediente.fundedTotalAmount}

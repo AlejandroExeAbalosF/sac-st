@@ -115,9 +115,14 @@ function MontosDelHaber({
                 />
             </span>
 
+            {/*
+             * «Ingresado» y no «Financiado»: es plata que entró y está en la
+             * caja, no plata entregada al beneficiario. El rótulo viejo se
+             * leía como lo segundo.
+             */}
             <span>
                 <span className="block text-[0.6875rem] tracking-wide text-field-label uppercase">
-                    Financiado
+                    Ingresado
                 </span>
                 <Money
                     value={haber.fundedAmount}
