@@ -36,14 +36,14 @@ use Throwable;
  * puede quedarse en la caja indefinidamente, así que se deposita en la
  * cuenta del organismo.
  *
- * **Es un traslado interno, no un ingreso nuevo** (§2.1, punto 145). El
- * dinero sigue siendo del mismo beneficiario y sigue imputado a la misma
- * cuota: `BENEFICIARY_FUNDS` no se toca. Lo único que cambia es dónde
- * está.
+ * **Es un traslado interno, no un ingreso nuevo.** El dinero sigue siendo
+ * del mismo beneficiario y sigue imputado a la misma cuota:
+ * `BENEFICIARY_FUNDS` no se toca. Lo único que cambia es dónde está.
  *
  * **Y el recibo de ingreso no se toca nunca.** Sigue diciendo «Efectivo»,
- * porque eso fue lo que ocurrió y el empleador tiene su copia firmada
- * (§2.1, punto 147). Este es un hecho nuevo, no una corrección de aquel.
+ * porque eso fue lo que ocurrió y el empleador tiene su copia firmada.
+ * Este es un hecho nuevo, no una corrección de aquel. Ver
+ * docs/haberes-reglas.md#canal-de-pago.
  *
  * **Por qué el asiento va a `CASH_IN_TRANSIT` y no directo al banco.**
  * Entre que el efectivo sale de la caja y el banco lo acredita hay una

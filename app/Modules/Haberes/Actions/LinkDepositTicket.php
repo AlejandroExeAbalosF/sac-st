@@ -17,8 +17,8 @@ use RuntimeException;
  * Vincula el ticket con el movimiento que el operador reconoció.
  *
  * **Todavía no hay recepción.** Esto dice «este papel y este crédito son
- * el mismo hecho»; convertir eso en dinero imputado a una cuota necesita
- * `fund_receipts` y `funding_allocations`, que son la tanda siguiente. La
+ * el mismo hecho»; convertir eso en dinero imputado a una cuota lo hace
+ * `ReceiveAndAllocateTicket`, en un acto aparte. La
  * separación no es burocracia: reconocer el movimiento es un acto de
  * lectura, imputarlo es un acto contable, y los firma gente distinta.
  *

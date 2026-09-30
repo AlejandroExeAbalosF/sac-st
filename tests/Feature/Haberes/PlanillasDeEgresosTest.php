@@ -23,7 +23,7 @@ use Tests\TestCase;
  * caja: ninguna de las dos hojas consulta nada —reciben las filas que la
  * pantalla ya tiene y arman el papel—, y eso permite probar qué escriben
  * sin montar el circuito entero. Que las filas sean las correctas es
- * asunto de `PantallaDeEgresosTest`.
+ * asunto de `PantallaDePlanillasTest`.
  */
 class PlanillasDeEgresosTest extends TestCase
 {

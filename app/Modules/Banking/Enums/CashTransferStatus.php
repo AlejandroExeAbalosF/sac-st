@@ -23,9 +23,8 @@ enum CashTransferStatus: string
     /**
      * El traslado se dio de baja y su efectivo vuelve a estar disponible.
      *
-     * Todavía no lo produce nadie: cancelar un traslado exige revertir su
-     * asiento, y las reversiones son de la tanda siguiente. El estado se
-     * declara ahora porque vive en un `CHECK` de una tabla append-only.
+     * Lo produce `CancelCashToBankTransfer`, que revierte el asiento del
+     * depósito en vez de borrarlo.
      */
     case Cancelled = 'cancelled';
 

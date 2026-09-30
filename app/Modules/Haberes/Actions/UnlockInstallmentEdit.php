@@ -13,22 +13,15 @@ use Illuminate\Validation\ValidationException;
 /**
  * Abre la ventana para corregir una cuota que ya está en circulación.
  *
- * El área definió los tres pasos (Correcciones §33):
+ * La corrección tiene tres pasos:
  *
- * 1. un botón para **registrar el caso y el porqué**;
+ * 1. registrar el caso y el porqué —esto—;
  * 2. registrado eso, se habilita la edición de todos los campos;
- * 3. guardado, se vuelve a bloquear.
+ * 3. guardado, se vuelve a bloquear: lo hace `UpdateInstallment`.
  *
- * Esto es el paso 1. El 3 lo hace `UpdateInstallment` al terminar de
- * guardar: la ventana se cierra sola, no queda abierta esperando que
- * alguien se acuerde de cerrarla.
- *
- * **No es un permiso, es un acto registrado.** Quien tiene la atribución
- * de editar la cuota ya la tenía; lo que esto agrega es que quede escrito
- * *por qué* se editó algo que el organismo superior ya tiene en la mano.
- * El motivo va a `audit_events` junto al antes y el después que
- * `UpdateInstallment` guarda por su cuenta, y es lo que alguien va a leer
- * el año que viene cuando la Orden y la cuota digan cosas distintas.
+ * **No es un permiso, es un acto registrado.** El motivo va a
+ * `audit_events` junto al antes y el después que guarda
+ * `UpdateInstallment`. Ver docs/haberes.md#corregir-cuota.
  */
 final class UnlockInstallmentEdit
 {

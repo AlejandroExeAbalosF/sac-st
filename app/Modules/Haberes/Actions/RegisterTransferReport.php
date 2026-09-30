@@ -118,7 +118,7 @@ final class RegisterTransferReport
              */
             'amount' => $orden->amount,
             /*
-             * El CBU al que se pidió transferir, congelado (§12.7.8). Si
+             * El CBU al que se pidió transferir, congelado. Si
              * el organismo terminó usando otro, es una observación que
              * vuelve con el expediente y no algo que se corrija en
              * silencio acá.

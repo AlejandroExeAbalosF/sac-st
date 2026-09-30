@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Enums;
 
 /**
- * Dónde está una Orden de Pago — §9.6 del DER.
+ * Dónde está una Orden de Pago — docs/haberes-reglas.md#orden-y-pase.
  *
  * Los siete primeros son etapas del documento en circulación; los tres
  * últimos son finales. La diferencia no es cosmética: mientras la Orden
@@ -13,10 +13,10 @@ namespace App\Modules\Haberes\Enums;
  * otra. Lo impone un índice único parcial que enumera exactamente los
  * mismos estados que `isActive()`.
  *
- * Esta tanda produce únicamente `Draft` y `Voided`. El resto se declara
- * entero porque un juego de estados se define de una vez: los estados
- * viven en un `CHECK` de una tabla append-only, y agregarlos de a uno
- * significaría una migración por etapa del circuito.
+ * La emisión produce `Draft`, la anulación `Voided` y la validación del
+ * egreso `Completed`. Los estados intermedios de la transferencia se
+ * resuelven en el egreso con `TransferStage`; declararlos también aquí
+ * no implica que cada uno tenga una transición de Orden implementada.
  */
 enum PaymentOrderStatus: string
 {

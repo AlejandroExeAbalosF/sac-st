@@ -33,8 +33,8 @@ use Tests\TestCase;
  * muestra**, y se resuelve devolviéndola al pozo de no identificados
  * —`DesasignarFondosTest` cubre ese lado—.
  *
- * El bloqueo real llega con el pase de pago, cuando el expediente sale
- * del área. Es de la etapa siguiente.
+ * El bloqueo llega con el pase de pago, cuando el expediente sale del
+ * área: lo aplica `InstallmentEditLock`.
  */
 class CuotaConReciboTest extends TestCase
 {

@@ -7,9 +7,9 @@ namespace App\Modules\Haberes\Enums;
 /**
  * Qué clase de asignación es — §9.4 del DER.
  *
- * `Allocation` es el caso normal y el único que esta tanda usa. Los otros
- * dos existen en el esquema desde ahora para no tener que migrar una tabla
- * append-only cuando lleguen sus circuitos.
+ * `Allocation` es el caso normal. `Reversal` lo escriben
+ * `UnallocateFunds`, `CancelHaber` y `CancelExpediente`.
+ * `CashRoundingSurplus` existe en el esquema, pero nada lo produce.
  */
 enum AllocationKind: string
 {
@@ -26,8 +26,8 @@ enum AllocationKind: string
      * `expected_amount` de la cuota— no se toca, porque ese importe es lo
      * que dice el expediente.
      *
-     * Solo vale con `medium = cash`, y por eso no entra en esta tanda: el
-     * circuito de efectivo todavía no existe.
+     * Solo vale con `medium = cash`. Todavía no hay una operación que lo
+     * registre.
      */
     case CashRoundingSurplus = 'cash_rounding_surplus';
 

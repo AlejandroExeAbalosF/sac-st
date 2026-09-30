@@ -34,7 +34,9 @@ namespace App\Modules\Ledger\Enums;
  *
  * Mientras tanto, un excedente quedaría como saldo sin asignar de su
  * recepción: visible en «Pendientes» del listado, sin forma de cerrarlo.
- * Ver el punto 48 de `Correcciones-al-DER-pendientes.md`.
+ * Ver docs/haberes.md#pendientes-y-antecedentes. El antecedente es
+ * «El excedente se modela pero todavía no se puede reconocer», en
+ * Correcciones, ancla `reconocimiento-excedente-pendiente`.
  */
 enum ResidualStatus: string
 {

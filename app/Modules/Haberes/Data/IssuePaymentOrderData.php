@@ -14,9 +14,9 @@ use Illuminate\Http\Request;
  * **Es todo lo que el formulario aporta, y nada más.** El importe, el
  * beneficiario, el empleador y la tabla de depósitos no viajan desde el
  * navegador: los deriva el Action de la propia cuota, por el mismo motivo
- * que en el recibo de ingreso (Correcciones §33, desvío 4). Un importe
- * propuesto por el cliente en un documento que pide transferir dinero es
- * exactamente lo que no puede pasar.
+ * que en el recibo de ingreso (docs/haberes-reglas.md#recibo-de-ingreso).
+ * Un importe propuesto por el cliente en un documento que pide transferir
+ * dinero es exactamente lo que no puede pasar.
  *
  * Lo que sí es una decisión de quien emite:
  *
@@ -24,7 +24,7 @@ use Illuminate\Http\Request;
  *   tiene más de una;
  * - **la foja donde el expediente informa el CBU**, que no vive en
  *   ninguna tabla y que redacta los dos renglones: la cita de la nota de
- *   Pase y el campo OBS de la Orden (§47, D-003);
+ *   Pase y el campo OBS de la Orden (docs/haberes-reglas.md#foja-cbu);
  * - **cuál de los dos números del recibo** se imprime;
  * - **el destino del Pase**, hoy siempre el mismo pero previsto para que
  *   cambie sin tocar código.

@@ -20,8 +20,9 @@ export type UseAppearanceReturn = {
  *
  * Para reactivarlo cuando esté listo:
  *   1. `DARK_MODE_ENABLED = true` acá;
- *   2. reponer el ítem "Apariencia" en `layouts/settings/layout.tsx`;
- *   3. reponer la ruta `appearance.edit` en `routes/settings.php`;
+ *   2. sumar «Apariencia» a `features/cuenta/components/account-nav.tsx`,
+ *      con su pantalla en `pages/mi-cuenta/`;
+ *   3. sumar su ruta en `routes/mi-cuenta.php`;
  *   4. devolverle a `HandleAppearance` la lectura de la cookie.
  */
 const DARK_MODE_ENABLED = false;

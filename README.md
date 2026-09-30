@@ -201,13 +201,11 @@ Hoy son **1003 tests** con 4898 aserciones.
 
 ## Documentación
 
-El relevamiento funcional y el modelo de datos viven **fuera de este repositorio**,
-en poder del área. Acá adentro:
+La documentación del circuito se actualiza junto con el código.
 
 | Documento                                          | Qué cubre                                        |
 | -------------------------------------------------- | ------------------------------------------------ |
+| [docs/haberes.md](docs/haberes.md)                 | Circuito implementado, permisos y pendientes     |
+| [docs/haberes-reglas.md](docs/haberes-reglas.md)   | Relaciones, reglas, controles y evidencia        |
 | [docs/caja-de-haberes.md](docs/caja-de-haberes.md) | Cómo funciona hoy la Caja, pantalla por pantalla |
 | [docker/README.md](docker/README.md)               | El entorno de desarrollo en contenedores         |
-
-El código explica en sus comentarios **por qué** cada decisión es así; los
-documentos son el mapa.

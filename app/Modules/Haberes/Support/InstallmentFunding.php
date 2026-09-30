@@ -16,12 +16,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * Cuánta plata tiene una cuota, y cuánta le queda a una recepción.
  *
- * **Todo se calcula; nada se guarda.** Es el §5.1 del DER: *«Los saldos se
- * calculan; no son contadores editables»*. La tentación de una columna
- * `funded_amount` en `beneficiary_installments` es real —una consulta menos
- * en cada listado— y es exactamente el error que este sistema no puede
- * permitirse: un contador se desincroniza en la primera reversión y nadie
- * se entera hasta que el arqueo no cierra.
+ * **Todo se calcula; nada se guarda.** Los saldos no son contadores
+ * editables (docs/haberes-reglas.md#financiacion). La tentación de una
+ * columna `funded_amount` en `beneficiary_installments` es real —una
+ * consulta menos en cada listado— y es exactamente el error que este
+ * sistema no puede permitirse: un contador se desincroniza en la primera
+ * reversión y nadie se entera hasta que el arqueo no cierra.
  *
  * Vive en un solo lugar para que la respuesta sea una sola. Si la pantalla
  * de la cuota y la del recibo calcularan cada una lo suyo, tarde o

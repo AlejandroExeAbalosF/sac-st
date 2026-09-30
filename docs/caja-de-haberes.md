@@ -2,6 +2,8 @@
 
 Qué hace hoy la Caja, en una página. Para el detalle de por qué cada decisión es
 así, el código lo explica en sus comentarios; esto es el mapa.
+El circuito de expedientes, cuotas, recibos y pagos está en
+[Haberes en consignación](haberes.md), con sus [reglas y modelo](haberes-reglas.md).
 
 ---
 

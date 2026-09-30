@@ -34,23 +34,23 @@ use Illuminate\Validation\ValidationException;
 /**
  * Emite la Orden de Pago de una cuota, junto con su nota de Pase.
  *
- * **Los dos documentos nacen en el mismo acto** porque en la realidad
- * viajan juntos: el §9.7 del DER lo dice y el área lo confirmó. El
- * expediente no va al organismo superior; van la Orden y el Pase, y nada
- * más. Emitir uno sin el otro produciría media remisión.
+ * **Los dos documentos nacen en el mismo acto**: al organismo superior
+ * viajan la Orden y el Pase, y nada más. Emitir uno sin el otro
+ * produciría media remisión. Ver docs/haberes-reglas.md#orden-y-pase.
  *
  * ── Qué se deriva y qué se elige ───────────────────────────────────────
  *
  * El importe, la tabla de depósitos, la cuenta del organismo y todos los
  * datos de las partes **los deriva este Action de la cuota**. Del
- * formulario llega únicamente lo que es una decisión: el tipo de Orden,
- * cuál cuenta verificada se usa, la foja del CBU, qué número de recibo se
- * imprime, las observaciones y el destino del Pase.
+ * formulario llega únicamente lo que es una decisión: cuál cuenta
+ * verificada se usa, la foja del CBU, qué número de recibo se imprime,
+ * el destino del Pase y, opcionalmente, el tesorero. La observación se
+ * deriva de la foja; no hay un tipo de Orden elegible.
  *
- * Es la misma regla que rige el recibo de ingreso (Correcciones §33,
- * desvío 4), y acá pesa más: un importe propuesto por el navegador en un
- * documento que le pide a otro organismo que transfiera dinero es
- * exactamente la clase de dato que no puede venir de afuera.
+ * Es la misma regla que rige el recibo de ingreso
+ * (docs/haberes-reglas.md#recibo-de-ingreso): un importe propuesto por el
+ * navegador en un documento que le pide a otro organismo que transfiera
+ * dinero es exactamente la clase de dato que no puede venir de afuera.
  *
  * ── Qué congela ────────────────────────────────────────────────────────
  *

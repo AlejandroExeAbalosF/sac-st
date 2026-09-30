@@ -43,7 +43,7 @@ const PERMISOS_SIN_CONSUMIDOR = [
     /*
      * Las fotos de comprobante sí se suben, pero gobernadas por el permiso
      * de la operación que las contiene —`depositos.registrar`,
-     * `traslados.registrar`—, no por uno propio. El adjunto no es un acto
+     * `caja.trasladar`—, no por uno propio. El adjunto no es un acto
      * independiente: nace pegado a lo que documenta. Queda por si alguna
      * vez hay una carga suelta; si se decide que no la habrá, se saca.
      */

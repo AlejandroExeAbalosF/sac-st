@@ -404,8 +404,8 @@ class FinanciacionDeCuotaTest extends TestCase
     /**
      * Una recepción en efectivo, escrita a mano.
      *
-     * El circuito de efectivo no existe todavía —es de otra etapa—, pero
-     * el invariante del medio único hay que poder probarlo igual.
+     * Se escribe sin pasar por el cobro por mostrador, para probar el
+     * invariante del medio único de forma aislada.
      */
     private function recepcionEnEfectivo(string $importe): FundReceipt
     {

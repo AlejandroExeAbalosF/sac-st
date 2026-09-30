@@ -174,9 +174,11 @@ final class UpdateInstallment
      * Y corregir hacia arriba es un caso legítimo, no una anomalía: si el
      * expediente decía $700.000 y se cargó $602.250, el recibo por lo
      * cobrado sigue siendo cierto y la cuota vuelve a estar incompleta,
-     * que es exactamente lo que pasó. Hacia abajo, el trigger
-     * `installment_amount_covers_allocations` impide bajar de lo ya
-     * asignado, que es la línea que sí importa.
+     * que es exactamente lo que pasó. Hacia abajo se permite quedar por
+     * debajo de lo asignado: `InstallmentFunding::overAllocated()` expone
+     * el excedente. Liberarlo requiere `UnallocateFunds`, con sus guardas;
+     * corregir la cuota no revierte imputaciones ni recibos por sí solo.
+     * Ver docs/haberes-reglas.md#correccion-y-sobreasignacion.
      *
      * El bloqueo real llega con el **pase de pago**, y ya está puesto:
      * arriba, contra `InstallmentEditLock`. Ahí el expediente sale del

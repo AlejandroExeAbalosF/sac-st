@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Enums;
 
 /**
- * Dónde está un egreso — §9.7 del DER.
+ * Dónde está un egreso — docs/haberes-reglas.md#egreso.
  *
  * Los cinco primeros son etapas de un pago en curso; los dos últimos son
  * finales. La diferencia no es cosmética: mientras el egreso está vivo
@@ -20,10 +20,10 @@ namespace App\Modules\Haberes\Enums;
  * `Confirmed`, porque el beneficiario está enfrente y no hay nada
  * posterior que esperar—.
  *
- * Esta tanda produce únicamente `Confirmed`. El resto se declara entero
- * porque un juego de estados se define de una vez: viven en un `CHECK` de
- * una tabla append-only, y agregarlos de a uno significaría una migración
- * por etapa del circuito.
+ * El mostrador produce `Confirmed`. La transferencia nace `Pending` y
+ * `TransferStage` deriva sus etapas según el informe y el débito; solo
+ * la validación la confirma. Declarar `Reversed` y `Failed` no implica
+ * que exista una operación de interfaz para cada transición.
  */
 enum DisbursementStatus: string
 {

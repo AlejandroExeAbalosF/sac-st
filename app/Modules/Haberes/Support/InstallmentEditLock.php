@@ -11,11 +11,9 @@ use App\Modules\Haberes\Models\PaymentOrder;
 /**
  * Si la cuota se puede editar, y qué la traba.
  *
- * **Hasta el Pase, todo es corregible.** El área lo definió así y el
- * motivo es más fuerte que la conveniencia (Correcciones §33, desvío 5):
- * el recibo de ingreso *copia* lo que imprime al emitirse, así que
- * corregir la cuota después no puede desmentir al papel, porque el papel
- * no la lee. Trabar antes no protegía nada; solo frenaba trabajo.
+ * **Hasta el Pase, todo es corregible.** El recibo de ingreso *copia* lo
+ * que imprime al emitirse, así que corregir la cuota después no desmiente
+ * al papel. Ver docs/haberes-reglas.md#correccion-y-sobreasignacion.
  *
  * **Con el Pase cambia.** El expediente sale del área y el dato entra en
  * circulación: hay una Orden en manos del organismo que dice un importe,

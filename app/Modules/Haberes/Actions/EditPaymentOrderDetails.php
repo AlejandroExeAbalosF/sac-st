@@ -29,7 +29,7 @@ use Illuminate\Validation\ValidationException;
  * | Se edita | No se edita |
  * |---|---|
  * | la foja del CBU —y con ella el `OBS`, que se redacta solo| importe, beneficiario, cuenta |
- * | destinatario y notas del Pase | número, fecha, tipo de Orden |
+ * | destinatario y notas del Pase | número y fecha |
  * | | el recibo de ingreso que referencia |
  *
  * La columna derecha es **la misma que protege el trigger append-only** de

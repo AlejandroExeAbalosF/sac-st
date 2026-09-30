@@ -1,0 +1,210 @@
+# Haberes: reglas y modelo vigente
+
+Complementa el [circuito de Haberes](haberes.md). Describe controles implementados,
+no una aprobación normativa. Cada sección identifica su evidencia; una restricción
+de un Action no debe presentarse como garantía de PostgreSQL sin comprobar su DDL.
+
+<a id="modelo"></a>
+
+## Relaciones principales
+
+| Entidad | Relación y responsabilidad |
+| --- | --- |
+| `expedientes` | Agrupa haberes; referencia al empleador en `people` |
+| `haberes` | Pertenece a un expediente y a un beneficiario; reconoce un importe |
+| `beneficiary_installments` | Pertenece a un haber; distribuye el importe en cuotas |
+| `deposit_tickets` | Evidencia del depósito asociada a la cuota; no es un asiento |
+| `fund_receipts` | Recepción monetaria de Ledger |
+| `funding_allocations` | Une recepción, haber y cuota; conserva asignaciones y reversiones en Haberes |
+| `receipts` | Comprobantes de ingreso/egreso de Shared con snapshots y numeración |
+| `payment_orders` | Solicitud de transferencia de una cuota, con recibo y cuenta de destino |
+| `payment_order_funding_sources` | Conserva los orígenes que respaldan la Orden |
+| `pases` | Nota asociada a la Orden |
+| `disbursements` | Pago al beneficiario: entrega o transferencia validada |
+| `cash_to_bank_transfers` / `cash_to_bank_transfer_items` | Traslado de Banking y sus imputaciones de Haberes |
+
+`financial_events` y `journal_lines` registran los hechos contables. Un ticket,
+una Orden o un informe de transferencia no deben confundirse con el asiento que
+reconoce el ingreso o el egreso. Ledger no depende de los modelos de Haberes.
+
+<a id="identidad-y-plan"></a>
+
+## Identidad y plan de cuotas
+
+- El número canónico del expediente tiene índice único; el ordinal del haber es
+  único dentro del expediente y el de la cuota dentro del haber.
+- Haber y cuota exigen importes positivos. El trigger diferido
+  `beneficiary_installments_sum` verifica, al cambiar cuotas, que la suma de las no
+  anuladas no supere el importe del haber. No exige igualdad mientras el plan se carga.
+- `UpdateInstallment` exige haber y cuota activos, versión vigente y respeto del total.
+  Si reducir una cuota deja saldo en un plan completo, aumenta la cantidad prevista
+  para reflejar una cuota pendiente; rechaza ese caso al alcanzar el máximo de 60.
+
+Evidencia: [esquema de expedientes](../database/migrations/2026_08_11_000000_create_expedientes_tables.php),
+[UpdateInstallment](../app/Modules/Haberes/Actions/UpdateInstallment.php),
+[gestión de cuotas](../tests/Feature/Haberes/GestionarCuotasTest.php) y
+[numeración del haber](../tests/Feature/Haberes/NumeroDelHaberTest.php).
+
+<a id="financiacion"></a>
+
+## Financiación y saldos derivados
+
+`InstallmentFunding` calcula lo asignado neto de reversiones. No hay un contador
+editable del saldo de la cuota. El pendiente es `max(esperado - asignado, 0)`;
+el excedente es `max(asignado - esperado, 0)`. Por ello, `isFullyFunded()` también
+es verdadero cuando hay sobreasignación: significa que no falta dinero.
+
+Los triggers de `funding_allocations` controlan el saldo de la recepción, el tope
+ordinario de la cuota, el medio único, la moneda y que la recepción no esté revertida.
+La FK compuesta asegura que la cuota pertenezca al haber indicado. Las asignaciones
+no se borran ni se reescriben: se compensan mediante filas `reversal`.
+
+El tope excluye `cash_rounding_surplus`, previsto como excepción. Que el esquema
+admita ese tipo no implica que exista una operación de interfaz para reconocer
+cualquier excedente. No confundirlo con `residual_status` de la recepción.
+
+Evidencia: [InstallmentFunding](../app/Modules/Haberes/Support/InstallmentFunding.php),
+[esquema de asignaciones](../database/migrations/2026_08_16_150000_create_funding_allocations_table.php)
+y [financiación de cuota](../tests/Feature/Haberes/FinanciacionDeCuotaTest.php).
+
+<a id="correccion-y-sobreasignacion"></a>
+
+## Corrección, bloqueo y sobreasignación
+
+El trigger `allocation_within_installment` se ejecuta sobre **asignaciones**, no al
+reducir `beneficiary_installments.expected_amount`. La reducción por debajo de lo
+imputado está admitida expresamente por los tests del Action y de escritura directa
+en base.
+La tarjeta recibe `overAllocatedAmount` y muestra el excedente.
+
+La edición se bloquea en la aplicación cuando hay una Orden activa con Pase no anulado.
+`UnlockInstallmentEdit` registra el motivo y abre la ventana; guardar la cierra.
+No basta con tener un recibo emitido para bloquear la cuota.
+
+`UnallocateFunds` exige importe positivo, saldo vigente y motivo; registra una
+reversión con fecha del día, sin editar la imputación original. Rechaza asignaciones
+que respaldan una Orden no rechazada ni anulada, incluidas las completadas, y las
+incluidas en un traslado no cancelado. Los controles del libro también siguen vigentes.
+
+Como la reversión inserta una asignación, vuelve a ejecutar el tope. Si después
+de esa inserción la suma ordinaria todavía supera lo esperado, la base la rechaza.
+La cobertura citada prueba liberar el excedente completo del caso preparado;
+no demuestra que cualquier secuencia de liberaciones parciales sea admisible.
+
+Evidencia: [edición](../app/Modules/Haberes/Actions/UpdateInstallment.php),
+[bloqueo](../app/Modules/Haberes/Support/InstallmentEditLock.php),
+[liberación](../app/Modules/Haberes/Actions/UnallocateFunds.php),
+[cuota con recibo](../tests/Feature/Haberes/CuotaConReciboTest.php),
+[desasignación](../tests/Feature/Haberes/DesasignarFondosTest.php) y
+[visualización del excedente](../resources/js/features/haberes/components/installment-income.tsx).
+
+<a id="recibo-de-ingreso"></a>
+
+## Recibo de ingreso
+
+Se emite con la cuota completamente financiada y conserva los datos impresos
+en snapshots. En mostrador, el cobro y la emisión pueden ser un solo acto atómico;
+la cantidad a cobrar se deriva del pendiente de la cuota. En banco, el ticket
+requiere identificar el crédito y registrar su recepción/asignación.
+
+Una corrección posterior de cuota no modifica el comprobante anterior. Esto explica
+por qué el recibo no congela la cuota; no autoriza editar un recibo emitido.
+
+Evidencia: [cobro y emisión](../app/Modules/Haberes/Actions/CollectAndIssueReceipt.php),
+[emisión](../app/Modules/Haberes/Actions/IssueIncomeReceipt.php),
+[recepción desde ticket](../app/Modules/Haberes/Actions/ReceiveAndAllocateTicket.php),
+[recibo de ingreso](../tests/Feature/Haberes/ReciboDeIngresoTest.php) y
+[conservación del recibo](../tests/Feature/Haberes/CuotaConReciboTest.php).
+
+<a id="canal-de-pago"></a>
+
+## Canal y traslado al banco
+
+`PaymentOrderSources::channel()` deriva el canal: ingreso bancario implica
+transferencia; efectivo/cheque sin traslado vigente implica mostrador; traslado
+acreditado implica transferencia; sin medio conocido o con traslado pendiente,
+el canal es indeterminado.
+
+El traslado no es un ingreso nuevo ni cambia el medio del recibo original.
+Pasa por `CASH_IN_TRANSIT` hasta la confirmación. La condición administrativa
+`blocks_payment` se comprueba para Orden y entrega, no para cobrar.
+
+Evidencia: [canal](../app/Modules/Haberes/Support/PaymentOrderSources.php),
+[traslado](../app/Modules/Haberes/Actions/DepositCashToBank.php),
+[elegibilidad de egreso](../app/Modules/Haberes/Support/DisbursementEligibility.php)
+y [pruebas de traslado](../tests/Feature/Haberes/TrasladoDeEfectivoTest.php).
+
+<a id="orden-y-pase"></a>
+
+## Orden y Pase
+
+`IssuePaymentOrder` crea ambos documentos en una transacción. El importe, las partes
+y los orígenes se derivan en el servidor; los campos elegibles están declarados en
+`IssuePaymentOrderData`. No existe un campo `order_kind` en ese contrato.
+
+PostgreSQL impide más de una Orden activa por cuota y protege los datos monetarios
+y de identidad impresos. `EditPaymentOrderDetails` permite la corrección accesoria;
+`VoidPaymentOrder` anula también el Pase, con motivo y responsable, dentro de sus
+condiciones de admisión. Reemitir enlaza la reemplazada y toma un número nuevo.
+
+El enum distingue estados activos de `completed`, `rejected` y `voided`. La emisión
+usa `draft`, la anulación `voided` y la validación del egreso `completed`. No se debe
+afirmar que todos los estados intermedios declarados tengan una transición expuesta.
+
+Evidencia: [emisión](../app/Modules/Haberes/Actions/IssuePaymentOrder.php),
+[datos de emisión](../app/Modules/Haberes/Data/IssuePaymentOrderData.php),
+[corrección](../app/Modules/Haberes/Actions/EditPaymentOrderDetails.php),
+[anulación](../app/Modules/Haberes/Actions/VoidPaymentOrder.php),
+[esquema de órdenes](../database/migrations/2026_08_29_110000_create_payment_orders_table.php)
+y [pruebas de Orden](../tests/Feature/Haberes/OrdenDePagoTest.php).
+
+<a id="foja-cbu"></a>
+
+## Foja del CBU y OBS
+
+La misma foja alimenta el Pase y la observación de la Orden mediante
+`PaymentOrderObservation`. El formulario de emisión exige la foja; la vista previa
+admite un borrador incompleto. No se acepta un OBS independiente que contradiga la foja.
+
+Evidencia: [composición](../app/Modules/Haberes/Support/PaymentOrderObservation.php),
+[validación de emisión](../app/Modules/Haberes/Http/Requests/IssuePaymentOrderRequest.php)
+y [validación de corrección](../app/Modules/Haberes/Http/Requests/EditPaymentOrderDetailsRequest.php).
+
+<a id="egreso"></a>
+
+## Egreso, confirmación y recibo
+
+Por mostrador, la entrega genera el egreso confirmado. Por transferencia,
+`TransferStage` distingue `pending`, `report_received`, `bank_debit_observed` y
+`ready_for_validation` según la presencia del informe y del débito. Ambos pueden
+llegar en cualquier orden. `confirmed` requiere el acto de validación.
+
+`ValidateTransferDisbursement` registra el asiento, la imputación al débito bancario,
+la confirmación del egreso, la cuota `paid` y la Orden `completed`. La fecha contable
+se toma del débito. No se debe confundir la etapa del egreso con el estado de la Orden.
+
+PostgreSQL exige Orden en la transferencia y datos de informe, validación y débito
+para confirmarla; impide más de un egreso vivo por cuota. `confirmed` sigue siendo
+un estado vivo para esa unicidad. El recibo de egreso requiere un egreso confirmado
+y solo puede existir uno vigente por cuota. Los estados `reversed` y `failed` están
+declarados; eso no demuestra por sí solo un circuito completo de reversión expuesto.
+
+Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
+[validación](../app/Modules/Haberes/Actions/ValidateTransferDisbursement.php),
+[esquema de egresos](../database/migrations/2026_08_30_100000_create_disbursements_table.php),
+[egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php) y
+[egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php).
+
+<a id="mantenimiento"></a>
+
+## Cómo mantener esta referencia
+
+Actualizar regla, evidencia y cobertura en la misma tanda cuando cambie el circuito.
+Conservar las anclas explícitas aunque se reordenen las secciones. Las migraciones
+prueban el esquema esperado; no certifican por sí solas el esquema desplegado.
+Una nueva decisión del área debe registrar su fuente y su estado de implementación.
+La ausencia de una función en la interfaz no se deduce de la sola presencia de un enum.
+
+El DER y Correcciones quedan como antecedentes para las reglas consolidadas, y como
+referencias todavía necesarias para los temas no cubiertos. No borrar una cita
+histórica hasta tener un destino que conserve su regla y su justificación.

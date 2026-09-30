@@ -106,7 +106,7 @@ Route::middleware(['auth', 'verified'])->prefix('recepciones')->name('recepcione
     });
 
     /*
-     * El alta a mano no existe — desvío 47.
+     * El alta a mano no está expuesta — docs/haberes.md#ingreso-y-recibo.
      *
      * Un crédito sin comprobante se deja pendiente en el extracto hasta que
      * aparece el expediente, que es como trabaja el área; cuando aparece, el
@@ -562,7 +562,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
          * Corregir lo accesorio del documento —la observación, la foja del
          * CBU, el destinatario de la nota—. Va con el mismo permiso que
          * emitir porque es el mismo acto de preparar el papel, y es el
-         * camino normal cuando algo está mal: el área no anula, aclara.
+         * camino para aclarar datos accesorios. Cuando corresponde anular
+         * la Orden se usa la operación específica, con su propio permiso.
+         * Ver docs/haberes-reglas.md#orden-y-pase.
          */
         Route::patch('ordenes/{order}', [PaymentOrderController::class, 'update'])
             ->whereNumber('order')

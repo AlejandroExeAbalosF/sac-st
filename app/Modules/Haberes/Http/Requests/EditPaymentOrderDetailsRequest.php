@@ -48,8 +48,9 @@ final class EditPaymentOrderDetailsRequest extends FormRequest
             /*
              * El OBS de la Orden no está acá porque no se recibe: lo
              * redacta `PaymentOrderObservation` desde esta misma foja
-             * (D-003, §47). Aceptarlo por separado dejaría que el renglón
-             * impreso citara una foja distinta de la que la nota cita.
+             * (docs/haberes-reglas.md#foja-cbu). Aceptarlo por separado
+             * dejaría que el renglón impreso citara una foja distinta de la
+             * que la nota cita.
              */
             'cbuFolio' => ['required', 'string', 'max:40'],
             'paseDestination' => ['nullable', 'string', 'max:160'],
