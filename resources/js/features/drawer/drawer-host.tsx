@@ -31,7 +31,7 @@ export default function DrawerHost() {
                 className="w-full gap-0 overflow-y-auto sm:max-w-md"
             >
                 {/*
-                 * La `key` no es cosmética: abrir otro sujeto sin cerrar
+                 * Con la `key`, abrir otro sujeto sin cerrar
                  * el panel remonta el cuerpo en lugar de reusarlo, y así
                  * el estado de carga arranca limpio sin que el efecto
                  * tenga que resetearlo a mano. Incluye el `kind` porque

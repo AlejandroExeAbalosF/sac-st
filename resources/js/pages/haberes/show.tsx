@@ -78,9 +78,8 @@ export default function MostrarExpediente({
     /*
      * La comparación contra el total declarado.
      *
-     * El aviso mostraba solo el declarado, así que decía «no coinciden» sin
-     * dar con qué comparar: había que ir a buscar el otro número y restarlo
-     * a mano para saber si el que estaba mal era el acta o la carga.
+     * El aviso da la diferencia: con un «no coinciden» a secas habría que
+     * restar a mano para saber si lo que está mal es el acta o la carga.
      */
     const contraDeclarado = isNonZero(expediente.declaredTotalAmount)
         ? compareAmounts(

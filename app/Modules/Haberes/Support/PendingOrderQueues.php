@@ -115,7 +115,7 @@ final class PendingOrderQueues
      * La suma neta de reversiones es la misma expresión que usa
      * `InstallmentFunding::allocatedForMany()`, y se repite en SQL porque
      * traer todas las cuotas del sistema para filtrarlas en PHP sería
-     * exactamente lo que este método evita.
+     * lo que este método evita.
      *
      * @return Collection<int, BeneficiaryInstallment>
      */

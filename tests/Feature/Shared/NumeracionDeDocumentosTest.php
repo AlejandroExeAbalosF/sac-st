@@ -33,8 +33,8 @@ class NumeracionDeDocumentosTest extends TestCase
      * Una serie por tipo de comprobante, no dos.
      *
      * Había una serie extra por tipo para los comprobantes cargados del
-     * talonario, y se retiró cuando el área confirmó que **el número del
-     * sistema es siempre el identificador**: el del papel se registra al
+     * talonario, y se retiró: **el número del sistema es siempre el
+     * identificador**, y el del papel se registra al
      * lado, en `receipts.talonario_number`. Dos correlativos para el
      * mismo documento volvían cada reporte una suma de series.
      */
@@ -85,7 +85,7 @@ class NumeracionDeDocumentosTest extends TestCase
      * tiempo se lleven el mismo número. La concurrencia real no se puede
      * reproducir acá —`RefreshDatabase` mantiene todo dentro de una
      * transacción y una segunda conexión no vería estos datos—, así que se
-     * verifica lo que sí es verificable y es exactamente lo que importa:
+     * verifica lo que sí es verificable y es lo que importa:
      * que el bloqueo esté en la consulta.
      *
      * Sin `FOR UPDATE` este test pasa a rojo, que es su razón de existir.

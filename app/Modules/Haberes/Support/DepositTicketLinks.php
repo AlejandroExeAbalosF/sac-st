@@ -26,11 +26,7 @@ final class DepositTicketLinks
     /**
      * La recepción ya registrada del crédito que cruzó cada ticket.
      *
-     * **Cruzar el ticket y registrar la recepción son dos actos**, y desde
-     * la tarjeta se ven iguales: en los dos casos el papel figura
-     * «encontrado en el extracto». Sin esto, la pantalla no puede
-     * distinguir «falta registrar» de «falta asignar», y el cartel que
-     * dice qué hacer termina diciendo lo que no es. Pasó.
+     * Para qué sirve: ver `InstallmentTicketData`.
      *
      * @param  list<int>  $installmentIds
      * @return array<int, int> id de ticket => id de recepción

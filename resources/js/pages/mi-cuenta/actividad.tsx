@@ -22,9 +22,7 @@ type Props = {
  *
  * Es la pantalla que le permite al titular ver lo que nadie más puede
  * confirmar por él: si ese ingreso del sábado a las 23:10 fue suyo. Los
- * datos se venían escribiendo en `user_login_events` desde el primer día,
- * append-only y con trigger; hasta ahora solo se asomaban en las últimas
- * cinco filas del tablero.
+ * datos salen de `user_login_events`, append-only y con trigger.
  */
 export default function Actividad({ sessions, events }: Props) {
     const otras = sessions.filter((session) => !session.isCurrent).length;

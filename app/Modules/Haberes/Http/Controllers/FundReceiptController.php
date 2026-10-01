@@ -230,12 +230,11 @@ final class FundReceiptController extends Controller
     /**
      * El expediente que el operador buscó, solo si no hay dudas de cuál es.
      *
-     * Antes se tomaba el primero que contuviera lo tipeado. Con un número
-     * incompleto —o con `%`, que era un comodín— aparecían las cuotas de
-     * un expediente cualquiera, listas para recibir dinero de un tercero.
-     * Ahora manda la coincidencia exacta; si no la hay, una parcial sirve
-     * solo cuando es única. Si hay varias, no se ofrece nada y el operador
-     * afina la búsqueda.
+     * Manda la coincidencia exacta; si no la hay, una parcial sirve solo
+     * cuando es única. Si hay varias, no se ofrece nada y el operador afina
+     * la búsqueda. Tomar la primera parcial ofrecería, ante un número
+     * incompleto, las cuotas de un expediente cualquiera listas para recibir
+     * dinero de un tercero.
      */
     private function expedienteBuscado(string $buscado): ?int
     {

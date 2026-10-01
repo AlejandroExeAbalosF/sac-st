@@ -19,7 +19,7 @@ use Tests\TestCase;
  * Lo que protege: el correlativo y el comprobante que lo usa tienen que
  * confirmarse juntos. Si el número se toma fuera de una transacción y la
  * emisión falla después, queda un número consumido sin documento — y un
- * hueco en la numeración de comprobantes es exactamente lo que una
+ * hueco en la numeración de comprobantes es lo que una
  * auditoría pregunta.
  */
 class NumeroSinTransaccionTest extends TestCase

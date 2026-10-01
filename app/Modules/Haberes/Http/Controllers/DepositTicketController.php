@@ -113,10 +113,10 @@ final class DepositTicketController extends Controller
     /**
      * La carga del comprobante que trajo el expediente.
      *
-     * Entra por la cuota y no por el expediente, y de ahí sale todo lo que
-     * antes era un campo: el beneficiario, el importe reconocido y el tipo
-     * de depósito. Preguntarlos era ofrecer contradecir a la dirección por
-     * la que se entró, y esa contradicción no tenía quién la arbitrara.
+     * Entra por la cuota y no por el expediente, y de ahí salen el
+     * beneficiario, el importe reconocido y el tipo de depósito.
+     * Preguntarlos sería ofrecer contradecir a la dirección por la que se
+     * entró.
      */
     public function create(BeneficiaryInstallment $installment): Response
     {

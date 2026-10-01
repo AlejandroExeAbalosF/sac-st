@@ -16,12 +16,12 @@ use Illuminate\Contracts\View\View;
  *
  * **Es una nota, no un formulario**: párrafos corridos con los datos
  * embebidos, y por eso su plantilla no se parece a la de la Orden. El
- * texto es fijo —el área lo confirmó— y lo que cambia son el destinatario,
+ * texto es fijo y lo que cambia son el destinatario,
  * la referencia del expediente, el beneficiario, el importe y la foja
  * donde el CBU está informado.
  *
- * **La firma va en blanco.** El área pidió expresamente que salga así,
- * para que la firme quien corresponda; el sistema no puede afirmar quién
+ * **La firma va en blanco**, para que la firme quien corresponda: el
+ * sistema no puede afirmar quién
  * lo hizo hasta que alguien se lo diga.
  *
  * **El membrete también.** El lugar está reservado y dibuja un marcador

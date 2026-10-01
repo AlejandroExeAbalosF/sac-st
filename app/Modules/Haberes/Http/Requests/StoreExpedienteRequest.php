@@ -13,17 +13,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 /**
- * Alta de un expediente, sin sus haberes.
- *
- * Los haberes se agregan después, desde el detalle. No es una concesión:
- * es cómo llega el trabajo. El expediente vuelve con el tiempo trayendo el
- * ticket de la cuota siguiente, así que el sistema tiene que saber abrir
- * uno ya cargado y completarlo. Ese camino hay que construirlo igual, y el
- * alta usa el mismo en lugar de uno propio.
- *
- * El costo asumido: puede quedar un expediente sin ningún haber si alguien
- * abandona a mitad. No hace daño —no mueve plata— y el listado los deja a
- * la vista para completarlos o descartarlos.
+ * Alta de un expediente, sin sus haberes. El porqué, en `CreateExpediente`.
  */
 final class StoreExpedienteRequest extends FormRequest
 {

@@ -9,7 +9,7 @@ namespace App\Modules\Shared\Enums;
  *
  * El de ingreso documenta que el dinero entró y de quién; el de egreso,
  * que salió y hacia quién. Son documentos distintos con numeración
- * distinta, y por eso el tipo no es un detalle de presentación.
+ * distinta.
  */
 enum ReceiptType: string
 {

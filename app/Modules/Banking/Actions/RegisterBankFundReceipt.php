@@ -25,9 +25,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Convierte un crédito bancario en dinero asentado.
  *
- * Es el paso que faltaba. Hasta acá el sistema sabía que el banco informó
- * un crédito y que un ticket lo respalda; a partir de acá ese dinero
- * existe en los libros:
+ * Antes de este paso el sistema sabe que el banco informó un crédito y que
+ * un ticket lo respalda; a partir de acá ese dinero existe en los libros:
  *
  * ```text
  *   Débito   BANK_ACCOUNT       está en la cuenta

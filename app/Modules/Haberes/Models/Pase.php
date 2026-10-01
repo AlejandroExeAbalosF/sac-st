@@ -17,8 +17,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * la Orden de Pago y esta nota, que se generan juntas para una cuota ya
  * financiada.
  *
- * No lleva número propio: el área confirmó que la nota real se identifica
- * por el número de su Orden. `reference_number` queda nulo, previsto por
+ * No lleva número propio: la nota se identifica por el número de su
+ * Orden. `reference_number` queda nulo, previsto por
  * el DER para el día en que eso cambie.
  *
  * @property int $id

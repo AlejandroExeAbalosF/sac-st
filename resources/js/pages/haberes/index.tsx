@@ -239,13 +239,6 @@ export default function HaberesIndex({
                                             >
                                                 Reconocido
                                             </th>
-                                            {/*
-                                             * «Ingresado» y no «Financiado»:
-                                             * es plata que entró y está en
-                                             * la caja, no plata entregada al
-                                             * beneficiario. El rótulo viejo
-                                             * se leía como lo segundo.
-                                             */}
                                             <th
                                                 scope="col"
                                                 className="py-2.5 pr-5 text-right font-medium"

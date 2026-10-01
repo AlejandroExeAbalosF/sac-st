@@ -9,7 +9,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Dejar un movimiento fuera del circuito exige explicar por qué.
  *
- * El mínimo de caracteres no es burocracia: «ok» o «no» dentro de seis
+ * Hay un mínimo de caracteres: «ok» o «no» dentro de seis
  * meses no le dicen nada a quien audite por qué ese débito nunca se
  * imputó. La base ya impide que el motivo falte; esto impide que sea
  * inútil.

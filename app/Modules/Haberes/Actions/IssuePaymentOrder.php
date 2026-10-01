@@ -50,7 +50,7 @@ use Illuminate\Validation\ValidationException;
  * Es la misma regla que rige el recibo de ingreso
  * (docs/haberes-reglas.md#recibo-de-ingreso): un importe propuesto por el
  * navegador en un documento que le pide a otro organismo que transfiera
- * dinero es exactamente la clase de dato que no puede venir de afuera.
+ * dinero es la clase de dato que no puede venir de afuera.
  *
  * ── Qué congela ────────────────────────────────────────────────────────
  *
@@ -300,10 +300,8 @@ final class IssuePaymentOrder
             'treasurer_title_snapshot' => $firmante?->position,
 
             /*
-             * El OBS no llega del formulario: es la foja, redactada. El
-             * área confirmó que ahí no se escribe nada más (D-003), y
-             * escribirla dos veces era la forma segura de que alguna vez
-             * no coincidieran.
+             * El OBS no llega del formulario: es la foja, redactada, y no
+             * lleva nada más. Ver `PaymentOrderObservation`.
              */
             'notes' => PaymentOrderObservation::forFolio($data->cbuFolio),
         ];

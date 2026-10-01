@@ -178,14 +178,11 @@ trait ValidatesPersonDocuments
         $identificador = null;
 
         /*
-         * El expediente muchas veces trae el CUIL y no el DNI. Hasta ahora
-         * el operador tenía que sacarle el prefijo y el verificador a mano:
-         * una cuenta mental por cada carga, y una que el sistema no puede
-         * auditar, porque ocho dígitos mal copiados siguen siendo un DNI
-         * válido. Si lo que llegó es un CUIL que cierra, se guardan los
-         * dos: el DNI, que es la identidad, y el número entero, porque el
-         * prefijo no se puede reconstruir a partir del DNI. Si no cierra,
-         * queda como vino y la validación lo dice con todas las letras.
+         * El expediente muchas veces trae el CUIL y no el DNI: ver `Cuit`.
+         * Si lo que llegó es un CUIL que cierra, se guardan los dos: el DNI,
+         * que es la identidad, y el número entero, porque el prefijo no se
+         * puede reconstruir a partir del DNI. Si no cierra, queda como vino
+         * y la validación lo dice con todas las letras.
          */
         if ($tipo === 'individual' && $documento !== null) {
             $dni = Cuit::toDocumentNumber($documento);

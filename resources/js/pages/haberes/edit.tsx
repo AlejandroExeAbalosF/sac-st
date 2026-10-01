@@ -33,15 +33,10 @@ type Props = {
 /**
  * Corrección de la ficha del expediente.
  *
- * Existe por el caso concreto que la destapó: un total declarado cargado
- * mal deja al expediente avisando para siempre que lo reconocido no
- * coincide, sin forma de resolverlo salvo tocando la base.
+ * Sin ella, un total declarado cargado mal deja al expediente avisando
+ * para siempre que lo reconocido no coincide.
  *
- * El número no está entre los campos, y es deliberado. El número es la
- * identidad del expediente: por él lo busca el operador, sobre él hay un
- * índice único y a él apuntan los eventos de auditoría. Un número
- * equivocado no es una ficha con un error —es otro expediente—, y eso se
- * resuelve anulando y cargando el correcto.
+ * El número no está entre los campos: ver `UpdateExpediente`.
  */
 export default function EditarExpediente({ expediente, empleadores }: Props) {
     const { data, setData, patch, transform, processing, errors } = useForm({

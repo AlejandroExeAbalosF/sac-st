@@ -34,8 +34,8 @@ final readonly class PaymentOrderPrintData
          * El renglón «FECHA» del bloque de la derecha.
          *
          * Es la fecha del depósito, la misma que abre el cuadro de abajo.
-         * El área confirmó que los dos lugares dicen lo mismo; se resuelve
-         * acá una vez para que no puedan discrepar.
+         * Se resuelve acá una vez para que los dos lugares no puedan
+         * discrepar.
          */
         public ?string $fechaBanco = null,
     ) {}

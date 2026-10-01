@@ -18,11 +18,8 @@ class ProfileController extends Controller
     /**
      * Los datos propios.
      *
-     * Van también los que el usuario **no** puede cambiar —nombre de
-     * usuario, DNI, cargo y rol—, en solo lectura. Mostrarlos no es
-     * decorativo: el rol es con lo que opera, el cargo es lo que se imprime
-     * al pie de los recibos que firma, y hasta ahora no tenía dónde
-     * verlos. La pantalla dice quién los asigna, así que nadie los busca.
+     * Van también los que el usuario **no** puede cambiar, en solo
+     * lectura y con quién los asigna: ver la página `mi-cuenta/perfil`.
      */
     public function edit(Request $request): Response
     {

@@ -12,8 +12,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 /**
  * La nota de Pase, tal como la muestra la tarjeta de la cuota.
  *
- * Sin número propio: el área confirmó que la nota se identifica por el
- * número de su Orden, así que la pantalla la nombra por ahí.
+ * Sin número propio: la nota se identifica por el número de su Orden,
+ * así que la pantalla la nombra por ahí.
  */
 #[TypeScript]
 final class PaseSummaryData extends Data

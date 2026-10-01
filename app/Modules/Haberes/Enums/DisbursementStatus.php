@@ -8,7 +8,7 @@ namespace App\Modules\Haberes\Enums;
  * Dónde está un egreso — docs/haberes-reglas.md#egreso.
  *
  * Los cinco primeros son etapas de un pago en curso; los dos últimos son
- * finales. La diferencia no es cosmética: mientras el egreso está vivo
+ * finales. Mientras el egreso está vivo
  * **ocupa el lugar de su cuota** y no puede haber otro, porque serían dos
  * pagos por el mismo dinero. Lo impone un índice único parcial que enumera
  * exactamente los mismos estados que `isLive()`.

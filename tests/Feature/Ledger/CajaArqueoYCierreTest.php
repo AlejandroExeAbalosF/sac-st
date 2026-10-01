@@ -776,8 +776,8 @@ class CajaArqueoYCierreTest extends TestCase
      * **El cierre congela el saldo del libro, no el contado.** Cerrar con
      * la diferencia sin resolver dejaba el día archivado diciendo que
      * había una plata que el conteo no encontró, y limpiarlo después
-     * obliga a reabrir el período. El área definió que el día se cierra
-     * con el arqueo resuelto: o cuadra, o la diferencia se imputó.
+     * obliga a reabrir el período. El día se cierra con el arqueo
+     * resuelto: o cuadra, o la diferencia se imputó.
      */
     public function test_el_dia_no_cierra_con_una_diferencia_sin_imputar(): void
     {

@@ -51,8 +51,8 @@ final class SaveBankAccountRequest extends FormRequest
     /**
      * La moneda se congela apenas la cuenta tiene movimientos.
      *
-     * Los movimientos no llevan moneda propia: la heredan de la cuenta
-     * (§4.4 del DER). Cambiarla acá reinterpretaría todos los importes ya
+     * Los movimientos no llevan moneda propia: la heredan de la cuenta.
+     * Cambiarla acá reinterpretaría todos los importes ya
      * importados. La base lo impide con un trigger; esto existe para que
      * el operador reciba una explicación en vez de una excepción.
      *

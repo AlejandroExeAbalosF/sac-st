@@ -166,7 +166,7 @@ class HandleInertiaRequests extends Middleware
              * que decide las cabeceras. El front la usa para avisar cuando
              * alguien enmarca un documento sin declararlo: sin eso el
              * navegador descarta la respuesta y el visor queda en blanco
-             * sin ningún error del lado del servidor. Pasó tres veces.
+             * sin ningún error del lado del servidor.
              *
              * Se comparte la plantilla y no el nombre de la ruta porque lo
              * que el componente tiene en la mano es una URL. Cotejar lo

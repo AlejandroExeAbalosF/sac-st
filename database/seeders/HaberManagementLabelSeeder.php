@@ -19,7 +19,7 @@ use Illuminate\Database\Seeder;
  * el día que se lo quiso apagar para probar el sistema desde cero, apagarlo
  * se llevaba puesto el catálogo.
  *
- * Van sin marca de bloqueo: el área definió que por ahora son informativas.
+ * Van sin marca de bloqueo: por ahora son informativas.
  * `T.CONC.` y `T.CONOC.` son el mismo código escrito de dos formas en la
  * planilla; se unifica en `T.CONOC.`.
  */

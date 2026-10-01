@@ -17,7 +17,7 @@ use Carbon\CarbonInterface;
  *
  * **No es un comprobante.** No se numera, no toca `document_series` y
  * pedirla dos veces el mismo día da resultados distintos porque entre
- * medio se trabajó. Por eso `generatedAt` no es decorativo: es lo único
+ * medio se trabajó. Por eso lleva `generatedAt`: es lo único
  * que le dice a quien la tiene en la mano a qué momento corresponde.
  */
 final class WorksheetData

@@ -16,7 +16,7 @@ use Illuminate\Http\JsonResponse;
  * Suele tener poco que contar, y eso **es** la respuesta: un haber se
  * reconoce, se anula y se reactiva, pero no se corrige —lo que se corrige
  * son sus cuotas, que tienen su propio historial—. Que la lista sea corta
- * dice que nadie tocó el derecho reconocido, que es exactamente lo que
+ * dice que nadie tocó el derecho reconocido, que es lo que
  * alguien viene a comprobar.
  */
 final class HaberHistoryController extends Controller

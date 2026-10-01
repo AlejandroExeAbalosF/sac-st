@@ -55,7 +55,7 @@ final class PostJournalEntry
          * `financial_events_reversal_check` y
          * `financial_events_reversal_reason_check`. Una reversión sin
          * motivo sería un asiento que mueve plata sin decir a cuenta de
-         * qué, y eso es exactamente lo que el rastro existe para evitar.
+         * qué, y eso es lo que el rastro existe para evitar.
          */
         ?int $reversalOfId = null,
         ?string $reversalReason = null,

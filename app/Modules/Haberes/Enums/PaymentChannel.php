@@ -10,7 +10,7 @@ namespace App\Modules\Haberes\Enums;
  * **No es el medio por el que entró.** El §2.4.6 del DER lo dice sin
  * rodeos: *«cómo entró el dinero y cómo sale son independientes»*. Entrar
  * en efectivo y salir por transferencia es la combinación habitual, y es
- * exactamente lo que pasa cuando el beneficiario no se presenta y la
+ * lo que pasa cuando el beneficiario no se presenta y la
  * contadora deposita.
  *
  * De este canal depende que exista o no la Orden de Pago: el mostrador se
@@ -41,8 +41,8 @@ enum PaymentChannel: string
      *
      * Va a ser `Transfer`, pero no lo es aún. Es la ventana de
      * `CASH_IN_TRANSIT`, y ofrecer la Orden acá sería pedirle al organismo
-     * que transfiera plata que su cuenta todavía no tiene: el área
-     * confirmó que la Orden se habilita *«cuando esté acreditado»*.
+     * que transfiera plata que su cuenta todavía no tiene. La Orden se
+     * habilita cuando el dinero está acreditado.
      */
     case Undetermined = 'undetermined';
 

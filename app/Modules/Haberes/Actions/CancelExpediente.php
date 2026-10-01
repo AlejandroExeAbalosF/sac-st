@@ -59,7 +59,7 @@ final class CancelExpediente
              * Sin esto la anulación no tiene vuelta atrás fiel: reactivar
              * dejaría todo en «activo», y un haber que estaba cerrado o
              * bloqueado volvería como si nunca lo hubiera estado. Vive en la
-             * auditoría porque es exactamente lo que la auditoría registra
+             * auditoría porque es lo que la auditoría registra
              * —el estado previo—, no un campo nuevo que haya que mantener.
              */
             /** @var list<array{id:int,workflow_status:string,block_reason:string|null}> $haberes */

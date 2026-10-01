@@ -19,7 +19,7 @@ use Carbon\CarbonImmutable;
  * **La casilla no es una firma.** El papel que el beneficiario firma es el
  * recibo de egreso, y el pie de la planilla lo dice: si la marca de esta
  * hoja valiera como constancia, alguien terminaría dando por entregado un
- * dinero sin comprobante que lo respalde, que es exactamente lo que el
+ * dinero sin comprobante que lo respalde, que es lo que el
  * circuito existe para evitar.
  */
 final class CounterPayoutSheet

@@ -290,7 +290,7 @@ function OrdenEmitida({
 
                 {/*
                  * Corregir va antes que anular. Los dos son caminos
-                 * válidos y el área definió que elige quien opera, así que
+                 * válidos y elige quien opera, así que
                  * el criterio del orden no es cuál se usa más: es que
                  * entre dos opciones legítimas, la que no destruye nada se
                  * ofrece primero.

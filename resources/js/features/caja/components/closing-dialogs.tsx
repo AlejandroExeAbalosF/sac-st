@@ -417,13 +417,13 @@ export function DialogoCierre({
                     </div>
 
                     {/*
-                     * Ya no es un aviso: es lo que va a impedir el cierre.
+                     * No es un aviso: es lo que va a impedir el cierre.
                      *
-                     * Los totales del mes se calculan sobre el libro, así
-                     * que cerraban igual aunque ninguna jornada hubiera
-                     * pasado por su arqueo — y el control diario, que es
-                     * donde se detecta un faltante, quedaba salteado. El
-                     * área definió que el mes exige sus días cerrados.
+                     * Los totales del mes se calculan sobre el libro y
+                     * cerrarían aunque ninguna jornada hubiera pasado por
+                     * su arqueo, salteando el control diario, que es donde
+                     * se detecta un faltante. El mes exige sus días
+                     * cerrados.
                      */}
                     {diasPendientes > 0 && (
                         <p className="flex items-start gap-2 rounded-md border border-warning-soft bg-warning-soft px-3 py-2 text-xs text-warning-strong">

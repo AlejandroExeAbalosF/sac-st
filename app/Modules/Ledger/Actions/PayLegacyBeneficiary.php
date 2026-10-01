@@ -29,10 +29,9 @@ use Illuminate\Validation\ValidationException;
  *
  * **Es la única salida de `LEGACY_FUNDS`**, y sin ella esa cuenta sube y
  * no baja jamás: la apertura la acredita con todo el saldo que ya estaba en
- * el cajón, y hasta acá nada la debitaba. En la práctica eso significaba
- * que los expedientes anteriores al arranque no se podían pagar desde el
- * sistema y el área tenía que seguir con la planilla en paralelo —
- * exactamente lo que la apertura vino a evitar.
+ * el cajón. Sin esta salida, los expedientes anteriores al arranque no se
+ * podrían pagar desde el sistema y el área seguiría con la planilla en
+ * paralelo.
  *
  * ```text
  * Débito   LEGACY_FUNDS      baja lo que se debía del sistema anterior
@@ -154,7 +153,7 @@ final class PayLegacyBeneficiary
                 'beneficiary_document_snapshot' => $beneficiary->document,
                 /*
                  * La referencia al registro manual va donde iría el número
-                 * de expediente, que es exactamente lo que es: el
+                 * de expediente, porque eso es: el
                  * identificador del caso en el sistema que este reemplaza.
                  */
                 'expediente_number_snapshot' => $referencia,

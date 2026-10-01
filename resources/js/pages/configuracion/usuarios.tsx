@@ -37,8 +37,6 @@ type Props = {
 /**
  * Los usuarios del sistema.
  *
- * Hasta que existió esta pantalla, dar de alta a alguien exigía `tinker`.
- *
  * No hay botón de borrar y no es un olvido: un usuario que registró una
  * recepción o validó un egreso tiene que seguir siendo identificable para
  * siempre. Lo que se hace es desactivarlo, que le impide entrar sin tocar

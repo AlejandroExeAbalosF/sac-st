@@ -56,7 +56,7 @@ class MotorContableTest extends TestCase
                 $this->lineaCruda($evento, LedgerAccount::UnassignedFunds, credit: '50000.00');
 
                 // Las dos líneas entraron con el asiento desbalanceado: es
-                // exactamente lo que un trigger diferido tiene que permitir.
+                // lo que un trigger diferido tiene que permitir.
                 $lineasInsertadas = true;
 
                 $this->confirmar();

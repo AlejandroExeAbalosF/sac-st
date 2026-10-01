@@ -44,8 +44,8 @@ return new class extends Migration
      *
      * `blocks_payment` es lo que le da consecuencia a la etiqueta: cambiarla
      * es la acción que bloquea o libera el pago, sin dos campos que
-     * mantener sincronizados. Hoy todas van en `false` porque el área
-     * definió que por ahora son informativas.
+     * mantener sincronizados. Hoy todas van en `false`: por ahora son
+     * informativas.
      */
     private function createLabels(): void
     {

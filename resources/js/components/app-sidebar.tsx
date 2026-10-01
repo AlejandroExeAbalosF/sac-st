@@ -103,9 +103,7 @@ const navGroups: NavGroup[] = [
              * Y acá cierra el recorrido: contar el cajón y cerrar el día.
              * Va último porque es lo último que pasa, no porque importe
              * menos. Es un acordeón porque el módulo tiene varias pantallas
-             * hermanas —el día, los arqueos, los cierres, el calendario— y
-             * hasta ahora se saltaba entre ellas por botones adentro de
-             * cada una. La primera sub-pantalla lleva a donde iba «Caja».
+             * hermanas: el día, los arqueos, los cierres, el calendario.
              */
             {
                 title: 'Caja',
@@ -137,11 +135,10 @@ const navGroups: NavGroup[] = [
                 icon: Landmark,
             },
             /*
-             * «Configuración» dejó de apuntar al perfil propio. Es un
-             * acordeón, igual que Caja, porque agrupa varias pantallas
-             * hermanas y su título no es ninguna de ellas; la cuenta
-             * personal se movió al menú del encabezado, que es donde el
-             * operador la busca.
+             * «Configuración» es un acordeón, igual que Caja, porque agrupa
+             * varias pantallas hermanas y su título no es ninguna de ellas.
+             * La cuenta personal está en el menú del encabezado, que es
+             * donde el operador la busca.
              */
             {
                 title: 'Configuración',
@@ -240,9 +237,8 @@ export function AppSidebar() {
             </SidebarHeader>
 
             {/*
-             * Sin pie: la cuenta se mudó al encabezado (ver UserMenu). La
-             * barra queda siendo solo navegación, que es lo único que le
-             * corresponde.
+             * Sin pie: la cuenta está en el encabezado (ver UserMenu). La
+             * barra es solo navegación, que es lo único que le corresponde.
              */}
             <SidebarContent className="gap-4">
                 <NavMain groups={grupos} />

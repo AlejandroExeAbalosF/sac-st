@@ -18,8 +18,8 @@ use App\Support\Money\Decimal;
  *
  * **Por qué importa acá y no en cualquier sistema.** El operador descarga
  * «Últimos movimientos» a mano. Si se saltea una semana e importa la
- * siguiente, hasta ahora nada lo delataba, y un crédito faltante no es un
- * dato perdido: es un empleador que depositó, una cuota que nunca queda
+ * siguiente, un crédito faltante no es un dato perdido: es un empleador
+ * que depositó, una cuota que nunca queda
  * financiada y un trabajador que no cobra sin que nadie sepa por qué.
  *
  * **Advierte, no rechaza.** Un salto no significa que este archivo esté

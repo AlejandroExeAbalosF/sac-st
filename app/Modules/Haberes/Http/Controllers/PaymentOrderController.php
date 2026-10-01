@@ -177,9 +177,8 @@ final class PaymentOrderController extends Controller
     /**
      * Anula la Orden y su Pase, con motivo.
      *
-     * **Es el camino de la Orden devuelta.** El área lo confirmó: *«la
-     * orden de pago devuelta queda anulada; se genera una nueva orden de
-     * pago»*. También es la única salida cuando lo que está mal es el
+     * **Es el camino de la Orden devuelta:** queda anulada y se genera una
+     * nueva. También es la única salida cuando lo que está mal es el
      * dinero o las partes, que la base no deja editar.
      *
      * Queda después de corregir en la pantalla —no antes— porque entre dos

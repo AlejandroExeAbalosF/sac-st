@@ -18,8 +18,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Imputa contablemente una diferencia de arqueo.
  *
- * **Es opcional y deliberadamente aparte del arqueo.** El §4.1 del DER deja
- * abierto si el área ajusta la diferencia o solo la documenta, y las dos
+ * **Es opcional y deliberadamente aparte del arqueo.** Sigue sin confirmar
+ * si el área ajusta la diferencia o solo la documenta, y las dos
  * prácticas son legítimas: documentar deja el libro diciendo lo que debería
  * haber y la realidad diciendo otra cosa; ajustar hace que el libro
  * describa el cajón real y traslada la explicación a `CASH_DIFFERENCE`.

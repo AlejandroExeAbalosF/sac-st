@@ -18,7 +18,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * tiene —expediente, empleador, beneficiario— y con lo que el formulario
  * de corrección necesita y aquel no lleva: la cuenta y la terminal.
  *
- * La diferencia no es cosmética: traer el DTO completo obligaría a cargar
+ * Traer el DTO completo obligaría a cargar
  * expediente y empleador **por cada cuota** de un plan que puede tener
  * sesenta, para repetir sesenta veces un dato que está en el encabezado.
  */

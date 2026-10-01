@@ -513,7 +513,7 @@ class OrdenDePagoTest extends TestCase
      * Se había relajado porque frenaba la emisión cuando el dato no estaba
      * a mano. Lo que cambió es cuánto pesa: desde que redacta también el
      * renglón OBS (D-003), emitir sin ella deja **dos** renglones en
-     * blanco, y el área pidió volver a exigirla.
+     * blanco.
      *
      * Se prueba por la ruta y no por el Action: quien la exige es el
      * `FormRequest`, y el Action tiene que seguir aceptando el nulo porque
@@ -792,7 +792,7 @@ class OrdenDePagoTest extends TestCase
      * Se mira el HTML y no el PDF: es la misma plantilla —de ahí que la
      * vista previa y la impresión no puedan discrepar— y el texto se puede
      * leer. Lo que se verifica es que cada dato caiga en el papel, que es
-     * exactamente lo que una plantilla rota deja de hacer en silencio.
+     * lo que una plantilla rota deja de hacer en silencio.
      */
     public function test_la_orden_impresa_dice_lo_que_congelo(): void
     {
@@ -816,8 +816,8 @@ class OrdenDePagoTest extends TestCase
 
         /*
          * **Sin los dos títulos.** El papel encabezaba con «VALORES EN
-         * CUSTODIA» y «CHEQUES PROPIOS», cada uno con su casilla, y el
-         * área confirmó que esos campos ya no van. Se afirma la ausencia
+         * CUSTODIA» y «CHEQUES PROPIOS», cada uno con su casilla, y esos
+         * campos ya no van. Se afirma la ausencia
          * y no se borra el renglón: es lo que impide que vuelvan sin que
          * nadie lo note.
          */

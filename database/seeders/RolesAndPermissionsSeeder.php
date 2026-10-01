@@ -179,7 +179,7 @@ class RolesAndPermissionsSeeder extends Seeder
         /*
          * ─── Capacidades de desarrollo ────────────────────────────────
          *
-         * El prefijo `dev.` no es decorativo: `Gate::before` lo lee para
+         * `Gate::before` lee el prefijo `dev.` para
          * dejar estas capacidades **fuera del comodín del administrador**,
          * que recibe todo lo demás sin enumerarlo. Las tiene `super-admin`
          * y nadie más.

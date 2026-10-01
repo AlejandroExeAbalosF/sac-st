@@ -21,7 +21,7 @@ import { unlockEdit as habilitar } from '@/routes/haberes/installments';
  * editar la cuota; lo que cambió es que su Orden y su Pase salieron del
  * área, y ahora hay alguien afuera leyendo lo que ese dato dice.
  *
- * El área definió el procedimiento en tres pasos y este es el primero. El
+ * La corrección tiene tres pasos y este es el primero. El
  * tercero —volver a bloquear— no tiene botón: sucede solo al guardar los
  * cambios, porque una ventana que hay que acordarse de cerrar es un
  * permiso permanente con otro nombre.

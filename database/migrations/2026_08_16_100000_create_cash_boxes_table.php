@@ -11,9 +11,8 @@ use Illuminate\Support\Facades\Schema;
  * Cajas — §9.1 del DER.
  *
  * **No son cajones físicos: son la clasificación contable** que separa
- * Haberes de Aranceles y de Multas. El §4.4 lo dice al descartar una caja
- * por moneda: *«`cash_boxes` sigue siendo la clasificación contable y el
- * cajón físico guarda las dos monedas»*.
+ * Haberes de Aranceles y de Multas. No hay una caja por moneda: el cajón
+ * físico guarda las dos.
  */
 return new class extends Migration
 {

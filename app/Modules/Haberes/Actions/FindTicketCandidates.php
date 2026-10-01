@@ -23,11 +23,11 @@ final class FindTicketCandidates
     /**
      * Cuántos días después del depósito se sigue buscando.
      *
-     * La ventana es asimétrica y eso no es un detalle: **el dinero no
-     * puede acreditarse antes de depositarse**. Hacia adelante hay margen
-     * —depósito después del cierre, fin de semana, feriado largo—; hacia
-     * atrás solo se admite un día, y únicamente por si quien cargó el
-     * ticket tipeó mal la fecha.
+     * La ventana es asimétrica porque **el dinero no puede acreditarse
+     * antes de depositarse**. Hacia adelante hay margen —depósito
+     * después del cierre, fin de semana, feriado largo—; hacia atrás solo
+     * se admite un día, y únicamente por si quien cargó el ticket tipeó mal
+     * la fecha.
      */
     private const DAYS_FORWARD = 5;
 

@@ -10,8 +10,8 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Los datos que el operador copia del ticket.
  *
- * **La foto no es obligatoria.** El área lo definió así: a veces el papel
- * se traspapela y el dato hay que cargarlo igual. Se advierte que falta en
+ * **La foto no es obligatoria:** a veces el papel se traspapela y el dato
+ * hay que cargarlo igual. Se advierte que falta en
  * lugar de trabar la carga, como con la continuidad de saldos.
  *
  * La fecha sí lo es: junto con el importe —que sale de la cuota— es la

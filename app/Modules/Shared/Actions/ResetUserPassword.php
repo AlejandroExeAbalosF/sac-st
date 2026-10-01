@@ -18,7 +18,7 @@ use RuntimeException;
  * porque si se está restableciendo la clave es justamente porque hay dudas
  * sobre quién la tiene.
  *
- * **Nadie se lo hace a sí mismo**, y no es una formalidad: es la puerta que
+ * **Nadie se lo hace a sí mismo**: es la puerta que
  * deja al administrador afuera de su propio sistema. Se autogenera una clave
  * que se muestra una sola vez, se le cierran todas las sesiones —incluida la
  * que está usando— y si el diálogo se cierra sin copiarla no queda nadie que

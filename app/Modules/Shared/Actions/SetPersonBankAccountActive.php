@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\DB;
  * ── Simétrico a propósito ─────────────────────────────────────────────
  *
  * Toma el estado que se quiere dejar y no sólo da de baja. Hoy la pantalla
- * de la Orden expone únicamente la baja —es lo que el área pidió—, pero
+ * de la Orden expone únicamente la baja, pero
  * una cuenta dada de baja por error no se ve en ningún listado, porque
  * tanto `PaymentOrderContextData` como `verifiedAccounts()` filtran por
  * `is_active`. Sin el camino de vuelta, ese error sería irreparable salvo

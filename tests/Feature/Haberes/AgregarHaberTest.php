@@ -412,7 +412,7 @@ class AgregarHaberTest extends TestCase
     }
 
     /**
-     * El caso normal según el área: el expediente llega con un solo ticket
+     * El caso normal: el expediente llega con un solo ticket
      * aunque el acta prevea tres cuotas.
      */
     public function test_a_partial_load_is_allowed_while_installments_are_missing()

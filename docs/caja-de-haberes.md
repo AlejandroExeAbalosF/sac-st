@@ -316,6 +316,8 @@ registro manual, porque la única evidencia es la planilla en papel.
 
 ---
 
+<a id="monedas"></a>
+
 ## Monedas
 
 El mismo cajón guarda pesos y dólares, y la base los lleva **separados en todo**:

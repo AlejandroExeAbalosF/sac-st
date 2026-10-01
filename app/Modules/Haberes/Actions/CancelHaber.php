@@ -18,9 +18,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Anula un haber suelto, sin tocar el resto del expediente.
  *
- * Hasta acá la única baja era la del expediente entero, y para un haber
- * cargado de más —el beneficiario equivocado, el acta leída mal— eso
- * obligaba a anular todo y volver a cargar lo que sí estaba bien.
+ * Es para el haber cargado de más: el beneficiario equivocado, el acta
+ * leída mal.
  *
  * Un haber anulado deja de contar en lo reconocido, que es lo que hace
  * que el expediente vuelva a cuadrar contra el total declarado.

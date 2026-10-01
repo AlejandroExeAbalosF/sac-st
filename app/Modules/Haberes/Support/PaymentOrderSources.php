@@ -25,7 +25,7 @@ use App\Support\Money\Decimal;
  * 1. **La tabla de depósitos** que el formulario imprime, con el número de
  *    operación, la fecha y la cuenta corriente de cada ingreso.
  * 2. **En qué cuenta del organismo está el dinero hoy**, que es la casilla
- *    que el papel marca. El área confirmó que la marca la pone el sistema.
+ *    que el papel marca. La marca la pone el sistema.
  *
  * Los dos caminos que llegan a una cuenta bancaria son distintos y por eso
  * se resuelven por separado:
@@ -298,10 +298,9 @@ final class PaymentOrderSources
          * que se escribió a conciencia manda, y la del extracto tapa el
          * agujero.
          *
-         * Sin esto la celda salía vacía teniendo el dato a un join de
-         * distancia, que es lo que pasaba con toda recepción en efectivo
-         * cuyo depósito nadie numeró a mano. La rama de las transferencias
-         * ya usaba `operation_id`; ésta se había quedado atrás.
+         * Sin esto la celda sale vacía en toda recepción en efectivo cuyo
+         * depósito nadie numeró a mano, teniendo el dato a un join de
+         * distancia.
          */
         $numeroDeOperacion = $traslado?->deposit_operation_number;
         $numeroDeOperacion ??= $movimiento?->operation_id;

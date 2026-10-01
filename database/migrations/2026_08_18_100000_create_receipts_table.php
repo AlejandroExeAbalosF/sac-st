@@ -31,8 +31,8 @@ return new class extends Migration
             /*
              * El número del sistema es **siempre** el identificador.
              *
-             * El área confirmó que el del talonario no compite con él: se
-             * registra al lado cuando el papel existe. Eso es lo que
+             * El del talonario no compite con él: se registra al lado
+             * cuando el papel existe. Eso es lo que
              * disuelve el problema del recibo emitido el 28/12 y cargado
              * el 05/01, que con dos numeraciones en pie de igualdad no
              * tenía una solución buena.

@@ -16,6 +16,10 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
  * trayendo el ticket de la cuota siguiente, así que el sistema tiene que
  * saber abrir uno ya cargado y completarlo; el alta usa ese mismo camino
  * en vez de uno propio.
+ *
+ * El costo asumido: puede quedar un expediente sin ningún haber si alguien
+ * abandona a mitad. No hace daño —no mueve plata— y el listado los deja a
+ * la vista para completarlos o descartarlos.
  */
 final class CreateExpediente
 {

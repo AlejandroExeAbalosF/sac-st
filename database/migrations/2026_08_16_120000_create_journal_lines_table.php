@@ -97,11 +97,10 @@ return new class extends Migration
          * créditos»*.
          *
          * Va como `CONSTRAINT TRIGGER … DEFERRABLE INITIALLY DEFERRED`, y
-         * el diferido no es un detalle de implementación: **es lo único
-         * que lo hace posible**. Las líneas se insertan de a una, así que
-         * después de la primera el asiento está necesariamente
-         * desbalanceado. Un trigger inmediato rechazaría todos los
-         * asientos del sistema.
+         * el diferido **es lo único que lo hace posible**. Las líneas se
+         * insertan de a una, así que después de la primera el asiento está
+         * necesariamente desbalanceado. Un trigger inmediato rechazaría
+         * todos los asientos del sistema.
          *
          * Diferido, la comprobación corre al confirmar la transacción,
          * cuando el asiento ya está completo. Si no cierra, no entra nada.

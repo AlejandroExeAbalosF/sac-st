@@ -24,12 +24,11 @@ use Illuminate\Validation\ValidationException;
 /**
  * Deshace una recepción que no ocurrió: el dinero sale de los libros.
  *
- * El trigger de `fund_receipts` viene diciendo desde el principio «una
- * recepcion de fondos no se borra: se revierte» y «los datos no se editan:
- * se revierte y se registra de nuevo». Esto es esa puerta, que hasta acá
- * no existía.
+ * El trigger de `fund_receipts` dice «una recepcion de fondos no se borra:
+ * se revierte» y «los datos no se editan: se revierte y se registra de
+ * nuevo». Esto es esa reversión.
  *
- * El caso que la hizo falta: el crédito de nuestro propio depósito de
+ * El caso típico: el crédito de nuestro propio depósito de
  * efectivo llega al extracto como cualquier otro. Si alguien lo registra
  * como recepción en vez de acreditarlo contra el traslado, la misma plata
  * queda contada dos veces —una en tránsito desde la caja y otra como si

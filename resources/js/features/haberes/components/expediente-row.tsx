@@ -105,11 +105,10 @@ export default function ExpedienteRow({
                 </td>
 
                 {/*
-                 * Antes acá iba la carátula, y decía lo mismo dos veces:
-                 * «García Claudio Adrián c/ CIACSA» es el beneficiario que
-                 * ya se puede nombrar acá y el empleador que está en la
-                 * columna siguiente. El nombre solo es más corto, se lee
-                 * derecho y es por lo que se busca.
+                 * El beneficiario y no la carátula: «García Claudio Adrián
+                 * c/ CIACSA» repetiría el empleador de la columna
+                 * siguiente. El nombre solo es más corto, se lee derecho y
+                 * es por lo que se busca.
                  */}
                 <td className="py-3 pr-5">
                     {primero === undefined ? (

@@ -18,9 +18,9 @@ use RuntimeException;
  *
  * **Todavía no hay recepción.** Esto dice «este papel y este crédito son
  * el mismo hecho»; convertir eso en dinero imputado a una cuota lo hace
- * `ReceiveAndAllocateTicket`, en un acto aparte. La
- * separación no es burocracia: reconocer el movimiento es un acto de
- * lectura, imputarlo es un acto contable, y los firma gente distinta.
+ * `ReceiveAndAllocateTicket`, en un acto aparte: reconocer el movimiento
+ * es un acto de lectura, imputarlo es un acto contable, y los firma gente
+ * distinta.
  *
  * **Las señales quedan guardadas.** No para la interfaz —ahí ya se
  * vieron— sino para poder responder con datos, dentro de unos meses, si el

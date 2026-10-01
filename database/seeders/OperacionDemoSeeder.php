@@ -224,7 +224,7 @@ class OperacionDemoSeeder extends Seeder
     */
 
     /**
-     * Dos personas distintas, y no es decorativo.
+     * Dos personas distintas.
      *
      * `ReviewCashCount` rechaza que revise el arqueo quien lo contó: con un
      * solo usuario el circuito de control no se puede reproducir.

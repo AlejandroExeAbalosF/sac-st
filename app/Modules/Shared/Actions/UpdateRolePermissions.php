@@ -19,7 +19,7 @@ use Spatie\Permission\PermissionRegistrar;
  * nada.
  *
  * El cambio se audita con el diff completo. Quién le dio a un rol la
- * facultad de reabrir un período cerrado es exactamente la clase de
+ * facultad de reabrir un período cerrado es la clase de
  * pregunta que esta tabla existe para responder.
  */
 final class UpdateRolePermissions

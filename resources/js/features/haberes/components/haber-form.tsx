@@ -43,8 +43,8 @@ const nuevoHaber = (): HaberDraft => ({
 /**
  * Alta de un haber dentro de un expediente ya cargado.
  *
- * El concepto vive en el haber y las cuotas lo heredan: el área confirmó
- * que normalmente todas comparten el mismo, y pedirlo cuota por cuota
+ * El concepto vive en el haber y las cuotas lo heredan: normalmente todas
+ * comparten el mismo, y pedirlo cuota por cuota
  * sería hacer tipear lo mismo N veces. Cada cuota puede sobrescribirlo
  * cuando difiere, que es el caso Tinte.
  */

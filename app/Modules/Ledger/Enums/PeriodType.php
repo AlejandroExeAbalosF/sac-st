@@ -10,7 +10,7 @@ use Carbon\CarbonInterface;
 /**
  * Qué tramo cubre un cierre — §9.9 del DER.
  *
- * El área confirmó que **las cajas se cierran todos los días**; el mensual
+ * **Las cajas se cierran todos los días**; el mensual
  * existe porque el DER lo pide y porque la planilla de junio es un libro
  * por mes. Los dos conviven sin duplicar nada: los movimientos pertenecen
  * a un período **por su fecha operativa**, no por un puntero guardado en

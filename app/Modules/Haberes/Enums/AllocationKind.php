@@ -20,11 +20,10 @@ enum AllocationKind: string
      * El redondeo del efectivo — §2.4 del DER.
      *
      * **La única excepción admitida** a la regla de no sobreasignar una
-     * cuota, y existe porque el área confirmó el hecho: cuando el
-     * empleador redondea hacia arriba en efectivo, se ingresa todo lo
-     * recibido y se le entrega todo al beneficiario. El derecho —el
-     * `expected_amount` de la cuota— no se toca, porque ese importe es lo
-     * que dice el expediente.
+     * cuota: cuando el empleador redondea hacia arriba en efectivo, se
+     * ingresa todo lo recibido y se le entrega todo al beneficiario. El
+     * derecho —el `expected_amount` de la cuota— no se toca, porque ese
+     * importe es lo que dice el expediente.
      *
      * Solo vale con `medium = cash`. Todavía no hay una operación que lo
      * registre.

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Cuenta bancaria del organismo.
  *
  * Es donde se establece la moneda: los movimientos la heredan sin llevar
- * columna propia (§4.4 del DER).
+ * columna propia.
  *
  * @property int $id
  * @property string $bank_name

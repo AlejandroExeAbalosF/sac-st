@@ -445,11 +445,10 @@ final class ClosePeriod
     /**
      * El mes no cierra sobre días que nunca se cerraron.
      *
-     * El cierre mensual congela los totales del período, y hasta ahora los
-     * calculaba del libro sin mirar si cada jornada había pasado por su
-     * arqueo. Un mes podía quedar cerrado con quince días que nadie contó:
-     * los números cerraban igual —salen de `journal_lines`— pero el control
-     * diario, que es donde se detecta un faltante, no había ocurrido.
+     * El cierre mensual congela los totales del período, que salen de
+     * `journal_lines` y cierran aunque nadie haya contado el cajón. Sin
+     * esta guarda un mes podría cerrarse con quince días sin arqueo, y el
+     * control diario —donde se detecta un faltante— no habría ocurrido.
      *
      * **Se exigen los días con movimiento, no los del calendario.** Un
      * sábado sin un solo asiento no tiene nada que arquear ni que cerrar, y
@@ -555,9 +554,9 @@ final class ClosePeriod
          * El cierre congela el saldo **del libro**, no el contado: cerrar
          * con una diferencia viva dejaba el día archivado diciendo que
          * había una plata que el conteo no encontró, y limpiarlo después
-         * exige reabrir el período. El área definió que el día se cierra
-         * cuando el arqueo está resuelto: o cuadra, o la diferencia se
-         * imputó y el libro ya describe el cajón real.
+         * exige reabrir el período. El día se cierra cuando el arqueo está
+         * resuelto: o cuadra, o la diferencia se imputó y el libro ya
+         * describe el cajón real.
          *
          * Un arqueo imputado llega acá como `adjusted` y su diferencia
          * quedó explicada en `CASH_DIFFERENCE`, así que no se lo vuelve a

@@ -130,11 +130,6 @@ export default function PagosAnteriores({
                         titulo="Cheques en custodia"
                         valor={balances.cheques}
                     />
-                    {/*
-                     * Lo que las empresas depositaron derecho en la cuenta
-                     * de la Secretaría. Un caso viejo que llegó por ahí se
-                     * paga por transferencia, no por el cajón.
-                     */}
                     <Saldo titulo="Depósitos directos" valor={balances.bank} />
                 </div>
 

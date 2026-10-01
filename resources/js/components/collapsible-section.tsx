@@ -13,7 +13,7 @@ type Props = {
 /**
  * Sección plegable de campos opcionales.
  *
- * El área pidió «cargar lo esencial» y también poder cargar todo. En vez
+ * El formulario carga lo esencial y también permite cargar todo. En vez
  * de dos formularios distintos —que serían dos juegos de validación
  * destinados a desincronizarse— lo esencial queda a la vista y el resto a
  * un clic, en la misma pantalla y con el mismo envío.

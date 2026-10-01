@@ -91,12 +91,8 @@ final class CashTransferController extends Controller
     }
 
     /**
-     * Registra el depósito del efectivo de una cuota.
-     *
-     * La foto del ticket es obligatoria acá, a diferencia del comprobante
-     * que trae el expediente: aquel documenta plata que entró y que el
-     * extracto va a confirmar igual; esta es la única prueba de que el
-     * efectivo salió de la caja.
+     * Registra el depósito del efectivo de una cuota. La foto del ticket
+     * es obligatoria: ver `DepositCashToBank`.
      */
     public function store(
         Request $request,

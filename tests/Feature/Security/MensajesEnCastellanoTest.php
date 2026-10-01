@@ -53,7 +53,7 @@ class MensajesEnCastellanoTest extends TestCase
 
     /**
      * El caso que motivó el archivo: un mensaje sin traducir se muestra como
-     * su clave, y una clave es exactamente lo que un contador no puede leer.
+     * su clave, y una clave es lo que un contador no puede leer.
      */
     public function test_ninguna_clave_del_framework_queda_sin_traducir(): void
     {

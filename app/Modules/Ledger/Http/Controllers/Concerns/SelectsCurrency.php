@@ -20,7 +20,7 @@ use Illuminate\Http\Request;
  * Por eso va en la query string y no en la sesión. Un `/caja/dia?moneda=usd`
  * se comparte, se marca y se vuelve con el botón de atrás; una preferencia
  * guardada haría que la misma dirección muestre cosas distintas según
- * quién la abra, que es exactamente lo que no se quiere en una pantalla
+ * quién la abra, que es lo que no se quiere en una pantalla
  * donde el importe es el dato.
  *
  * Lo desconocido cae en pesos en vez de fallar: una URL mal escrita

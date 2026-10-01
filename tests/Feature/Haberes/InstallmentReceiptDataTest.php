@@ -70,7 +70,7 @@ class InstallmentReceiptDataTest extends TestCase
     /**
      * Y hacen falta las dos.
      *
-     * Es la prueba de que la constante no es decorativa: cargar de menos
+     * Es la prueba de que la constante hace falta: cargar de menos
      * —lo que hacía la consulta original— revienta, aunque los recibos
      * estén vigentes y `voided_by` sea nulo. Eloquent no pregunta si la
      * columna tiene valor; pregunta si la relación se cargó.

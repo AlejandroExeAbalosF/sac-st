@@ -21,9 +21,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Las cuentas bancarias particulares de una persona.
  *
- * Existe porque sin ella la Orden de Pago es imposible: el §2.2.9 exige
- * una cuenta `verified` y hasta ahora toda cuenta nacía `unverified` sin
- * que nada pudiera cambiarle el estado.
+ * Sin ella la Orden de Pago es imposible: el §2.2.9 exige una cuenta
+ * `verified`, y las cuentas nacen `unverified`.
  *
  * Se opera desde el modal de la Orden, que es donde el dato hace falta: el
  * expediente informa el CBU en una foja, alguien lo carga, alguien lo

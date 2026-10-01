@@ -116,8 +116,7 @@ final class UpdateInstallment
                  * Y se vuelve a bloquear. La ventana la abre un acto
                  * justificado y la cierra el guardado: dejarla abierta
                  * esperando que alguien se acuerde de cerrarla la
-                 * convertiría en un permiso permanente, que es
-                 * exactamente lo que no es.
+                 * convertiría en un permiso permanente, y no lo es.
                  */
                 'edit_unlocked_at' => null,
                 'edit_unlock_reason' => null,
@@ -174,7 +173,7 @@ final class UpdateInstallment
      * Y corregir hacia arriba es un caso legítimo, no una anomalía: si el
      * expediente decía $700.000 y se cargó $602.250, el recibo por lo
      * cobrado sigue siendo cierto y la cuota vuelve a estar incompleta,
-     * que es exactamente lo que pasó. Hacia abajo se permite quedar por
+     * que es lo que pasó. Hacia abajo se permite quedar por
      * debajo de lo asignado: `InstallmentFunding::overAllocated()` expone
      * el excedente. Liberarlo requiere `UnallocateFunds`, con sus guardas;
      * corregir la cuota no revierte imputaciones ni recibos por sí solo.

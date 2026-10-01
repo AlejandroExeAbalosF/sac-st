@@ -8,7 +8,7 @@ namespace App\Modules\Haberes\Enums;
  * Dónde está una Orden de Pago — docs/haberes-reglas.md#orden-y-pase.
  *
  * Los siete primeros son etapas del documento en circulación; los tres
- * últimos son finales. La diferencia no es cosmética: mientras la Orden
+ * últimos son finales. Mientras la Orden
  * está en circulación **ocupa el lugar de su cuota**, y no puede haber
  * otra. Lo impone un índice único parcial que enumera exactamente los
  * mismos estados que `isActive()`.

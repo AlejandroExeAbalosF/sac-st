@@ -54,12 +54,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
      * Configuración del sistema.
      *
      * Es lo que administra el sistema, no la cuenta de quien lo usa: eso
-     * vive en `mi-cuenta.php` y no lleva permiso. La distinción importa
-     * porque hasta ahora «Configuración» apuntaba al perfil propio, y el
-     * operador entraba buscando administrar y se encontraba con su email.
-     *
-     * Los permisos de este bloque estaban sembrados desde la Fase 2 y
-     * ninguna ruta los usaba.
+     * vive en `mi-cuenta.php` y no lleva permiso.
      */
     Route::prefix('configuracion')->name('configuracion.')->group(function (): void {
         Route::middleware('can:usuarios.ver')->group(function (): void {

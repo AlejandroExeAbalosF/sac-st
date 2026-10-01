@@ -28,7 +28,7 @@ use Illuminate\Validation\ValidationException;
  *
  * **El CVU** se detecta por su entidad emisora, `000`, y no por el dígito
  * verificador: un CVU está bien formado y pasa el cálculo igual que un
- * CBU. Confundir las dos cosas dejaría pasar exactamente el caso que el
+ * CBU. Confundir las dos cosas dejaría pasar el caso que el
  * §2.2.9 quiere impedir.
  *
  * **El dígito verificador** atrapa lo otro: un número mal tipeado o

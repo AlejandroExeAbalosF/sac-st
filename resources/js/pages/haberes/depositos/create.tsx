@@ -40,10 +40,7 @@ type Props = {
 /**
  * Carga del comprobante que llegó con el expediente.
  *
- * La foto va **al lado del formulario**, no debajo ni detrás de un clic.
- * El operador está copiando datos de un papel a mano y cambiar de ventana
- * en cada campo es donde se pierde el tiempo y donde se cuela el dígito
- * equivocado.
+ * La foto va al lado del formulario: ver `TicketPhotoPanel`.
  *
  * Es la misma forma que «Depositar el efectivo en el banco», y por la
  * misma razón: **a quién apunta el depósito y por cuánto no se eligen**.

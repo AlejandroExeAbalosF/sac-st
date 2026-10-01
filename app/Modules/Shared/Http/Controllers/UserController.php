@@ -24,11 +24,9 @@ use RuntimeException;
 /**
  * Alta, corrección y baja operativa de los usuarios del sistema.
  *
- * Hasta que existió esta pantalla, crear un usuario exigía `tinker`.
- *
  * La contraseña temporal viaja de vuelta en un flash de una sola vista.
  * No se guarda en ningún lado y no hay forma de volver a consultarla: si
- * se pierde, se restablece, que es exactamente lo que corresponde.
+ * se pierde, se restablece, que es lo que corresponde.
  */
 final class UserController extends Controller
 {

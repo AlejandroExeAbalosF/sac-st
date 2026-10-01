@@ -38,9 +38,9 @@ return new class extends Migration
              * Lo que dice el ticket del cajero.
              *
              * Se guarda como **evidencia de lo que dice el papel**, no como
-             * clave de vinculación: el área confirmó que el número de
-             * operación no es fiable. La acreditación se busca por fecha e
-             * importe, igual que el resto de los movimientos (§4.3).
+             * clave de vinculación: el número de operación no es fiable.
+             * La acreditación se busca por fecha e importe, igual que el
+             * resto de los movimientos.
              */
             $table->date('deposit_date');
             $table->time('deposit_time', 0)->nullable();

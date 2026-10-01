@@ -33,8 +33,7 @@ type PageProps = {
  * Los datos propios.
  *
  * Solo se editan dos: el nombre y el correo. Los otros cuatro se muestran
- * igual, en solo lectura, porque hasta ahora el usuario no tenía dónde
- * verlos y son los que explican cómo opera: el rol es lo que le habilita o
+ * en solo lectura porque explican cómo opera: el rol es lo que le habilita o
  * le niega cada pantalla, y el cargo es lo que se imprime al pie de los
  * comprobantes que firma.
  */

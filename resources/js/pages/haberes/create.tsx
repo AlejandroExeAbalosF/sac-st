@@ -32,9 +32,7 @@ const ESPERA_MS = 450;
  * Alta del expediente, sin sus haberes.
  *
  * Es un formulario corto a propósito: se guarda enseguida y se sigue en el
- * detalle. El expediente vuelve con el tiempo trayendo el ticket de la
- * cuota siguiente, así que el sistema tiene que saber abrir uno ya cargado
- * y completarlo; el alta usa ese mismo camino en vez de uno propio.
+ * detalle. El porqué, en `CreateExpediente`.
  *
  * Sobre la disposición: la tarjeta ocupa el ancho disponible, pero los
  * campos NO. Cada uno se lleva las columnas que su contenido justifica —el

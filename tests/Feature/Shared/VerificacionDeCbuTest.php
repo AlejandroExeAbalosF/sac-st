@@ -31,7 +31,7 @@ use Tests\TestCase;
  * **Las dos guardas son independientes y hay que probarlas por separado**,
  * porque la intuición las confunde: un CVU está bien escrito y pasa el
  * dígito verificador igual que un CBU. Detectarlo por el verificador —que
- * es lo que este código hacía— dejaba pasar exactamente el caso que la
+ * es lo que este código hacía— dejaba pasar el caso que la
  * regla quiere impedir.
  */
 class VerificacionDeCbuTest extends TestCase
@@ -239,7 +239,7 @@ class VerificacionDeCbuTest extends TestCase
      * Y cargar un CVU avisa en el momento, sin frenar la carga.
      *
      * El número se guarda igual —el expediente informa lo que informa—,
-     * así que la operación es un éxito con reparo: exactamente lo que el
+     * así que la operación es un éxito con reparo: lo que el
      * tono `warning` dice y lo que el verde no decía.
      */
     public function test_cargar_un_cvu_avisa_sin_frenar_la_carga(): void

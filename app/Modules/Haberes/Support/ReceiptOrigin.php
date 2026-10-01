@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\DB;
  * él, así que el sistema ya sabe cuál es.
  *
  * **Ninguna recepción está obligada a tener origen.** Una en efectivo no
- * tiene movimiento bancario, y una bancaria puede no tener ticket —el área
- * confirmó que el comprobante se pide pero no se exige—. En ambos casos
+ * tiene movimiento bancario, y una bancaria puede no tener ticket: el
+ * comprobante se pide pero no se exige. En ambos casos
  * la respuesta es `null` y la pantalla ofrece buscar a mano.
  */
 final class ReceiptOrigin

@@ -40,9 +40,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('user-password.update');
 
     /*
-     * Las sesiones abiertas y el historial propio. Los datos ya se venían
-     * escribiendo desde el primer día en `user_login_events`; hasta acá
-     * nadie los leía más que el tablero, y en sus últimas cinco filas.
+     * Las sesiones abiertas y el historial propio, desde
+     * `user_login_events`.
      */
     Route::get('mi-cuenta/actividad', [AccountActivityController::class, 'index'])
         ->name('mi-cuenta.actividad');

@@ -56,8 +56,7 @@ final class StoreHaberRequest extends FormRequest
             'installments.*.dueDate' => ['nullable', 'date'],
             /*
              * Previsión, no decisión: el medio real lo fija la primera
-             * recepción. Pero declararlo es obligatorio —el área confirmó
-             * que al cargar el expediente siempre se sabe—, porque una
+             * recepción. Pero declararlo es obligatorio, porque una
              * cuota sin medio no se puede leer: no dice si se cobra por
              * mostrador o si se espera un depósito, y de eso depende todo
              * el circuito que viene después.
@@ -105,7 +104,7 @@ final class StoreHaberRequest extends FormRequest
      * Los campos opcionales de la cuota llegan como cadena vacía desde el
      * formulario, no como `null`.
      *
-     * La diferencia no es cosmética: el Action decide con `??` si la cuota
+     * El Action decide con `??` si la cuota
      * hereda el concepto del haber, y `''` no dispara ese respaldo. Sin
      * esta normalización, dejar el concepto en blanco —que la pantalla
      * anuncia como «el mismo del haber»— guardaba una cuota sin concepto.

@@ -309,10 +309,8 @@ export function DialogoRevision({
                 {/*
                  * Quién contó y quién firma, con nombre y apellido.
                  *
-                 * Antes acá había un párrafo explicando qué es la doble
-                 * firma y por qué el sistema la deja pasar. Los dos
-                 * nombres dicen lo mismo en un renglón: si son el mismo,
-                 * se ve solo.
+                 * Los dos nombres en un renglón: si son el mismo, se ve
+                 * solo, sin un párrafo que explique la doble firma.
                  */}
                 <dl className="grid gap-1 px-1 text-sm">
                     <div className="flex justify-between gap-4">

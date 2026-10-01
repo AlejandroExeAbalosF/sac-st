@@ -21,8 +21,8 @@ namespace App\Modules\Ledger\Enums;
  *
  * **Nada escribe `AcknowledgedExcess`**: no hay Action, ni ruta, ni botón,
  * y el front no lee esta columna. Toda recepción nace `Open` y se queda
- * así. Está a propósito y no es un olvido: el área confirmó que los
- * depósitos vienen por el importe justo, y que el efectivo de más se suma
+ * así. Está a propósito y no es un olvido: los depósitos vienen por el
+ * importe justo, y el efectivo de más se suma
  * al pago en el papel y en el sistema, así que la cuota vale ese total y
  * no sobra nada que reconocer.
  *

@@ -335,8 +335,7 @@ final class ExpedienteController extends Controller
 
         /*
          * Los mismos enlaces que arma la pantalla del haber. Sin esto la
-         * foto del comprobante desaparece acá: el DTO dejó de buscarla por
-         * su cuenta cuando se sacó la consulta por ticket.
+         * foto del comprobante no aparece: el DTO no la busca por su cuenta.
          */
         /** @var list<int> $cuotaIds */
         $cuotaIds = $expediente->haberes
@@ -348,9 +347,8 @@ final class ExpedienteController extends Controller
 
         /*
          * Lo que las cuotas necesitan para decir la verdad: el traslado al
-         * banco, el recibo, lo imputado, el medio real y la etapa. Hasta
-         * acá no se pasaban, y el listado mostraba «Efectivo» para una
-         * cuota ya depositada sin que nada fallara.
+         * banco, el recibo, lo imputado, el medio real y la etapa. Ver
+         * `InstallmentBatch`.
          */
         $lote = app(InstallmentBatch::class)->for(
             $expediente->haberes->flatMap(fn (Haber $haber) => $haber->installments),
@@ -385,11 +383,8 @@ final class ExpedienteController extends Controller
     }
 
     /**
-     * Formulario de corrección de la ficha.
-     *
-     * El número no se edita: identifica al expediente. Un número
-     * equivocado no es una ficha con un error, es otro expediente, y eso
-     * se resuelve anulando y cargando el correcto.
+     * Formulario de corrección de la ficha. El número no se edita: ver
+     * `UpdateExpediente`.
      */
     public function edit(Expediente $expediente): Response
     {

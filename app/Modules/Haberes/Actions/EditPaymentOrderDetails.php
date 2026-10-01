@@ -16,9 +16,8 @@ use Illuminate\Validation\ValidationException;
  * **Es uno de los dos caminos, y lo elige quien opera.** Cuando falta o
  * está mal un dato accesorio se agrega una foja aclarando el problema y
  * los mismos documentos siguen su camino; cuando el organismo devuelve la
- * Orden, en cambio, se anula y se emite otra (`VoidPaymentOrder`). El área
- * confirmó que las dos situaciones existen y que la decisión es del
- * operador, que es el único que tiene el papel devuelto a la vista.
+ * Orden, en cambio, se anula y se emite otra (`VoidPaymentOrder`). Elige
+ * el operador, que es el único que tiene el papel devuelto a la vista.
  *
  * Lo que este Action resuelve es el primer caso: arreglar la foja donde
  * figura el CBU o el destinatario de la nota, que son datos del documento

@@ -24,10 +24,10 @@ use App\Modules\Banking\Support\TransactionFingerprint;
  *    Subir el extracto de otra cuenta es un error trivial de cometer y
  *    catastrófico de no detectar: mezclaría los movimientos de dos cuentas
  *    en la misma conciliación.
- * 2. **La moneda.** Hoy todo es ARS, pero se prevé una cuenta en dólares y
- *    §4.4 del DER es terminante: nunca se suman importes de monedas
- *    distintas. El control tiene que existir antes que la cuenta, no
- *    después.
+ * 2. **La moneda.** Hoy todo es ARS, pero se prevé una cuenta en dólares,
+ *    y nunca se suman importes de monedas distintas
+ *    (docs/caja-de-haberes.md#monedas). El control tiene que existir
+ *    antes que la cuenta, no después.
  * 3. **La cadena de saldos.** Si `saldo[n] ≠ saldo[n-1] + importe[n]`,
  *    falta un movimiento en el archivo.
  *

@@ -19,8 +19,8 @@ type Orden = App.Modules.Haberes.Data.PaymentOrderSummaryData;
 /**
  * Anular la Orden y su Pase.
  *
- * **Es el camino de la Orden devuelta.** El área lo confirmó: *«la orden
- * de pago devuelta queda anulada; se genera una nueva orden de pago»*. El
+ * **Es el camino de la Orden devuelta:** queda anulada y se genera una
+ * nueva. El
  * otro camino —agregar una foja aclaratoria y dejar que los mismos papeles
  * sigan— está en «Corregir observaciones», y cuál corresponde lo decide
  * quien opera: es el único que tiene el documento devuelto a la vista.

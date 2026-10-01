@@ -26,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * egreso, pero la fila de `bank_transaction_allocations` se escribe recién
  * al validar: esa tabla exige un evento financiero, y el evento del egreso
  * no existe hasta que el contador confirma (§2.3.5). La alternativa era
- * postear el asiento acá, que es exactamente lo que el DER prohíbe.
+ * postear el asiento acá, que es lo que el DER prohíbe.
  *
  * **Y por eso esto se puede deshacer.** Mientras el egreso no esté
  * confirmado, un débito mal atribuido se desvincula sin dejar nada roto:

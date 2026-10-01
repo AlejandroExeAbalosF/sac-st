@@ -18,18 +18,13 @@ use Illuminate\Support\Collection;
  *
  * Las pantallas que muestran cuotas —el detalle del expediente, las filas
  * expandibles del listado, la tarjeta del haber— necesitan las mismas
- * cuatro cosas: cuánto se imputó, el recibo de ingreso, el traslado al
- * banco y el medio real. Preguntarlas por cuota sería una consulta por
+ * cosas: cuánto se imputó, el recibo de ingreso, el traslado al banco, el
+ * medio real y la etapa. Preguntarlas por cuota sería una consulta por
  * fila; acá se resuelven de una y se reparten por id.
  *
- * ── Por qué existe ─────────────────────────────────────────────────────
- *
- * El detalle del expediente **no las pedía**, y el efecto era silencioso:
- * `cashTransfer` llegaba siempre en `null`, `effectiveMedium` caía en el
- * previsto, y el listado mostraba «Efectivo» para una cuota que ya estaba
- * depositada en el banco. Nada fallaba —la pantalla decía menos de lo que
- * creía— y por eso pasó desapercibido hasta que alguien comparó las dos
- * pantallas.
+ * Una pantalla que no las pida no falla: `cashTransfer` llega en `null`,
+ * `effectiveMedium` cae en el previsto y el listado muestra «Efectivo»
+ * para una cuota ya depositada. Por eso todas pasan por acá.
  */
 final class InstallmentBatch
 {

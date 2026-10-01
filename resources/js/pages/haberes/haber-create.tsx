@@ -17,12 +17,10 @@ type Props = {
 /**
  * Alta de un haber, en su propia pantalla.
  *
- * Estaba dentro del detalle, debajo de los haberes ya cargados, y ahí el
- * formulario se leía como uno más de la lista. Separarlo visualmente no
- * alcanzaba: con cinco haberes desplegados arriba, cada uno con sus
- * cuotas, el formulario quedaba a dos pantallas de distancia.
+ * Dentro del detalle, debajo de los haberes ya cargados, el formulario se
+ * leería como uno más de la lista y quedaría a dos pantallas de distancia.
  *
- * Lo que no se pierde al mudarlo es el contexto. Arriba va el expediente
+ * El contexto se conserva: arriba va el expediente
  * con lo que ya reconoce y a quiénes, porque es contra eso que se controla
  * el importe nuevo y que se evita cargar dos veces al mismo beneficiario
  * —el error que el servidor rechaza, pero que conviene no cometer—.

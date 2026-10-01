@@ -27,12 +27,7 @@ final class PersonController extends Controller
     private const RESULT_LIMIT = 20;
 
     /**
-     * Pantalla del maestro.
-     *
-     * Existe porque el documento del empleador es opcional: alguien
-     * cargado hoy con la razón social nada más tiene que poder recibir su
-     * CUIT cuando llegue el expediente siguiente. Sin esta pantalla, un
-     * nombre mal tipeado queda impreso en los comprobantes para siempre.
+     * Pantalla del maestro. Por qué existe: ver `UpdatePerson`.
      */
     public function page(Request $request): Response
     {
@@ -127,10 +122,7 @@ final class PersonController extends Controller
     /**
      * La persona física que tiene ese documento, si está en el maestro.
      *
-     * Contesta mientras se tipea, para que el titular de una organización
-     * se resuelva sin abrir un buscador aparte. Un paso que hay que
-     * acordarse de dar es un paso que el día apurado no se da, y ahí entra
-     * la segunda ficha del mismo humano.
+     * Contesta mientras se tipea: la consulta `PersonPicker`.
      */
     public function resolve(ResolvePersonRequest $request): JsonResponse
     {

@@ -104,7 +104,7 @@ final class CashSheetArchivist
      * Un cierre diario es una planilla. Uno mensual son todas las del mes
      * más la suya, en orden — y solo las **cerradas**: un día sin cerrar no
      * tiene snapshot, y meterlo obligaría a recalcularlo, que es
-     * exactamente lo que este circuito no hace.
+     * lo que este circuito no hace.
      *
      * @return list<PeriodClosing>
      */

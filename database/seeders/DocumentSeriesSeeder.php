@@ -29,8 +29,8 @@ class DocumentSeriesSeeder extends Seeder
          *
          * Había dos —`system` y `talonario_loaded`— y nacieron de suponer
          * que el papel preimpreso traía su propia numeración en pie de
-         * igualdad. El área confirmó lo contrario: **el número del sistema
-         * es siempre el identificador**, y el del talonario se registra
+         * igualdad. No es así: **el número del sistema es siempre el
+         * identificador**, y el del talonario se registra
          * al lado cuando el papel existe. Con eso, dos correlativos para
          * el mismo documento sobran y vuelven cada reporte una suma de
          * series. De dónde vino el comprobante lo dice `issue_mode`.

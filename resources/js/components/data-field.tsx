@@ -3,10 +3,9 @@ import type { ReactNode } from 'react';
 /**
  * Un renglón de ficha: su rótulo y su valor.
  *
- * La del expediente y la del haber son la misma tarjeta con otros campos,
- * y hasta acá cada una escribía su propio `dt`/`dd`. Con el renglón en un
- * solo lugar no pueden verse distinto ni empezar a separarse cuando una de
- * las dos cambie.
+ * La del expediente y la del haber son la misma tarjeta con otros campos.
+ * Con el renglón en un solo lugar no pueden verse distinto ni separarse
+ * cuando una de las dos cambie.
  *
  * Va dentro de un `<dl>`: el `div` intermedio es lo que HTML permite para
  * agrupar el par sin romper la lista de definiciones.

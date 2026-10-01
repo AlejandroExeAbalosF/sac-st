@@ -96,13 +96,8 @@ final class ExpedienteListItemData extends Data
         ?LastChangeData $lastChange = null,
         array $haberChanges = [],
         /*
-         * Lo que las cuotas necesitan para no mentir.
-         *
-         * Hasta acá esta pantalla no los pasaba, y el efecto era silencioso:
-         * `cashTransfer` llegaba siempre en `null`, `effectiveMedium` caía
-         * en el previsto y el listado mostraba «Efectivo» para una cuota ya
-         * depositada. No fallaba nada, simplemente decía menos de lo que
-         * creía. Todos se resuelven en lote sobre las cuotas del expediente.
+         * Lo que las cuotas necesitan para no mentir, en lote: ver
+         * `InstallmentBatch`.
          */
         array $funded = [],
         array $receipts = [],

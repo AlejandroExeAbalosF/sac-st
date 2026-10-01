@@ -106,7 +106,7 @@ final class CounterPayoutQueue
      * neta de reversiones es la misma expresión que usan
      * `InstallmentFunding::allocatedForMany()` y `PendingOrderQueues`, y se
      * repite en SQL porque traer todas las cuotas del sistema para
-     * filtrarlas en PHP sería exactamente lo que este método evita.
+     * filtrarlas en PHP sería lo que este método evita.
      *
      * @return Collection<int, BeneficiaryInstallment>
      */

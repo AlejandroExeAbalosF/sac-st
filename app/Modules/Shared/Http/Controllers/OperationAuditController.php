@@ -25,11 +25,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Qué se hizo en el sistema, quién y cuándo, de punta a punta.
  *
- * Los historiales de cada expediente responden por una cosa; esta pantalla
- * responde las preguntas que no empiezan por un expediente: quién anuló
- * cobros este mes, quién reabrió un período, quién forzó un CBU. Es de
- * solo lectura sin excepciones: los eventos no se editan ni se marcan, y
- * la base lo impide de todos modos.
+ * Para qué sirve la pantalla, en `configuracion/auditoria`. Es de solo
+ * lectura sin excepciones: los eventos no se editan ni se marcan, y la
+ * base lo impide de todos modos.
  */
 final class OperationAuditController extends Controller
 {

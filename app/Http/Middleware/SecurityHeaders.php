@@ -96,8 +96,7 @@ final class SecurityHeaders
          * página, incluidas las redirecciones. Sobre un servidor de
          * desarrollo sin TLS eso rompe la navegación: al guardar un
          * formulario, la respuesta redirige a http y el navegador intenta
-         * https, que no existe, y la conexión se cierra. Costó un rato
-         * entender por qué «no pasaba nada» al guardar.
+         * https, que no existe, y la conexión se cierra.
          */
         if (! $seguro) {
             unset($directives['upgrade-insecure-requests']);

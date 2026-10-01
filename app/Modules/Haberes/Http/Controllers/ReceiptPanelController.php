@@ -28,7 +28,7 @@ use Illuminate\Http\JsonResponse;
  *
  * Responde JSON y no Inertia porque el panel se abre encima de la pantalla
  * que estés mirando: una visita de Inertia la reemplazaría, que es
- * exactamente lo que el panel viene a evitar.
+ * lo que el panel viene a evitar.
  */
 final class ReceiptPanelController extends Controller
 {

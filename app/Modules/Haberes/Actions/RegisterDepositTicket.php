@@ -23,9 +23,9 @@ use Throwable;
  * nace cuando el crédito aparece en el extracto (§2.1.13), y esto es lo
  * que hay antes.
  *
- * **La foto es opcional pero se pide.** El área definió que no sea
- * obligatoria —a veces el papel se traspapela y el dato hay que cargarlo
- * igual—, así que se advierte que falta en lugar de trabar la carga. Es el
+ * **La foto es opcional pero se pide.** A veces el papel se traspapela y
+ * el dato hay que cargarlo igual, así que se advierte que falta en lugar
+ * de trabar la carga. Es el
  * mismo criterio de la continuidad de saldos: avisar sin impedir.
  */
 final class RegisterDepositTicket

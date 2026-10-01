@@ -17,9 +17,9 @@ use Exception;
  * pantalla —reabriendo el período— o no se arregla.
  *
  * Lleva el cierre entero para que la pantalla pueda decir cuál es y llevar
- * hasta él. Antes esto llegaba como `QueryException` del trigger
- * `financial_events_period_open`: una traza de PostgreSQL en la cara del
- * operador, sin decirle qué hacer.
+ * hasta él. Sin ella, el caso llega como `QueryException` del trigger
+ * `financial_events_period_open`: una traza de PostgreSQL que no le dice
+ * al operador qué hacer.
  *
  * **Hereda de `Exception` y no de `RuntimeException` a propósito.** Varios
  * controladores atrapan `RuntimeException` para convertirla en un aviso

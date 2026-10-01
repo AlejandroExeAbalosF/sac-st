@@ -46,8 +46,6 @@ final class StatementImportListItemData extends Data
         /*
          * La procedencia: lo que el archivo decía de sí mismo.
          *
-         * Se guarda desde el principio y hasta ahora no se veía en ninguna
-         * pantalla, que es la peor forma de tener un dato de trazabilidad.
          * Cuando una importación se rechaza porque el extracto era de otra
          * cuenta, el número que traía es justamente lo que hay que mirar.
          */

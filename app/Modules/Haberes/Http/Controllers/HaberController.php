@@ -71,17 +71,8 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 final class HaberController extends Controller
 {
     /**
-     * Alta de un haber, en su propia pantalla.
-     *
-     * Estaba dentro del detalle, debajo de los haberes ya cargados, y ahí
-     * el formulario se leía como uno más de la lista. Tampoco alcanzaba con
-     * separarlo visualmente: con cinco haberes desplegados arriba, cada uno
-     * con sus cuotas, el formulario quedaba a dos pantallas de distancia.
-     *
-     * Lo que no se pierde al mudarlo es el contexto: arriba va el
-     * expediente con lo que ya reconoce y a quiénes, porque es contra eso
-     * que se controla el importe nuevo y que se evita cargar dos veces al
-     * mismo beneficiario.
+     * Alta de un haber, en su propia pantalla y con el expediente como
+     * contexto. El porqué, en la página `haberes/haber-create`.
      */
     public function create(Expediente $expediente): Response
     {
@@ -142,9 +133,7 @@ final class HaberController extends Controller
             : "Haber de {$haber->beneficiary->name} agregado, con {$cuotas} cuotas.";
 
         /*
-         * Un acto puede reconocer varios haberes —el expediente de Bulacio
-         * tiene cinco— y volver al detalle entre uno y otro obliga a
-         * arrancar de nuevo cada vez.
+         * «Guardar y agregar otro» vuelve al alta: ver `HaberForm`.
          */
         if ($request->boolean('andAnother')) {
             return to_route('haberes.haber.create', $expediente->id)->with('status', $aviso);
@@ -598,17 +587,8 @@ final class HaberController extends Controller
     }
 
     /**
-     * Detalle de un haber, con su plan de cuotas.
-     *
-     * El haber vivía dentro del expediente como una fila desplegable, y ahí
-     * entraba mientras la cuota fuera un importe. Ahora la cuota tiene
-     * concepto, etiqueta, medio previsto, observaciones y estado propio, y
-     * el plan puede llegar a sesenta: eso no cabe en un acordeón dentro de
-     * una lista de cinco beneficiarios.
-     *
-     * El expediente sigue arriba porque el haber no se entiende suelto: el
-     * número, el empleador y el total declarado son el marco contra el que
-     * se lee lo que este beneficiario tiene reconocido.
+     * Detalle de un haber, con su plan de cuotas y el expediente que lo
+     * enmarca. El porqué del diseño, en la página `haberes/haber-show`.
      */
     public function show(Request $request, Expediente $expediente, Haber $haber): Response|RedirectResponse
     {
@@ -861,12 +841,7 @@ final class HaberController extends Controller
     }
 
     /**
-     * Anula un haber sin tocar el resto del expediente.
-     *
-     * Hasta acá la única baja era la del expediente entero, y para un
-     * haber cargado de más eso obligaba a anular todo y volver a cargar lo
-     * que sí estaba bien. Un haber anulado deja de contar en lo
-     * reconocido, que es lo que hace que el expediente vuelva a cuadrar.
+     * Anula un haber sin tocar el resto del expediente: ver `CancelHaber`.
      */
     public function cancel(
         CancelHaberRequest $request,

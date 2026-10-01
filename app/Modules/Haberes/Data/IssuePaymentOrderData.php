@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
  * navegador: los deriva el Action de la propia cuota, por el mismo motivo
  * que en el recibo de ingreso (docs/haberes-reglas.md#recibo-de-ingreso).
  * Un importe propuesto por el cliente en un documento que pide transferir
- * dinero es exactamente lo que no puede pasar.
+ * dinero es lo que no puede pasar.
  *
  * Lo que sí es una decisión de quien emite:
  *
@@ -48,8 +48,8 @@ final readonly class IssuePaymentOrderData
         /**
          * Quién firma como Tesorero.
          *
-         * Nulo es lo normal: el área pidió que la Orden salga con la firma
-         * en blanco para que la firme quien corresponda. Se guarda cuando
+         * Nulo es lo normal: la Orden sale con la firma en blanco para que
+         * la firme quien corresponda. Se guarda cuando
          * se lo elige, congelado con su cargo, porque un ascenso no puede
          * reescribir un papel ya entregado.
          */

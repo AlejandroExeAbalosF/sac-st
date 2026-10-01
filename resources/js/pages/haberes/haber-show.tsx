@@ -91,11 +91,9 @@ const ETIQUETA: Record<HaberStatus, string> = {
 /**
  * Detalle de un haber, con su plan de cuotas.
  *
- * El haber vivía dentro del expediente como una fila desplegable, y ahí
- * entraba mientras la cuota fuera un importe. Ahora la cuota tiene
- * concepto, etiqueta, medio previsto, observaciones y estado propio, y el
- * plan puede llegar a sesenta: eso no cabe en un acordeón dentro de una
- * lista de cinco beneficiarios.
+ * Tiene pantalla propia porque la cuota tiene concepto, etiqueta, medio
+ * previsto, observaciones y estado propio, y el plan puede llegar a
+ * sesenta: eso no cabe en un acordeón dentro de una lista de beneficiarios.
  *
  * El expediente queda arriba porque el haber no se entiende suelto: el
  * número, el empleador y el total declarado son el marco contra el que se

@@ -120,7 +120,7 @@ final class CashSheetBuilder
      * lo dice: «un recibo de ingreso puede respaldar varias asignaciones»—.
      * Unirlos por el evento de recepción devuelve el importe correcto y
      * **todas las columnas que identifican el cheque en blanco**, que es
-     * exactamente lo que el reverso necesita.
+     * lo que el reverso necesita.
      *
      * `funding_allocations` es la única tabla que registra qué recepción
      * pagó qué cuota, así que es el único puente posible. Se lee con

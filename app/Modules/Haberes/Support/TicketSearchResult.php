@@ -16,7 +16,7 @@ namespace App\Modules\Haberes\Support;
  * - El período está importado y aun así el crédito no aparece. Ahí sí hay
  *   algo que revisar: el depósito no llegó, o el ticket tiene un dato mal.
  *
- * La diferencia entre «esperá» y «revisá» es exactamente lo que hoy la
+ * La diferencia entre «esperá» y «revisá» es lo que hoy la
  * contadora resuelve abriendo el homebanking, y se calcula con los
  * períodos que ya guarda cada importación.
  */

@@ -69,15 +69,15 @@ final class Cuit
     /**
      * El DNI que hay adentro de un CUIL.
      *
-     * El expediente muchas veces trae el CUIL y no el DNI, y hasta ahora el
-     * operador tenía que sacarle el prefijo y el verificador a mano. Es una
-     * cuenta mental por cada carga, y una que el sistema no puede auditar:
-     * ocho dígitos mal copiados siguen siendo un DNI válido.
+     * El expediente muchas veces trae el CUIL y no el DNI. Sacarle el
+     * prefijo y el verificador a mano es una cuenta que el sistema no puede
+     * auditar: ocho dígitos mal copiados siguen siendo un DNI válido.
      *
-     * Se guarda el DNI y no el CUIL porque el CUIL no agrega identidad, la
-     * duplica: es el mismo documento con dos dígitos adelante y uno atrás.
-     * Guardar los dos permitiría dos fichas del mismo humano, y el índice
-     * único de `document` no las vería.
+     * En `document` va el DNI y no el CUIL, porque el CUIL no agrega
+     * identidad, la duplica: es el mismo documento con dos dígitos adelante
+     * y uno atrás. Si `document` admitiera las dos formas, el mismo humano
+     * podría tener dos fichas y el índice único no las vería. El CUIL
+     * entero se conserva aparte, en `tax_identifier`.
      */
     public static function toDocumentNumber(string $cuil): ?string
     {

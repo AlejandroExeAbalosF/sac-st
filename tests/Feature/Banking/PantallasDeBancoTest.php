@@ -286,7 +286,7 @@ class PantallasDeBancoTest extends TestCase
     /**
      * La moneda de una cuenta con movimientos no se toca.
      *
-     * Los movimientos la heredan sin llevarla encima (§4.4 del DER), así
+     * Los movimientos la heredan sin llevarla encima, así
      * que cambiarla acá no corregiría un dato: reinterpretaría todos los
      * importes ya importados.
      */

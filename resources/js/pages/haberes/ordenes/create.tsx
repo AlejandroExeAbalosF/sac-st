@@ -566,9 +566,7 @@ export default function OrdenCreate({
                          * porque es el único dato que se escribe una vez y
                          * se imprime dos: redacta la cita de la nota —«a la
                          * CBU informada en fs. 19»— y el renglón OBS de la
-                         * Orden, que el área confirmó que no lleva nada más
-                         * (D-003). Cuando eran dos campos, nada garantizaba
-                         * que dijeran el mismo número.
+                         * Orden, que no lleva nada más.
                          */}
                         <Seccion
                             titulo="Foja donde el expediente informa el CBU"
@@ -672,14 +670,12 @@ export default function OrdenCreate({
 
                             {/*
                              * El último paso abre el papel, y generar vive
-                             * adentro del visor. Antes acá había un
-                             * «Generar» apagado cuya condición se explicaba
-                             * en un cartel de arriba: comunicaba el «no»
-                             * sin comunicar la salida.
+                             * adentro del visor: no hay un «Generar»
+                             * apagado que diga que no sin decir cómo
+                             * seguir.
                              *
-                             * De paso desaparece la revisión vencida. Como
-                             * no se puede emitir sin tener las hojas en
-                             * pantalla, la firma nunca llega a envejecer
+                             * Como no se puede emitir sin tener las hojas
+                             * en pantalla, la revisión nunca envejece
                              * entre que se mira y se confirma.
                              */}
                             <Button

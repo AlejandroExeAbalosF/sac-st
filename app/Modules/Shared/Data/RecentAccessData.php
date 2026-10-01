@@ -11,10 +11,6 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Un ingreso propio, para mostrarle al usuario su actividad reciente.
- *
- * Que cada uno vea sus últimos accesos es la forma más barata de detectar
- * un uso indebido de credenciales: nadie conoce mejor que el titular si
- * ese ingreso del sábado a las 23:10 fue suyo.
  */
 #[TypeScript]
 final class RecentAccessData extends Data

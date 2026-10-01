@@ -26,11 +26,10 @@ use App\Support\Money\Decimal;
 final class FindCashDepositCandidates
 {
     /**
-     * La ventana es asimétrica y esa asimetría no es un detalle: **el
-     * banco no puede acreditar antes de que uno deposite**. Hacia adelante
-     * hay margen —depósito después del cierre, fin de semana, feriado
-     * largo—; hacia atrás solo un día, y únicamente por si quien cargó el
-     * ticket tipeó mal la fecha.
+     * La ventana es asimétrica porque **el banco no puede acreditar antes
+     * de que uno deposite**. Hacia adelante hay margen —depósito después
+     * del cierre, fin de semana, feriado largo—; hacia atrás solo un día, y
+     * únicamente por si quien cargó el ticket tipeó mal la fecha.
      */
     private const DAYS_FORWARD = 5;
 
@@ -80,8 +79,8 @@ final class FindCashDepositCandidates
         $dias = $fecha === null ? 0 : (int) $transfer->deposit_date->diffInDays($fecha, false);
 
         /*
-         * El número de operación del ticket se compara, pero no manda: el
-         * área confirmó que no es fiable. Cuando coincide es la señal más
+         * El número de operación del ticket se compara, pero no manda: no
+         * es fiable. Cuando coincide es la señal más
          * fuerte que hay; cuando no, no significa nada.
          */
         $operacion = $transfer->deposit_operation_number !== null

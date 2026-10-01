@@ -92,8 +92,7 @@ trait ProfileValidationRules
     }
 
     /**
-     * El email es obligatorio: el área confirmó que todo el personal tiene
-     * casilla institucional. Es además lo que permite que cualquiera
+     * El email es obligatorio. Es además lo que permite que cualquiera
      * restablezca su contraseña sin depender de un administrador.
      *
      * @return array<int, ValidationRule|Unique|array<mixed>|string>

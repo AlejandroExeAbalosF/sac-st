@@ -48,7 +48,7 @@ return new class extends Migration
             /*
              * El arqueo se cuenta **por moneda**: billetes de pesos y de
              * dólares son dos conteos con dos totales, y sumarlos no
-             * significa nada. §4.4 del DER, corrección 23.
+             * significa nada.
              */
             $table->char('currency', 3)->default('ARS');
 
@@ -90,8 +90,8 @@ return new class extends Migration
             /*
              * El asiento que imputa la diferencia a `CASH_DIFFERENCE`,
              * cuando además de documentarla se la regulariza. Nulo si solo
-             * se documenta — cuál de las dos vías corresponde sigue siendo
-             * pregunta abierta del §4.1.
+             * se documenta: cuál de las dos vías corresponde sigue sin
+             * confirmar.
              */
             $table->foreignId('adjustment_event_id')->nullable()
                 ->constrained('financial_events')->restrictOnDelete();

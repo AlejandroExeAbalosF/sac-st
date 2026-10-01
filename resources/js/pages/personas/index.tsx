@@ -72,13 +72,7 @@ const roles = (persona: Persona): string =>
         .join(' · ') || 'Sin rol operativo';
 
 /**
- * Maestro de personas y organizaciones.
- *
- * Existe por una consecuencia concreta de que el documento del empleador
- * sea opcional: alguien cargado hoy con la razón social nada más tiene que
- * poder recibir su CUIT cuando llegue el expediente siguiente. Y como el
- * nombre de esta ficha es el que se imprime en los comprobantes, un error
- * de tipeo sin forma de corregirlo queda ahí para siempre.
+ * Maestro de personas y organizaciones. Por qué existe: ver `UpdatePerson`.
  */
 export default function PersonasIndex({ personas, filters }: Props) {
     const [termino, setTermino] = useState(filters.q ?? '');

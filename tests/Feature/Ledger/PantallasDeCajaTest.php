@@ -32,11 +32,12 @@ use Tests\TestCase;
  * Las tres pantallas de caja.
  *
  * Lo que se prueba acá es el reparto de permisos y que el saldo que llega
- * a la pantalla salga del libro. **El reparto no es decorativo**: contar el
- * cajón es trabajo de mostrador, imputar una diferencia mueve plata contra
- * `CASH_DIFFERENCE` sin que haya entrado ni salido nada, y reabrir un
- * período deshace algo que el área pudo haber archivado en papel. Que un
- * administrativo llegue a lo último sería un agujero, no una comodidad.
+ * a la pantalla salga del libro. **Cada permiso protege algo
+ * distinto**: contar el cajón es trabajo de mostrador, imputar una
+ * diferencia mueve plata contra `CASH_DIFFERENCE` sin que haya entrado ni
+ * salido nada, y reabrir un período deshace algo que el área pudo haber
+ * archivado en papel. Que un administrativo llegue a lo último sería un
+ * agujero, no una comodidad.
  */
 class PantallasDeCajaTest extends TestCase
 {
@@ -117,7 +118,7 @@ class PantallasDeCajaTest extends TestCase
      * Contar, revisar y cerrar son tres actos encadenados —el cierre no
      * admite arqueos en borrador— y ahora los tres se hacen desde la misma
      * pantalla. Lo que se prueba es la cadena entera con **un solo
-     * usuario**, que es el caso que el área pidió poder cubrir.
+     * usuario**.
      */
     public function test_un_solo_usuario_cuenta_revisa_y_cierra_el_dia(): void
     {

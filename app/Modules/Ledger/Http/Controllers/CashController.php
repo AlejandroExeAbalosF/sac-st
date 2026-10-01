@@ -133,8 +133,7 @@ final class CashController extends Controller
              * La apertura, para poder mostrar de dónde salió el saldo con
              * el que arrancó todo. Su observación —«según acta de arqueo
              * del 31/05», «planilla manual»— es la única explicación que
-             * tienen los tres saldos iniciales, y hasta ahora vivía
-             * enterrada en la pantalla de apertura.
+             * tienen los tres saldos iniciales.
              */
             'opening' => $apertura === null ? null : [
                 'date' => $apertura->event_date->toDateString(),

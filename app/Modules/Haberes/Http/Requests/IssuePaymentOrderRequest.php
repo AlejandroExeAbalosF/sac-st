@@ -37,7 +37,7 @@ final class IssuePaymentOrderRequest extends FormRequest
              * el dato no estaba a mano. Lo que cambió después es cuánto
              * pesa: desde que redacta también el renglón OBS de la Orden
              * (D-003), una emisión sin foja saca **dos** renglones en
-             * blanco en vez de uno, y el área pidió volver a exigirla.
+             * blanco en vez de uno.
              *
              * Es una regla del formulario y no de la base a propósito: las
              * Órdenes emitidas mientras fue opcional tienen la columna nula

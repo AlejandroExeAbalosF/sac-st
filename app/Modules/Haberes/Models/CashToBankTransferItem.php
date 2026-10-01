@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * De quién era el efectivo que se depositó — §9.5 del DER.
  *
  * Vive en Haberes y no junto al traslado porque referencia
- * `funding_allocations`, que tiene `haber_id`: es exactamente el mismo
+ * `funding_allocations`, que tiene `haber_id`: es el mismo
  * motivo por el que esa tabla tampoco pudo quedar en Ledger.
  *
  * Sin esto, depositar efectivo perdería el vínculo con el beneficiario y

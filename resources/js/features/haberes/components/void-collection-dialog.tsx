@@ -21,10 +21,7 @@ type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 /**
  * Anular el cobro: el dinero nunca entró.
  *
- * **No es liberar.** Liberar mueve plata que existe de una cuota al pozo
- * de no identificados; esto deshace la afirmación de que entró. Se usa
- * cuando el importe se tipeó mal y el sistema asentó en la caja un dinero
- * que nadie trajo.
+ * No es liberar: la diferencia está en `VoidCashCollection`.
  *
  * Deja la cuota sin cobrar y el recibo anulado con su número. Después el
  * circuito normal la cobra bien y emite uno nuevo que apunta al anulado.

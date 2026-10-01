@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
  * `RequirePassword` protege la sección de seguridad de un caso concreto: la
  * sesión que quedó abierta y alguien más se sienta en esa máquina. Volver a
  * pedirle la contraseña a quien la tipeó hace tres segundos no cubre ese
- * caso —cubre el mismo acto dos veces— y es exactamente lo que le pasaba al
+ * caso —cubre el mismo acto dos veces— y es lo que le pasaba al
  * usuario nuevo, obligado a cambiar su clave provisoria y frenado en el
  * camino por una pantalla que además se parecía al login.
  *

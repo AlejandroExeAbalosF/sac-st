@@ -160,7 +160,7 @@ export default function UnallocateDialog({
                     </div>
 
                     {/*
-                     * El motivo es obligatorio y no es burocracia: es lo
+                     * El motivo es obligatorio: es lo
                      * único que va a explicar el movimiento cuando nadie se
                      * acuerde de por qué se hizo.
                      */}

@@ -23,14 +23,7 @@ use Inertia\Response;
 /**
  * La apertura de los libros.
  *
- * **Es el primer acto de la vida del sistema y ocurre una sola vez.** El día
- * que arranque hay plata física en el cajón que él no conoce; sin este
- * asiento el saldo teórico empieza en cero y el primer arqueo da una
- * diferencia igual a todo el saldo histórico.
- *
- * Hasta ahora solo se podía invocar por consola, y un sistema que maneja
- * dinero de terceros no puede pedir que alguien abra un `tinker` en
- * producción para declarar ocho millones de pesos.
+ * Ocurre una sola vez; el porqué, en la página `caja/apertura`.
  *
  * **Si la caja ya está abierta no hay formulario**: hay un asiento que
  * mostrar. Corregirlo no es volver a abrir —eso duplicaría el saldo— sino

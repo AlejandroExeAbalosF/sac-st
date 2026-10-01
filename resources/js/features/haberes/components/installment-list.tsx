@@ -74,11 +74,8 @@ export default function InstallmentList({
     etiquetas: EtiquetaOption[];
     editable: boolean;
     /**
-     * Avisa cuándo se abre y se cierra el editor.
-     *
-     * Lo necesita el nivel de arriba para apagar los demás haberes: con
-     * cinco en pantalla, un formulario abierto en el tercero se pierde
-     * entre todo lo que sigue encendido alrededor.
+     * Avisa cuándo se abre y se cierra el editor, para que el nivel de
+     * arriba atenúe los demás haberes.
      */
     onEditorChange?: (abierto: boolean) => void;
 }) {
@@ -160,10 +157,8 @@ export default function InstallmentList({
                     )}
 
                     {/*
-                     * Con su rotulo: «Efectivo» a secas, entre el concepto y
-                     * el vencimiento, no decia si era lo previsto o lo que
-                     * pasó. El caso «sin definir» se fue con el NOT NULL de
-                     * 09/2026.
+                     * Con su rótulo: «Efectivo» a secas no dice si es lo
+                     * previsto o lo que pasó.
                      */}
                     <span className="text-muted-foreground">
                         Medio previsto:{' '}

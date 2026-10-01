@@ -239,7 +239,7 @@ class ImportarExtractoTest extends TestCase
     }
 
     /**
-     * §4.4 del DER: nunca se suman importes de monedas distintas. El
+     * Nunca se suman importes de monedas distintas. El
      * control tiene que existir antes de que exista la cuenta en dólares.
      */
     public function test_un_extracto_en_pesos_no_entra_a_una_cuenta_en_dolares(): void
@@ -262,7 +262,7 @@ class ImportarExtractoTest extends TestCase
 
     /**
      * La referencia bancaria se repite: la transferencia y su comisión
-     * comparten `86934222`. Es el hallazgo que cierra §4.3 del DER.
+     * comparten `86934222`, así que no sirve como clave.
      */
     public function test_la_referencia_bancaria_puede_repetirse(): void
     {

@@ -308,7 +308,7 @@ class FinanciacionDeCuotaTest extends TestCase
      * La concurrencia real no se puede reproducir aca —`RefreshDatabase`
      * mantiene todo dentro de una transaccion y una segunda conexion no
      * veria estos datos—, asi que se verifica lo que si es verificable y
-     * es exactamente lo que importa: que los bloqueos esten, y en orden.
+     * es lo que importa: que los bloqueos esten, y en orden.
      */
     public function test_la_asignacion_bloquea_de_afuera_hacia_adentro(): void
     {

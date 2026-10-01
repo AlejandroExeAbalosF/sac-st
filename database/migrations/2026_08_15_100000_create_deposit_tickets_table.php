@@ -67,7 +67,7 @@ return new class extends Migration
              * espacio de numeración. Se guarda, se compara, y las
              * coincidencias quedan registradas en `match_signals` para
              * poder responder con datos —dentro de unos meses— si este
-             * campo sirvió alguna vez. Mismo criterio que §4.3.
+             * campo sirvió alguna vez.
              */
             $table->string('operation_number', 40)->nullable();
             $table->string('terminal', 40)->nullable();

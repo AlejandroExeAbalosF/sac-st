@@ -226,8 +226,8 @@ class CierreListoParaCerrarTest extends TestCase
      *
      * **No sale del DER**: el invariante 30 no los nombra y los totales
      * del mes no dependen de los cierres diarios —se calculan sobre el
-     * libro—, así que el mes cerraba igual. El área definió lo contrario:
-     * sin su cierre diario, esos días nunca pasaron por el arqueo, que es
+     * libro—, así que el mes cerraría igual. Se exige porque sin su cierre
+     * diario esos días nunca pasaron por el arqueo, que es
      * donde se detecta un faltante.
      *
      * La pantalla ya los contaba para avisar; ahora ese mismo número es lo

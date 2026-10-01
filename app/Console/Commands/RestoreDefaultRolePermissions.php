@@ -12,10 +12,9 @@ use function Laravel\Prompts\confirm;
 /**
  * Devuelve cada rol a la matriz declarada en el seeder.
  *
- * Existe porque el seeder dejó de hacerlo solo: desde que los permisos se
- * editan desde Configuración, un `db:seed` que pisara la matriz borraría en
- * silencio decisiones del área. Volver atrás sigue siendo posible, pero hay
- * que pedirlo.
+ * El seeder no pisa la matriz: los permisos se editan desde Configuración,
+ * y un `db:seed` que la pisara borraría en silencio decisiones del área.
+ * Volver a la matriz declarada hay que pedirlo con este comando.
  */
 final class RestoreDefaultRolePermissions extends Command
 {

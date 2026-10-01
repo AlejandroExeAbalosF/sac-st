@@ -57,7 +57,7 @@ final class AuditEvent extends Model
      * El valor que tenía un campo antes del cambio.
      *
      * Lo usan las reactivaciones: el estado previo vive acá y no en una
-     * columna aparte, porque es exactamente lo que la auditoría registra.
+     * columna aparte, porque es lo que la auditoría registra.
      */
     public function before(string $campo): mixed
     {

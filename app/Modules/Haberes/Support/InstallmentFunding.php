@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  * **Todo se calcula; nada se guarda.** Los saldos no son contadores
  * editables (docs/haberes-reglas.md#financiacion). La tentación de una
  * columna `funded_amount` en `beneficiary_installments` es real —una
- * consulta menos en cada listado— y es exactamente el error que este
+ * consulta menos en cada listado— y es el error que este
  * sistema no puede permitirse: un contador se desincroniza en la primera
  * reversión y nadie se entera hasta que el arqueo no cierra.
  *

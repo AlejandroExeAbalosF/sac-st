@@ -514,10 +514,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
             ->name('haberes.installments.order.complete');
 
         /*
-         * La pantalla que arma los dos documentos. Es pantalla y no modal
-         * por lo mismo que el traslado del efectivo: acá se completan datos
-         * de dos personas, se verifica un CBU y se leen dos hojas enteras
-         * antes de firmar.
+         * La pantalla que arma los dos documentos.
          */
         Route::get('haberes/cuotas/{installment}/orden/nueva', [PaymentOrderController::class, 'create'])
             ->whereNumber('installment')

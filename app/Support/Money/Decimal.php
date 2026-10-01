@@ -200,7 +200,7 @@ final class Decimal
      * No es una concesión al analizador estático. `bcadd` con una cadena
      * que no es numérica devuelve un resultado igual —tratándola como
      * cero— en vez de fallar, y un cero silencioso dentro de un cálculo de
-     * saldos es exactamente el error que nadie encuentra después.
+     * saldos es el error que nadie encuentra después.
      *
      * @return numeric-string
      */

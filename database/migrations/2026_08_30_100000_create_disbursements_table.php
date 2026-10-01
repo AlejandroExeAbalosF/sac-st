@@ -131,7 +131,7 @@ return new class extends Migration
          *
          * Y si salió, hay un asiento que lo dice y un día en que ocurrió.
          * Sin eso, «confirmado» sería una etiqueta sin respaldo en los
-         * libros, que es exactamente lo que este sistema no puede tener.
+         * libros, que es lo que este sistema no puede tener.
          */
         DB::statement("ALTER TABLE disbursements ADD CONSTRAINT disbursements_confirmed_check
             CHECK (

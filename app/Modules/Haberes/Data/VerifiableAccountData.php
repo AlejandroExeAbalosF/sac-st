@@ -16,7 +16,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * El modal las lista todas —no solo las verificadas— porque la decisión
  * que hay que tomar ahí es justamente esa: cotejar el número contra la
  * foja del expediente y darlo por bueno, o rechazarlo con su motivo.
- * Mostrar solo las verificadas escondería exactamente lo que hay que
+ * Mostrar solo las verificadas escondería lo que hay que
  * mirar.
  *
  * Los tres datos automáticos viajan aparte del estado porque responden
