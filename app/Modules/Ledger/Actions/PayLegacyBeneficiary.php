@@ -11,6 +11,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\LegacyFundsLock;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
@@ -70,6 +71,7 @@ final class PayLegacyBeneficiary
         private readonly TakeNextDocumentNumber $numerar,
         private readonly CashBalance $saldos,
         private readonly RecordAuditEvent $auditar,
+        private readonly LegacyFundsLock $bloqueo,
     ) {}
 
     /** @throws ValidationException */
@@ -91,13 +93,20 @@ final class PayLegacyBeneficiary
         $referencia = trim($legacyReference);
         $origen = $this->accountFor($medium);
 
-        $this->assertPayable($cashBoxId, $importe, $referencia, $origen, $currency, $bankAccountId);
-
         return DB::transaction(function () use (
             $cashBoxId, $beneficiary, $importe, $referencia, $paymentDate,
             $medium, $origen, $currency, $bankAccountId, $actorId, $talonarioNumber,
             $printsTalonarioNumber, $notes
         ): Receipt {
+            /*
+             * El pendiente se lee con el mismo bloqueo que toma la guarda de
+             * la base: dos pagos simultáneos no leen el mismo saldo, y el
+             * segundo recibe este mensaje y no el rechazo crudo del trigger.
+             */
+            $this->bloqueo->acquire($cashBoxId, $currency);
+
+            $this->assertPayable($cashBoxId, $importe, $referencia, $origen, $currency, $bankAccountId);
+
             $evento = $this->postJournalEntry->handle(
                 type: FinancialEventType::LegacyDisbursement,
                 /*
