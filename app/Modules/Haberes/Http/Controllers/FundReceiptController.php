@@ -282,6 +282,7 @@ final class FundReceiptController extends Controller
             ->whereNotIn('workflow_status', [
                 InstallmentWorkflowStatus::Cancelled->value,
                 InstallmentWorkflowStatus::Paid->value,
+                InstallmentWorkflowStatus::LegacySettled->value,
             ])
             ->whereHas('haber', fn ($q) => $q
                 ->where('expediente_id', $expedienteId)

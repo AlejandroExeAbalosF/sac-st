@@ -12,6 +12,7 @@ use App\Modules\Haberes\Http\Controllers\HaberController;
 use App\Modules\Haberes\Http\Controllers\HaberHistoryController;
 use App\Modules\Haberes\Http\Controllers\InstallmentController;
 use App\Modules\Haberes\Http\Controllers\InstallmentHistoryController;
+use App\Modules\Haberes\Http\Controllers\LegacySettlementController;
 use App\Modules\Haberes\Http\Controllers\PaymentOrderController;
 use App\Modules\Haberes\Http\Controllers\PayoutQueueController;
 use App\Modules\Haberes\Http\Controllers\ReceiptPanelController;
@@ -607,6 +608,23 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::post('personas/cuentas/{account}/forzar', [PersonBankAccountController::class, 'force'])
             ->whereNumber('account')
             ->name('personas.cuentas.force');
+    });
+
+    /*
+     * Las cuotas pagadas fuera del circuito, al cargar un expediente
+     * histórico. Registrar es parte de la carga; anular deja la cuota otra
+     * vez por pagar, y por eso pide el permiso de anular.
+     */
+    Route::middleware('can:expedientes.registrar-historico')->group(function (): void {
+        Route::post('haberes/cuotas/{installment}/pago-anterior', [LegacySettlementController::class, 'store'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.legacy-settlement');
+    });
+
+    Route::middleware('can:expedientes.anular')->group(function (): void {
+        Route::post('haberes/cuotas/{installment}/pago-anterior/anular', [LegacySettlementController::class, 'void'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.legacy-settlement.void');
     });
 
     Route::middleware('can:expedientes.editar')->group(function (): void {

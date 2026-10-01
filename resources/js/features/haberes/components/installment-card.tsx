@@ -1,4 +1,5 @@
 import {
+    Archive,
     ArrowDownRight,
     ArrowUpRight,
     CircleDashed,
@@ -16,7 +17,11 @@ import { Button } from '@/components/ui/button';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { salidaDe } from '@/features/haberes/installment-channel';
 import { ETAPA, TONO_ETAPA } from '@/features/haberes/installment-stage';
-import type { EgresoProps, OrdenDePagoProps } from '@/features/haberes/types';
+import type {
+    EgresoProps,
+    HistoricoProps,
+    OrdenDePagoProps,
+} from '@/features/haberes/types';
 import { date } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { history as historialDeCuota } from '@/routes/haberes/installments';
@@ -24,6 +29,8 @@ import InstallmentExpense from './installment-expense';
 import InstallmentIncome from './installment-income';
 import InstallmentTimeline from './installment-timeline';
 import type { Firmante } from './issue-receipt-dialog';
+import LegacySettlementDialog from './legacy-settlement-dialog';
+import LegacySettlementPanel from './legacy-settlement-panel';
 import PaymentOrderPanel from './payment-order-panel';
 import UnlockEditDialog from './unlock-edit-dialog';
 
@@ -36,6 +43,7 @@ const TONO: Record<CuotaStatus, StatusTone> = {
     blocked: 'blocked',
     cancelled: 'neutral',
     paid: 'done',
+    legacy_settled: 'done',
 };
 
 const ETIQUETA: Record<CuotaStatus, string> = {
@@ -44,6 +52,7 @@ const ETIQUETA: Record<CuotaStatus, string> = {
     blocked: 'Bloqueada',
     cancelled: 'Anulada',
     paid: 'Pagada',
+    legacy_settled: 'Pagada fuera del circuito',
 };
 
 const MEDIO: Record<
@@ -93,6 +102,7 @@ export default function InstallmentCard({
     firmantes,
     orden,
     egreso,
+    historico,
     onEditar,
 }: {
     cuota: Cuota;
@@ -110,13 +120,32 @@ export default function InstallmentCard({
     firmantes: Firmante[];
     orden: OrdenDePagoProps;
     egreso: EgresoProps;
+    historico: HistoricoProps;
     onEditar: () => void;
 }) {
     const { openDrawer } = useDrawer();
     const [destrabar, setDestrabar] = useState(false);
+    const [pagoAnterior, setPagoAnterior] = useState(false);
     const anulada = cuota.status === 'cancelled';
     const estadoOrden = orden.estados[cuota.id];
     const estadoEgreso = egreso.estados[cuota.id];
+    const estadoHistorico = historico.estados[cuota.id];
+
+    /*
+     * Pagada fuera del circuito: sus tramos ya pasaron, afuera, y lo que
+     * queda de ellos son los papeles. La cuota no se edita mientras tanto.
+     */
+    const saldada = cuota.status === 'legacy_settled';
+
+    /*
+     * Ofrecer registrar el pago anterior solo donde el servidor dice que se
+     * puede: pendiente y sin ningún movimiento adentro del sistema.
+     */
+    const puedeRegistrarAnterior =
+        historico.permisos.registrar &&
+        cuota.status === 'active' &&
+        estadoHistorico !== undefined &&
+        estadoHistorico.obstacle === null;
 
     /*
      * Con la Orden y el Pase emitidos el expediente salió del área. La
@@ -294,60 +323,81 @@ export default function InstallmentCard({
                 )}
             </Seccion>
 
-            <Seccion icono={ArrowDownRight} titulo="Ingreso">
-                <InstallmentIncome
-                    cuota={cuota}
-                    cuentas={cuentas}
-                    puedeEditarTicket={puedeEditarTicket}
-                    puedeEmitirRecibo={puedeEmitirRecibo}
-                    puedeRegistrarPago={puedeRegistrarPago}
-                    puedeTrasladar={puedeTrasladar}
-                    puedeAcreditar={puedeAcreditar}
-                    puedeDesasignar={puedeDesasignar}
-                    puedeAnular={puedeAnular}
-                    firmantes={firmantes}
-                />
-            </Seccion>
-
-            <Seccion icono={FolderOpen} titulo="Documentación de pago">
-                {estadoOrden === undefined ? (
-                    <Pendiente>
-                        Sin información de la Orden para esta cuota.
-                    </Pendiente>
-                ) : (
-                    <PaymentOrderPanel
+            {saldada && estadoHistorico !== undefined ? (
+                <Seccion
+                    icono={Archive}
+                    titulo="Pagada fuera del circuito"
+                    ultima
+                >
+                    <LegacySettlementPanel
                         cuotaId={cuota.id}
-                        estado={estadoOrden}
-                        permisos={{
-                            ...orden.permisos,
-                            // Una cuota anulada no empieza nada nuevo. Lo
-                            // ya emitido se sigue viendo: un documento que
-                            // el organismo tiene no deja de existir porque
-                            // acá alguien anule la cuota.
-                            emitir: orden.permisos.emitir && !anulada,
-                        }}
+                        numero={cuota.number}
+                        estado={estadoHistorico}
+                        puedeAnular={historico.permisos.anular}
                     />
-                )}
-            </Seccion>
+                </Seccion>
+            ) : (
+                <>
+                    <Seccion icono={ArrowDownRight} titulo="Ingreso">
+                        <InstallmentIncome
+                            cuota={cuota}
+                            cuentas={cuentas}
+                            puedeEditarTicket={puedeEditarTicket}
+                            puedeEmitirRecibo={puedeEmitirRecibo}
+                            puedeRegistrarPago={puedeRegistrarPago}
+                            puedeTrasladar={puedeTrasladar}
+                            puedeAcreditar={puedeAcreditar}
+                            puedeDesasignar={puedeDesasignar}
+                            puedeAnular={puedeAnular}
+                            firmantes={firmantes}
+                        />
+                    </Seccion>
 
-            <Seccion icono={ArrowUpRight} titulo="Egreso" ultima>
-                {estadoEgreso === undefined ? (
-                    <Pendiente>
-                        Sin información del egreso para esta cuota.
-                    </Pendiente>
-                ) : (
-                    <InstallmentExpense
-                        cuota={cuota}
-                        estado={estadoEgreso}
-                        // Una cuota anulada no empieza nada nuevo. Lo ya
-                        // pagado se sigue viendo: un recibo que el
-                        // beneficiario firmó no deja de existir porque acá
-                        // alguien anule la cuota.
-                        puedePagar={egreso.permisos.registrar && !anulada}
-                        puedeValidar={egreso.permisos.validar && !anulada}
-                    />
-                )}
-            </Seccion>
+                    <Seccion icono={FolderOpen} titulo="Documentación de pago">
+                        {estadoOrden === undefined ? (
+                            <Pendiente>
+                                Sin información de la Orden para esta cuota.
+                            </Pendiente>
+                        ) : (
+                            <PaymentOrderPanel
+                                cuotaId={cuota.id}
+                                estado={estadoOrden}
+                                permisos={{
+                                    ...orden.permisos,
+                                    // Una cuota anulada no empieza nada nuevo. Lo
+                                    // ya emitido se sigue viendo: un documento que
+                                    // el organismo tiene no deja de existir porque
+                                    // acá alguien anule la cuota.
+                                    emitir: orden.permisos.emitir && !anulada,
+                                }}
+                            />
+                        )}
+                    </Seccion>
+
+                    <Seccion icono={ArrowUpRight} titulo="Egreso" ultima>
+                        {estadoEgreso === undefined ? (
+                            <Pendiente>
+                                Sin información del egreso para esta cuota.
+                            </Pendiente>
+                        ) : (
+                            <InstallmentExpense
+                                cuota={cuota}
+                                estado={estadoEgreso}
+                                // Una cuota anulada no empieza nada nuevo. Lo ya
+                                // pagado se sigue viendo: un recibo que el
+                                // beneficiario firmó no deja de existir porque acá
+                                // alguien anule la cuota.
+                                puedePagar={
+                                    egreso.permisos.registrar && !anulada
+                                }
+                                puedeValidar={
+                                    egreso.permisos.validar && !anulada
+                                }
+                            />
+                        )}
+                    </Seccion>
+                </>
+            )}
 
             <div className="flex items-center justify-end gap-1 border-t bg-muted/20 px-4 py-2.5 sm:px-5">
                 {/*
@@ -378,7 +428,24 @@ export default function InstallmentCard({
                     Historial
                 </Button>
 
-                {editable && !anulada && (
+                {/*
+                 * Para cargar un expediente histórico: la cuota ya se pagó
+                 * y hay que dejarlo registrado con sus papeles.
+                 */}
+                {puedeRegistrarAnterior && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setPagoAnterior(true)}
+                    >
+                        <Archive className="size-3.5" aria-hidden="true" />
+                        Registrar pago anterior
+                    </Button>
+                )}
+
+                {editable && !anulada && !saldada && (
                     <Button
                         type="button"
                         variant="ghost"
@@ -403,6 +470,15 @@ export default function InstallmentCard({
                     </Button>
                 )}
             </div>
+
+            {pagoAnterior && estadoHistorico !== undefined && (
+                <LegacySettlementDialog
+                    cuota={cuota}
+                    estado={estadoHistorico}
+                    abierto
+                    onCerrar={() => setPagoAnterior(false)}
+                />
+            )}
 
             {destrabar && estadoOrden?.order != null && (
                 <UnlockEditDialog

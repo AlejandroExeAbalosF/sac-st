@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int $haber_number Ordinal dentro del expediente, único ahí.
  * @property int $beneficiary_id
  * @property string $assigned_amount
+ * @property string $currency ARS o USD; el CHECK de la base lo restringe.
  * @property int|null $expected_installment_count
  * @property string|null $concept
  * @property HaberWorkflowStatus $workflow_status
@@ -124,8 +125,9 @@ final class Haber extends Model
             ])
             ->withCount([
                 'installments',
+                // Pagadas adentro o afuera del circuito: las dos ya no se deben.
                 'installments as paid_installments_count' => fn (Builder $cuotas) => $cuotas
-                    ->where('workflow_status', InstallmentWorkflowStatus::Paid),
+                    ->whereIn('workflow_status', [InstallmentWorkflowStatus::Paid, InstallmentWorkflowStatus::LegacySettled]),
             ]);
     }
 

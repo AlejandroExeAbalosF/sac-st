@@ -318,6 +318,11 @@ No se paga más de lo que queda. El Action lo explica y la base lo impide aunque
 el asiento no pase por él; dos pagos simultáneos se ordenan con un bloqueo por
 caja y moneda, el mismo en los dos lados (`LegacyFundsLock`).
 
+Cuando después se carga el expediente histórico, sus cuotas se vinculan a estos
+recibos desde la ficha del haber
+([expedientes históricos](haberes.md#historicos)). El vínculo es documental: no
+mueve el libro, y un recibo con vínculos vigentes no se puede anular.
+
 ---
 
 <a id="monedas"></a>

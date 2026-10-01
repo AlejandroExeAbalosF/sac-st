@@ -22,6 +22,8 @@ de un Action no debe presentarse como garantía de PostgreSQL sin comprobar su D
 | `pases` | Nota asociada a la Orden |
 | `disbursements` | Pago al beneficiario: entrega o transferencia validada |
 | `cash_to_bank_transfers` / `cash_to_bank_transfer_items` | Traslado de Banking y sus imputaciones de Haberes |
+| `legacy_settlements` | Que una cuota se pagó fuera del circuito, y cómo; append-only con anulación |
+| `legacy_documents` | Papeles del sistema anterior de la cuota, con número de talonario, fecha e importe impresos |
 
 `financial_events` y `journal_lines` registran los hechos contables. Un ticket,
 una Orden o un informe de transferencia no deben confundirse con el asiento que
@@ -194,6 +196,42 @@ Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 [esquema de egresos](../database/migrations/2026_08_30_100000_create_disbursements_table.php),
 [egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php) y
 [egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php).
+
+<a id="historicos"></a>
+
+## Cuotas pagadas fuera del circuito
+
+Una cuota saldada afuera está en `legacy_settled` y tiene un `legacy_settlement`
+vigente. Las dos modalidades —`before_opening` y `legacy_disbursement`— comparten
+las reglas; cambia de dónde salen la fecha y el medio del pago.
+
+| Regla | Action | Base |
+| --- | --- | --- |
+| Estado y registro dicen lo mismo; el importe de la cuota no cambia mientras está saldada | `RecordLegacySettlement`, `VoidLegacySettlement` | `legacy_settlement_coherence`, diferido |
+| Solo se salda una cuota pendiente sin asignaciones, recibos, Orden, egreso ni comprobante de depósito | `InstallmentMovements` | `legacy_settlement_requires_clean_installment`, con `FOR UPDATE` sobre la cuota |
+| Una cuota saldada no acepta asignaciones, Órdenes, egresos, comprobantes ni recibos nuevos | `AllocateFundsToInstallment`, elegibilidades, `RegisterDepositTicket` | `reject_movement_on_legacy_settled_installment`, con `FOR SHARE` |
+| Recibo de ingreso de papel obligatorio y por la cuota entera | `RecordLegacySettlement` | La obligatoriedad, en la coherencia; el importe, solo en el Action |
+| Desde Pagos anteriores no hay recibo de egreso de papel | `RecordLegacySettlement` | coherencia |
+| Papeles y pago anteriores a la primera apertura de la caja de Haberes; sin apertura no se cargan | `LegacyCutoff`, `LegacyPaperCheck` | `legacy_paper_before_opening` y `opening_after_legacy_papers` |
+| El mismo papel —tipo, número y fecha— no se carga dos veces | `LegacyPaperCheck` | índice `legacy_documents_paper_unique` |
+| El mismo número con otra fecha, o una foto ya cargada, avisa y pasa con confirmación | `LegacyPaperCheck` | — |
+| El recibo vinculado es un egreso de Pagos anteriores vigente, del beneficiario, en la moneda del haber, y no se vincula más que su importe | `LegacyDisbursementReceipts` | `legacy_settlement_receipt_link`, con `FOR UPDATE` sobre el recibo |
+| Un recibo con vínculos vigentes no se anula | — | `receipts_keep_legacy_settlement_links` |
+| Registros y papeles no se borran ni se editan: se anulan una vez | `VoidLegacySettlement` | `legacy_records_append_only` |
+| Anular un haber o un expediente no barre cuotas saldadas | `CancelHaber`, `CancelExpediente` | coherencia |
+
+Anular el registro es documental: si la cuota se pagó desde Pagos anteriores, el
+asiento sigue y el recibo recupera su disponible. Los papeles que el registro
+trajo se anulan con él; un recibo de ingreso cargado antes, por otra vía, no.
+
+La carrera entre dos vínculos al mismo recibo no se reproduce en los tests —el
+recibo nace dentro de la transacción del test y otra conexión no lo ve—; se
+verifica que el Action lo bloquee antes de leer su disponible.
+
+Evidencia: [esquema](../database/migrations/2026_10_01_010000_create_legacy_settlement_tables.php),
+[RecordLegacySettlement](../app/Modules/Haberes/Actions/RecordLegacySettlement.php),
+[VoidLegacySettlement](../app/Modules/Haberes/Actions/VoidLegacySettlement.php) y
+[cuota histórica](../tests/Feature/Haberes/CuotaHistoricaTest.php).
 
 <a id="mantenimiento"></a>
 

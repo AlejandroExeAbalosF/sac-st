@@ -177,8 +177,9 @@ final class HaberListItemData extends Data
             // Las que se esperan, no las cargadas: es lo que permite decir
             // "1 de 3" mientras faltan cuotas por llegar.
             installmentCount: $haber->expected_installment_count ?? $cuotas->count(),
+            // Pagadas adentro o afuera del circuito: las dos ya no se deben.
             paidInstallmentCount: $cuotas
-                ->where('workflow_status', InstallmentWorkflowStatus::Paid)
+                ->whereIn('workflow_status', [InstallmentWorkflowStatus::Paid, InstallmentWorkflowStatus::LegacySettled])
                 ->count(),
             status: $haber->workflow_status,
             blockReason: $haber->block_reason,

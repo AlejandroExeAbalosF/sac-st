@@ -117,6 +117,10 @@ final class PaymentOrderEligibility
             return 'La cuota está anulada.';
         }
 
+        if ($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
+            return 'La cuota ya se pagó fuera del circuito: no lleva Orden.';
+        }
+
         if (! $this->financiacion->isFullyFunded($installment)) {
             return sprintf(
                 'La cuota todavía no está completa: le faltan $ %s.',

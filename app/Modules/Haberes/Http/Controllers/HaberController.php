@@ -22,6 +22,7 @@ use App\Modules\Haberes\Data\InstallmentDisbursementData;
 use App\Modules\Haberes\Data\InstallmentOrderStateData;
 use App\Modules\Haberes\Data\InstallmentReceiptData;
 use App\Modules\Haberes\Data\InstallmentTransferData;
+use App\Modules\Haberes\Data\LegacyReceiptOptionData;
 use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Http\Requests\CancelHaberRequest;
@@ -37,6 +38,9 @@ use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\InstallmentBatch;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\InstallmentStages;
+use App\Modules\Haberes\Support\LegacyCutoff;
+use App\Modules\Haberes\Support\LegacyDisbursementReceipts;
+use App\Modules\Haberes\Support\LegacyInstallments;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Haberes\Support\ReceiptFormData;
@@ -645,6 +649,8 @@ final class HaberController extends Controller
         /** @var list<int> $cuotaIds */
         $cuotaIds = $haber->installments->map(fn (BeneficiaryInstallment $c): int => $c->id)->all();
 
+        $puedeRegistrarHistorico = request()->user()?->can('expedientes.registrar-historico') ?? false;
+
         return Inertia::render('haberes/haber-show', [
             'haber' => HaberListItemData::fromModel(
                 haber: $haber,
@@ -753,6 +759,21 @@ final class HaberController extends Controller
              * asiento y deja la cuota pagada. Permiso propio.
              */
             'canValidateDisbursement' => request()->user()?->can('egresos.validar') ?? false,
+            /*
+             * Lo del sistema anterior: los papeles de cada cuota, si se
+             * pagó fuera del circuito, y con qué se puede registrar que se
+             * pagó. Los recibos de Pagos anteriores solo viajan a quien
+             * puede usarlos: listan pagos con su beneficiario.
+             */
+            'historicos' => app(LegacyInstallments::class)->forMany($cuotaIds),
+            'recibosAnteriores' => $puedeRegistrarHistorico
+                ? app(LegacyDisbursementReceipts::class)->availableFor($haber)
+                    ->map(fn (array $fila): LegacyReceiptOptionData => LegacyReceiptOptionData::fromModel($fila['receipt'], $fila['available']))
+                    ->all()
+                : [],
+            'corteHistorico' => app(LegacyCutoff::class)->date()?->toDateString(),
+            'canRecordLegacy' => $puedeRegistrarHistorico,
+            'canVoidLegacy' => request()->user()?->can('expedientes.anular') ?? false,
         ]);
     }
 

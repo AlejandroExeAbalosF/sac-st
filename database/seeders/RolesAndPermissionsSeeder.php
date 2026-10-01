@@ -77,6 +77,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // Anular deshace el expediente entero y arrastra sus haberes:
         // no lo alcanza quien carga todos los dias.
         'expedientes.anular' => ['administrador', 'contador'],
+        // Registrar que una cuota de un expediente histórico ya se pagó
+        // fuera del circuito. Es parte de cargar el expediente, así que lo
+        // tiene quien carga; anular ese registro va con `expedientes.anular`.
+        'expedientes.registrar-historico' => ['administrador', 'administrativo'],
 
         // Banco — Fase 2
         // La cuenta del organismo es un maestro que casi no cambia y del

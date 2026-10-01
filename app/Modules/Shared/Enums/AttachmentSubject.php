@@ -30,6 +30,9 @@ enum AttachmentSubject: string
     /** La planilla del día: el Excel que el área archiva y firma. */
     case PeriodClosing = 'period_closing';
 
+    /** Un papel del sistema anterior: recibo u Orden de Pago de talonario. */
+    case LegacyDocument = 'legacy_document';
+
     public function label(): string
     {
         return match ($this) {
@@ -42,6 +45,7 @@ enum AttachmentSubject: string
             self::CashTransfer => 'Traslado de efectivo',
             self::DepositTicket => 'Ticket de depósito',
             self::PeriodClosing => 'Planilla de caja',
+            self::LegacyDocument => 'Papel del sistema anterior',
         };
     }
 }

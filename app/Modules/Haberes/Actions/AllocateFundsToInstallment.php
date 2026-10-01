@@ -181,6 +181,12 @@ final class AllocateFundsToInstallment
                 'installmentId' => 'La cuota está anulada o pagada: no se le puede imputar dinero.',
             ]);
         }
+
+        if ($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'La cuota ya se pagó fuera del circuito: no se le puede imputar dinero.',
+            ]);
+        }
     }
 
     /**

@@ -15,6 +15,7 @@ import type { Firmante } from '@/features/haberes/components/issue-receipt-dialo
 import type {
     EgresoProps,
     EtiquetaOption,
+    HistoricoProps,
     OrdenDePagoProps,
 } from '@/features/haberes/types';
 import {
@@ -70,6 +71,10 @@ type Props = {
     >;
     canPayBeneficiary: boolean;
     canValidateDisbursement: boolean;
+    /** Los papeles y el pago fuera del circuito de cada cuota, por su id. */
+    historicos: Record<number, App.Modules.Haberes.Data.InstallmentLegacyData>;
+    canRecordLegacy: boolean;
+    canVoidLegacy: boolean;
 };
 
 const TONO: Record<HaberStatus, StatusTone> = {
@@ -124,6 +129,9 @@ export default function MostrarHaber({
     egresos,
     canPayBeneficiary,
     canValidateDisbursement,
+    historicos,
+    canRecordLegacy,
+    canVoidLegacy,
 }: Props) {
     const { openDrawer } = useDrawer();
     const [baja, setBaja] = useState(false);
@@ -149,6 +157,15 @@ export default function MostrarHaber({
         permisos: {
             registrar: canPayBeneficiary,
             validar: canValidateDisbursement,
+        },
+    };
+
+    /* Y lo del sistema anterior, por el mismo camino. */
+    const historico: HistoricoProps = {
+        estados: historicos,
+        permisos: {
+            registrar: canRecordLegacy && haber.status === 'active',
+            anular: canVoidLegacy,
         },
     };
 
@@ -453,6 +470,7 @@ export default function MostrarHaber({
                         firmantes={firmantes}
                         orden={orden}
                         egreso={egreso}
+                        historico={historico}
                         cuotas={haber.installments}
                         previstas={haber.installmentCount}
                         totalReconocido={haber.assignedAmount}

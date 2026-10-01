@@ -68,6 +68,14 @@ enum InstallmentStage: string
     /** El egreso está confirmado: el dinero salió y el libro lo dice. */
     case Paid = 'paid';
 
+    /* ── Pagada fuera del circuito ───────────────────────────────────── */
+
+    /** En papel, antes de que el sistema abriera los libros. */
+    case PaidBeforeOpening = 'paid_before_opening';
+
+    /** Desde «Pagos anteriores», con su recibo de egreso del sistema. */
+    case PaidFromLegacy = 'paid_from_legacy';
+
     public function label(): string
     {
         return match ($this) {
@@ -84,6 +92,8 @@ enum InstallmentStage: string
             self::DebitObserved => 'Débito observado',
             self::ReadyToValidate => 'Lista para validar',
             self::Paid => 'Pagada',
+            self::PaidBeforeOpening => 'Pagada antes de la apertura',
+            self::PaidFromLegacy => 'Pagada desde Pagos anteriores',
         };
     }
 

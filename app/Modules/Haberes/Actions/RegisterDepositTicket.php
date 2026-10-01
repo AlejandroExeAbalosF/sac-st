@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Enums\ExpectedMedium;
+use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Actions\RecordAuditEvent;
@@ -14,6 +15,7 @@ use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -44,6 +46,8 @@ final class RegisterDepositTicket
 
         try {
             return DB::transaction(function () use ($datos, $foto, $userId, &$adjunto): DepositTicket {
+                $this->assertCuotaEsperaDeposito($datos['installmentId'] ?? null);
+
                 $ticket = DepositTicket::query()->create([
                     'expediente_id' => $datos['expedienteId'],
                     'haber_id' => $datos['haberId'] ?? null,
@@ -143,5 +147,25 @@ final class RegisterDepositTicket
             ],
             actorId: $userId,
         );
+    }
+
+    /**
+     * Una cuota pagada fuera del circuito no espera ningún depósito.
+     *
+     * @throws ValidationException
+     */
+    private function assertCuotaEsperaDeposito(mixed $installmentId): void
+    {
+        if (! is_numeric($installmentId)) {
+            return;
+        }
+
+        $estado = BeneficiaryInstallment::query()->whereKey((int) $installmentId)->value('workflow_status');
+
+        if ($estado === InstallmentWorkflowStatus::LegacySettled) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'La cuota ya se pagó fuera del circuito: no espera ningún depósito.',
+            ]);
+        }
     }
 }

@@ -9,9 +9,11 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
+use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
@@ -65,11 +67,20 @@ final class InstallmentStages
         $traslados = app(PaymentOrderSources::class)->transfersFor($ids);
         $ordenes = $this->ordenesVigentes($ids);
         $egresos = $this->egresosVivos($ids);
+        $pagosAfuera = $this->pagosFueraDelCircuito($ids);
 
         $etapas = [];
 
         foreach ($cuotas as $cuota) {
             $id = (int) $cuota->id;
+
+            if ($cuota->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
+                $etapas[$id] = ($pagosAfuera[$id] ?? null) === LegacySettlementMode::LegacyDisbursement
+                    ? InstallmentStage::PaidFromLegacy
+                    : InstallmentStage::PaidBeforeOpening;
+
+                continue;
+            }
 
             $etapas[$id] = $this->etapaDe(
                 $cuota,
@@ -149,6 +160,23 @@ final class InstallmentStages
         return $tieneRecibo
             ? InstallmentStage::InCashBox
             : InstallmentStage::AwaitingReceipt;
+    }
+
+    /**
+     * Cómo se pagaron las cuotas saldadas fuera del circuito.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, LegacySettlementMode>
+     */
+    private function pagosFueraDelCircuito(array $ids): array
+    {
+        $porCuota = [];
+
+        foreach (LegacySettlement::query()->current()->whereIn('beneficiary_installment_id', $ids)->get(['beneficiary_installment_id', 'mode']) as $registro) {
+            $porCuota[$registro->beneficiary_installment_id] = $registro->mode;
+        }
+
+        return $porCuota;
     }
 
     /**

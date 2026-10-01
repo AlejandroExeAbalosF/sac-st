@@ -2,7 +2,12 @@ import { Plus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { compareAmounts, money, sumAmounts } from '@/lib/format';
-import type { EgresoProps, EtiquetaOption, OrdenDePagoProps } from '../types';
+import type {
+    EgresoProps,
+    EtiquetaOption,
+    HistoricoProps,
+    OrdenDePagoProps,
+} from '../types';
 import InstallmentCard from './installment-card';
 import InstallmentEditor from './installment-editor';
 import type { Firmante } from './issue-receipt-dialog';
@@ -32,6 +37,7 @@ export default function InstallmentCards({
     firmantes,
     orden,
     egreso,
+    historico,
     cuotas,
     previstas,
     totalReconocido,
@@ -56,6 +62,8 @@ export default function InstallmentCards({
     orden: OrdenDePagoProps;
     /** Y lo del egreso, por el mismo camino. */
     egreso: EgresoProps;
+    /** Lo del sistema anterior, igual. */
+    historico: HistoricoProps;
     cuotas: Cuota[];
     previstas: number;
     totalReconocido: string;
@@ -129,6 +137,7 @@ export default function InstallmentCards({
                             firmantes={firmantes}
                             orden={orden}
                             egreso={egreso}
+                            historico={historico}
                             // Con el editor abierto el resto se apaga, pero
                             // no se oculta: los importes de las otras cuotas
                             // son contra lo que se controla el que se edita.

@@ -144,6 +144,37 @@ están en `/haberes/planillas`.
 
 Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 
+<a id="historicos"></a>
+
+## Expedientes históricos
+
+Un expediente del sistema anterior se carga con las pantallas de siempre: el
+expediente, sus haberes y sus cuotas. Lo que cambia es qué se dice de cada cuota.
+
+Una cuota que **ya se pagó fuera del circuito** se registra desde su tarjeta con
+«Registrar pago anterior», de una de dos maneras:
+
+| Modalidad | Cuándo | Qué se carga |
+| --- | --- | --- |
+| Antes de la apertura | Se pagó en papel, antes de que la caja abriera los libros | Recibo de ingreso; Orden y recibo de egreso si están; fecha y medio del pago |
+| Desde Pagos anteriores | Se pagó con `/caja/pagos-anteriores`, contra el saldo del sistema anterior | Recibo de ingreso y el recibo del sistema que registró ese egreso |
+
+Los papeles van con **el número de talonario y la fecha que tienen impresos**,
+nunca con numeración del sistema, y la foto si está a mano. El recibo de ingreso
+es obligatorio y por el importe de la cuota: las cuotas se pagan enteras.
+
+No mueve dinero. En la primera modalidad el pago ocurrió antes de la apertura; en
+la segunda el egreso ya está en el libro y lo único que se agrega es el vínculo.
+Un recibo de Pagos anteriores puede respaldar varias cuotas del mismo beneficiario,
+hasta su importe.
+
+La cuota queda en `legacy_settled` y su tarjeta muestra los papeles en lugar de
+los tramos de ingreso, Orden y egreso. Un registro mal cargado se anula con motivo
+y la cuota vuelve a estar pendiente; si venía de Pagos anteriores, el pago sigue
+en la caja.
+
+Reglas: [cuotas pagadas fuera del circuito](haberes-reglas.md#historicos).
+
 <a id="permisos"></a>
 
 ## Permisos y auditoría
@@ -159,6 +190,8 @@ puede cambiar; esta tabla describe las capacidades que consulta el circuito.
 | Emitir recibo de ingreso | `recibos.emitir` (el cobro comprueba además su permiso de recepción) |
 | Emitir / anular Orden | `ordenes.emitir` / `ordenes.anular` |
 | Registrar / validar egreso | `egresos.registrar` / `egresos.validar` |
+| Registrar una cuota pagada fuera del circuito | `expedientes.registrar-historico` |
+| Anular ese registro | `expedientes.anular` |
 
 La referencia completa es [rutas de Haberes](../routes/modules/haberes.php).
 Las correcciones y operaciones relevantes registran eventos; pueden consultarse en
@@ -176,6 +209,10 @@ los historiales del circuito y en la [auditoría transversal](auditoria-acceso.m
 - Correcciones registra como pendiente de confirmación del área la exigencia del recibo
   de ingreso antes del egreso por mostrador. Hoy el sistema la exige; esta guía no
   transforma esa implementación en aprobación funcional.
+- Apartar del saldo del sistema anterior la plata de una cuota que todavía está en
+  custodia —para que siga el circuito normal— es la segunda etapa de la carga
+  histórica y todavía no está implementada. Hasta entonces, esos casos se pagan
+  desde Pagos anteriores y después se vinculan.
 - Los pendientes de dólares y comprobantes siguen en
   [la guía de Caja](caja-de-haberes.md); no se resuelven con esta consolidación.
 

@@ -45,11 +45,12 @@ final class CancelExpediente
                 ]);
             }
 
-            $this->assertSinDineroImputado(
-                BeneficiaryInstallment::query()
-                    ->whereIn('haber_id', $bloqueado->haberes()->pluck('id'))
-                    ->pluck('id'),
-            );
+            $cuotaIds = BeneficiaryInstallment::query()
+                ->whereIn('haber_id', $bloqueado->haberes()->pluck('id'))
+                ->pluck('id');
+
+            $this->assertSinDineroImputado($cuotaIds);
+            $this->assertSinPagosFueraDelCircuito($cuotaIds);
 
             $estadoAnterior = $bloqueado->status;
 
@@ -156,6 +157,33 @@ final class CancelExpediente
                 'reason' => $conPlata === 1
                     ? 'Una cuota todavía tiene dinero imputado. Hay que liberarlo o anular su cobro antes.'
                     : "Hay {$conPlata} cuotas con dinero imputado. Hay que liberarlo o anular sus cobros antes.",
+            ]);
+        }
+    }
+
+    /**
+     * Una cuota pagada fuera del circuito no se anula de rebote.
+     *
+     * Barrerla a `cancelled` borraría que ya se pagó, y reactivar después
+     * la dejaría por cobrar. Si el registro está mal, se anula primero ese
+     * registro, que es una decisión con su propio motivo.
+     *
+     * @param  Collection<int, mixed>  $cuotaIds
+     *
+     * @throws ValidationException
+     */
+    private function assertSinPagosFueraDelCircuito(Collection $cuotaIds): void
+    {
+        $saldadas = BeneficiaryInstallment::query()
+            ->whereIn('id', $cuotaIds)
+            ->where('workflow_status', InstallmentWorkflowStatus::LegacySettled)
+            ->count();
+
+        if ($saldadas > 0) {
+            throw ValidationException::withMessages([
+                'reason' => $saldadas === 1
+                    ? 'Una cuota ya se pagó fuera del circuito. Hay que anular ese registro antes.'
+                    : "Hay {$saldadas} cuotas pagadas fuera del circuito. Hay que anular esos registros antes.",
             ]);
         }
     }

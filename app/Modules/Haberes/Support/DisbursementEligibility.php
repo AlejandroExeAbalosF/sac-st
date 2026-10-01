@@ -122,6 +122,10 @@ final class DisbursementEligibility
             return 'La cuota está anulada.';
         }
 
+        if ($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
+            return 'La cuota ya se pagó fuera del circuito.';
+        }
+
         if ($canal === PaymentChannel::Undetermined) {
             return 'El depósito al banco todavía no está acreditado. Hasta que el extracto lo '
                 .'confirme, la cuenta del organismo no tiene ese dinero.';

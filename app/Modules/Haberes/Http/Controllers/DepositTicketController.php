@@ -18,6 +18,7 @@ use App\Modules\Haberes\Data\DepositTicketData;
 use App\Modules\Haberes\Data\TicketCandidateData;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Http\Requests\SaveDepositTicketRequest;
 use App\Modules\Haberes\Http\Requests\UpdateDepositTicketRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
@@ -120,6 +121,9 @@ final class DepositTicketController extends Controller
      */
     public function create(BeneficiaryInstallment $installment): Response
     {
+        // Una cuota pagada fuera del circuito no espera ningún depósito.
+        abort_if($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled, 404);
+
         $installment->loadMissing(['haber.beneficiary', 'haber.expediente.employer']);
 
         $haber = $installment->haber;

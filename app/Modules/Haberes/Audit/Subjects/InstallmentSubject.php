@@ -6,8 +6,11 @@ namespace App\Modules\Haberes\Audit\Subjects;
 
 use App\Models\User;
 use App\Modules\Haberes\Audit\InstallmentLinks;
+use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
+use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Shared\Audit\AuditSubjectDescription;
 use App\Modules\Shared\Audit\BaseAuditSubjectResolver;
+use App\Support\EnumLabels;
 
 final class InstallmentSubject extends BaseAuditSubjectResolver
 {
@@ -39,6 +42,12 @@ final class InstallmentSubject extends BaseAuditSubjectResolver
             'reason' => 'Motivo',
             'payment_order_number' => 'Orden de pago',
             'payment_order_id' => 'Orden de pago (id interno)',
+            // Del pago registrado fuera del circuito.
+            'mode' => 'Cómo se pagó',
+            'amount' => 'Importe',
+            'paid_on' => 'Fecha de pago',
+            'payment_medium' => 'Medio de pago',
+            'legacy_disbursement_receipt_id' => 'Recibo de Pagos anteriores (id interno)',
         ];
     }
 
@@ -50,6 +59,13 @@ final class InstallmentSubject extends BaseAuditSubjectResolver
                 'cheque' => 'Cheque',
                 'bank' => 'Depósito en cuenta',
             ],
+            'payment_medium' => [
+                'cash' => 'Efectivo',
+                'cheque' => 'Cheque',
+                'bank' => 'Depósito en cuenta',
+            ],
+            'mode' => EnumLabels::of(LegacySettlementMode::class),
+            'workflow_status' => EnumLabels::of(InstallmentWorkflowStatus::class),
         ];
     }
 

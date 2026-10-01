@@ -333,6 +333,11 @@ declare namespace App {
                     canValidate: boolean;
                     needsReceipt: boolean;
                 };
+                export type InstallmentLegacyData = {
+                    settlement: App.Modules.Haberes.Data.LegacySettlementData | null;
+                    documents: App.Modules.Haberes.Data.LegacyDocumentData[];
+                    obstacle: string | null;
+                };
                 export type InstallmentListItemData = {
                     id: number;
                     number: number;
@@ -422,6 +427,37 @@ declare namespace App {
                     cancelledAt: string | null;
                     cancelledByName: string | null;
                     cancelReason: string | null;
+                };
+                export type LegacyDocumentData = {
+                    id: number;
+                    kind: App.Modules.Haberes.Enums.LegacyDocumentKind;
+                    number: string;
+                    issuedOn: string;
+                    amount: string;
+                    attachmentId: number | null;
+                    belongsToSettlement: boolean;
+                };
+                export type LegacyReceiptOptionData = {
+                    id: number;
+                    number: string;
+                    date: string;
+                    medium: string | null;
+                    reference: string | null;
+                    amount: string;
+                    available: string;
+                };
+                export type LegacySettlementData = {
+                    id: number;
+                    mode: App.Modules.Haberes.Enums.LegacySettlementMode;
+                    amount: string;
+                    paidOn: string | null;
+                    paymentMedium: App.Modules.Ledger.Enums.PaymentMedium | null;
+                    receiptId: number | null;
+                    receiptNumber: string | null;
+                    receiptReference: string | null;
+                    notes: string | null;
+                    recordedBy: string | null;
+                    recordedAt: string;
                 };
                 export type MissingOrderFieldData = {
                     code: string;
@@ -580,9 +616,20 @@ declare namespace App {
                     | 'transfer_reported'
                     | 'debit_observed'
                     | 'ready_to_validate'
-                    | 'paid';
+                    | 'paid'
+                    | 'paid_before_opening'
+                    | 'paid_from_legacy';
                 export type InstallmentWorkflowStatus =
-                    'active' | 'suspended' | 'blocked' | 'cancelled' | 'paid';
+                    | 'active'
+                    | 'suspended'
+                    | 'blocked'
+                    | 'cancelled'
+                    | 'paid'
+                    | 'legacy_settled';
+                export type LegacyDocumentKind =
+                    'income_receipt' | 'payment_order' | 'expense_receipt';
+                export type LegacySettlementMode =
+                    'before_opening' | 'legacy_disbursement';
                 export type PaseStatus =
                     'draft' | 'generated' | 'signed' | 'archived' | 'voided';
                 export type PaymentChannel =
@@ -904,7 +951,8 @@ declare namespace App {
                     | 'disbursement'
                     | 'cash_transfer'
                     | 'deposit_ticket'
-                    | 'period_closing';
+                    | 'period_closing'
+                    | 'legacy_document';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

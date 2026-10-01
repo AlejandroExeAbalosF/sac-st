@@ -74,6 +74,22 @@ final class HaberesAuditCatalog implements AuditCatalogContributor
                 AuditSeverity::Critical,
             ),
 
+            new AuditActionDefinition(
+                'cuota.pagada-fuera-del-circuito',
+                'Se registró que la cuota se pagó fuera del circuito',
+                'Haberes',
+                metadata: ['papeles' => 'Papeles'],
+            ),
+            // Vuelve a dejar la cuota pendiente: si estuviera mal, se le
+            // podría pagar de nuevo a alguien que ya cobró.
+            new AuditActionDefinition(
+                'cuota.pago-fuera-del-circuito-anulado',
+                'Se anuló el registro del pago fuera del circuito',
+                'Haberes',
+                AuditSeverity::Critical,
+                metadata: ['reason' => 'Motivo'],
+            ),
+
             new AuditActionDefinition('cuota.financiada', 'Se asignaron fondos a la cuota', 'Recepciones y cobros'),
             new AuditActionDefinition(
                 'asignacion.desasignada',
