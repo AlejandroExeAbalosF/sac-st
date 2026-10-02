@@ -23,6 +23,7 @@ use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
+use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
@@ -30,6 +31,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayTakings;
+use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
@@ -126,6 +128,69 @@ class FondosAnterioresTest extends TestCase
         $this->assertSame('5000.00', app(InstallmentFunding::class)->unallocated($dos));
         // Los cheques ya eran recepciones: no se crean otras.
         $this->assertSame(0, FundReceipt::query()->where('origin', 'legacy')->count());
+    }
+
+    /**
+     * La apertura declaró los cheques como un total: el cheque se identifica
+     * al apartar, con su papel, y queda en la cartera para entregarse.
+     */
+    public function test_identifica_un_cheque_que_la_apertura_declaro_sin_detalle(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '85000.00');
+        $cuota = $this->cuotaPor('223/2024', '85000.00', ExpectedMedium::Cheque);
+
+        $this->apartar($cuota, PaymentMedium::Cheque, sources: [
+            ['amount' => '85000.00', 'newCheque' => ['number' => '00045871', 'bank' => 'Macro', 'issueDate' => '2025-03-01']],
+        ]);
+
+        $cheque = FundReceipt::query()->where('origin', FundReceiptOrigin::Legacy->value)->sole();
+
+        $this->assertSame(PaymentMedium::Cheque, $cheque->medium);
+        $this->assertSame('00045871', $cheque->cheque_number);
+        $this->assertSame(ChequeStatus::InCustody, $cheque->cheque_status);
+        $this->assertSame('0.00', app(UndetailedCheques::class)->amount($this->caja(), Currency::Ars));
+        $this->assertSame('85000.00', app(CashBalance::class)->of(LedgerAccount::ChequesInCustody, $this->caja()));
+
+        app(DeliverToBeneficiary::class)->handle($cuota->refresh(), 'test-entrega-223', $this->operador('contador')->id);
+
+        $this->assertSame(ChequeStatus::Delivered, $cheque->refresh()->cheque_status);
+        $this->assertSame('0.00', app(CashBalance::class)->of(LedgerAccount::ChequesInCustody, $this->caja()));
+    }
+
+    public function test_no_se_identifica_un_cheque_por_mas_de_lo_que_la_apertura_dejo_sin_detallar(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '50000.00');
+        $cuota = $this->cuotaPor('224/2024', '85000.00', ExpectedMedium::Cheque);
+
+        try {
+            $this->apartar($cuota, PaymentMedium::Cheque, sources: [
+                ['amount' => '85000.00', 'newCheque' => ['number' => '1', 'bank' => null, 'issueDate' => null]],
+            ]);
+            $this->fail('Se identificó un cheque que la caja no tiene.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('sin identificar', $e->errors()['source'][0]);
+        }
+    }
+
+    public function test_no_se_identifica_dos_veces_el_mismo_cheque(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '170000.00');
+        $primera = $this->cuotaPor('225/2024', '85000.00', ExpectedMedium::Cheque);
+        $segunda = $this->cuotaPor('226/2024', '85000.00', ExpectedMedium::Cheque);
+        $papel = ['number' => '00045871', 'bank' => 'Macro', 'issueDate' => '2025-03-01'];
+
+        $this->apartar($primera, PaymentMedium::Cheque, sources: [['amount' => '85000.00', 'newCheque' => $papel]]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('ya está en la cartera');
+
+        app(FundInstallmentFromLegacy::class)->handle(
+            installment: $segunda,
+            medium: PaymentMedium::Cheque,
+            sources: [['amount' => '85000.00', 'newCheque' => [...$papel, 'number' => ' 00045871 ']]],
+            income: new LegacyPaper(LegacyDocumentKind::IncomeReceipt, 'income', '3122', CarbonImmutable::parse('2025-03-10'), '85000.00'),
+            idempotencyKey: 'test-segunda-226',
+        );
     }
 
     public function test_no_se_aparta_mas_de_lo_que_queda_libre_de_un_cheque(): void
@@ -484,7 +549,7 @@ class FondosAnterioresTest extends TestCase
     /* ── Ayudas ──────────────────────────────────────────────────────── */
 
     /**
-     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null}>|null  $sources
+     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>|null  $sources
      * @return list<FundingAllocation>
      */
     private function apartar(
@@ -523,8 +588,14 @@ class FondosAnterioresTest extends TestCase
         array $cheques = [],
         ?string $banco = null,
         ?int $cuentaBancaria = null,
+        ?string $chequesSinDetalle = null,
     ): void {
         $saldos = [LedgerAccount::CashOnHand->value => $efectivo];
+
+        // La apertura puede declarar los cheques como un total, sin detallarlos.
+        if ($chequesSinDetalle !== null) {
+            $saldos[LedgerAccount::ChequesInCustody->value] = $chequesSinDetalle;
+        }
         $cartera = [];
         $totalCheques = '0.00';
 

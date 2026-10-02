@@ -14,6 +14,7 @@ use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 
@@ -22,13 +23,16 @@ use App\Support\Money\Decimal;
  *
  * El efectivo y el depósito directo no se listan: en la apertura entraron
  * como un total y no hay forma de saber qué billete es de quién. Los
- * cheques sí: son papeles con número, y se elige cuál.
+ * cheques sí: son papeles con número, y se elige cuál. Si la apertura los
+ * declaró como un total, sin detalle, se informa cuánto queda sin
+ * identificar para cargar el cheque en el momento.
  */
 final class LegacyFundsOptions
 {
     public function __construct(
         private readonly CashBalance $saldos,
         private readonly InstallmentFunding $financiacion,
+        private readonly UndetailedCheques $sinDetallar,
     ) {}
 
     public function for(Haber $haber): LegacyFundsOptionsData
@@ -74,6 +78,7 @@ final class LegacyFundsOptions
         return new LegacyFundsOptionsData(
             pending: $this->saldos->of(LedgerAccount::LegacyFunds, $caja, $moneda),
             cheques: $cheques,
+            undetailedCheques: $this->sinDetallar->amount($caja, $moneda),
             bankAccounts: $cuentas,
         );
     }

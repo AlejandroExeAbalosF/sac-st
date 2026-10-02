@@ -22,18 +22,36 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { businessToday, date, money, parseAmount } from '@/lib/format';
+import {
+    businessToday,
+    compareAmounts,
+    date,
+    money,
+    parseAmount,
+} from '@/lib/format';
 import { legacyFunds as apartarFondos } from '@/routes/haberes/installments';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
 type Opciones = App.Modules.Haberes.Data.LegacyFundsOptionsData;
 
+type ChequeNuevo = {
+    number: string;
+    bank: string;
+    issueDate: string;
+    amount: string;
+};
+
 type Formulario = {
     medium: string;
     bankAccountId: string;
     /** Cuánto aporta cada cheque elegido, por su id. */
     cheques: Record<number, string>;
+    /**
+     * Un cheque que la apertura declaró sin detallar y se identifica ahora,
+     * con los datos del papel. `null` mientras no se carga.
+     */
+    chequeNuevo: ChequeNuevo | null;
     incomeNumber: string;
     incomeDate: string;
     incomeAmount: string;
@@ -83,6 +101,7 @@ export default function LegacyFundsDialog({
                 ? String(fondosAnteriores.bankAccounts[0].id)
                 : '',
         cheques: {},
+        chequeNuevo: null,
         incomeNumber: '',
         incomeDate: '',
         incomeAmount: money(cuota.expectedAmount, { symbol: false }),
@@ -109,10 +128,26 @@ export default function LegacyFundsDialog({
             bankAccountId: datos.medium === 'bank' ? datos.bankAccountId : null,
             cheques:
                 datos.medium === 'cheque'
-                    ? Object.entries(datos.cheques).map(([id, importe]) => ({
-                          receiptId: Number(id),
-                          amount: parseAmount(importe),
-                      }))
+                    ? [
+                          ...Object.entries(datos.cheques).map(
+                              ([id, importe]) => ({
+                                  receiptId: Number(id),
+                                  amount: parseAmount(importe),
+                              }),
+                          ),
+                          ...(datos.chequeNuevo === null
+                              ? []
+                              : [
+                                    {
+                                        number: datos.chequeNuevo.number,
+                                        bank: datos.chequeNuevo.bank,
+                                        issueDate: datos.chequeNuevo.issueDate,
+                                        amount: parseAmount(
+                                            datos.chequeNuevo.amount,
+                                        ),
+                                    },
+                                ]),
+                      ]
                     : null,
             ...(reciboDePapel === null
                 ? {
@@ -144,6 +179,30 @@ export default function LegacyFundsDialog({
 
         form.setData('cheques', cheques);
     };
+
+    const cambiarChequeNuevo = (campo: keyof ChequeNuevo, valor: string) => {
+        if (form.data.chequeNuevo === null) {
+            return;
+        }
+
+        form.setData('chequeNuevo', {
+            ...form.data.chequeNuevo,
+            [campo]: valor,
+        });
+    };
+
+    /*
+     * Lo que la apertura declaró en cheques sin detallarlos. De ahí, y solo
+     * de ahí, sale un cheque que no está en la lista: más sería un cheque
+     * que la caja no tiene.
+     */
+    const haySinDetallar =
+        compareAmounts(fondosAnteriores.undetailedCheques, '0.00') === 1;
+
+    // Los errores de cada renglón de cheque vuelven como `cheques.0.number`.
+    const errorDeCheque = Object.entries(errores).find(([clave]) =>
+        clave.startsWith('cheques.'),
+    )?.[1];
 
     return (
         <Dialog open={abierto} onOpenChange={(v) => !v && cerrar()}>
@@ -237,8 +296,8 @@ export default function LegacyFundsDialog({
                             </legend>
                             {fondosAnteriores.cheques.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
-                                    No quedan cheques de la apertura con saldo
-                                    sin asignar.
+                                    No hay cheques de la apertura cargados uno
+                                    por uno con saldo sin asignar.
                                 </p>
                             ) : (
                                 <ul className="divide-y rounded-lg border">
@@ -326,7 +385,150 @@ export default function LegacyFundsDialog({
                                     })}
                                 </ul>
                             )}
+                            {haySinDetallar &&
+                                form.data.chequeNuevo === null && (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                                        <span>
+                                            La apertura declaró{' '}
+                                            {money(
+                                                fondosAnteriores.undetailedCheques,
+                                            )}{' '}
+                                            en cheques sin detallarlos.
+                                        </span>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                form.setData('chequeNuevo', {
+                                                    number: '',
+                                                    bank: '',
+                                                    issueDate: '',
+                                                    amount: money(
+                                                        cuota.expectedAmount,
+                                                        { symbol: false },
+                                                    ),
+                                                })
+                                            }
+                                        >
+                                            Cargar un cheque que no está en la
+                                            lista
+                                        </Button>
+                                    </div>
+                                )}
+
+                            {form.data.chequeNuevo !== null && (
+                                <div className="grid gap-3 rounded-lg border p-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        Cheque de la cartera que la apertura no
+                                        detalló. Queda en custodia con estos
+                                        datos, para entregarlo o depositarlo.
+                                        Quedan{' '}
+                                        {money(
+                                            fondosAnteriores.undetailedCheques,
+                                        )}{' '}
+                                        sin identificar.
+                                    </p>
+                                    <div className="grid gap-3 sm:grid-cols-4">
+                                        <div className="grid gap-1.5">
+                                            <Label
+                                                htmlFor={`cheque-nuevo-numero-${cuota.id}`}
+                                            >
+                                                N.º del cheque
+                                            </Label>
+                                            <Input
+                                                id={`cheque-nuevo-numero-${cuota.id}`}
+                                                className="font-mono tabular-nums"
+                                                value={
+                                                    form.data.chequeNuevo.number
+                                                }
+                                                onChange={(e) =>
+                                                    cambiarChequeNuevo(
+                                                        'number',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                            <Label
+                                                htmlFor={`cheque-nuevo-banco-${cuota.id}`}
+                                            >
+                                                Banco
+                                            </Label>
+                                            <Input
+                                                id={`cheque-nuevo-banco-${cuota.id}`}
+                                                value={
+                                                    form.data.chequeNuevo.bank
+                                                }
+                                                onChange={(e) =>
+                                                    cambiarChequeNuevo(
+                                                        'bank',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                            <Label
+                                                htmlFor={`cheque-nuevo-fecha-${cuota.id}`}
+                                            >
+                                                Fecha del cheque
+                                            </Label>
+                                            <Input
+                                                id={`cheque-nuevo-fecha-${cuota.id}`}
+                                                type="date"
+                                                max={hoy}
+                                                value={
+                                                    form.data.chequeNuevo
+                                                        .issueDate
+                                                }
+                                                onChange={(e) =>
+                                                    cambiarChequeNuevo(
+                                                        'issueDate',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                            <Label
+                                                htmlFor={`cheque-nuevo-importe-${cuota.id}`}
+                                            >
+                                                Importe
+                                            </Label>
+                                            <Input
+                                                id={`cheque-nuevo-importe-${cuota.id}`}
+                                                inputMode="decimal"
+                                                className="text-right font-mono tabular-nums"
+                                                value={
+                                                    form.data.chequeNuevo.amount
+                                                }
+                                                onChange={(e) =>
+                                                    cambiarChequeNuevo(
+                                                        'amount',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="justify-self-start text-xs"
+                                        onClick={() =>
+                                            form.setData('chequeNuevo', null)
+                                        }
+                                    >
+                                        Quitar este cheque
+                                    </Button>
+                                </div>
+                            )}
+
                             <InputError message={errores.cheques} />
+                            <InputError message={errorDeCheque} />
                         </fieldset>
                     )}
 

@@ -25,6 +25,13 @@ final class LegacyFundsOptionsData extends Data
         public string $pending,
         /** @var list<LegacyChequeOptionData> */
         public array $cheques,
+        /**
+         * Lo que la apertura declaró en cheques sin detallarlos: de ahí se
+         * puede identificar un cheque que no está en la lista.
+         *
+         * @var numeric-string
+         */
+        public string $undetailedCheques,
         /** @var list<array{id: int, label: string}> */
         public array $bankAccounts,
     ) {}

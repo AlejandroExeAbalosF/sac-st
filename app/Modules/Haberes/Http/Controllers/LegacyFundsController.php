@@ -63,7 +63,7 @@ final class LegacyFundsController extends Controller
      * la cuota y el navegador no tiene por qué proponer otro. Los cheques
      * dicen cuánto aporta cada uno.
      *
-     * @return list<array{amount: numeric-string, chequeReceiptId?: int|null}>
+     * @return list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>
      */
     private function sources(FundInstallmentFromLegacyRequest $request, PaymentMedium $medio, BeneficiaryInstallment $installment): array
     {
@@ -79,10 +79,16 @@ final class LegacyFundsController extends Controller
                 continue;
             }
 
-            $fuentes[] = [
-                'amount' => Decimal::parse((string) ($cheque['amount'] ?? '')) ?? '0.00',
-                'chequeReceiptId' => (int) ($cheque['receiptId'] ?? 0),
-            ];
+            $importe = Decimal::parse((string) ($cheque['amount'] ?? '')) ?? '0.00';
+
+            // Uno de la cartera, o uno que la apertura declaró sin detallar.
+            $fuentes[] = isset($cheque['receiptId']) && is_numeric($cheque['receiptId'])
+                ? ['amount' => $importe, 'chequeReceiptId' => (int) $cheque['receiptId']]
+                : ['amount' => $importe, 'newCheque' => [
+                    'number' => (string) ($cheque['number'] ?? ''),
+                    'bank' => isset($cheque['bank']) && is_string($cheque['bank']) ? $cheque['bank'] : null,
+                    'issueDate' => isset($cheque['issueDate']) && is_string($cheque['issueDate']) ? $cheque['issueDate'] : null,
+                ]];
         }
 
         return $fuentes;

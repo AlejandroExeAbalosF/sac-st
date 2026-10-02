@@ -15,6 +15,11 @@ import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { salidaDe } from '@/features/haberes/installment-channel';
 import { ETAPA, TONO_ETAPA } from '@/features/haberes/installment-stage';
@@ -456,30 +461,44 @@ export default function InstallmentCard({
                  * Para cargar un expediente histórico: la cuota ya se pagó
                  * y hay que dejarlo registrado con sus papeles.
                  */}
+                {/*
+                 * Los dos botones de la carga histórica llevan su explicación
+                 * en un globo: los nombres son cortos para caber al pie de la
+                 * tarjeta, y la diferencia entre uno y otro —ya se pagó, o la
+                 * plata todavía está en la caja— es justo lo que hay que
+                 * tener claro antes de apretar.
+                 */}
                 {puedeApartar && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setApartando(true)}
-                    >
-                        <PiggyBank className="size-3.5" aria-hidden="true" />
-                        Apartar fondos anteriores
-                    </Button>
+                    <ConAyuda texto="La cuota todavía no se pagó y su plata del sistema anterior sigue en la caja: efectivo, un cheque de la cartera o un depósito directo. Se aparta para esta cuota, con su recibo de ingreso de papel, y desde ahí sigue el circuito normal para pagarla.">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => setApartando(true)}
+                        >
+                            <PiggyBank
+                                className="size-3.5"
+                                aria-hidden="true"
+                            />
+                            Apartar fondos anteriores
+                        </Button>
+                    </ConAyuda>
                 )}
 
                 {puedeRegistrarAnterior && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setPagoAnterior(true)}
-                    >
-                        <Archive className="size-3.5" aria-hidden="true" />
-                        Registrar pago anterior
-                    </Button>
+                    <ConAyuda texto="La cuota ya se pagó fuera del circuito: en papel antes de la apertura, o desde Pagos anteriores. Se cargan los papeles con su número de talonario y la cuota queda pagada, sin mover plata.">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => setPagoAnterior(true)}
+                        >
+                            <Archive className="size-3.5" aria-hidden="true" />
+                            Registrar pago anterior
+                        </Button>
+                    </ConAyuda>
                 )}
 
                 {editable && !anulada && !saldada && (
@@ -578,5 +597,32 @@ function Pendiente({ children }: { children: React.ReactNode }) {
             />
             {children}
         </p>
+    );
+}
+
+/**
+ * Un botón con su explicación en un globo.
+ *
+ * El globo acompaña al botón en vez de reemplazar su nombre: se lee al
+ * pasar el mouse o al enfocarlo con el teclado, y en un teléfono el toque
+ * abre el diálogo, que repite lo esencial en su encabezado.
+ */
+function ConAyuda({
+    texto,
+    children,
+}: {
+    texto: string;
+    children: React.ReactElement;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>{children}</TooltipTrigger>
+            <TooltipContent
+                side="top"
+                className="max-w-xs text-xs leading-relaxed"
+            >
+                {texto}
+            </TooltipContent>
+        </Tooltip>
     );
 }

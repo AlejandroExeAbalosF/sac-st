@@ -189,6 +189,11 @@ papel** que se le dio al empleador, con su número de talonario y su fecha. Ese
 papel hace las veces del recibo del sistema: la cuota no lleva los dos, y la Orden
 de Pago imprime el número del talonario.
 
+Si la apertura declaró los cheques como un total, sin detallarlos uno por uno, el
+cheque se identifica en el mismo momento con su número, banco y fecha. Sale de lo
+que la apertura dejó sin detallar y entra a la cartera en custodia, como cualquier
+otro cheque.
+
 Desde ahí la cuota sigue el circuito de siempre: entrega por mostrador, traslado al
 banco, u Orden y transferencia. Si hay que liberar la plata —toda o el excedente
 de una corrección—, vuelve al saldo del sistema anterior, no a los fondos sin

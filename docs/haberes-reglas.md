@@ -245,8 +245,15 @@ Evidencia: [esquema](../database/migrations/2026_10_01_010000_create_legacy_sett
 débito `LEGACY_FUNDS`, crédito `BENEFICIARY_FUNDS`, con la fecha de hoy. La
 recepción de la que se asigna dice su origen en `fund_receipts.origin`:
 `received` (entró por el circuito), `opening` (un cheque de la cartera de la
-apertura) o `legacy` (efectivo o depósito directo apartados, con su cuenta en
-`bank_account_id`).
+apertura) o `legacy` (efectivo, depósito directo —con su cuenta en
+`bank_account_id`— o un cheque que la apertura no detalló y se identifica al
+apartar).
+
+Lo sin detallar es el saldo de `CHEQUES_IN_CUSTODY` menos los cheques en custodia
+que tienen recepción. Es una cota prudente y vive solo en el Action: un cheque
+depositado sigue figurando en custodia —nada actualiza todavía ese estado—, así
+que puede achicarla de más pero nunca agrandarla, y una guarda de base sobre ese
+estado rechazaría datos legítimos.
 
 | Regla | Action | Base |
 | --- | --- | --- |
@@ -256,6 +263,7 @@ apertura) o `legacy` (efectivo o depósito directo apartados, con su cuenta en
 | Lo del circuito se asigna con `funds_allocated`; lo anterior, con `legacy_funds_allocated` | `AllocateFundsToInstallment` | `allocation_respects_origin` |
 | Una recepción `legacy` no se reutiliza: solo admite la asignación de su propio evento | — | `allocation_respects_origin` |
 | Una cuota no mezcla dinero anterior y actual, en ningún sentido | `FundInstallmentFromLegacy`, `AllocateFundsToInstallment` | `allocation_respects_origin`, con `FOR UPDATE` sobre la cuota |
+| Un cheque identificado al apartar sale de lo que la apertura declaró sin detallar, y no repite uno que ya está en la cartera | `SetAsideLegacyFunds`, `UndetailedCheques` | — |
 | El saldo libre de un cheque no se asigna dos veces | `FundInstallmentFromLegacy`, que bloquea los cheques en orden | `allocation_within_receipt`, ahora con `FOR UPDATE` sobre la recepción |
 | Se aparta con financiación cero y por el importe completo | `FundInstallmentFromLegacy` | — |
 | Recibo de ingreso de papel por el importe de la cuota, anterior a la apertura | `FundInstallmentFromLegacy`, `LegacyPaperCheck` | `legacy_paper_before_opening`, `legacy_documents_paper_unique` |

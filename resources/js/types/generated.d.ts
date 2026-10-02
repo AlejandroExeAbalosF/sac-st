@@ -449,6 +449,7 @@ declare namespace App {
                 export type LegacyFundsOptionsData = {
                     pending: string;
                     cheques: App.Modules.Haberes.Data.LegacyChequeOptionData[];
+                    undetailedCheques: string;
                     bankAccounts: {
                         id: number;
                         label: string;

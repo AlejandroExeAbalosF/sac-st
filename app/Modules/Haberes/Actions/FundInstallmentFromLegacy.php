@@ -70,12 +70,12 @@ final class FundInstallmentFromLegacy
     ) {}
 
     /**
-     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null}>  $sources  De dónde
-     *                                                                                    sale: una por
-     *                                                                                    cheque, o una
-     *                                                                                    sola para el
-     *                                                                                    efectivo o el
-     *                                                                                    depósito.
+     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>  $sources  De dónde
+     *                                                                                                                                                                       sale: una por
+     *                                                                                                                                                                       cheque, o una
+     *                                                                                                                                                                       sola para el
+     *                                                                                                                                                                       efectivo o el
+     *                                                                                                                                                                       depósito.
      * @return list<FundingAllocation>
      *
      * @throws ValidationException
@@ -134,6 +134,7 @@ final class FundInstallmentFromLegacy
                         idempotencyKey: $idempotencyKey.':'.$indice,
                         cheque: $cheque,
                         bankAccountId: $bankAccountId,
+                        newCheque: $fuente['newCheque'] ?? null,
                         description: sprintf(
                             'Apartado para Expte. %s · %s · cuota %d',
                             $expediente->display_number,
@@ -245,7 +246,7 @@ final class FundInstallmentFromLegacy
      * El orden fijo es lo que evita el abrazo mortal entre dos apartados
      * que usan los mismos dos cheques.
      *
-     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null}>  $sources
+     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>  $sources
      * @return array<int, FundReceipt>
      */
     private function lockedCheques(PaymentMedium $medium, array $sources): array
@@ -255,8 +256,8 @@ final class FundInstallmentFromLegacy
         }
 
         $ids = array_values(array_unique(array_map(
-            fn (array $fuente): int => (int) ($fuente['chequeReceiptId'] ?? 0),
-            $sources,
+            fn (array $fuente): int => (int) $fuente['chequeReceiptId'],
+            array_filter($sources, fn (array $fuente): bool => isset($fuente['chequeReceiptId'])),
         )));
         sort($ids);
 
@@ -270,7 +271,7 @@ final class FundInstallmentFromLegacy
     }
 
     /**
-     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null}>  $sources
+     * @param  list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>  $sources
      * @param  array<int, FundReceipt>  $cheques
      *
      * @throws ValidationException
@@ -299,7 +300,12 @@ final class FundInstallmentFromLegacy
         foreach ($sources as $fuente) {
             $total = Decimal::add($total, $fuente['amount']);
 
-            if ($medium !== PaymentMedium::Cheque) {
+            /*
+             * Un cheque identificado recién ahora no tiene saldo libre que
+             * mirar: nace por este importe. Lo controla Ledger, contra lo
+             * que la apertura declaró sin detallar.
+             */
+            if ($medium !== PaymentMedium::Cheque || isset($fuente['newCheque'])) {
                 continue;
             }
 
