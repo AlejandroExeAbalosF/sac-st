@@ -113,9 +113,9 @@ final class InstallmentOrderStateData extends Data
             deposits: $depositos,
             depositsTotal: $total,
             organismAccountLabel: $organismAccountLabel,
-            incomeReceiptSystemNumber: $recibo?->formatted_number,
-            incomeReceiptTalonarioNumber: $recibo?->talonario_number,
-            incomeReceiptPrintsTalonario: $recibo->prints_talonario_number ?? false,
+            incomeReceiptSystemNumber: $recibo?->systemNumber(),
+            incomeReceiptTalonarioNumber: $recibo?->talonarioNumber(),
+            incomeReceiptPrintsTalonario: $recibo?->printsTalonario() ?? false,
             editLocked: $traba && $installment->edit_unlocked_at === null,
             editUnlockReason: $traba ? $installment->edit_unlock_reason : null,
         );

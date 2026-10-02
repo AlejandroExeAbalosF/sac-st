@@ -7,6 +7,7 @@ namespace App\Modules\Ledger\Actions;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
+use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FinancialEvent;
@@ -214,6 +215,8 @@ final class RegisterOpeningBalance
             'cash_box_id' => $cashBoxId,
             'currency' => $currency,
             'medium' => PaymentMedium::Cheque,
+            // Plata del sistema anterior: se asigna apartándola, no por el circuito.
+            'origin' => FundReceiptOrigin::Opening,
             'amount' => $cheque['amount'],
             'received_date' => $date,
             'received_by' => $actorId,

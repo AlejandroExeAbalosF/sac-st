@@ -6,7 +6,6 @@ namespace App\Modules\Haberes\Support;
 
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Models\PaymentOrder;
-use App\Modules\Shared\Models\Receipt;
 
 /**
  * El estado completo de una cuota frente a su Orden de Pago.
@@ -43,7 +42,8 @@ final readonly class PaymentOrderReadiness
         /** La Orden vigente, si ya se emitió. */
         public ?PaymentOrder $activeOrder,
         /** El recibo de ingreso que la Orden va a referenciar. */
-        public ?Receipt $incomeReceipt,
+        /** El recibo de ingreso, del sistema o de papel. */
+        public ?IncomeEvidence $incomeReceipt,
         public array $rows,
         public ?int $organismBankAccountId,
     ) {}

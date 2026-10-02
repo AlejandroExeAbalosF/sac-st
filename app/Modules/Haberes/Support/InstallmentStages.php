@@ -9,10 +9,12 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
+use App\Modules\Haberes\Enums\LegacyDocumentKind;
 use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Shared\Enums\ReceiptStatus;
@@ -183,7 +185,8 @@ final class InstallmentStages
      * Qué cuotas ya tienen su recibo de ingreso emitido.
      *
      * Los anulados no cuentan: consumieron número, pero la cuota vuelve a
-     * necesitar uno vigente.
+     * necesitar uno vigente. El de papel de la plata apartada del sistema
+     * anterior sí cuenta: es el recibo de esa cuota.
      *
      * @param  list<int>  $ids
      * @return array<int, true>
@@ -196,9 +199,15 @@ final class InstallmentStages
             ->where('status', ReceiptStatus::Issued)
             ->pluck('beneficiary_installment_id');
 
+        $papeles = LegacyDocument::query()
+            ->current()
+            ->whereIn('beneficiary_installment_id', $ids)
+            ->where('kind', LegacyDocumentKind::IncomeReceipt->value)
+            ->pluck('beneficiary_installment_id');
+
         $porCuota = [];
 
-        foreach ($filas as $id) {
+        foreach ([...$filas, ...$papeles] as $id) {
             $porCuota[(int) $id] = true;
         }
 

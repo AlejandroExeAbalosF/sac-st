@@ -428,6 +428,15 @@ declare namespace App {
                     cancelledByName: string | null;
                     cancelReason: string | null;
                 };
+                export type LegacyChequeOptionData = {
+                    id: number;
+                    number: string;
+                    bank: string | null;
+                    amount: string;
+                    available: string;
+                    expediente: string | null;
+                    beneficiary: string | null;
+                };
                 export type LegacyDocumentData = {
                     id: number;
                     kind: App.Modules.Haberes.Enums.LegacyDocumentKind;
@@ -436,6 +445,14 @@ declare namespace App {
                     amount: string;
                     attachmentId: number | null;
                     belongsToSettlement: boolean;
+                };
+                export type LegacyFundsOptionsData = {
+                    pending: string;
+                    cheques: App.Modules.Haberes.Data.LegacyChequeOptionData[];
+                    bankAccounts: {
+                        id: number;
+                        label: string;
+                    }[];
                 };
                 export type LegacyReceiptOptionData = {
                     id: number;
@@ -802,7 +819,10 @@ declare namespace App {
                     | 'opening_balance'
                     | 'legacy_disbursement'
                     | 'reversal'
-                    | 'authorized_adjustment';
+                    | 'authorized_adjustment'
+                    | 'legacy_funds_allocated';
+                export type FundReceiptOrigin =
+                    'received' | 'opening' | 'legacy';
                 export type LedgerAccount =
                     | 'CASH_ON_HAND'
                     | 'CHEQUES_IN_CUSTODY'

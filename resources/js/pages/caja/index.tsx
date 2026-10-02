@@ -314,16 +314,17 @@ export default function CajaIndex({
                 </div>
 
                 {/*
-                 * Lo que queda del sistema anterior, mientras quede algo.
-                 * Desaparece solo el día que se pague el último caso viejo,
-                 * y ese es el día que se apaga la planilla en paralelo.
+                 * Lo que queda del sistema anterior sin dueño, mientras quede
+                 * algo. Baja con cada pago y con cada apartado para un
+                 * expediente histórico; el día que llega a cero se apaga la
+                 * planilla en paralelo.
                  */}
                 {/[1-9]/.test(legacyPending) && (
                     <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
                         <HandCoins className="size-4 shrink-0 text-muted-foreground" />
                         <span>
                             Quedan <Money value={legacyPending} /> del sistema
-                            anterior por pagar.
+                            anterior sin asignar.
                         </span>
                         {can.payLegacy && (
                             <Button

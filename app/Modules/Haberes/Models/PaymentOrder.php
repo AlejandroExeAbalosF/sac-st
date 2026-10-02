@@ -58,7 +58,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $expediente_subject_snapshot
  * @property CarbonInterface|null $custody_start_date_snapshot
  * @property int|null $organism_bank_account_id
- * @property int $income_receipt_id
+ * @property int|null $income_receipt_id El del sistema; nulo cuando la cuota tiene recibo de papel.
+ * @property int|null $legacy_income_document_id El de papel, de la plata apartada del sistema anterior.
  * @property ReceiptNumberSource $income_receipt_number_source
  * @property string $income_receipt_number_snapshot
  * @property int|null $expense_receipt_id
@@ -105,6 +106,7 @@ final class PaymentOrder extends Model
         'custody_start_date_snapshot',
         'organism_bank_account_id',
         'income_receipt_id',
+        'legacy_income_document_id',
         'income_receipt_number_source',
         'income_receipt_number_snapshot',
         'expense_receipt_id',
@@ -151,6 +153,12 @@ final class PaymentOrder extends Model
     public function incomeReceipt(): BelongsTo
     {
         return $this->belongsTo(Receipt::class, 'income_receipt_id');
+    }
+
+    /** @return BelongsTo<LegacyDocument, $this> */
+    public function legacyIncomeDocument(): BelongsTo
+    {
+        return $this->belongsTo(LegacyDocument::class, 'legacy_income_document_id');
     }
 
     /** @return BelongsTo<Receipt, $this> */

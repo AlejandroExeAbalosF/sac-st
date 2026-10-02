@@ -57,8 +57,8 @@ final readonly class DisbursementReadiness
         public ?Disbursement $disbursement,
         /** El comprobante que el beneficiario firmó. */
         public ?Receipt $expenseReceipt,
-        /** El recibo de ingreso, que va antes que éste. */
-        public ?Receipt $incomeReceipt,
+        /** El recibo de ingreso, del sistema o de papel, que va antes que éste. */
+        public ?IncomeEvidence $incomeReceipt,
         /** La Orden que autoriza el pago, en el circuito bancario. */
         public ?PaymentOrder $paymentOrder,
         /** Qué le falta al egreso bancario para poder validarse. */

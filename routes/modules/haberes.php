@@ -12,6 +12,7 @@ use App\Modules\Haberes\Http\Controllers\HaberController;
 use App\Modules\Haberes\Http\Controllers\HaberHistoryController;
 use App\Modules\Haberes\Http\Controllers\InstallmentController;
 use App\Modules\Haberes\Http\Controllers\InstallmentHistoryController;
+use App\Modules\Haberes\Http\Controllers\LegacyFundsController;
 use App\Modules\Haberes\Http\Controllers\LegacySettlementController;
 use App\Modules\Haberes\Http\Controllers\PaymentOrderController;
 use App\Modules\Haberes\Http\Controllers\PayoutQueueController;
@@ -619,6 +620,17 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::post('haberes/cuotas/{installment}/pago-anterior', [LegacySettlementController::class, 'store'])
             ->whereNumber('installment')
             ->name('haberes.installments.legacy-settlement');
+    });
+
+    /*
+     * Apartar del saldo del sistema anterior la plata de una cuota que
+     * todavía está en custodia. Va con el criterio de quien paga los
+     * haberes anteriores: es la misma plata, y sale del mismo saldo.
+     */
+    Route::middleware('can:caja.apartar-anterior')->group(function (): void {
+        Route::post('haberes/cuotas/{installment}/fondos-anteriores', [LegacyFundsController::class, 'store'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.legacy-funds');
     });
 
     Route::middleware('can:expedientes.anular')->group(function (): void {

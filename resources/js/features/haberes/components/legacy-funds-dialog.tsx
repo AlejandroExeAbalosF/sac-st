@@ -1,0 +1,474 @@
+import { useForm, usePage } from '@inertiajs/react';
+import { PiggyBank } from 'lucide-react';
+import { useState } from 'react';
+import InputError from '@/components/input-error';
+import Money from '@/components/money';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { businessToday, date, money, parseAmount } from '@/lib/format';
+import { legacyFunds as apartarFondos } from '@/routes/haberes/installments';
+
+type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
+type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
+type Opciones = App.Modules.Haberes.Data.LegacyFundsOptionsData;
+
+type Formulario = {
+    medium: string;
+    bankAccountId: string;
+    /** Cuánto aporta cada cheque elegido, por su id. */
+    cheques: Record<number, string>;
+    incomeNumber: string;
+    incomeDate: string;
+    incomeAmount: string;
+    incomePhoto: File | null;
+    idempotencyKey: string;
+    confirmDuplicates: boolean;
+};
+
+/**
+ * Apartar del saldo del sistema anterior la plata de una cuota.
+ *
+ * Es para el expediente histórico que todavía tiene plata en custodia. La
+ * plata no se mueve: el efectivo sigue en el cajón, el cheque en la
+ * cartera y el depósito directo en la cuenta. Lo que cambia es de quién
+ * es, y desde ahí la cuota sigue el circuito de siempre.
+ *
+ * **No hay campo de importe para el efectivo ni para el depósito**: es el
+ * de la cuota, porque se pagan enteras. Solo se reparte cuando la plata
+ * está en varios cheques.
+ */
+export default function LegacyFundsDialog({
+    cuota,
+    reciboDePapel,
+    abierto,
+    onCerrar,
+}: {
+    cuota: Cuota;
+    /** El recibo de papel que la cuota ya tiene, si se apartó antes y se liberó. */
+    reciboDePapel: Papel | null;
+    abierto: boolean;
+    onCerrar: () => void;
+}) {
+    const { fondosAnteriores, corteHistorico } = usePage().props as unknown as {
+        fondosAnteriores: Opciones | null;
+        corteHistorico: string | null;
+    };
+
+    const hoy = businessToday();
+    const [clave] = useState(
+        () => `apartar:${cuota.id}:${crypto.randomUUID()}`,
+    );
+
+    const form = useForm<Formulario>({
+        medium: cuota.expectedMedium,
+        bankAccountId:
+            fondosAnteriores?.bankAccounts.length === 1
+                ? String(fondosAnteriores.bankAccounts[0].id)
+                : '',
+        cheques: {},
+        incomeNumber: '',
+        incomeDate: '',
+        incomeAmount: money(cuota.expectedAmount, { symbol: false }),
+        incomePhoto: null,
+        idempotencyKey: clave,
+        confirmDuplicates: false,
+    });
+
+    const errores = form.errors as Partial<Record<string, string>>;
+    const cerrar = () => {
+        form.clearErrors();
+        onCerrar();
+    };
+
+    if (fondosAnteriores === null) {
+        return null;
+    }
+
+    const enviar = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        form.transform((datos) => ({
+            medium: datos.medium,
+            bankAccountId: datos.medium === 'bank' ? datos.bankAccountId : null,
+            cheques:
+                datos.medium === 'cheque'
+                    ? Object.entries(datos.cheques).map(([id, importe]) => ({
+                          receiptId: Number(id),
+                          amount: parseAmount(importe),
+                      }))
+                    : null,
+            ...(reciboDePapel === null
+                ? {
+                      incomeNumber: datos.incomeNumber,
+                      incomeDate: datos.incomeDate,
+                      incomeAmount: parseAmount(datos.incomeAmount),
+                      incomePhoto: datos.incomePhoto,
+                  }
+                : {}),
+            idempotencyKey: datos.idempotencyKey,
+            confirmDuplicates: datos.confirmDuplicates,
+        }));
+
+        form.post(apartarFondos(cuota.id).url, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => cerrar(),
+        });
+    };
+
+    const elegirCheque = (id: number, elegido: boolean, disponible: string) => {
+        const cheques = { ...form.data.cheques };
+
+        if (elegido) {
+            cheques[id] = money(disponible, { symbol: false });
+        } else {
+            delete cheques[id];
+        }
+
+        form.setData('cheques', cheques);
+    };
+
+    return (
+        <Dialog open={abierto} onOpenChange={(v) => !v && cerrar()}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>
+                        Apartar fondos del sistema anterior para la cuota{' '}
+                        {cuota.number}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Se apartan <Money value={cuota.expectedAmount} /> del
+                        saldo anterior, que hoy tiene{' '}
+                        <Money value={fondosAnteriores.pending} /> sin asignar.
+                        La plata no se mueve: cambia de dueño.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form
+                    id={`form-apartar-${cuota.id}`}
+                    onSubmit={enviar}
+                    className="grid gap-5"
+                >
+                    <InputError message={errores.installment} />
+                    <InputError message={errores.amount} />
+
+                    <div className="grid gap-2">
+                        <Label htmlFor={`medio-apartar-${cuota.id}`}>
+                            Dónde está la plata
+                        </Label>
+                        <Select
+                            value={form.data.medium}
+                            onValueChange={(valor) =>
+                                form.setData('medium', valor)
+                            }
+                        >
+                            <SelectTrigger id={`medio-apartar-${cuota.id}`}>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="cash">
+                                    Efectivo en el cajón
+                                </SelectItem>
+                                <SelectItem value="cheque">
+                                    Cheques de la cartera
+                                </SelectItem>
+                                <SelectItem value="bank">
+                                    Depósito directo en la cuenta
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errores.medium} />
+                    </div>
+
+                    {form.data.medium === 'bank' && (
+                        <div className="grid gap-2">
+                            <Label htmlFor={`cuenta-apartar-${cuota.id}`}>
+                                En qué cuenta está
+                            </Label>
+                            <Select
+                                value={form.data.bankAccountId}
+                                onValueChange={(valor) =>
+                                    form.setData('bankAccountId', valor)
+                                }
+                            >
+                                <SelectTrigger
+                                    id={`cuenta-apartar-${cuota.id}`}
+                                >
+                                    <SelectValue placeholder="Elegí la cuenta" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {fondosAnteriores.bankAccounts.map(
+                                        (cuenta) => (
+                                            <SelectItem
+                                                key={cuenta.id}
+                                                value={String(cuenta.id)}
+                                            >
+                                                {cuenta.label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errores.bankAccountId} />
+                        </div>
+                    )}
+
+                    {form.data.medium === 'cheque' && (
+                        <fieldset className="grid gap-2">
+                            <legend className="mb-1 text-sm font-medium">
+                                Cheques de la cartera de la apertura
+                            </legend>
+                            {fondosAnteriores.cheques.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No quedan cheques de la apertura con saldo
+                                    sin asignar.
+                                </p>
+                            ) : (
+                                <ul className="divide-y rounded-lg border">
+                                    {fondosAnteriores.cheques.map((cheque) => {
+                                        const elegido =
+                                            form.data.cheques[cheque.id] !==
+                                            undefined;
+
+                                        return (
+                                            <li
+                                                key={cheque.id}
+                                                className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm"
+                                            >
+                                                <Checkbox
+                                                    checked={elegido}
+                                                    onCheckedChange={(v) =>
+                                                        elegirCheque(
+                                                            cheque.id,
+                                                            v === true,
+                                                            cheque.available,
+                                                        )
+                                                    }
+                                                    aria-label={`Cheque ${cheque.number}`}
+                                                />
+                                                <span className="flex-1">
+                                                    <span className="font-mono">
+                                                        {cheque.number}
+                                                    </span>
+                                                    {cheque.bank && (
+                                                        <> · {cheque.bank}</>
+                                                    )}
+                                                    <span className="block text-xs text-muted-foreground">
+                                                        Quedan{' '}
+                                                        {money(
+                                                            cheque.available,
+                                                        )}{' '}
+                                                        de{' '}
+                                                        {money(cheque.amount)}
+                                                        {cheque.expediente && (
+                                                            <>
+                                                                {' '}
+                                                                · Expte.{' '}
+                                                                {
+                                                                    cheque.expediente
+                                                                }
+                                                            </>
+                                                        )}
+                                                        {cheque.beneficiary && (
+                                                            <>
+                                                                {' '}
+                                                                ·{' '}
+                                                                {
+                                                                    cheque.beneficiary
+                                                                }
+                                                            </>
+                                                        )}
+                                                    </span>
+                                                </span>
+                                                {elegido && (
+                                                    <Input
+                                                        inputMode="decimal"
+                                                        aria-label={`Importe del cheque ${cheque.number}`}
+                                                        className="w-36 text-right font-mono tabular-nums"
+                                                        value={
+                                                            form.data.cheques[
+                                                                cheque.id
+                                                            ]
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'cheques',
+                                                                {
+                                                                    ...form.data
+                                                                        .cheques,
+                                                                    [cheque.id]:
+                                                                        e.target
+                                                                            .value,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                            <InputError message={errores.cheques} />
+                        </fieldset>
+                    )}
+
+                    <InputError message={errores.sources} />
+
+                    {reciboDePapel === null ? (
+                        <fieldset className="grid gap-3 rounded-lg border p-3">
+                            <legend className="px-1 text-sm font-medium">
+                                Recibo de ingreso de papel
+                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                    el que se le dio al empleador
+                                    {corteHistorico !== null && (
+                                        <>
+                                            , anterior al {date(corteHistorico)}
+                                        </>
+                                    )}
+                                </span>
+                            </legend>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="grid gap-1.5">
+                                    <Label
+                                        htmlFor={`apartar-numero-${cuota.id}`}
+                                    >
+                                        N.º de talonario
+                                    </Label>
+                                    <Input
+                                        id={`apartar-numero-${cuota.id}`}
+                                        className="font-mono tabular-nums"
+                                        value={form.data.incomeNumber}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'incomeNumber',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label
+                                        htmlFor={`apartar-fecha-${cuota.id}`}
+                                    >
+                                        Fecha
+                                    </Label>
+                                    <Input
+                                        id={`apartar-fecha-${cuota.id}`}
+                                        type="date"
+                                        max={hoy}
+                                        value={form.data.incomeDate}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'incomeDate',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label
+                                        htmlFor={`apartar-importe-${cuota.id}`}
+                                    >
+                                        Importe del papel
+                                    </Label>
+                                    <Input
+                                        id={`apartar-importe-${cuota.id}`}
+                                        inputMode="decimal"
+                                        className="text-right font-mono tabular-nums"
+                                        value={form.data.incomeAmount}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'incomeAmount',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <InputError message={errores.incomeNumber} />
+                            <InputError message={errores.incomeDate} />
+                            <InputError message={errores.incomeAmount} />
+                            <div className="grid gap-1.5">
+                                <Label htmlFor={`apartar-foto-${cuota.id}`}>
+                                    Foto
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                        opcional · JPG, PNG, WEBP o PDF
+                                    </span>
+                                </Label>
+                                <Input
+                                    id={`apartar-foto-${cuota.id}`}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'incomePhoto',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                />
+                                <InputError message={errores.incomePhoto} />
+                            </div>
+                        </fieldset>
+                    ) : (
+                        <p className="rounded-lg border bg-muted/30 p-3 text-sm">
+                            La cuota ya tiene su recibo de ingreso de papel n.º{' '}
+                            <span className="font-mono">
+                                {reciboDePapel.number}
+                            </span>{' '}
+                            del {date(reciboDePapel.issuedOn)}: se usa ese.
+                        </p>
+                    )}
+
+                    {errores.confirmDuplicates && (
+                        <label className="flex items-start gap-2 rounded-lg border border-warning-strong/30 bg-warning-soft p-3 text-sm text-warning-strong">
+                            <Checkbox
+                                className="mt-0.5"
+                                checked={form.data.confirmDuplicates}
+                                onCheckedChange={(v) =>
+                                    form.setData(
+                                        'confirmDuplicates',
+                                        v === true,
+                                    )
+                                }
+                            />
+                            Revisé los avisos: es un papel distinto del que ya
+                            está cargado.
+                        </label>
+                    )}
+                </form>
+
+                <DialogFooter className="gap-2">
+                    <Button type="button" variant="outline" onClick={cerrar}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        form={`form-apartar-${cuota.id}`}
+                        disabled={form.processing}
+                    >
+                        <PiggyBank className="size-4" aria-hidden="true" />
+                        Apartar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}

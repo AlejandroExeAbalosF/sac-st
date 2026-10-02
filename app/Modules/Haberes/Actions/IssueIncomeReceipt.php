@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Actions;
 use App\Models\User;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
@@ -363,6 +364,19 @@ final class IssueIncomeReceipt
             throw ValidationException::withMessages([
                 'installmentId' => "La cuota ya tiene el recibo {$vigente->formatted_number}. "
                     .'Para emitir otro hay que anular ese primero.',
+            ]);
+        }
+
+        /*
+         * La plata apartada del sistema anterior ya tiene su recibo: el de
+         * talonario que se le dio al empleador. Uno del sistema sería un
+         * segundo recibo por el mismo dinero.
+         */
+        $papel = IncomeEvidence::of($installment);
+
+        if ($papel !== null && $papel->isPaper()) {
+            throw ValidationException::withMessages([
+                'installmentId' => "La cuota ya tiene su recibo de ingreso de papel n.º {$papel->talonarioNumber()}: no lleva uno del sistema.",
             ]);
         }
     }

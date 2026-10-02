@@ -92,6 +92,12 @@ final class HaberesAuditCatalog implements AuditCatalogContributor
 
             new AuditActionDefinition('cuota.financiada', 'Se asignaron fondos a la cuota', 'Recepciones y cobros'),
             new AuditActionDefinition(
+                'cuota.financiada-sistema-anterior',
+                'Se apartaron fondos del sistema anterior para la cuota',
+                'Recepciones y cobros',
+                metadata: ['fuentes' => 'Fuentes', 'recibo' => 'Recibo de ingreso de papel'],
+            ),
+            new AuditActionDefinition(
                 'asignacion.desasignada',
                 'Se desasignaron fondos de la cuota',
                 'Recepciones y cobros',

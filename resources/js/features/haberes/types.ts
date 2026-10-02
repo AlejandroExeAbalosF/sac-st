@@ -152,5 +152,10 @@ export type HistoricoProps = {
         registrar: boolean;
         /** Anular ese registro: la cuota vuelve a estar por pagar. */
         anular: boolean;
+        /**
+         * Apartar del saldo anterior la plata de una cuota en custodia.
+         * Falso también cuando no queda nada que apartar.
+         */
+        apartar: boolean;
     };
 };

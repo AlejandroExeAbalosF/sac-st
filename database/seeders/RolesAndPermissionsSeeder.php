@@ -257,6 +257,12 @@ class RolesAndPermissionsSeeder extends Seeder
         // el criterio del contador, no el del que atiende.
         'caja.pagar-anterior' => ['administrador', 'contador'],
 
+        // Apartar del saldo del sistema anterior la plata de una cuota
+        // histórica que todavía está en custodia. Es la misma plata que
+        // paga `caja.pagar-anterior`, y baja el mismo saldo: el mismo
+        // criterio del contador.
+        'caja.apartar-anterior' => ['administrador', 'contador'],
+
         // Abrir los libros con el saldo que ya está en el cajón. Se hace
         // una sola vez en la vida del sistema y define todos los saldos
         // posteriores: solo el administrador.

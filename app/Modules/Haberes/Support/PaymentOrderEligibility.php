@@ -9,10 +9,8 @@ use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
-use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -110,7 +108,7 @@ final class PaymentOrderEligibility
     private function traba(
         BeneficiaryInstallment $installment,
         PaymentChannel $canal,
-        ?Receipt $recibo,
+        ?IncomeEvidence $recibo,
         ?PaymentOrder $vigente,
     ): ?string {
         if ($installment->workflow_status === InstallmentWorkflowStatus::Cancelled) {
@@ -237,13 +235,10 @@ final class PaymentOrderEligibility
         return $this->verifiedAccounts($beneficiary)->first();
     }
 
-    private function reciboVigente(BeneficiaryInstallment $installment): ?Receipt
+    /** El del sistema, o el de papel si la plata se apartó del sistema anterior. */
+    private function reciboVigente(BeneficiaryInstallment $installment): ?IncomeEvidence
     {
-        return Receipt::query()
-            ->issued()
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('beneficiary_installment_id', $installment->id)
-            ->first();
+        return IncomeEvidence::of($installment);
     }
 
     private function ordenVigente(BeneficiaryInstallment $installment): ?PaymentOrder

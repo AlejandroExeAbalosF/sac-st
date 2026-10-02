@@ -45,6 +45,14 @@ type Pago = {
     voided: boolean;
 };
 
+type Apartado = {
+    id: number;
+    date: string;
+    description: string | null;
+    amount: string;
+    released: string;
+};
+
 type Props = {
     selected: {
         cashBoxId: number;
@@ -59,6 +67,8 @@ type Props = {
     };
     bankAccounts: { id: number; label: string }[];
     payments: Pago[];
+    /** Lo apartado para cuotas de expedientes históricos. */
+    setAside: Apartado[];
 };
 
 /**
@@ -79,6 +89,7 @@ export default function PagosAnteriores({
     balances,
     bankAccounts,
     payments,
+    setAside,
 }: Props) {
     const [pagando, setPagando] = useState(false);
     const quedaAlgo = /[1-9]/.test(balances.pending);
@@ -113,14 +124,14 @@ export default function PagosAnteriores({
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-lg border-2 border-primary/30 bg-card p-4">
                         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Queda por pagar
+                            Queda sin asignar
                         </p>
                         <p className="mt-2 text-2xl">
                             <Money value={balances.pending} dimWhenZero />
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground">
                             {quedaAlgo
-                                ? 'Cuando llegue a cero, no queda ningún caso viejo por pagar.'
+                                ? 'Baja con cada pago y con cada apartado para un expediente histórico. En cero, no queda ningún caso viejo sin resolver.'
                                 : 'No queda nada del sistema anterior.'}
                         </p>
                     </div>
@@ -133,13 +144,16 @@ export default function PagosAnteriores({
                     <Saldo titulo="Depósitos directos" valor={balances.bank} />
                 </div>
 
-                {!quedaAlgo && payments.length === 0 && (
-                    <p className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
-                        <Info className="size-4 shrink-0" />
-                        Esta caja no declaró saldo del sistema anterior al abrir
-                        los libros, así que no hay nada que pagar por acá.
-                    </p>
-                )}
+                {!quedaAlgo &&
+                    payments.length === 0 &&
+                    setAside.length === 0 && (
+                        <p className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
+                            <Info className="size-4 shrink-0" />
+                            Esta caja no declaró saldo del sistema anterior al
+                            abrir los libros, así que no hay nada que pagar por
+                            acá.
+                        </p>
+                    )}
 
                 {payments.length > 0 && (
                     <div className="overflow-hidden rounded-lg border bg-card">
@@ -197,6 +211,64 @@ export default function PagosAnteriores({
                     </div>
                 )}
             </div>
+
+            {setAside.length > 0 && (
+                <section className="flex flex-col gap-2 px-4 pb-6 sm:px-6">
+                    <h2 className="text-sm font-semibold">
+                        Apartado para expedientes
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                        Plata del sistema anterior que ya tiene dueño: una cuota
+                        de un expediente histórico. Sigue en la caja hasta que
+                        se le pague; lo liberado vuelve al saldo.
+                    </p>
+                    <div className="overflow-hidden rounded-lg border bg-card">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left font-medium">
+                                            Fecha
+                                        </th>
+                                        <th className="px-4 py-2 text-left font-medium">
+                                            Para
+                                        </th>
+                                        <th className="px-4 py-2 text-right font-medium">
+                                            Apartado
+                                        </th>
+                                        <th className="px-4 py-2 text-right font-medium">
+                                            Liberado
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {setAside.map((apartado) => (
+                                        <tr key={apartado.id}>
+                                            <td className="px-4 py-2 whitespace-nowrap">
+                                                {formatDate(apartado.date)}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {apartado.description}
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <Money
+                                                    value={apartado.amount}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <Money
+                                                    value={apartado.released}
+                                                    dimWhenZero
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             <DialogoPago
                 abierto={pagando}

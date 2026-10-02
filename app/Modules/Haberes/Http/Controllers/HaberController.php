@@ -40,6 +40,7 @@ use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\LegacyCutoff;
 use App\Modules\Haberes\Support\LegacyDisbursementReceipts;
+use App\Modules\Haberes\Support\LegacyFundsOptions;
 use App\Modules\Haberes\Support\LegacyInstallments;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderSources;
@@ -774,6 +775,13 @@ final class HaberController extends Controller
             'corteHistorico' => app(LegacyCutoff::class)->date()?->toDateString(),
             'canRecordLegacy' => $puedeRegistrarHistorico,
             'canVoidLegacy' => request()->user()?->can('expedientes.anular') ?? false,
+            /*
+             * De dónde apartar plata del sistema anterior para una cuota:
+             * solo para quien puede, y solo mientras quede algo.
+             */
+            'fondosAnteriores' => request()->user()?->can('caja.apartar-anterior') === true
+                ? app(LegacyFundsOptions::class)->for($haber)
+                : null,
         ]);
     }
 

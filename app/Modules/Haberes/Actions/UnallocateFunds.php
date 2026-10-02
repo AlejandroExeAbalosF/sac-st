@@ -14,6 +14,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
@@ -117,18 +118,27 @@ final class UnallocateFunds
 
             /*
              * El asiento inverso al de la asignación: la plata deja de
-             * tener dueño y vuelve a la cola de no identificados, que es
-             * de donde salió.
+             * tener dueño y vuelve a donde estaba. Lo que entró por el
+             * circuito vuelve a la cola de no identificados; lo apartado
+             * del sistema anterior vuelve a `LEGACY_FUNDS`, que es de donde
+             * salió. Mandarlo a la cola lo haría asignable por el camino
+             * normal, y esa plata nunca pasó por ahí.
              */
+            $moneda = Currency::from((string) $receipt->currency);
+            $devolucion = $receipt->origin->isLegacy()
+                ? EntryLine::credit(LedgerAccount::LegacyFunds, $importe)
+                : EntryLine::credit(LedgerAccount::UnassignedFunds, $importe)->from($receipt->depositor_id);
+
             $evento = $this->asentar->handle(
                 type: FinancialEventType::Reversal,
                 idempotencyKey: $idempotencyKey,
                 lines: [
                     EntryLine::debit(LedgerAccount::BeneficiaryFunds, $importe)
+                        ->in($moneda)
                         ->forInstallment($original->haber_id, $original->beneficiary_installment_id)
                         ->onCashBox($receipt->cash_box_id),
-                    EntryLine::credit(LedgerAccount::UnassignedFunds, $importe)
-                        ->from($receipt->depositor_id)
+                    $devolucion
+                        ->in($moneda)
                         ->onCashBox($receipt->cash_box_id),
                 ],
                 date: BusinessDate::today(),

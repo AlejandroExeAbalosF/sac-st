@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Support;
 
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
+use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
@@ -72,6 +73,8 @@ final class CashDayTakings
             ->where('fund_receipts.cash_box_id', $cashBoxId)
             ->where('fund_receipts.currency', $currency->value)
             ->where('fund_receipts.medium', 'cash')
+            // Lo apartado del sistema anterior no entró hoy: ya estaba en el cajón.
+            ->where('fund_receipts.origin', FundReceiptOrigin::Received->value)
             ->whereDate('fund_receipts.received_date', $date)
             ->where('financial_events.status', FinancialEventStatus::Posted->value)
             ->sum('fund_receipts.amount');
@@ -118,6 +121,8 @@ final class CashDayTakings
             ->where('fund_receipts.cash_box_id', $cashBoxId)
             ->where('fund_receipts.currency', $currency->value)
             ->where('fund_receipts.medium', 'cash')
+            // Lo apartado del sistema anterior no entró hoy: ya estaba en el cajón.
+            ->where('fund_receipts.origin', FundReceiptOrigin::Received->value)
             ->whereDate('fund_receipts.received_date', $date)
             ->whereNull('funding_allocations.reversal_of_id')
             ->sum('funding_allocations.amount');
@@ -145,6 +150,7 @@ final class CashDayTakings
             ->where('traslado.cash_box_id', $cashBoxId)
             ->where('recepcion.currency', $currency->value)
             ->where('recepcion.medium', 'cash')
+            ->where('recepcion.origin', FundReceiptOrigin::Received->value)
             ->whereDate('recepcion.received_date', $date)
             ->whereDate('deposito.event_date', $date)
             ->where('deposito.status', FinancialEventStatus::Posted->value)

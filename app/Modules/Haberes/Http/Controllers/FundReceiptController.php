@@ -22,6 +22,7 @@ use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\ReceiptOrigin;
+use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Support\Database\Like;
 use App\Support\Money\Decimal;
@@ -56,6 +57,13 @@ final class FundReceiptController extends Controller
 
         $recepciones = FundReceipt::query()
             ->with(['depositor', 'cashBox'])
+            /*
+             * Solo lo que entró por el circuito. La plata del sistema
+             * anterior —los cheques de la apertura, lo apartado— no espera
+             * dueño en esta cola: se asigna desde la cuota, y su saldo se
+             * mira en Pagos anteriores.
+             */
+            ->where('origin', FundReceiptOrigin::Received->value)
             /*
              * «Pendientes» es la cola de trabajo del área: lo que entró y
              * todavía no tiene dueño.

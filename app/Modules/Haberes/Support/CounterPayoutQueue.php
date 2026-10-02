@@ -212,7 +212,8 @@ final class CounterPayoutQueue
             employerName: $haber->expediente->employer?->name,
             concept: $haber->concept,
             amount: $estado->amount,
-            incomeReceiptNumber: $estado->incomeReceipt?->formatted_number,
+            // Un recibo de papel no tiene número del sistema: va el del talonario.
+            incomeReceiptNumber: $estado->incomeReceipt?->systemNumber() ?? $estado->incomeReceipt?->talonarioNumber(),
             cashBoxName: $cajas[(int) $cuota->id] ?? null,
         );
     }

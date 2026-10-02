@@ -15,9 +15,8 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\CashDepositCandidate;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
-use App\Modules\Shared\Enums\ReceiptType;
-use App\Modules\Shared\Models\Receipt;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -50,11 +49,7 @@ final class CashTransferController extends Controller
     {
         $installment->loadMissing('haber.beneficiary', 'haber.expediente');
 
-        $recibo = Receipt::query()
-            ->issued()
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('beneficiary_installment_id', $installment->id)
-            ->first();
+        $recibo = IncomeEvidence::of($installment);
 
         /*
          * Sin recibo no hay nada que trasladar, y el Action lo rechazaria
@@ -72,7 +67,8 @@ final class CashTransferController extends Controller
                 'number' => $installment->installment_number,
                 'amount' => app(InstallmentFunding::class)->allocated($installment),
                 'concept' => $installment->description ?? $haber->concept,
-                'receiptNumber' => $recibo->formatted_number,
+                // Un recibo de papel no tiene número del sistema: va el del talonario.
+                'receiptNumber' => $recibo->systemNumber() ?? $recibo->talonarioNumber(),
             ],
             'haber' => [
                 'id' => $haber->id,

@@ -76,7 +76,7 @@ final class DisbursementEligibility
         $medio = $medium ?? $this->financiacion->medium($installment);
         $canal = $this->origen->channel($installment, $medio);
         $egreso = $this->egresoVivo($installment);
-        $reciboIngreso = $this->recibo($installment, ReceiptType::Income);
+        $reciboIngreso = IncomeEvidence::of($installment);
         $orden = $canal === PaymentChannel::Counter ? null : $this->ordenVigente($installment);
 
         return new DisbursementReadiness(
@@ -115,7 +115,7 @@ final class DisbursementEligibility
     private function traba(
         BeneficiaryInstallment $installment,
         PaymentChannel $canal,
-        ?Receipt $reciboIngreso,
+        ?IncomeEvidence $reciboIngreso,
         ?PaymentOrder $orden,
     ): ?string {
         if ($installment->workflow_status === InstallmentWorkflowStatus::Cancelled) {

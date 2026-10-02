@@ -7,6 +7,7 @@ import {
     History,
     Lock,
     Pencil,
+    PiggyBank,
     Receipt,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -22,13 +23,14 @@ import type {
     HistoricoProps,
     OrdenDePagoProps,
 } from '@/features/haberes/types';
-import { date } from '@/lib/format';
+import { date, isNonZero } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { history as historialDeCuota } from '@/routes/haberes/installments';
 import InstallmentExpense from './installment-expense';
 import InstallmentIncome from './installment-income';
 import InstallmentTimeline from './installment-timeline';
 import type { Firmante } from './issue-receipt-dialog';
+import LegacyFundsDialog from './legacy-funds-dialog';
 import LegacySettlementDialog from './legacy-settlement-dialog';
 import LegacySettlementPanel from './legacy-settlement-panel';
 import PaymentOrderPanel from './payment-order-panel';
@@ -126,6 +128,7 @@ export default function InstallmentCard({
     const { openDrawer } = useDrawer();
     const [destrabar, setDestrabar] = useState(false);
     const [pagoAnterior, setPagoAnterior] = useState(false);
+    const [apartando, setApartando] = useState(false);
     const anulada = cuota.status === 'cancelled';
     const estadoOrden = orden.estados[cuota.id];
     const estadoEgreso = egreso.estados[cuota.id];
@@ -141,6 +144,26 @@ export default function InstallmentCard({
      * Ofrecer registrar el pago anterior solo donde el servidor dice que se
      * puede: pendiente y sin ningún movimiento adentro del sistema.
      */
+    /*
+     * El recibo de ingreso de papel, si la plata se apartó del sistema
+     * anterior. Hace las veces del recibo del sistema en el tramo de
+     * ingreso.
+     */
+    const reciboDePapel =
+        estadoHistorico?.documents.find(
+            (papel) => papel.kind === 'income_receipt',
+        ) ?? null;
+
+    /*
+     * Apartar solo en una cuota pendiente sin plata ni recibo del sistema:
+     * no se mezcla dinero del sistema anterior con dinero actual.
+     */
+    const puedeApartar =
+        historico.permisos.apartar &&
+        cuota.status === 'active' &&
+        !isNonZero(cuota.fundedAmount) &&
+        cuota.incomeReceipt === null;
+
     const puedeRegistrarAnterior =
         historico.permisos.registrar &&
         cuota.status === 'active' &&
@@ -350,6 +373,7 @@ export default function InstallmentCard({
                             puedeDesasignar={puedeDesasignar}
                             puedeAnular={puedeAnular}
                             firmantes={firmantes}
+                            reciboDePapel={reciboDePapel}
                         />
                     </Seccion>
 
@@ -432,6 +456,19 @@ export default function InstallmentCard({
                  * Para cargar un expediente histórico: la cuota ya se pagó
                  * y hay que dejarlo registrado con sus papeles.
                  */}
+                {puedeApartar && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setApartando(true)}
+                    >
+                        <PiggyBank className="size-3.5" aria-hidden="true" />
+                        Apartar fondos anteriores
+                    </Button>
+                )}
+
                 {puedeRegistrarAnterior && (
                     <Button
                         type="button"
@@ -470,6 +507,15 @@ export default function InstallmentCard({
                     </Button>
                 )}
             </div>
+
+            {apartando && (
+                <LegacyFundsDialog
+                    cuota={cuota}
+                    reciboDePapel={reciboDePapel}
+                    abierto
+                    onCerrar={() => setApartando(false)}
+                />
+            )}
 
             {pagoAnterior && estadoHistorico !== undefined && (
                 <LegacySettlementDialog

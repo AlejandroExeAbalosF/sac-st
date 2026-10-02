@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Enums\PaseStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
+use App\Modules\Haberes\Enums\ReceiptNumberSource;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
@@ -257,7 +258,7 @@ final class IssuePaymentOrder
              * lo que el recibo de ingreso ya dice. Que salgan del mismo
              * lugar es lo que hace que los dos papeles cierren entre sí.
              */
-            'amount' => $recibo->amount ?? $this->origen->total($estado->rows),
+            'amount' => $recibo?->amount() ?? $this->origen->total($estado->rows),
 
             'beneficiary_bank_account_id' => $cuenta?->id,
             'beneficiary_person_id' => $cuenta === null ? null : $beneficiario->id,
@@ -286,11 +287,19 @@ final class IssuePaymentOrder
 
             'organism_bank_account_id' => $estado->organismBankAccountId,
 
-            'income_receipt_id' => $recibo?->id,
-            'income_receipt_number_source' => $data->incomeReceiptNumberSource,
+            /*
+             * Uno de los dos, nunca ambos: el del sistema o el de papel de
+             * la plata apartada del sistema anterior. El de papel no tiene
+             * número del sistema, así que imprime siempre el del talonario.
+             */
+            'income_receipt_id' => $recibo?->receipt?->id,
+            'legacy_income_document_id' => $recibo?->paper?->id,
+            'income_receipt_number_source' => $recibo?->isPaper() === true
+                ? ReceiptNumberSource::Talonario
+                : $data->incomeReceiptNumberSource,
             'income_receipt_number_snapshot' => $recibo === null
                 ? '—'
-                : $data->incomeReceiptNumberSource->numberOf($recibo),
+                : $recibo->numberFor($data->incomeReceiptNumberSource),
 
             'cheque_number_snapshot' => $cheque?->cheque_number,
             'cheque_bank_snapshot' => $cheque?->cheque_bank,

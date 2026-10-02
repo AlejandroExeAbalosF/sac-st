@@ -24,6 +24,8 @@ type Movement = App.Modules.Ledger.Data.MovementRowData;
 const ICONO: Record<string, LucideIcon> = {
     funds_received: ArrowDownLeft,
     funds_allocated: Scale,
+    // Como la asignación: cambia el dueño del dinero, no lo mueve.
+    legacy_funds_allocated: Scale,
     cash_disbursement: ArrowUpRight,
     bank_disbursement: ArrowUpRight,
     legacy_disbursement: ArrowUpRight,

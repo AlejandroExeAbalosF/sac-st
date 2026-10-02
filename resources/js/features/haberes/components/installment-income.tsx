@@ -18,6 +18,7 @@ import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { preview } from '@/routes/adjuntos';
 import { receiveAndAllocate as registrarIngreso } from '@/routes/haberes/installments';
 import { create as nuevoTicket } from '@/routes/haberes/installments/ticket';
 import { create as nuevoTraslado } from '@/routes/haberes/installments/transfer';
@@ -32,6 +33,7 @@ import UnallocateDialog from './unallocate-dialog';
 import VoidCollectionDialog from './void-collection-dialog';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
+type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
 
 /**
  * El tramo de ingreso de una cuota: qué entró, con qué papel y su recibo.
@@ -54,6 +56,7 @@ export default function InstallmentIncome({
     puedeDesasignar,
     puedeAnular,
     firmantes,
+    reciboDePapel,
 }: {
     cuota: Cuota;
     cuentas: { id: number; label: string }[];
@@ -65,6 +68,12 @@ export default function InstallmentIncome({
     puedeDesasignar: boolean;
     puedeAnular: boolean;
     firmantes: Firmante[];
+    /**
+     * El recibo de ingreso de papel, si la plata se apartó del sistema
+     * anterior. Hace las veces del recibo del sistema: la cuota no lleva
+     * los dos.
+     */
+    reciboDePapel: Papel | null;
 }) {
     const anulada = cuota.status === 'cancelled';
     const sinFinanciar = Number(cuota.fundedAmount) <= 0;
@@ -75,11 +84,17 @@ export default function InstallmentIncome({
                 <Financiacion cuota={cuota} puedeDesasignar={puedeDesasignar} />
             )}
 
-            <Comprobante
-                cuota={cuota}
-                cuentas={cuentas}
-                puedeEditar={puedeEditarTicket}
-            />
+            {/*
+             * La plata del sistema anterior ya estaba en la cuenta o en el
+             * cajón: no hay comprobante de depósito que esperar.
+             */}
+            {reciboDePapel === null && (
+                <Comprobante
+                    cuota={cuota}
+                    cuentas={cuentas}
+                    puedeEditar={puedeEditarTicket}
+                />
+            )}
 
             {/*
              * **Ni el traslado ni el recibo se esconden con la cuota.**
@@ -92,6 +107,9 @@ export default function InstallmentIncome({
              */}
             <TrasladoAlBanco
                 cuota={cuota}
+                conRecibo={
+                    cuota.incomeReceipt !== null || reciboDePapel !== null
+                }
                 puedeTrasladar={puedeTrasladar && !anulada}
                 puedeAcreditar={puedeAcreditar}
             />
@@ -105,21 +123,65 @@ export default function InstallmentIncome({
 
             <TrasladosCancelados cuota={cuota} />
 
-            <ReciboDeIngreso
-                cuota={cuota}
-                firmantes={firmantes}
-                puedeAnular={puedeAnular}
-                puedeRegistrarPago={puedeRegistrarPago}
-                /*
-                 * Con la cuota sin financiar el mismo boton cobra, y
-                 * eso asienta dinero: hacen falta los dos permisos.
-                 */
-                puedeEmitir={
-                    !anulada &&
-                    puedeEmitirRecibo &&
-                    (cuota.isFullyFunded || puedeRegistrarPago)
-                }
-            />
+            {reciboDePapel !== null && cuota.incomeReceipt === null ? (
+                <ReciboDePapel papel={reciboDePapel} />
+            ) : (
+                <ReciboDeIngreso
+                    cuota={cuota}
+                    firmantes={firmantes}
+                    puedeAnular={puedeAnular}
+                    puedeRegistrarPago={puedeRegistrarPago}
+                    /*
+                     * Con la cuota sin financiar el mismo boton cobra, y
+                     * eso asienta dinero: hacen falta los dos permisos.
+                     */
+                    puedeEmitir={
+                        !anulada &&
+                        puedeEmitirRecibo &&
+                        (cuota.isFullyFunded || puedeRegistrarPago)
+                    }
+                />
+            )}
+        </div>
+    );
+}
+
+/**
+ * El recibo de ingreso de papel de la plata apartada del sistema anterior.
+ *
+ * Es el que se le dio al empleador en su momento, con número de talonario.
+ * No se emite ni se anula desde acá: es un papel que ya existe, y la cuota
+ * no lleva uno del sistema además.
+ */
+function ReciboDePapel({ papel }: { papel: Papel }) {
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-success/40 bg-success-soft/40 px-3 py-2">
+            <p className="flex items-center gap-1.5 text-xs">
+                <BadgeCheck className="size-3.5 shrink-0 text-success-strong" />
+                <span>
+                    Recibo de papel{' '}
+                    <strong className="font-mono">n.º {papel.number}</strong>
+                    <span className="text-muted-foreground">
+                        {' '}
+                        · {date(papel.issuedOn)} · del sistema anterior
+                    </span>
+                </span>
+            </p>
+            <div className="flex items-center gap-3">
+                <span className="font-mono text-xs tabular-nums">
+                    {money(papel.amount)}
+                </span>
+                {papel.attachmentId !== null && (
+                    <a
+                        href={preview(papel.attachmentId).url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary hover:underline"
+                    >
+                        Ver foto
+                    </a>
+                )}
+            </div>
         </div>
     );
 }
@@ -722,10 +784,13 @@ function Comprobante({
  */
 function TrasladoAlBanco({
     cuota,
+    conRecibo,
     puedeTrasladar,
     puedeAcreditar,
 }: {
     cuota: Cuota;
+    /** Si hay recibo de ingreso vigente, del sistema o de papel. */
+    conRecibo: boolean;
     puedeTrasladar: boolean;
     puedeAcreditar: boolean;
 }) {
@@ -752,7 +817,7 @@ function TrasladoAlBanco({
      * Lo que sí necesita el recibo es **empezar** un traslado: el orden
      * del circuito es cobrar, documentar y recién ahí depositar.
      */
-    if (traslado === null && cuota.incomeReceipt === null) {
+    if (traslado === null && !conRecibo) {
         return null;
     }
 

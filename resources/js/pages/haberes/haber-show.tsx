@@ -75,6 +75,8 @@ type Props = {
     historicos: Record<number, App.Modules.Haberes.Data.InstallmentLegacyData>;
     canRecordLegacy: boolean;
     canVoidLegacy: boolean;
+    /** De dónde apartar plata del sistema anterior; nulo sin permiso. */
+    fondosAnteriores: App.Modules.Haberes.Data.LegacyFundsOptionsData | null;
 };
 
 const TONO: Record<HaberStatus, StatusTone> = {
@@ -132,6 +134,7 @@ export default function MostrarHaber({
     historicos,
     canRecordLegacy,
     canVoidLegacy,
+    fondosAnteriores,
 }: Props) {
     const { openDrawer } = useDrawer();
     const [baja, setBaja] = useState(false);
@@ -166,6 +169,10 @@ export default function MostrarHaber({
         permisos: {
             registrar: canRecordLegacy && haber.status === 'active',
             anular: canVoidLegacy,
+            apartar:
+                fondosAnteriores !== null &&
+                haber.status === 'active' &&
+                compareAmounts(fondosAnteriores.pending, '0.00') === 1,
         },
     };
 

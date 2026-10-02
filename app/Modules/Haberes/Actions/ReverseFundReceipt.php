@@ -126,6 +126,17 @@ final class ReverseFundReceipt
      */
     private function assertSinDueño(FundReceipt $receipt): void
     {
+        /*
+         * Revertir una recepción del sistema anterior desharía el asiento
+         * de la apertura o el del apartado, no un ingreso: no hay nada que
+         * entró por error. Lo que se puede hacer es liberarla de su cuota.
+         */
+        if ($receipt->origin->isLegacy()) {
+            throw ValidationException::withMessages([
+                'receiptId' => 'Esa plata es del sistema anterior: no se revierte, se libera de la cuota.',
+            ]);
+        }
+
         $asignado = $this->financiacion->allocatedFrom($receipt);
 
         if (! Decimal::equals($asignado, '0')) {

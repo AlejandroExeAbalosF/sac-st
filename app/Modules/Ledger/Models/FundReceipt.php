@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Models;
 
 use App\Models\User;
 use App\Modules\Ledger\Enums\ChequeStatus;
+use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Enums\ResidualStatus;
 use App\Modules\Shared\Models\CashBox;
@@ -47,6 +48,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonInterface|null $reversed_at
  * @property int|null $reversed_by
  * @property string|null $reversal_reason
+ * @property FundReceiptOrigin $origin De dónde viene el dinero; decide por qué vía se asigna.
+ * @property int|null $bank_account_id Solo en un depósito directo apartado del sistema anterior.
  */
 final class FundReceipt extends Model
 {
@@ -82,6 +85,8 @@ final class FundReceipt extends Model
         'residual_acknowledged_at',
         'received_by',
         'notes',
+        'origin',
+        'bank_account_id',
     ];
 
     /** @return BelongsTo<FinancialEvent, $this> */
@@ -138,6 +143,7 @@ final class FundReceipt extends Model
     {
         return [
             'medium' => PaymentMedium::class,
+            'origin' => FundReceiptOrigin::class,
             'cheque_status' => ChequeStatus::class,
             'residual_status' => ResidualStatus::class,
             'amount' => 'decimal:2',

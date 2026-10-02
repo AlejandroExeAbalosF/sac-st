@@ -24,6 +24,7 @@ de un Action no debe presentarse como garantía de PostgreSQL sin comprobar su D
 | `cash_to_bank_transfers` / `cash_to_bank_transfer_items` | Traslado de Banking y sus imputaciones de Haberes |
 | `legacy_settlements` | Que una cuota se pagó fuera del circuito, y cómo; append-only con anulación |
 | `legacy_documents` | Papeles del sistema anterior de la cuota, con número de talonario, fecha e importe impresos |
+| `fund_receipts.origin` | Si la recepción entró por el circuito, es un cheque de la apertura o se apartó del sistema anterior |
 
 `financial_events` y `journal_lines` registran los hechos contables. Un ticket,
 una Orden o un informe de transferencia no deben confundirse con el asiento que
@@ -111,6 +112,9 @@ requiere identificar el crédito y registrar su recepción/asignación.
 
 Una corrección posterior de cuota no modifica el comprobante anterior. Esto explica
 por qué el recibo no congela la cuota; no autoriza editar un recibo emitido.
+
+Una cuota financiada con plata del sistema anterior no lleva recibo del sistema:
+su recibo es el de papel ([fondos anteriores](#fondos-anteriores)).
 
 Evidencia: [cobro y emisión](../app/Modules/Haberes/Actions/CollectAndIssueReceipt.php),
 [emisión](../app/Modules/Haberes/Actions/IssueIncomeReceipt.php),
@@ -232,6 +236,46 @@ Evidencia: [esquema](../database/migrations/2026_10_01_010000_create_legacy_sett
 [RecordLegacySettlement](../app/Modules/Haberes/Actions/RecordLegacySettlement.php),
 [VoidLegacySettlement](../app/Modules/Haberes/Actions/VoidLegacySettlement.php) y
 [cuota histórica](../tests/Feature/Haberes/CuotaHistoricaTest.php).
+
+<a id="fondos-anteriores"></a>
+
+## Fondos del sistema anterior apartados para una cuota
+
+`FundInstallmentFromLegacy` asienta, por cada fuente, un `legacy_funds_allocated`:
+débito `LEGACY_FUNDS`, crédito `BENEFICIARY_FUNDS`, con la fecha de hoy. La
+recepción de la que se asigna dice su origen en `fund_receipts.origin`:
+`received` (entró por el circuito), `opening` (un cheque de la cartera de la
+apertura) o `legacy` (efectivo o depósito directo apartados, con su cuenta en
+`bank_account_id`).
+
+| Regla | Action | Base |
+| --- | --- | --- |
+| El asiento solo debita `LEGACY_FUNDS` y acredita `BENEFICIARY_FUNDS`: no mueve dinero de lugar | `SetAsideLegacyFunds` | `legacy_allocation_shape`, diferido |
+| `LEGACY_FUNDS` no queda negativo | `SetAsideLegacyFunds`, con `LegacyFundsLock` | `legacy_funds_balance_check` |
+| El origen de la recepción corresponde al tipo de su evento | — | `fund_receipts_origin_matches_event` |
+| Lo del circuito se asigna con `funds_allocated`; lo anterior, con `legacy_funds_allocated` | `AllocateFundsToInstallment` | `allocation_respects_origin` |
+| Una recepción `legacy` no se reutiliza: solo admite la asignación de su propio evento | — | `allocation_respects_origin` |
+| Una cuota no mezcla dinero anterior y actual, en ningún sentido | `FundInstallmentFromLegacy`, `AllocateFundsToInstallment` | `allocation_respects_origin`, con `FOR UPDATE` sobre la cuota |
+| El saldo libre de un cheque no se asigna dos veces | `FundInstallmentFromLegacy`, que bloquea los cheques en orden | `allocation_within_receipt`, ahora con `FOR UPDATE` sobre la recepción |
+| Se aparta con financiación cero y por el importe completo | `FundInstallmentFromLegacy` | — |
+| Recibo de ingreso de papel por el importe de la cuota, anterior a la apertura | `FundInstallmentFromLegacy`, `LegacyPaperCheck` | `legacy_paper_before_opening`, `legacy_documents_paper_unique` |
+| Recibo de papel o del sistema, nunca los dos | `IssueIncomeReceipt` | `income_receipt_paper_or_system` |
+| La Orden cita uno de los dos recibos e imprime el talonario si es de papel | `IssuePaymentOrder` | `payment_orders_one_income_receipt_check`, `payment_orders_paper_prints_talonario_check` |
+| El papel no se anula mientras lo cite una Orden o respalde plata apartada | — | `legacy_income_document_keeps_backing` |
+| Liberar devuelve a `LEGACY_FUNDS`; la recepción no se revierte ni se anula su cobro | `UnallocateFunds`, `ReverseFundReceipt`, `VoidCashCollection` | `allocation_respects_origin` |
+
+El recibo de ingreso se lee igual sea del sistema o de papel (`IncomeEvidence`): la
+Orden, la entrega, el traslado y las etapas preguntan si hay recibo sin saber cuál
+es. La Orden por banco toma la cuenta del organismo de la recepción cuando no hay
+movimiento del extracto que la confirme.
+
+Lo apartado no figura en la recaudación del día ni en `/recepciones`: ya estaba en
+la caja. Se ve en Pagos anteriores, con lo liberado al lado.
+
+Evidencia: [esquema](../database/migrations/2026_10_01_020000_allow_allocating_legacy_funds.php),
+[FundInstallmentFromLegacy](../app/Modules/Haberes/Actions/FundInstallmentFromLegacy.php),
+[SetAsideLegacyFunds](../app/Modules/Ledger/Actions/SetAsideLegacyFunds.php) y
+[fondos anteriores](../tests/Feature/Haberes/FondosAnterioresTest.php).
 
 <a id="mantenimiento"></a>
 

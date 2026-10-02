@@ -57,9 +57,10 @@ final class LegacyDisbursementController extends Controller
             ],
             'balances' => [
                 /*
-                 * Lo que falta pagar del sistema anterior. Es el número que
-                 * ordena toda la pantalla: baja con cada pago y el día que
-                 * llegue a cero se apaga la operación en paralelo.
+                 * Lo del sistema anterior que todavía no tiene dueño. Es el
+                 * número que ordena toda la pantalla: baja con cada pago y
+                 * con cada apartado para un expediente histórico, y el día
+                 * que llegue a cero se apaga la operación en paralelo.
                  */
                 'pending' => $this->saldos->of(LedgerAccount::LegacyFunds, $id, $moneda),
                 'cash' => $this->saldos->of(LedgerAccount::CashOnHand, $id, $moneda),
@@ -73,6 +74,7 @@ final class LegacyDisbursementController extends Controller
             ],
             'bankAccounts' => $this->bankAccounts(),
             'payments' => $this->history($id, $moneda),
+            'setAside' => $this->setAside($id, $moneda),
         ]);
     }
 
@@ -180,6 +182,60 @@ final class LegacyDisbursementController extends Controller
         }
 
         return $historial;
+    }
+
+    /**
+     * Lo apartado para cuotas de expedientes históricos.
+     *
+     * La otra forma en que baja el saldo: no se le pagó a nadie todavía, se
+     * dijo de quién es. Se lee del libro y no de las cuotas —esta pantalla
+     * es de Ledger, que no sabe de expedientes—; el detalle es la
+     * descripción que dejó quien apartó. Lo liberado después vuelve al
+     * saldo, y se muestra al lado para que la suma cierre.
+     *
+     * @return list<array{id: int, date: string, description: string|null, amount: numeric-string, released: numeric-string}>
+     */
+    private function setAside(int $cashBoxId, Currency $currency): array
+    {
+        $eventos = DB::table('financial_events')
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'financial_events.id')
+            ->where('financial_events.cash_box_id', $cashBoxId)
+            ->where('financial_events.event_type', FinancialEventType::LegacyFundsAllocated->value)
+            ->where('financial_events.status', '<>', 'draft')
+            ->where('journal_lines.account_code', LedgerAccount::LegacyFunds->value)
+            ->where('journal_lines.currency', $currency->value)
+            ->groupBy('financial_events.id', 'financial_events.event_date', 'financial_events.description')
+            ->orderByDesc('financial_events.event_date')
+            ->orderByDesc('financial_events.id')
+            ->limit(100)
+            ->get([
+                'financial_events.id',
+                'financial_events.event_date',
+                'financial_events.description',
+                DB::raw('SUM(journal_lines.debit) AS importe'),
+            ]);
+
+        $liberado = DB::table('financial_events')
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'financial_events.id')
+            ->whereIn('financial_events.reversal_of_id', $eventos->pluck('id'))
+            ->where('journal_lines.account_code', LedgerAccount::LegacyFunds->value)
+            ->groupBy('financial_events.reversal_of_id')
+            ->selectRaw('financial_events.reversal_of_id AS apartado, SUM(journal_lines.credit) AS liberado')
+            ->pluck('liberado', 'apartado');
+
+        $lista = [];
+
+        foreach ($eventos as $evento) {
+            $lista[] = [
+                'id' => (int) $evento->id,
+                'date' => CarbonImmutable::parse((string) $evento->event_date)->toDateString(),
+                'description' => is_string($evento->description) ? $evento->description : null,
+                'amount' => Decimal::scale((string) $evento->importe),
+                'released' => Decimal::scale((string) ($liberado[$evento->id] ?? '0')),
+            ];
+        }
+
+        return $lista;
     }
 
     /**

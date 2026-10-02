@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
+use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -113,6 +114,7 @@ final class AllocateFundsToInstallment
             $recepcionBloqueada = FundReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
             $this->assertPuedeRecibirFondos($expedienteBloqueado, $haberBloqueado, $cuotaBloqueada);
+            $this->assertDineroDelCircuito($recepcionBloqueada, $cuotaBloqueada);
             $this->assertFits($recepcionBloqueada, $cuotaBloqueada, $importe);
             $this->assertSameMedium($recepcionBloqueada, $cuotaBloqueada);
 
@@ -185,6 +187,34 @@ final class AllocateFundsToInstallment
         if ($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
             throw ValidationException::withMessages([
                 'installmentId' => 'La cuota ya se pagó fuera del circuito: no se le puede imputar dinero.',
+            ]);
+        }
+    }
+
+    /**
+     * Esta vía es para lo que entró por el circuito.
+     *
+     * La plata del sistema anterior —un cheque de la cartera de la apertura
+     * o lo apartado— nunca estuvo en `UNASSIGNED_FUNDS`: debitarla de ahí
+     * dejaría esa cuenta en negativo. Se asigna apartándola, desde la cuota.
+     * Y una cuota con recibo de ingreso de papel solo se financia con esa
+     * plata, que es la que el papel respalda.
+     *
+     * @throws ValidationException
+     */
+    private function assertDineroDelCircuito(FundReceipt $receipt, BeneficiaryInstallment $installment): void
+    {
+        if ($receipt->origin->isLegacy()) {
+            throw ValidationException::withMessages([
+                'receiptId' => 'Esa plata es del sistema anterior: se asigna apartándola desde la cuota.',
+            ]);
+        }
+
+        $evidencia = IncomeEvidence::of($installment);
+
+        if ($evidencia !== null && $evidencia->isPaper()) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'La cuota tiene su recibo de ingreso de papel: solo se financia con dinero del sistema anterior.',
             ]);
         }
     }

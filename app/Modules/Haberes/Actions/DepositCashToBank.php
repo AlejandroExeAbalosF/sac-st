@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -19,8 +20,6 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
-use App\Modules\Shared\Enums\ReceiptType;
-use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
@@ -214,15 +213,10 @@ final class DepositCashToBank
         /*
          * Sin recibo no se traslada. No es formalismo: el recibo es lo que
          * documenta de quién se recibió ese efectivo, y depositar primero
-         * dejaría un movimiento bancario respaldado por nada.
+         * dejaría un movimiento bancario respaldado por nada. Vale el de
+         * papel de la plata apartada del sistema anterior.
          */
-        $tieneRecibo = Receipt::query()
-            ->issued()
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('beneficiary_installment_id', $installment->id)
-            ->exists();
-
-        if (! $tieneRecibo) {
+        if (IncomeEvidence::of($installment) === null) {
             throw ValidationException::withMessages([
                 'installmentId' => 'Primero hay que emitir el recibo de ingreso de esta cuota.',
             ]);

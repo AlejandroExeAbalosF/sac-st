@@ -73,7 +73,7 @@ final class PaymentOrderController extends Controller
                 'id' => $installment->id,
                 'number' => $installment->installment_number,
                 'concept' => $installment->description ?? $haber->concept,
-                'amount' => $estado->incomeReceipt->amount
+                'amount' => $estado->incomeReceipt?->amount()
                     ?? app(InstallmentFunding::class)->allocated($installment),
             ],
             'haber' => [

@@ -51,6 +51,14 @@ enum FinancialEventType: string
     /** Corrección autorizada, con responsable y motivo. */
     case AuthorizedAdjustment = 'authorized_adjustment';
 
+    /**
+     * Plata del sistema anterior que se apartó para una cuota.
+     *
+     * No mueve el dinero de lugar: deja de ser de `LEGACY_FUNDS` y pasa a
+     * `BENEFICIARY_FUNDS`. Desde ahí la cuota sigue el circuito.
+     */
+    case LegacyFundsAllocated = 'legacy_funds_allocated';
+
     public function label(): string
     {
         return match ($this) {
@@ -65,6 +73,7 @@ enum FinancialEventType: string
             self::LegacyDisbursement => 'Pago de haber anterior',
             self::Reversal => 'Reversión',
             self::AuthorizedAdjustment => 'Ajuste autorizado',
+            self::LegacyFundsAllocated => 'Apartado del sistema anterior',
         };
     }
 

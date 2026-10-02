@@ -197,6 +197,13 @@ final class VoidCashCollection
             ]);
         }
 
+        // Anular el cobro saca efectivo del cajón: lo del sistema anterior no se cobró acá.
+        if ($recepcion->origin->isLegacy()) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'Esa plata es del sistema anterior: no se cobró acá. Lo que se puede hacer es liberarla de esta cuota.',
+            ]);
+        }
+
         return $recepcion;
     }
 

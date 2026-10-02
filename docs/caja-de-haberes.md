@@ -22,7 +22,7 @@ saldos no se guardan: se suman. Las ocho cuentas son:
 | `BANK_ACCOUNT` | saldo en la cuenta bancaria |
 | `UNASSIGNED_FUNDS` | plata recibida que todavía no se sabe de quién es |
 | `BENEFICIARY_FUNDS` | plata ya atribuida a un beneficiario |
-| `LEGACY_FUNDS` | saldo histórico anterior al sistema |
+| `LEGACY_FUNDS` | saldo histórico anterior al sistema, todavía sin dueño |
 | `CASH_DIFFERENCE` | diferencias de arqueo imputadas |
 
 Las cuatro primeras dicen **dónde está** la plata; las demás, **de quién es**.
@@ -323,6 +323,12 @@ recibos desde la ficha del haber
 ([expedientes históricos](haberes.md#historicos)). El vínculo es documental: no
 mueve el libro, y un recibo con vínculos vigentes no se puede anular.
 
+El saldo también baja cuando se **aparta** plata para una cuota histórica que
+todavía no se pagó ([fondos anteriores](haberes.md#fondos-anteriores)). Apartar no
+mueve el dinero: sigue en el cajón, la cartera o la cuenta hasta que se le pague a
+la cuota por el circuito. La pantalla lista lo apartado con lo liberado al lado,
+y el saldo se rotula «sin asignar».
+
 ---
 
 <a id="monedas"></a>
@@ -357,6 +363,10 @@ legible; el trigger impide el desastre.
 - El total del arqueo sale de sus denominaciones: un total tipeado no se audita.
 - `LEGACY_FUNDS` **nunca queda negativo** por caja y moneda: del sistema anterior
   no sale más de lo que se declaró al abrir los libros.
+- Apartar plata del sistema anterior **no mueve dinero de lugar**: el asiento solo
+  toca `LEGACY_FUNDS` y `BENEFICIARY_FUNDS`, así que no cambia el arqueo.
+- Un cheque de la cartera de la apertura no se asigna por el camino normal: nunca
+  estuvo en fondos sin identificar.
 
 ---
 
@@ -370,6 +380,7 @@ legible; el trigger impide el desastre.
 | Imputar la diferencia | | | ✓ | ✓ |
 | Cerrar y reabrir | | | ✓ | ✓ |
 | Pagar saldo anterior | | | ✓ | ✓ |
+| Apartar saldo anterior para una cuota | | | ✓ | ✓ |
 | Abrir los libros | | | | ✓ |
 | Rehacer una planilla | | | | ✓ |
 

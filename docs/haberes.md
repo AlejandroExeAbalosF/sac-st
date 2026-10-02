@@ -175,6 +175,27 @@ en la caja.
 
 Reglas: [cuotas pagadas fuera del circuito](haberes-reglas.md#historicos).
 
+<a id="fondos-anteriores"></a>
+
+### Plata del sistema anterior todavía en custodia
+
+Una cuota histórica que **todavía no se pagó** y cuya plata está en la caja —en
+el cajón, en un cheque de la cartera de la apertura o como depósito directo en la
+cuenta— se financia desde su tarjeta con «Apartar fondos anteriores».
+
+Apartar no mueve el dinero: deja de ser «del sistema anterior» y pasa a ser de la
+cuota. Se aparta el importe completo, y el respaldo es **el recibo de ingreso de
+papel** que se le dio al empleador, con su número de talonario y su fecha. Ese
+papel hace las veces del recibo del sistema: la cuota no lleva los dos, y la Orden
+de Pago imprime el número del talonario.
+
+Desde ahí la cuota sigue el circuito de siempre: entrega por mostrador, traslado al
+banco, u Orden y transferencia. Si hay que liberar la plata —toda o el excedente
+de una corrección—, vuelve al saldo del sistema anterior, no a los fondos sin
+identificar; el papel queda y se reutiliza si se vuelve a apartar.
+
+Reglas: [fondos del sistema anterior](haberes-reglas.md#fondos-anteriores).
+
 <a id="permisos"></a>
 
 ## Permisos y auditoría
@@ -192,6 +213,7 @@ puede cambiar; esta tabla describe las capacidades que consulta el circuito.
 | Registrar / validar egreso | `egresos.registrar` / `egresos.validar` |
 | Registrar una cuota pagada fuera del circuito | `expedientes.registrar-historico` |
 | Anular ese registro | `expedientes.anular` |
+| Apartar fondos del sistema anterior para una cuota | `caja.apartar-anterior` |
 
 La referencia completa es [rutas de Haberes](../routes/modules/haberes.php).
 Las correcciones y operaciones relevantes registran eventos; pueden consultarse en
@@ -209,10 +231,6 @@ los historiales del circuito y en la [auditoría transversal](auditoria-acceso.m
 - Correcciones registra como pendiente de confirmación del área la exigencia del recibo
   de ingreso antes del egreso por mostrador. Hoy el sistema la exige; esta guía no
   transforma esa implementación en aprobación funcional.
-- Apartar del saldo del sistema anterior la plata de una cuota que todavía está en
-  custodia —para que siga el circuito normal— es la segunda etapa de la carga
-  histórica y todavía no está implementada. Hasta entonces, esos casos se pagan
-  desde Pagos anteriores y después se vinculan.
 - Los pendientes de dólares y comprobantes siguen en
   [la guía de Caja](caja-de-haberes.md); no se resuelven con esta consolidación.
 

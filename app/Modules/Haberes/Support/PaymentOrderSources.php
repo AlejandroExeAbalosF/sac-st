@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Support;
 
 use App\Modules\Banking\Enums\BankAllocationRole;
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
@@ -253,15 +254,26 @@ final class PaymentOrderSources
             ? null
             : BankTransaction::query()->with('account')->find($imputacion->bank_transaction_id);
 
+        /*
+         * Un depósito directo apartado del sistema anterior no tiene
+         * movimiento en el extracto: la plata ya estaba en la cuenta cuando
+         * se abrieron los libros. La cuenta la dice la recepción, que la
+         * registró al apartarlo.
+         */
+        $cuenta = $movimiento->account
+            ?? ($asignacion->fundReceipt->bank_account_id === null
+                ? null
+                : BankAccount::query()->find($asignacion->fundReceipt->bank_account_id));
+
         return new FundingSourceRow(
             fundingAllocationId: $asignacion->id,
             amount: $importeVigente,
-            organismBankAccountId: $movimiento?->bank_account_id,
+            organismBankAccountId: $movimiento->bank_account_id ?? $cuenta?->id,
             bankTransactionId: $movimiento?->id,
             operationNumber: $movimiento?->operation_id,
             operationDate: $movimiento->transaction_date ?? $asignacion->fundReceipt->received_date,
-            bankAccountNumber: $movimiento?->account?->account_number,
-            bankName: $movimiento?->account?->bank_name,
+            bankAccountNumber: $cuenta?->account_number,
+            bankName: $cuenta?->bank_name,
         );
     }
 
