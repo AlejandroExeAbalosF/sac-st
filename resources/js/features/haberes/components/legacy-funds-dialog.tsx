@@ -419,8 +419,14 @@ export default function LegacyFundsDialog({
                                                 form.setData('chequeNuevo', {
                                                     number: '',
                                                     bank: '',
-                                                    // Propone la fecha en que se cargó la cuota; se corrige si el papel dice otra.
-                                                    issueDate: cuota.createdAt,
+                                                    /*
+                                                     * Vacía: no hay otra fecha que se
+                                                     * le parezca. La de carga de la cuota
+                                                     * o la del recibo no son la del
+                                                     * cheque, y proponerlas sería guardar
+                                                     * algo que el papel no dice.
+                                                     */
+                                                    issueDate: '',
                                                 })
                                             }
                                         >
@@ -490,6 +496,9 @@ export default function LegacyFundsDialog({
                                                 htmlFor={`cheque-nuevo-fecha-${cuota.id}`}
                                             >
                                                 Fecha del cheque
+                                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                                    opcional
+                                                </span>
                                             </Label>
                                             <Input
                                                 id={`cheque-nuevo-fecha-${cuota.id}`}
