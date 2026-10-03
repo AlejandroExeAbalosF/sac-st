@@ -70,6 +70,7 @@ final class RegisterCashPayment
                 actorId: $actorId,
                 notes: $notes,
                 cheque: $cheque,
+                currency: $installment->currency(),
             );
 
             /*

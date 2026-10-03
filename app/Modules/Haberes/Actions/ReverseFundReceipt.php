@@ -13,8 +13,7 @@ use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Models\FundReceipt;
-use App\Modules\Ledger\Models\JournalLine;
-use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
@@ -57,6 +56,7 @@ final class ReverseFundReceipt
         private readonly InstallmentFunding $financiacion,
         private readonly AllocatableAmount $disponible,
         private readonly RecordAuditEvent $auditar,
+        private readonly InverseEntry $inverso,
     ) {}
 
     /**
@@ -87,7 +87,7 @@ final class ReverseFundReceipt
             $evento = $this->asentar->handle(
                 type: FinancialEventType::Reversal,
                 idempotencyKey: $idempotencyKey,
-                lines: $this->inversoDe($bloqueada),
+                lines: $this->inverso->of($bloqueada->financial_event_id),
                 date: BusinessDate::today(),
                 cashBoxId: $bloqueada->cash_box_id,
                 description: $reason,
@@ -147,37 +147,6 @@ final class ReverseFundReceipt
                 ),
             ]);
         }
-    }
-
-    /**
-     * El asiento original, dado vuelta.
-     *
-     * @return list<EntryLine>
-     */
-    private function inversoDe(FundReceipt $receipt): array
-    {
-        $original = JournalLine::query()
-            ->where('financial_event_id', $receipt->financial_event_id)
-            ->orderBy('id')
-            ->get();
-
-        /** @var list<EntryLine> $lineas */
-        $lineas = $original->map(function (JournalLine $linea): EntryLine {
-            // `account_code` ya llega como enum: el modelo lo castea.
-            $cuenta = $linea->account_code;
-            $esDebito = ! Decimal::equals(Decimal::scale($linea->debit), '0');
-
-            $invertida = $esDebito
-                ? EntryLine::credit($cuenta, Decimal::scale($linea->debit))
-                : EntryLine::debit($cuenta, Decimal::scale($linea->credit));
-
-            return $invertida
-                ->onCashBox($linea->cash_box_id)
-                ->onBankAccount($linea->bank_account_id)
-                ->from($linea->depositor_id);
-        })->all();
-
-        return $lineas;
     }
 
     /**

@@ -99,6 +99,11 @@ El asiento pasa por `CASH_IN_TRANSIT`; el banco debe confirmar la acreditación.
 Mientras está en tránsito no corresponde pagar por mostrador ni emitir la Orden
 como si los fondos ya estuvieran disponibles en la cuenta.
 
+Se deposita todo lo que la cuota tiene en la caja: si se cubrió con dos cheques,
+van los dos. Un cheque viaja entero y cambia de estado con el traslado
+—depositado, acreditado, o de vuelta en custodia si el traslado se cancela—, así
+que la planilla de caja deja de listarlo apenas sale.
+
 Regla: [canal de pago](haberes-reglas.md#canal-de-pago).
 
 <a id="orden-y-pase"></a>

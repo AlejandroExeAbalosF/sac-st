@@ -106,16 +106,19 @@ final class ValidateTransferDisbursement
              * cerrado, que no puede frenar un evento sin caja.
              */
             $caja = $this->cajaDeLaCuota->for($cuota);
+            $moneda = $cuota->currency();
 
             $evento = $this->asentar->handle(
                 type: FinancialEventType::BankDisbursement,
                 idempotencyKey: "egreso:{$egreso->id}:validacion",
                 lines: [
                     EntryLine::debit(LedgerAccount::BeneficiaryFunds, $importe)
+                        ->in($moneda)
                         ->forInstallment($cuota->haber_id, $cuota->id)
                         ->onBankAccount($orden?->organism_bank_account_id)
                         ->onCashBox($caja),
                     EntryLine::credit(LedgerAccount::BankAccount, $importe)
+                        ->in($moneda)
                         ->onBankAccount($orden?->organism_bank_account_id)
                         ->onCashBox($caja),
                 ],

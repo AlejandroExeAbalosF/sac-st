@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $depositor_id
  * @property PaymentMedium $medium
  * @property numeric-string $amount
+ * @property string $currency ARS o USD; la de las líneas de su asiento.
  * @property CarbonInterface $received_date
  * @property string|null $cheque_number
  * @property string|null $cheque_bank

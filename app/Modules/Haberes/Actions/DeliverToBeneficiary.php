@@ -90,18 +90,21 @@ final class DeliverToBeneficiary
         $importe = $estado->amount;
         $fecha = $paymentDate ?? BusinessDate::today();
         $caja = $this->cajaDeLaCuota->for($installment);
+        $moneda = $installment->currency();
 
         return DB::transaction(function () use (
-            $installment, $metodo, $importe, $fecha, $caja, $idempotencyKey, $actorId, $notes
+            $installment, $metodo, $importe, $fecha, $caja, $moneda, $idempotencyKey, $actorId, $notes
         ): Disbursement {
             $evento = $this->asentar->handle(
                 type: $metodo->eventType(),
                 idempotencyKey: $idempotencyKey,
                 lines: [
                     EntryLine::debit(LedgerAccount::BeneficiaryFunds, $importe)
+                        ->in($moneda)
                         ->forInstallment($installment->haber_id, $installment->id)
                         ->onCashBox($caja),
                     EntryLine::credit($metodo->sourceAccount(), $importe)
+                        ->in($moneda)
                         ->onCashBox($caja),
                 ],
                 date: $fecha,
@@ -155,12 +158,16 @@ final class DeliverToBeneficiary
      * sale de consultar las recepciones que siguen `InCustody`. Si el
      * cheque se entregó y el estado no lo dice, el arqueo lo sigue
      * contando.
+     *
+     * Solo los que la cuota tiene en pie: un cheque que se le asignó y se
+     * liberó del todo volvió a la cartera, y no se le entrega a este
+     * beneficiario.
      */
     private function entregarCheques(BeneficiaryInstallment $installment): void
     {
         $recepciones = FundReceipt::query()
             ->whereIn('id', FundingAllocation::query()
-                ->live()
+                ->withRemainingBalance()
                 ->where('beneficiary_installment_id', $installment->id)
                 ->select('fund_receipt_id'))
             ->where('cheque_status', ChequeStatus::InCustody)

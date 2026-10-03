@@ -64,6 +64,9 @@ class EgresoPorTransferenciaTest extends TestCase
 
     private const CBU_VALIDO = '2850000300000000000017';
 
+    /** La moneda del haber y de la cuenta del organismo en el escenario. */
+    private string $moneda = 'ARS';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -175,6 +178,28 @@ class EgresoPorTransferenciaTest extends TestCase
             PaymentOrderStatus::Completed,
             PaymentOrder::query()->firstOrFail()->status,
         );
+    }
+
+    /**
+     * Un haber en dólares se asienta en dólares de punta a punta.
+     *
+     * El cobro, el traslado, la acreditación y el egreso escribían sus
+     * líneas sin moneda, y `EntryLine` cae en pesos: un haber en dólares
+     * terminaba con sus fondos en pesos, o la base rechazaba la línea del
+     * banco por no coincidir con la cuenta.
+     */
+    public function test_un_haber_en_dolares_se_asienta_en_dolares(): void
+    {
+        $this->moneda = 'USD';
+        $desde = (int) DB::table('journal_lines')->max('id');
+
+        $this->cuotaValidada();
+
+        $this->assertSame(
+            ['USD'],
+            DB::table('journal_lines')->where('id', '>', $desde)->distinct()->pluck('currency')->all(),
+        );
+        $this->assertSame(['USD'], DB::table('fund_receipts')->distinct()->pluck('currency')->all());
     }
 
     /** El §10: el dinero deja de estar asignado y sale de la cuenta. */
@@ -513,6 +538,7 @@ class EgresoPorTransferenciaTest extends TestCase
             ->installments()->orderBy('installment_number')->firstOrFail();
 
         $cuota->forceFill(['expected_medium' => 'cash'])->save();
+        $cuota->haber->forceFill(['currency' => $this->moneda])->save();
 
         app(CollectAndIssueReceipt::class)->handle(
             installment: $cuota->refresh(),
@@ -598,11 +624,11 @@ class EgresoPorTransferenciaTest extends TestCase
     private function cuentaDelOrganismo(): BankAccount
     {
         return BankAccount::query()->firstOrCreate(
-            ['account_number' => self::CUENTA_ORGANISMO],
+            ['account_number' => self::CUENTA_ORGANISMO.$this->moneda],
             [
                 'label' => 'Cta. Cte. 2693 — Haberes en consignación',
                 'bank_name' => 'Banco Macro',
-                'currency' => 'ARS',
+                'currency' => $this->moneda,
                 'is_active' => true,
             ],
         );

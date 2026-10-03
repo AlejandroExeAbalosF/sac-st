@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Actions;
 
 use App\Modules\Ledger\Enums\ChequeStatus;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -59,13 +60,14 @@ final class RegisterCashFundReceipt
         ?int $actorId = null,
         ?string $notes = null,
         ?array $cheque = null,
+        Currency $currency = Currency::Ars,
     ): FundReceipt {
         $importe = Decimal::scale($amount);
 
         $this->assertReceivable($importe, $medium, $cheque);
 
         return DB::transaction(function () use (
-            $importe, $idempotencyKey, $cashBoxId, $receivedDate, $medium, $depositorId, $actorId, $notes, $cheque
+            $importe, $idempotencyKey, $cashBoxId, $receivedDate, $medium, $depositorId, $actorId, $notes, $cheque, $currency
         ): FundReceipt {
             $yaRegistrada = FundReceipt::query()
                 ->whereRelation('financialEvent', 'idempotency_key', $idempotencyKey)
@@ -90,8 +92,9 @@ final class RegisterCashFundReceipt
                 type: FinancialEventType::FundsReceived,
                 idempotencyKey: $idempotencyKey,
                 lines: [
-                    EntryLine::debit($cuenta, $importe)->onCashBox($cashBoxId),
+                    EntryLine::debit($cuenta, $importe)->in($currency)->onCashBox($cashBoxId),
                     EntryLine::credit(LedgerAccount::UnassignedFunds, $importe)
+                        ->in($currency)
                         ->from($depositorId)
                         ->onCashBox($cashBoxId),
                 ],
@@ -107,6 +110,7 @@ final class RegisterCashFundReceipt
                 'depositor_id' => $depositorId,
                 'medium' => $medium,
                 'amount' => $importe,
+                'currency' => $currency,
                 'received_date' => $receivedDate,
                 'received_by' => $actorId,
                 'notes' => $notes,

@@ -79,8 +79,10 @@ final class CashTransferController extends Controller
                 'id' => $expediente->id,
                 'displayNumber' => $expediente->display_number,
             ],
+            // Solo las de la moneda del haber: el depósito no cambia de moneda.
             'accounts' => BankAccount::query()
                 ->where('is_active', true)
+                ->where('currency', $haber->currency)
                 ->orderBy('label')
                 ->get(['id', 'label', 'currency']),
         ]);

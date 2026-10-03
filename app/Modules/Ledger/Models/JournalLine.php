@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $financial_event_id
  * @property LedgerAccount $account_code
+ * @property string $currency ARS o USD; el CHECK de la base lo restringe.
  * @property numeric-string $debit
  * @property numeric-string $credit
  * @property int|null $cash_box_id

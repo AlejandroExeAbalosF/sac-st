@@ -7,10 +7,12 @@ namespace App\Modules\Banking\Actions;
 use App\Modules\Banking\Enums\BankAllocationRole;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -112,14 +114,21 @@ final class RegisterBankFundReceipt
                 ]);
             }
 
+            // La plata entró en la moneda de la cuenta que la recibió.
+            $moneda = Currency::from((string) BankAccount::query()
+                ->whereKey($transaction->bank_account_id)
+                ->value('currency'));
+
             $evento = $this->asentar->handle(
                 type: FinancialEventType::FundsReceived,
                 idempotencyKey: $idempotencyKey,
                 lines: [
                     EntryLine::debit(LedgerAccount::BankAccount, $importe)
+                        ->in($moneda)
                         ->onBankAccount($transaction->bank_account_id)
                         ->onCashBox($cashBoxId),
                     EntryLine::credit(LedgerAccount::UnassignedFunds, $importe)
+                        ->in($moneda)
                         ->from($depositorId)
                         ->onCashBox($cashBoxId),
                 ],
@@ -135,6 +144,7 @@ final class RegisterBankFundReceipt
                 'depositor_id' => $depositorId,
                 'medium' => PaymentMedium::Bank,
                 'amount' => $importe,
+                'currency' => $moneda,
                 'received_date' => $transaction->transaction_date ?? BusinessDate::today(),
                 'received_by' => $actorId,
                 'notes' => $notes,

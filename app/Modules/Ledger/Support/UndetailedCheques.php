@@ -24,9 +24,9 @@ use App\Support\Money\Decimal;
  * puede identificar un cheque nuevo del sistema anterior: más sería
  * inventar un cheque que la caja no tiene.
  *
- * Es una cota prudente. Un cheque depositado sigue figurando en custodia
- * —nada actualiza todavía ese estado—, así que puede achicarla de más, pero
- * nunca agrandarla.
+ * Un cheque depositado deja de estar en custodia en los dos lados a la vez
+ * —el asiento lo saca de la cuenta y el traslado le cambia el estado—, así
+ * que no altera la resta.
  */
 final class UndetailedCheques
 {

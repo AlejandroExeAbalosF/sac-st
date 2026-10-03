@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Models;
 
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
+use App\Modules\Ledger\Enums\Currency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -61,6 +62,22 @@ final class BeneficiaryInstallment extends Model
         $importe = $this->expected_amount;
 
         return $importe;
+    }
+
+    /**
+     * La moneda de la cuota, que es la de su haber.
+     *
+     * Usa el haber si ya vino cargado y si no lo consulta: los Actions la
+     * piden para escribir sus líneas, y no tienen por qué haber cargado la
+     * relación.
+     */
+    public function currency(): Currency
+    {
+        $moneda = $this->relationLoaded('haber')
+            ? $this->haber->currency
+            : Haber::query()->whereKey($this->haber_id)->value('currency');
+
+        return Currency::from((string) $moneda);
     }
 
     /**

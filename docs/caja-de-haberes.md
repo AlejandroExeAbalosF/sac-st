@@ -223,7 +223,9 @@ de arqueo antes de imputar diferencias originadas únicamente por esa separació
 **El arqueo cuenta solo efectivo.** Los cheques en cartera no se cuentan por
 cantidad: cada uno es único —número, banco, fecha, beneficiario— y va listado
 uno por uno en el inventario del reverso, que sale de `fund_receipts` con
-`cheque_status = 'in_custody'`. No hay tabla de arqueo de cheques.
+`cheque_status = 'in_custody'`. No hay tabla de arqueo de cheques. Un cheque
+depositado deja de figurar ahí en cuanto sale el traslado, y vuelve si el
+traslado se cancela.
 
 ### Revisión
 
@@ -367,6 +369,10 @@ legible; el trigger impide el desastre.
   toca `LEGACY_FUNDS` y `BENEFICIARY_FUNDS`, así que no cambia el arqueo.
 - Un cheque de la cartera de la apertura no se asigna por el camino normal: nunca
   estuvo en fondos sin identificar.
+- El estado de un cheque es el de su traslado vigente: no figura en custodia si
+  está en el banco, ni en el banco sin un traslado que lo haya llevado.
+- Una línea con cuota va en la moneda del haber, y las del asiento de una
+  recepción en la moneda de la recepción.
 
 ---
 

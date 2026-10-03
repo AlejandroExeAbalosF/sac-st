@@ -8,11 +8,14 @@ use App\Modules\Banking\Enums\BankAllocationRole;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
@@ -42,6 +45,7 @@ final class ConfirmCashDepositCredit
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
         private readonly RecordAuditEvent $auditar,
+        private readonly CashTransferContents $contenido,
     ) {}
 
     /** @throws ValidationException */
@@ -66,14 +70,28 @@ final class ConfirmCashDepositCredit
             $this->assertConfirmable($transfer, $transaction);
 
             $importe = Decimal::scale($transfer->amount);
+            $moneda = Currency::from((string) BankAccount::query()
+                ->whereKey($transfer->bank_account_id)
+                ->value('currency'));
 
+            /*
+             * Las dos patas llevan la caja. El dinero en la cuenta del
+             * organismo sigue siendo de esta caja —es la columna «banco» de
+             * su saldo—. Sin la caja, el crédito le restaba el tránsito y
+             * el débito no le sumaba a nadie: el depósito acreditado
+             * desaparecía de la caja, y la transferencia que después lo
+             * pagaba dejaba su banco en negativo.
+             */
             $evento = $this->asentar->handle(
                 type: FinancialEventType::CashDepositCredited,
                 idempotencyKey: $idempotencyKey,
                 lines: [
                     EntryLine::debit(LedgerAccount::BankAccount, $importe)
-                        ->onBankAccount($transfer->bank_account_id),
+                        ->in($moneda)
+                        ->onBankAccount($transfer->bank_account_id)
+                        ->onCashBox($transfer->cash_box_id),
                     EntryLine::credit(LedgerAccount::CashInTransit, $importe)
+                        ->in($moneda)
                         ->onBankAccount($transfer->bank_account_id)
                         ->onCashBox($transfer->cash_box_id),
                 ],
@@ -96,6 +114,9 @@ final class ConfirmCashDepositCredit
                 'credit_event_id' => $evento->id,
                 'status' => CashTransferStatus::BankConfirmed,
             ])->save();
+
+            // Los cheques que viajaron quedan acreditados.
+            $this->contenido->credited($transfer);
 
             $this->updateReconciliation($transaction);
 

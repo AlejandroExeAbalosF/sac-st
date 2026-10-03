@@ -6,10 +6,10 @@ namespace App\Modules\Banking\Actions;
 
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
-use App\Modules\Ledger\Enums\LedgerAccount;
-use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
@@ -21,8 +21,10 @@ use Illuminate\Validation\ValidationException;
  *
  * Se usa cuando el depósito se cargó por error —la fecha, el importe, o
  * directamente el traslado equivocado— y el banco todavía no lo acreditó.
- * El asiento inverso devuelve el dinero de `CASH_IN_TRANSIT` a la caja, y
- * el traslado queda `cancelled` con su motivo.
+ * El asiento inverso devuelve el dinero de `CASH_IN_TRANSIT` a la cuenta de
+ * la que salió —el efectivo a la caja, el cheque a custodia—, los cheques
+ * que viajaron vuelven a figurar en custodia, y el traslado queda
+ * `cancelled` con su motivo.
  *
  * **Sólo se cancela lo que sigue en tránsito.** Un traslado acreditado ya
  * está confirmado por el extracto: ese dinero está en la cuenta y decir lo
@@ -40,6 +42,8 @@ final class CancelCashToBankTransfer
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly RecordAuditEvent $auditar,
+        private readonly InverseEntry $inverso,
+        private readonly CashTransferContents $contenido,
     ) {}
 
     /** @throws ValidationException */
@@ -69,20 +73,15 @@ final class CancelCashToBankTransfer
             $importe = Decimal::scale($bloqueado->amount);
 
             /*
-             * El inverso del asiento del depósito. El efectivo vuelve a la
-             * caja, que es donde estuvo todo el tiempo: lo que se deshace
-             * es la afirmación de que salió.
+             * El inverso del asiento del depósito, línea por línea. El
+             * efectivo vuelve a la caja y el cheque a custodia —cada uno a
+             * la cuenta de la que salió—, en la moneda en que salió. Lo que
+             * se deshace es la afirmación de que salieron.
              */
             $evento = $this->asentar->handle(
                 type: FinancialEventType::Reversal,
                 idempotencyKey: $idempotencyKey,
-                lines: [
-                    EntryLine::debit(LedgerAccount::CashOnHand, $importe)
-                        ->onCashBox($bloqueado->cash_box_id),
-                    EntryLine::credit(LedgerAccount::CashInTransit, $importe)
-                        ->onBankAccount($bloqueado->bank_account_id)
-                        ->onCashBox($bloqueado->cash_box_id),
-                ],
+                lines: $this->inverso->of($bloqueado->deposit_event_id),
                 date: BusinessDate::today(),
                 cashBoxId: $bloqueado->cash_box_id,
                 description: $reason,
@@ -95,6 +94,9 @@ final class CancelCashToBankTransfer
                 'status' => CashTransferStatus::Cancelled,
                 'notes' => $reason,
             ])->save();
+
+            // Los cheques que viajaron vuelven a custodia.
+            $this->contenido->cancelled($bloqueado);
 
             $this->auditar->handle('traslado.cancelado', $bloqueado, null, null, [
                 'amount' => $importe,

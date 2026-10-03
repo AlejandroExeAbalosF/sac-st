@@ -15,6 +15,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\FundReceipt;
@@ -118,14 +119,19 @@ final class AllocateFundsToInstallment
             $this->assertFits($recepcionBloqueada, $cuotaBloqueada, $importe);
             $this->assertSameMedium($recepcionBloqueada, $cuotaBloqueada);
 
+            // La de la recepción, que la base ata a la del haber.
+            $moneda = Currency::from($recepcionBloqueada->currency);
+
             $evento = $this->asentar->handle(
                 type: FinancialEventType::FundsAllocated,
                 idempotencyKey: $idempotencyKey,
                 lines: [
                     EntryLine::debit(LedgerAccount::UnassignedFunds, $importe)
+                        ->in($moneda)
                         ->from($recepcionBloqueada->depositor_id)
                         ->onCashBox($recepcionBloqueada->cash_box_id),
                     EntryLine::credit(LedgerAccount::BeneficiaryFunds, $importe)
+                        ->in($moneda)
                         ->forInstallment($cuotaBloqueada->haber_id, $cuotaBloqueada->id)
                         ->onCashBox($recepcionBloqueada->cash_box_id),
                 ],

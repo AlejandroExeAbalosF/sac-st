@@ -135,10 +135,51 @@ El traslado no es un ingreso nuevo ni cambia el medio del recibo original.
 Pasa por `CASH_IN_TRANSIT` hasta la confirmación. La condición administrativa
 `blocks_payment` se comprueba para Orden y entrega, no para cobrar.
 
+El traslado lleva **todas** las asignaciones con saldo de la cuota, cada una por
+lo que le queda en pie: una cuota cubierta con dos cheques los deposita a los dos.
+El cheque sigue al traslado: `deposited` mientras está en tránsito, `cleared`
+cuando el extracto lo acredita y de vuelta `in_custody` si el traslado se cancela.
+Cancelar invierte el asiento del depósito línea por línea, así que el cheque
+vuelve a `CHEQUES_IN_CUSTODY` y el efectivo a `CASH_ON_HAND`. El rechazo de un
+cheque depositado (`rejected`) no tiene circuito todavía.
+
+| Regla | Action | Base |
+|---|---|---|
+| El estado del cheque coincide con el de su traslado vigente, y sin traslado no figura en el banco | `DepositCashToBank`, `CancelCashToBankTransfer`, `ConfirmCashDepositCredit` vía `TransferredCheques` | `cheque_follows_transfer`, diferido, desde el ítem, el traslado y el cheque |
+| Un cheque se deposita entero: la cuota tiene que tenerlo completo | `DepositCashToBank` | — |
+| El traslado sale de una sola caja, a una cuenta en la moneda del haber | `DepositCashToBank` | `journal_lines_bank_currency` (moneda) |
+| La acreditación deja el dinero en el banco de la caja del traslado | `ConfirmCashDepositCredit` | — |
+
+Banking no conoce los ítems del traslado: avisa por el contrato
+`CashTransferContents`, que Haberes implementa y `AppServiceProvider` registra.
+
 Evidencia: [canal](../app/Modules/Haberes/Support/PaymentOrderSources.php),
 [traslado](../app/Modules/Haberes/Actions/DepositCashToBank.php),
-[elegibilidad de egreso](../app/Modules/Haberes/Support/DisbursementEligibility.php)
-y [pruebas de traslado](../tests/Feature/Haberes/TrasladoDeEfectivoTest.php).
+[cheques del traslado](../app/Modules/Haberes/Support/TransferredCheques.php),
+[elegibilidad de egreso](../app/Modules/Haberes/Support/DisbursementEligibility.php),
+[pruebas de traslado](../tests/Feature/Haberes/TrasladoDeEfectivoTest.php) y
+[cheques en el traslado](../tests/Feature/Haberes/ChequeEnElTrasladoTest.php).
+
+<a id="moneda"></a>
+
+### Moneda de las líneas
+
+Cada línea va en la moneda de lo que mueve: la de la recepción al asignar, la del
+haber al entregar, trasladar o validar una transferencia, la de la cuenta al
+registrar una recepción bancaria. Las reversiones invierten el asiento original
+copiando su moneda (`InverseEntry`).
+
+| Regla | Action | Base |
+|---|---|---|
+| Una línea con cuota va en la moneda del haber | los Actions que asientan sobre una cuota | `journal_lines_installment_currency` |
+| Las líneas del asiento de una recepción van en la moneda de la recepción | `RegisterCashFundReceipt`, `RegisterBankFundReceipt` | `fund_receipts_currency_matches_event`, diferido |
+| La moneda de una recepción no se edita | — | `fund_receipts_append_only` |
+
+Hoy ninguna pantalla crea un haber en dólares: la columna `haberes.currency` vale
+pesos salvo que se cargue por otra vía. Evidencia:
+[moneda del asiento](../tests/Feature/Haberes/MonedaDelAsientoTest.php) y el
+circuito en dólares de
+[egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php).
 
 <a id="orden-y-pase"></a>
 
@@ -250,10 +291,9 @@ apertura) o `legacy` (efectivo, depósito directo —con su cuenta en
 apartar).
 
 Lo sin detallar es el saldo de `CHEQUES_IN_CUSTODY` menos los cheques en custodia
-que tienen recepción. Es una cota prudente y vive solo en el Action: un cheque
-depositado sigue figurando en custodia —nada actualiza todavía ese estado—, así
-que puede achicarla de más pero nunca agrandarla, y una guarda de base sobre ese
-estado rechazaría datos legítimos.
+que tienen recepción. Vive solo en el Action. Un cheque depositado sale de los dos
+lados a la vez —el asiento lo saca de la cuenta y el traslado le cambia el
+estado ([canal y traslado](#canal-de-pago))—, así que no altera la resta.
 
 | Regla | Action | Base |
 | --- | --- | --- |

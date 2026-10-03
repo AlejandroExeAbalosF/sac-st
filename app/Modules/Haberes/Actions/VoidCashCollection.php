@@ -10,10 +10,9 @@ use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
-use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
-use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
@@ -54,6 +53,7 @@ final class VoidCashCollection
         private readonly PostJournalEntry $asentar,
         private readonly UnallocateFunds $liberar,
         private readonly RecordAuditEvent $auditar,
+        private readonly InverseEntry $inverso,
     ) {}
 
     /** @throws ValidationException */
@@ -244,22 +244,12 @@ final class VoidCashCollection
         ?int $actorId,
         string $reason,
     ): void {
-        $importe = Decimal::scale($recepcion->amount);
-
-        $origen = $recepcion->medium === PaymentMedium::Cheque
-            ? LedgerAccount::ChequesInCustody
-            : LedgerAccount::CashOnHand;
-
+        // El cheque vuelve a salir de custodia y el efectivo de la caja, en
+        // la moneda en que entraron: lo dice el asiento original.
         $this->asentar->handle(
             type: FinancialEventType::Reversal,
             idempotencyKey: $idempotencyKey.':recepcion',
-            lines: [
-                EntryLine::debit(LedgerAccount::UnassignedFunds, $importe)
-                    ->from($recepcion->depositor_id)
-                    ->onCashBox($recepcion->cash_box_id),
-                EntryLine::credit($origen, $importe)
-                    ->onCashBox($recepcion->cash_box_id),
-            ],
+            lines: $this->inverso->of($recepcion->financial_event_id),
             date: BusinessDate::today(),
             cashBoxId: $recepcion->cash_box_id,
             description: $reason,

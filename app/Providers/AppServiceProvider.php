@@ -8,7 +8,9 @@ use App\Listeners\ConfirmPasswordOnLogin;
 use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
+use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
+use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
@@ -38,6 +40,14 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->registerAuditCatalog();
+
+        /*
+         * Banking avisa cuando un traslado se cancela o se acredita, y quien
+         * sabe qué cheques viajaron —Haberes, dueño de los ítems— actualiza
+         * su estado. Va acá por la misma razón que el catálogo: Banking no
+         * puede nombrar a Haberes.
+         */
+        $this->app->bind(CashTransferContents::class, TransferredCheques::class);
     }
 
     /**
