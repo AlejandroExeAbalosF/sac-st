@@ -15,6 +15,7 @@ use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 /**
  * La plata del sistema anterior que todavía está en custodia, apartada
@@ -60,8 +61,9 @@ final class LegacyFundsController extends Controller
      * De dónde sale la plata.
      *
      * El efectivo y el depósito directo salen enteros: el importe es el de
-     * la cuota y el navegador no tiene por qué proponer otro. Los cheques
-     * dicen cuánto aporta cada uno.
+     * la cuota y el navegador no tiene por qué proponer otro. Los cheques de
+     * la cartera dicen cuánto aporta cada uno, y el que se identifica ahora
+     * cubre lo que falta: tampoco ese importe se toma del navegador.
      *
      * @return list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>
      */
@@ -72,25 +74,54 @@ final class LegacyFundsController extends Controller
         }
 
         $cheques = $request->validated('cheques');
-        $fuentes = [];
+        $deLaCartera = [];
+        $nuevo = null;
 
         foreach (is_array($cheques) ? $cheques : [] as $cheque) {
             if (! is_array($cheque)) {
                 continue;
             }
 
-            $importe = Decimal::parse((string) ($cheque['amount'] ?? '')) ?? '0.00';
+            if (isset($cheque['receiptId']) && is_numeric($cheque['receiptId'])) {
+                $deLaCartera[] = [
+                    'amount' => Decimal::parse((string) ($cheque['amount'] ?? '')) ?? '0.00',
+                    'chequeReceiptId' => (int) $cheque['receiptId'],
+                ];
 
-            // Uno de la cartera, o uno que la apertura declaró sin detallar.
-            $fuentes[] = isset($cheque['receiptId']) && is_numeric($cheque['receiptId'])
-                ? ['amount' => $importe, 'chequeReceiptId' => (int) $cheque['receiptId']]
-                : ['amount' => $importe, 'newCheque' => [
-                    'number' => (string) ($cheque['number'] ?? ''),
-                    'bank' => isset($cheque['bank']) && is_string($cheque['bank']) ? $cheque['bank'] : null,
-                    'issueDate' => isset($cheque['issueDate']) && is_string($cheque['issueDate']) ? $cheque['issueDate'] : null,
-                ]];
+                continue;
+            }
+
+            if ($nuevo !== null) {
+                throw ValidationException::withMessages([
+                    'cheques' => 'Se identifica un cheque nuevo por vez.',
+                ]);
+            }
+
+            $banco = isset($cheque['bank']) && is_string($cheque['bank']) ? trim($cheque['bank']) : '';
+
+            $nuevo = [
+                'number' => (string) ($cheque['number'] ?? ''),
+                'bank' => $banco === '' ? null : $banco,
+                'issueDate' => isset($cheque['issueDate']) && is_string($cheque['issueDate']) ? $cheque['issueDate'] : null,
+            ];
         }
 
-        return $fuentes;
+        if ($nuevo === null) {
+            return $deLaCartera;
+        }
+
+        $falta = $installment->importeEsperado();
+
+        foreach ($deLaCartera as $fuente) {
+            $falta = Decimal::sub($falta, $fuente['amount']);
+        }
+
+        if (Decimal::isNegative($falta) || Decimal::equals($falta, '0')) {
+            throw ValidationException::withMessages([
+                'cheques' => 'Los cheques de la lista ya cubren la cuota: el cheque nuevo sobra.',
+            ]);
+        }
+
+        return [...$deLaCartera, ['amount' => $falta, 'newCheque' => $nuevo]];
     }
 }

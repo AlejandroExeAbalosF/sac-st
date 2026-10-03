@@ -28,6 +28,8 @@ import {
     date,
     money,
     parseAmount,
+    subtractAmounts,
+    sumAmounts,
 } from '@/lib/format';
 import { legacyFunds as apartarFondos } from '@/routes/haberes/installments';
 
@@ -35,11 +37,14 @@ type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
 type Opciones = App.Modules.Haberes.Data.LegacyFundsOptionsData;
 
+/**
+ * El papel del cheque que se identifica ahora. Sin importe: es lo que le
+ * falta a la cuota, y lo fija el servidor.
+ */
 type ChequeNuevo = {
     number: string;
     bank: string;
     issueDate: string;
-    amount: string;
 };
 
 type Formulario = {
@@ -142,9 +147,6 @@ export default function LegacyFundsDialog({
                                         number: datos.chequeNuevo.number,
                                         bank: datos.chequeNuevo.bank,
                                         issueDate: datos.chequeNuevo.issueDate,
-                                        amount: parseAmount(
-                                            datos.chequeNuevo.amount,
-                                        ),
                                     },
                                 ]),
                       ]
@@ -190,6 +192,20 @@ export default function LegacyFundsDialog({
             [campo]: valor,
         });
     };
+
+    /*
+     * El importe del cheque nuevo no se tipea: es lo que le falta a la
+     * cuota después de los cheques de la lista, porque las cuotas se pagan
+     * enteras. El servidor lo vuelve a calcular y no toma otro.
+     */
+    const importeChequeNuevo = subtractAmounts(
+        cuota.expectedAmount,
+        sumAmounts(
+            Object.values(form.data.cheques).map((importe) =>
+                parseAmount(importe),
+            ),
+        ),
+    );
 
     /*
      * Lo que la apertura declaró en cheques sin detallarlos. De ahí, y solo
@@ -403,11 +419,8 @@ export default function LegacyFundsDialog({
                                                 form.setData('chequeNuevo', {
                                                     number: '',
                                                     bank: '',
-                                                    issueDate: '',
-                                                    amount: money(
-                                                        cuota.expectedAmount,
-                                                        { symbol: false },
-                                                    ),
+                                                    // Propone la fecha en que se cargó la cuota; se corrige si el papel dice otra.
+                                                    issueDate: cuota.createdAt,
                                                 })
                                             }
                                         >
@@ -455,6 +468,9 @@ export default function LegacyFundsDialog({
                                                 htmlFor={`cheque-nuevo-banco-${cuota.id}`}
                                             >
                                                 Banco
+                                                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                                                    opcional
+                                                </span>
                                             </Label>
                                             <Input
                                                 id={`cheque-nuevo-banco-${cuota.id}`}
@@ -492,25 +508,15 @@ export default function LegacyFundsDialog({
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
-                                            <Label
-                                                htmlFor={`cheque-nuevo-importe-${cuota.id}`}
-                                            >
+                                            <span className="text-sm font-medium">
                                                 Importe
-                                            </Label>
-                                            <Input
-                                                id={`cheque-nuevo-importe-${cuota.id}`}
-                                                inputMode="decimal"
-                                                className="text-right font-mono tabular-nums"
-                                                value={
-                                                    form.data.chequeNuevo.amount
-                                                }
-                                                onChange={(e) =>
-                                                    cambiarChequeNuevo(
-                                                        'amount',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
+                                            </span>
+                                            <p
+                                                className="flex h-9 items-center justify-end rounded-md border bg-muted/40 px-3 font-mono text-sm tabular-nums"
+                                                title="Es lo que le falta a la cuota: las cuotas se pagan enteras"
+                                            >
+                                                {money(importeChequeNuevo)}
+                                            </p>
                                         </div>
                                     </div>
                                     <Button

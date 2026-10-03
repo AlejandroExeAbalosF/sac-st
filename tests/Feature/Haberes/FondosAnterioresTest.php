@@ -157,6 +157,34 @@ class FondosAnterioresTest extends TestCase
         $this->assertSame('0.00', app(CashBalance::class)->of(LedgerAccount::ChequesInCustody, $this->caja()));
     }
 
+    /**
+     * El importe del cheque nuevo no lo decide la pantalla: es lo que le
+     * falta a la cuota después de los cheques de la lista.
+     */
+    public function test_el_cheque_nuevo_cubre_lo_que_falta_y_no_toma_el_importe_de_la_pantalla(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '85000.00');
+        $cuota = $this->cuotaPor('227/2024', '85000.00', ExpectedMedium::Cheque);
+
+        $this->actingAs($this->operador('contador'))
+            ->post("/haberes/cuotas/{$cuota->id}/fondos-anteriores", [
+                'medium' => 'cheque',
+                'cheques' => [['number' => '00045871', 'bank' => '', 'issueDate' => '2025-03-01', 'amount' => '1.00']],
+                'incomeNumber' => '3121',
+                'incomeDate' => '2025-03-10',
+                'incomeAmount' => '85000.00',
+                'idempotencyKey' => 'test-importe-fijo',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $cheque = FundReceipt::query()->where('origin', FundReceiptOrigin::Legacy->value)->sole();
+
+        $this->assertSame('85000.00', $cheque->amount);
+        // Sin banco es válido: el campo es opcional.
+        $this->assertNull($cheque->cheque_bank);
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota));
+    }
+
     public function test_no_se_identifica_un_cheque_por_mas_de_lo_que_la_apertura_dejo_sin_detallar(): void
     {
         $this->abrirLibros(chequesSinDetalle: '50000.00');

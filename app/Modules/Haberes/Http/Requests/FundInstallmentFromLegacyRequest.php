@@ -47,7 +47,8 @@ final class FundInstallmentFromLegacyRequest extends FormRequest
             'cheques.*.number' => ['nullable', 'required_without:cheques.*.receiptId', 'string', 'max:50'],
             'cheques.*.bank' => ['nullable', 'string', 'max:120'],
             'cheques.*.issueDate' => ['nullable', 'date', 'before_or_equal:'.$hoy],
-            'cheques.*.amount' => ['required', 'numeric', 'gt:0'],
+            // El cheque nuevo no trae importe: lo fija el controlador.
+            'cheques.*.amount' => ['nullable', 'required_with:cheques.*.receiptId', 'numeric', 'gt:0'],
             'incomeNumber' => ['nullable', 'string', 'max:40'],
             'incomeDate' => ['nullable', 'required_with:incomeNumber', 'date', 'before_or_equal:'.$hoy],
             'incomeAmount' => ['nullable', 'required_with:incomeNumber', 'numeric', 'gt:0'],
