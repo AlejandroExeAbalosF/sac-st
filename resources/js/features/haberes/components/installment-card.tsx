@@ -379,6 +379,7 @@ export default function InstallmentCard({
                             puedeAnular={puedeAnular}
                             firmantes={firmantes}
                             reciboDePapel={reciboDePapel}
+                            puedeAnularPapel={historico.permisos.anularPapel}
                         />
                     </Seccion>
 

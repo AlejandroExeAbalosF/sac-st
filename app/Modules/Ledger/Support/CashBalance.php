@@ -72,6 +72,31 @@ final class CashBalance
     }
 
     /**
+     * El saldo de una cuenta bancaria del organismo en particular.
+     *
+     * `of(BankAccount)` suma todas las cuentas: alcanza para la planilla,
+     * que las muestra juntas, pero no para decir si la plata está en una
+     * cuenta concreta. Las líneas bancarias llevan su cuenta desde que se
+     * escriben, así que la pregunta se contesta sin suponer nada.
+     *
+     * @return numeric-string
+     */
+    public function ofBankAccount(int $cashBoxId, Currency $currency, int $bankAccountId): string
+    {
+        $fila = $this->lines($cashBoxId, $currency)
+            ->where('journal_lines.account_code', LedgerAccount::BankAccount->value)
+            ->where('journal_lines.bank_account_id', $bankAccountId)
+            ->selectRaw('COALESCE(SUM(journal_lines.debit), 0) AS debito')
+            ->selectRaw('COALESCE(SUM(journal_lines.credit), 0) AS credito')
+            ->first();
+
+        return Decimal::sub(
+            Decimal::scale((string) ($fila->debito ?? '0')),
+            Decimal::scale((string) ($fila->credito ?? '0')),
+        );
+    }
+
+    /**
      * Lo que se movió en una cuenta durante un período, abierto por hecho.
      *
      * Es lo que la planilla necesita y un saldo no da: el anverso separa

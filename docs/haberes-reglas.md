@@ -264,6 +264,10 @@ estado rechazaría datos legítimos.
 | Una recepción `legacy` no se reutiliza: solo admite la asignación de su propio evento | — | `allocation_respects_origin` |
 | Una cuota no mezcla dinero anterior y actual, en ningún sentido | `FundInstallmentFromLegacy`, `AllocateFundsToInstallment` | `allocation_respects_origin`, con `FOR UPDATE` sobre la cuota |
 | Un cheque identificado al apartar sale de lo que la apertura declaró sin detallar, y no repite uno que ya está en la cartera | `SetAsideLegacyFunds`, `UndetailedCheques` | — |
+| Un cheque del sistema anterior se asigna y se libera entero: lo asignado es cero o el cheque completo | `FundInstallmentFromLegacy`, `UnallocateFunds` | `legacy_cheque_stays_whole`, diferido |
+| Un cheque identificado y liberado vuelve a poder apartarse; el efectivo y el depósito apartados son de un solo uso | `SetAsideLegacyFunds`, `LegacyFundsOptions` | `allocation_respects_origin` |
+| El depósito directo se aparta del saldo de la cuenta elegida, activa y en la moneda del haber | `SetAsideLegacyFunds`, `CashBalance::ofBankAccount` | `fund_receipts_bank_account_currency` (moneda) |
+| Un recibo de papel suelto se anula con motivo solo si ya no respalda plata ni lo cita una Orden | `VoidLegacyIncomeDocument` | `legacy_income_document_keeps_backing` |
 | El saldo libre de un cheque no se asigna dos veces | `FundInstallmentFromLegacy`, que bloquea los cheques en orden | `allocation_within_receipt`, ahora con `FOR UPDATE` sobre la recepción |
 | Se aparta con financiación cero y por el importe completo | `FundInstallmentFromLegacy` | — |
 | Recibo de ingreso de papel por el importe de la cuota, anterior a la apertura | `FundInstallmentFromLegacy`, `LegacyPaperCheck` | `legacy_paper_before_opening`, `legacy_documents_paper_unique` |

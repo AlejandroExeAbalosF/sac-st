@@ -17,6 +17,7 @@ use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\BusinessDate;
@@ -111,6 +112,7 @@ final class UnallocateFunds
                 ->findOrFail($allocation->id);
 
             $this->assertReversible($original, $importe);
+            $this->assertChequeEntero($original, $importe);
             $this->assertNoRespaldaOrden($cuotaBloqueada);
             $this->assertSigueEnLaCaja($original);
 
@@ -267,6 +269,34 @@ final class UnallocateFunds
             throw ValidationException::withMessages([
                 'amount' => 'De esa imputación quedan $ '.Decimal::format($vigente)
                     .': no se puede liberar más que eso.',
+            ]);
+        }
+    }
+
+    /**
+     * Un cheque del sistema anterior se libera entero.
+     *
+     * Liberar una parte dejaría el papel repartido: una parte de dueño y
+     * otra sin, y al entregarlo se iría completo. Si la cuota bajó y el
+     * cheque sobra, se libera entero y se decide qué hacer con el papel.
+     *
+     * @throws ValidationException
+     */
+    private function assertChequeEntero(FundingAllocation $allocation, string $importe): void
+    {
+        $recepcion = $allocation->fundReceipt;
+
+        if ($recepcion->medium !== PaymentMedium::Cheque || ! $recepcion->origin->isLegacy()) {
+            return;
+        }
+
+        if (! Decimal::equals($importe, $this->vigente($allocation))) {
+            throw ValidationException::withMessages([
+                'amount' => sprintf(
+                    'El cheque %s del sistema anterior se libera entero: %s.',
+                    $recepcion->cheque_number,
+                    Decimal::format($this->vigente($allocation)),
+                ),
             ]);
         }
     }

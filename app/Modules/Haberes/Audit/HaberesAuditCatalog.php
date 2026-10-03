@@ -98,6 +98,13 @@ final class HaberesAuditCatalog implements AuditCatalogContributor
                 metadata: ['fuentes' => 'Fuentes', 'recibo' => 'Recibo de ingreso de papel'],
             ),
             new AuditActionDefinition(
+                'cuota.recibo-de-papel-anulado',
+                'Se anuló el recibo de ingreso de papel de la cuota',
+                'Recepciones y cobros',
+                AuditSeverity::Critical,
+                metadata: ['reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'asignacion.desasignada',
                 'Se desasignaron fondos de la cuota',
                 'Recepciones y cobros',

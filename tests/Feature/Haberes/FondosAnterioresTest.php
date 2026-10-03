@@ -9,6 +9,7 @@ use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\FundInstallmentFromLegacy;
 use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Actions\UnallocateFunds;
+use App\Modules\Haberes\Actions\VoidLegacyIncomeDocument;
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
@@ -20,6 +21,7 @@ use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\InstallmentStages;
+use App\Modules\Haberes\Support\LegacyFundsOptions;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
@@ -113,9 +115,9 @@ class FondosAnterioresTest extends TestCase
         $this->assertSame('3121', $estado->incomeReceipt?->numberFor(ReceiptNumberSource::System));
     }
 
-    public function test_apartar_dos_cheques_de_la_cartera(): void
+    public function test_apartar_dos_cheques_enteros_de_la_cartera(): void
     {
-        $this->abrirLibros(cheques: [['A-1', '50000.00'], ['A-2', '40000.00']]);
+        $this->abrirLibros(cheques: [['A-1', '50000.00'], ['A-2', '35000.00']]);
         $cuota = $this->cuotaPor('203/2024', '85000.00', ExpectedMedium::Cheque);
         [$uno, $dos] = FundReceipt::query()->where('origin', 'opening')->orderBy('id')->get()->all();
 
@@ -125,9 +127,158 @@ class FondosAnterioresTest extends TestCase
         ]);
 
         $this->assertCount(2, $asignaciones);
-        $this->assertSame('5000.00', app(InstallmentFunding::class)->unallocated($dos));
+        $this->assertSame('0.00', app(InstallmentFunding::class)->unallocated($dos));
         // Los cheques ya eran recepciones: no se crean otras.
         $this->assertSame(0, FundReceipt::query()->where('origin', 'legacy')->count());
+    }
+
+    /**
+     * Un cheque no se reparte entre cuotas: entregar una marcaría entregado
+     * el papel entero y el resto quedaría en custodia sin cheque detrás.
+     */
+    public function test_un_cheque_del_sistema_anterior_no_se_aparta_en_parte(): void
+    {
+        $this->abrirLibros(cheques: [['A-1', '50000.00'], ['A-2', '40000.00']]);
+        $cuota = $this->cuotaPor('230/2024', '85000.00', ExpectedMedium::Cheque);
+        [$uno, $dos] = FundReceipt::query()->where('origin', 'opening')->orderBy('id')->get()->all();
+
+        try {
+            $this->apartar($cuota, PaymentMedium::Cheque, sources: [
+                ['amount' => '50000.00', 'chequeReceiptId' => $uno->id],
+                ['amount' => '35000.00', 'chequeReceiptId' => $dos->id],
+            ]);
+            $this->fail('Se apartó un cheque en parte.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('se aparta entero', $e->errors()['sources'][0]);
+        }
+
+        $evento = $this->eventoApartado($cuota, '35000.00');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('se asigna y se libera entero');
+
+        $this->insertarAsignacion($cuota, $dos, $evento, '35000.00');
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+    }
+
+    public function test_un_cheque_del_sistema_anterior_se_libera_entero(): void
+    {
+        $this->abrirLibros(cheques: [['A-6', '85000.00']]);
+        $cuota = $this->cuotaPor('231/2024', '85000.00', ExpectedMedium::Cheque);
+        $cheque = FundReceipt::query()->where('origin', 'opening')->sole();
+        $this->apartar($cuota, PaymentMedium::Cheque, sources: [['amount' => '85000.00', 'chequeReceiptId' => $cheque->id]]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('se libera entero');
+
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '5000.00', 'test-parcial-231', 'La cuota bajó.');
+    }
+
+    /**
+     * Un cheque identificado al apartar es un papel de la cartera: liberado,
+     * vuelve a la lista y se aparta para otra cuota.
+     */
+    public function test_un_cheque_identificado_y_liberado_se_vuelve_a_apartar(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '85000.00');
+        $primera = $this->cuotaPor('232/2024', '85000.00', ExpectedMedium::Cheque);
+        $segunda = $this->cuotaPor('233/2024', '85000.00', ExpectedMedium::Cheque);
+
+        $this->apartar($primera, PaymentMedium::Cheque, sources: [
+            ['amount' => '85000.00', 'newCheque' => ['number' => '00045871', 'bank' => null, 'issueDate' => null]],
+        ]);
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-232', 'Era de otra cuota.');
+
+        $cheque = FundReceipt::query()->where('origin', 'legacy')->sole();
+        $opciones = app(LegacyFundsOptions::class)->for($segunda->haber);
+        $this->assertSame([$cheque->id], array_map(fn ($c) => $c->id, $opciones->cheques));
+
+        app(FundInstallmentFromLegacy::class)->handle(
+            installment: $segunda,
+            medium: PaymentMedium::Cheque,
+            sources: [['amount' => '85000.00', 'chequeReceiptId' => $cheque->id]],
+            income: new LegacyPaper(LegacyDocumentKind::IncomeReceipt, 'income', '3122', CarbonImmutable::parse('2025-03-10'), '85000.00'),
+            idempotencyKey: 'test-reapartar-233',
+        );
+
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($segunda));
+        $this->assertSame(1, FundReceipt::query()->where('origin', 'legacy')->count());
+    }
+
+    /** El depósito directo tiene que estar en la cuenta elegida, no en cualquiera. */
+    public function test_el_deposito_directo_mira_el_saldo_de_la_cuenta_elegida(): void
+    {
+        $conPlata = $this->cuentaBancaria();
+        $vacia = $this->cuentaBancaria('310000999999999');
+        $this->abrirLibros(banco: '300000.00', cuentaBancaria: $conPlata);
+        $cuota = $this->cuotaPor('234/2024', '85000.00', ExpectedMedium::Bank);
+
+        try {
+            $this->apartar($cuota, PaymentMedium::Bank, bankAccountId: $vacia);
+            $this->fail('Se apartó de una cuenta sin saldo.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('hay 0,00', $e->errors()['bankAccountId'][0]);
+        }
+
+        $this->apartar($cuota, PaymentMedium::Bank, bankAccountId: $conPlata);
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota));
+    }
+
+    public function test_la_base_rechaza_una_cuenta_de_otra_moneda_para_el_deposito_directo(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuotaPor('235/2024', '85000.00', ExpectedMedium::Bank);
+        $dolares = (int) DB::table('bank_accounts')->insertGetId([
+            'label' => 'Cuenta en dólares', 'bank_name' => 'Banco Macro', 'account_number' => '320000123456789',
+            'currency' => 'USD', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $evento = $this->eventoApartado($cuota, '1.00');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('no es de la moneda de la recepción');
+
+        FundReceipt::query()->create([
+            'financial_event_id' => $evento,
+            'cash_box_id' => $this->caja(),
+            'medium' => PaymentMedium::Bank,
+            'origin' => FundReceiptOrigin::Legacy,
+            'bank_account_id' => $dolares,
+            'amount' => '1.00',
+            'received_date' => BusinessDate::today(),
+        ]);
+    }
+
+    /** Un papel mal cargado se anula con motivo y se carga el correcto. */
+    public function test_un_recibo_de_papel_mal_cargado_se_anula_y_se_reemplaza(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuota('236/2024', '85000.00');
+        $this->apartar($cuota, PaymentMedium::Cash);
+
+        try {
+            app(VoidLegacyIncomeDocument::class)->handle($cuota, 'El número del talonario estaba mal tipeado.');
+            $this->fail('Se anuló un papel que respalda plata apartada.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('primero hay que liberarla', $e->errors()['reason'][0]);
+        }
+
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-236', 'El papel estaba mal cargado.');
+
+        $this->actingAs($this->operador('contador'))
+            ->post("/haberes/cuotas/{$cuota->id}/recibo-de-papel/anular", ['reason' => 'El número del talonario estaba mal tipeado.'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(0, LegacyDocument::query()->current()->count());
+
+        app(FundInstallmentFromLegacy::class)->handle(
+            installment: $cuota->refresh(),
+            medium: PaymentMedium::Cash,
+            sources: [['amount' => '85000.00']],
+            income: new LegacyPaper(LegacyDocumentKind::IncomeReceipt, 'income', '3127', CarbonImmutable::parse('2025-03-10'), '85000.00'),
+            idempotencyKey: 'test-reapartar-236',
+        );
+
+        $this->assertSame('3127', LegacyDocument::query()->current()->sole()->number);
     }
 
     /**
@@ -746,12 +897,12 @@ class FondosAnterioresTest extends TestCase
         return (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
     }
 
-    private function cuentaBancaria(): int
+    private function cuentaBancaria(string $numero = '310000123456789'): int
     {
         return (int) DB::table('bank_accounts')->insertGetId([
-            'label' => 'Cta. Cte. 2693 — Haberes',
+            'label' => 'Cta. Cte. '.$numero,
             'bank_name' => 'Banco Macro',
-            'account_number' => '310000123456789',
+            'account_number' => $numero,
             'currency' => 'ARS',
             'is_active' => true,
             'created_at' => now(),

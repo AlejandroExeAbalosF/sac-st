@@ -12,6 +12,7 @@ use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\UndetailedCheques;
@@ -43,7 +44,8 @@ final class LegacyFundsOptions
         $cheques = [];
 
         $cartera = FundReceipt::query()
-            ->where('origin', FundReceiptOrigin::Opening->value)
+            ->whereIn('origin', [FundReceiptOrigin::Opening->value, FundReceiptOrigin::Legacy->value])
+            ->where('medium', PaymentMedium::Cheque->value)
             ->where('cheque_status', ChequeStatus::InCustody->value)
             ->whereNull('reversal_event_id')
             ->where('cash_box_id', $caja)
@@ -52,9 +54,10 @@ final class LegacyFundsOptions
             ->get();
 
         foreach ($cartera as $cheque) {
+            // Solo los enteros y libres: un cheque se aparta completo.
             $libre = $this->financiacion->unallocated($cheque);
 
-            if (Decimal::isNegative($libre) || Decimal::equals($libre, '0')) {
+            if (! Decimal::equals($libre, $cheque->amount)) {
                 continue;
             }
 

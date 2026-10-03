@@ -157,5 +157,10 @@ export type HistoricoProps = {
          * Falso también cuando no queda nada que apartar.
          */
         apartar: boolean;
+        /**
+         * Anular un recibo de papel mal cargado al apartar, cuando ya no
+         * respalda plata. Va con el permiso de apartar.
+         */
+        anularPapel: boolean;
     };
 };

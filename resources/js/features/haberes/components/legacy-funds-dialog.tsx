@@ -50,7 +50,10 @@ type ChequeNuevo = {
 type Formulario = {
     medium: string;
     bankAccountId: string;
-    /** Cuánto aporta cada cheque elegido, por su id. */
+    /**
+     * El importe de cada cheque elegido, por su id. Se aparta entero: el
+     * importe es el del cheque y no se edita.
+     */
     cheques: Record<number, string>;
     /**
      * Un cheque que la apertura declaró sin detallar y se identifica ahora,
@@ -73,9 +76,10 @@ type Formulario = {
  * cartera y el depósito directo en la cuenta. Lo que cambia es de quién
  * es, y desde ahí la cuota sigue el circuito de siempre.
  *
- * **No hay campo de importe para el efectivo ni para el depósito**: es el
- * de la cuota, porque se pagan enteras. Solo se reparte cuando la plata
- * está en varios cheques.
+ * **No hay ningún campo de importe**: el efectivo y el depósito son por la
+ * cuota entera, y un cheque se aparta entero —es un papel que se entrega o
+ * se deposita completo—. Si la cuota se cubre con varios cheques, se eligen
+ * todos, y uno identificado ahora cubre lo que falte.
  */
 export default function LegacyFundsDialog({
     cuota,
@@ -134,12 +138,9 @@ export default function LegacyFundsDialog({
             cheques:
                 datos.medium === 'cheque'
                     ? [
-                          ...Object.entries(datos.cheques).map(
-                              ([id, importe]) => ({
-                                  receiptId: Number(id),
-                                  amount: parseAmount(importe),
-                              }),
-                          ),
+                          ...Object.keys(datos.cheques).map((id) => ({
+                              receiptId: Number(id),
+                          })),
                           ...(datos.chequeNuevo === null
                               ? []
                               : [
@@ -174,7 +175,7 @@ export default function LegacyFundsDialog({
         const cheques = { ...form.data.cheques };
 
         if (elegido) {
-            cheques[id] = money(disponible, { symbol: false });
+            cheques[id] = disponible;
         } else {
             delete cheques[id];
         }
@@ -346,12 +347,7 @@ export default function LegacyFundsDialog({
                                                         <> · {cheque.bank}</>
                                                     )}
                                                     <span className="block text-xs text-muted-foreground">
-                                                        Quedan{' '}
-                                                        {money(
-                                                            cheque.available,
-                                                        )}{' '}
-                                                        de{' '}
-                                                        {money(cheque.amount)}
+                                                        Se aparta entero
                                                         {cheque.expediente && (
                                                             <>
                                                                 {' '}
@@ -372,30 +368,9 @@ export default function LegacyFundsDialog({
                                                         )}
                                                     </span>
                                                 </span>
-                                                {elegido && (
-                                                    <Input
-                                                        inputMode="decimal"
-                                                        aria-label={`Importe del cheque ${cheque.number}`}
-                                                        className="w-36 text-right font-mono tabular-nums"
-                                                        value={
-                                                            form.data.cheques[
-                                                                cheque.id
-                                                            ]
-                                                        }
-                                                        onChange={(e) =>
-                                                            form.setData(
-                                                                'cheques',
-                                                                {
-                                                                    ...form.data
-                                                                        .cheques,
-                                                                    [cheque.id]:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                )}
+                                                <span className="font-mono text-sm tabular-nums">
+                                                    {money(cheque.amount)}
+                                                </span>
                                             </li>
                                         );
                                     })}

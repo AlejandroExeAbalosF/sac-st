@@ -46,10 +46,18 @@ export default function UnallocateDialog({
     cuota,
     abierto,
     onCerrar,
+    delSistemaAnterior = false,
 }: {
     cuota: Cuota;
     abierto: boolean;
     onCerrar: () => void;
+    /**
+     * Si la plata se apartó del sistema anterior. Vuelve a ese saldo y no a
+     * los fondos sin identificar, y se propone liberar la imputación
+     * entera: es el caso de haberla apartado para la cuota equivocada, y un
+     * cheque del sistema anterior solo se libera entero.
+     */
+    delSistemaAnterior?: boolean;
 }) {
     const [clave] = useState(
         () => `desasignar:${cuota.id}:${crypto.randomUUID()}`,
@@ -63,7 +71,12 @@ export default function UnallocateDialog({
          * distinto.
          */
         allocationId: cuota.allocations[0]?.id ?? 0,
-        amount: money(cuota.overAllocatedAmount, { symbol: false }),
+        amount: money(
+            delSistemaAnterior
+                ? (cuota.allocations[0]?.amount ?? '0')
+                : cuota.overAllocatedAmount,
+            { symbol: false },
+        ),
         reason: '',
         idempotencyKey: clave,
     });
@@ -88,10 +101,9 @@ export default function UnallocateDialog({
                 <DialogHeader>
                     <DialogTitle>Liberar dinero de esta cuota</DialogTitle>
                     <DialogDescription>
-                        El dinero se queda en el organismo: deja de estar
-                        imputado a este beneficiario y vuelve a la cola de
-                        fondos sin identificar, para que lo tome la cuota que
-                        corresponda. El asiento se registra con la fecha de hoy.
+                        {delSistemaAnterior
+                            ? 'El dinero se queda en el organismo: deja de estar apartado para este beneficiario y vuelve al saldo del sistema anterior, para apartarlo para la cuota que corresponda. Un cheque se libera entero. El asiento se registra con la fecha de hoy.'
+                            : 'El dinero se queda en el organismo: deja de estar imputado a este beneficiario y vuelve a la cola de fondos sin identificar, para que lo tome la cuota que corresponda. El asiento se registra con la fecha de hoy.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -122,9 +134,22 @@ export default function UnallocateDialog({
                             </Label>
                             <Select
                                 value={form.data.allocationId.toString()}
-                                onValueChange={(v) =>
-                                    form.setData('allocationId', Number(v))
-                                }
+                                onValueChange={(v) => {
+                                    form.setData('allocationId', Number(v));
+
+                                    // Del sistema anterior se propone la imputación entera.
+                                    if (delSistemaAnterior) {
+                                        form.setData(
+                                            'amount',
+                                            money(
+                                                cuota.allocations.find(
+                                                    (a) => a.id === Number(v),
+                                                )?.amount ?? '0',
+                                                { symbol: false },
+                                            ),
+                                        );
+                                    }
+                                }}
                             >
                                 <SelectTrigger id={`imputacion-${cuota.id}`}>
                                     <SelectValue />

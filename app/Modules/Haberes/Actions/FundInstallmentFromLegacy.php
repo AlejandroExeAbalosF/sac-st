@@ -316,15 +316,21 @@ final class FundInstallmentFromLegacy
                 throw ValidationException::withMessages(['sources' => 'Uno de los cheques no está en la cartera.']);
             }
 
+            /*
+             * Entero y libre. El cheque es un papel que se entrega o se
+             * deposita completo: repartido entre cuotas, entregar una
+             * marcaría entregado el papel entero y el libro conservaría el
+             * resto en custodia sin ningún cheque detrás. La base lo
+             * impone igual (`legacy_cheque_stays_whole`).
+             */
             $libre = $this->financiacion->unallocated($cheque);
 
-            if (Decimal::isNegative(Decimal::sub($libre, $fuente['amount']))) {
+            if (! Decimal::equals($libre, $cheque->amount) || ! Decimal::equals($fuente['amount'], $cheque->amount)) {
                 throw ValidationException::withMessages([
                     'sources' => sprintf(
-                        'Al cheque %s le quedan %s sin asignar y se le piden %s.',
+                        'El cheque %s es de %s y se aparta entero: no se reparte entre cuotas.',
                         $cheque->cheque_number,
-                        Decimal::format($libre),
-                        Decimal::format($fuente['amount']),
+                        Decimal::format($cheque->amount),
                     ),
                 ]);
             }

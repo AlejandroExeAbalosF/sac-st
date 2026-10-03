@@ -631,6 +631,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::post('haberes/cuotas/{installment}/fondos-anteriores', [LegacyFundsController::class, 'store'])
             ->whereNumber('installment')
             ->name('haberes.installments.legacy-funds');
+        // Anular un recibo de papel mal cargado, cuando ya no respalda nada.
+        Route::post('haberes/cuotas/{installment}/recibo-de-papel/anular', [LegacyFundsController::class, 'voidPaper'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.legacy-funds.void-paper');
     });
 
     Route::middleware('can:expedientes.anular')->group(function (): void {

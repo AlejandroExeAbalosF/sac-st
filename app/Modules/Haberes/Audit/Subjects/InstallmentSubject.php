@@ -48,6 +48,9 @@ final class InstallmentSubject extends BaseAuditSubjectResolver
             'paid_on' => 'Fecha de pago',
             'payment_medium' => 'Medio de pago',
             'legacy_disbursement_receipt_id' => 'Recibo de Pagos anteriores (id interno)',
+            // Del recibo de papel anulado.
+            'number' => 'Número de talonario',
+            'issued_on' => 'Fecha del papel',
         ];
     }
 

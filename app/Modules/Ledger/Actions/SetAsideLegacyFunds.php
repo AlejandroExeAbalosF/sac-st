@@ -187,8 +187,14 @@ final class SetAsideLegacyFunds
         }
 
         if ($medium === PaymentMedium::Cheque) {
+            /*
+             * De la cartera del sistema anterior: de la apertura o
+             * identificado al apartar otra cuota y después liberado. Y
+             * entero: el papel se entrega o se deposita completo.
+             */
             if ($cheque === null
-                || $cheque->origin !== FundReceiptOrigin::Opening
+                || ! $cheque->origin->isLegacy()
+                || ! Decimal::equals($cheque->amount, $amount)
                 || $cheque->medium !== PaymentMedium::Cheque
                 || $cheque->cheque_status !== ChequeStatus::InCustody
                 || $cheque->reversal_event_id !== null
@@ -196,27 +202,26 @@ final class SetAsideLegacyFunds
                 || $cheque->currency !== $currency->value
             ) {
                 throw ValidationException::withMessages([
-                    'source' => 'El cheque tiene que ser uno de la cartera de la apertura, todavía en custodia.',
+                    'source' => 'El cheque tiene que ser uno del sistema anterior, todavía en custodia, y se aparta entero.',
                 ]);
             }
 
             return;
         }
 
-        if ($medium === PaymentMedium::Bank && $bankAccountId === null) {
-            throw ValidationException::withMessages([
-                'bankAccountId' => 'Un depósito directo tiene que decir en qué cuenta está.',
-            ]);
+        if ($medium === PaymentMedium::Bank) {
+            $this->assertBankAccount($cashBoxId, $currency, $amount, $bankAccountId);
+
+            return;
         }
 
-        $cuenta = $medium === PaymentMedium::Bank ? LedgerAccount::BankAccount : LedgerAccount::CashOnHand;
-        $disponible = $this->saldos->of($cuenta, $cashBoxId, $currency);
+        $disponible = $this->saldos->of(LedgerAccount::CashOnHand, $cashBoxId, $currency);
 
         if (Decimal::isNegative(Decimal::sub($disponible, $amount))) {
             throw ValidationException::withMessages([
                 'amount' => sprintf(
                     'En «%s» hay %s y esto es por %s.',
-                    $cuenta->label(),
+                    LedgerAccount::CashOnHand->label(),
                     Decimal::format($disponible),
                     Decimal::format($amount),
                 ),
@@ -270,6 +275,56 @@ final class SetAsideLegacyFunds
                 'source' => sprintf(
                     'De los cheques de la apertura quedan %s sin identificar y este es por %s.',
                     Decimal::format($sinDetallar),
+                    Decimal::format($amount),
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * El depósito directo está en **esa** cuenta.
+     *
+     * El saldo bancario total no alcanza: con plata en la cuenta A y nada
+     * en la B, apartar diciendo B dejaría registrada una ubicación que no
+     * existe. Se mira el saldo de la cuenta elegida, que tiene que estar
+     * activa y ser de la moneda del haber.
+     *
+     * Se lee con `DB::table` y no con el modelo de Banking, por el mismo
+     * motivo que en `journal_lines`: `bank_accounts` es el maestro de las
+     * cuentas del organismo, no dominio de Banking.
+     *
+     * @param  numeric-string  $amount
+     *
+     * @throws ValidationException
+     */
+    private function assertBankAccount(int $cashBoxId, Currency $currency, string $amount, ?int $bankAccountId): void
+    {
+        if ($bankAccountId === null) {
+            throw ValidationException::withMessages([
+                'bankAccountId' => 'Un depósito directo tiene que decir en qué cuenta está.',
+            ]);
+        }
+
+        $cuenta = DB::table('bank_accounts')
+            ->where('id', $bankAccountId)
+            ->where('is_active', true)
+            ->where('currency', $currency->value)
+            ->first(['id', 'label']);
+
+        if ($cuenta === null) {
+            throw ValidationException::withMessages([
+                'bankAccountId' => 'Esa cuenta no está activa o no es de la moneda del haber.',
+            ]);
+        }
+
+        $disponible = $this->saldos->ofBankAccount($cashBoxId, $currency, $bankAccountId);
+
+        if (Decimal::isNegative(Decimal::sub($disponible, $amount))) {
+            throw ValidationException::withMessages([
+                'bankAccountId' => sprintf(
+                    'En la cuenta «%s» hay %s y esto es por %s.',
+                    $cuenta->label,
+                    Decimal::format($disponible),
                     Decimal::format($amount),
                 ),
             ]);

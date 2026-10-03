@@ -16,10 +16,21 @@ import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { preview } from '@/routes/adjuntos';
 import { receiveAndAllocate as registrarIngreso } from '@/routes/haberes/installments';
+import { voidPaper as anularPapel } from '@/routes/haberes/installments/legacy-funds';
 import { create as nuevoTicket } from '@/routes/haberes/installments/ticket';
 import { create as nuevoTraslado } from '@/routes/haberes/installments/transfer';
 import { show as verRecepcion } from '@/routes/recepciones';
@@ -57,6 +68,7 @@ export default function InstallmentIncome({
     puedeAnular,
     firmantes,
     reciboDePapel,
+    puedeAnularPapel,
 }: {
     cuota: Cuota;
     cuentas: { id: number; label: string }[];
@@ -74,6 +86,8 @@ export default function InstallmentIncome({
      * los dos.
      */
     reciboDePapel: Papel | null;
+    /** Si puede anular un recibo de papel mal cargado que ya no respalda plata. */
+    puedeAnularPapel: boolean;
 }) {
     const anulada = cuota.status === 'cancelled';
     const sinFinanciar = Number(cuota.fundedAmount) <= 0;
@@ -124,7 +138,23 @@ export default function InstallmentIncome({
             <TrasladosCancelados cuota={cuota} />
 
             {reciboDePapel !== null && cuota.incomeReceipt === null ? (
-                <ReciboDePapel papel={reciboDePapel} />
+                <ReciboDePapel
+                    cuota={cuota}
+                    papel={reciboDePapel}
+                    puedeAnular={puedeAnularPapel && !anulada && sinFinanciar}
+                    /*
+                     * Liberar la plata apartada por error: vuelve al saldo del
+                     * sistema anterior. No con un traslado en curso: ese
+                     * efectivo ya salió de la caja.
+                     */
+                    puedeLiberar={
+                        puedeDesasignar &&
+                        !anulada &&
+                        !sinFinanciar &&
+                        cuota.cashTransfer === null &&
+                        cuota.allocations.length > 0
+                    }
+                />
             ) : (
                 <ReciboDeIngreso
                     cuota={cuota}
@@ -150,10 +180,26 @@ export default function InstallmentIncome({
  * El recibo de ingreso de papel de la plata apartada del sistema anterior.
  *
  * Es el que se le dio al empleador en su momento, con número de talonario.
- * No se emite ni se anula desde acá: es un papel que ya existe, y la cuota
- * no lleva uno del sistema además.
+ * No se emite desde acá: es un papel que ya existe, y la cuota no lleva uno
+ * del sistema además. Si se cargó mal, se anula con motivo —una vez
+ * liberada la plata que respalda— y el correcto se carga al volver a
+ * apartar.
  */
-function ReciboDePapel({ papel }: { papel: Papel }) {
+function ReciboDePapel({
+    cuota,
+    papel,
+    puedeAnular,
+    puedeLiberar,
+}: {
+    cuota: Cuota;
+    papel: Papel;
+    puedeAnular: boolean;
+    puedeLiberar: boolean;
+}) {
+    const [anulando, setAnulando] = useState(false);
+    const [liberando, setLiberando] = useState(false);
+    const cuotaId = cuota.id;
+
     return (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-success/40 bg-success-soft/40 px-3 py-2">
             <p className="flex items-center gap-1.5 text-xs">
@@ -181,8 +227,118 @@ function ReciboDePapel({ papel }: { papel: Papel }) {
                         Ver foto
                     </a>
                 )}
+                {puedeLiberar && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setLiberando(true)}
+                    >
+                        <Undo2 className="size-3.5" />
+                        Liberar la plata apartada
+                    </Button>
+                )}
+                {puedeAnular && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-destructive-strong hover:bg-destructive-soft"
+                        onClick={() => setAnulando(true)}
+                    >
+                        <Ban className="size-3.5" />
+                        Anular el papel
+                    </Button>
+                )}
             </div>
+
+            {liberando && (
+                <UnallocateDialog
+                    cuota={cuota}
+                    abierto
+                    delSistemaAnterior
+                    onCerrar={() => setLiberando(false)}
+                />
+            )}
+
+            {anulando && (
+                <AnularPapelDialog
+                    cuotaId={cuotaId}
+                    numero={papel.number}
+                    onCerrar={() => setAnulando(false)}
+                />
+            )}
         </div>
+    );
+}
+
+/** Anular un recibo de papel mal cargado, con motivo. */
+function AnularPapelDialog({
+    cuotaId,
+    numero,
+    onCerrar,
+}: {
+    cuotaId: number;
+    numero: string;
+    onCerrar: () => void;
+}) {
+    const form = useForm({ reason: '' });
+
+    return (
+        <Dialog open onOpenChange={(v) => !v && onCerrar()}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>
+                        Anular el recibo de papel n.º {numero}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Queda anulado con su motivo, no se borra. Al volver a
+                        apartar fondos se carga el papel correcto.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        form.post(anularPapel(cuotaId).url, {
+                            preserveScroll: true,
+                            onSuccess: () => onCerrar(),
+                        });
+                    }}
+                    className="mt-2 space-y-4"
+                >
+                    <div className="space-y-1.5">
+                        <Label htmlFor={`motivo-papel-${cuotaId}`}>
+                            Qué estaba mal
+                        </Label>
+                        <Textarea
+                            id={`motivo-papel-${cuotaId}`}
+                            rows={3}
+                            value={form.data.reason}
+                            onChange={(e) =>
+                                form.setData('reason', e.target.value)
+                            }
+                            placeholder="El número del talonario estaba mal tipeado: es 0072190."
+                        />
+                        <InputError message={form.errors.reason} />
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onCerrar}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="destructive"
+                            disabled={form.processing}
+                        >
+                            Anular el papel
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

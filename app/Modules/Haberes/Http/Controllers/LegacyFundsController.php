@@ -6,11 +6,14 @@ namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Haberes\Actions\FundInstallmentFromLegacy;
+use App\Modules\Haberes\Actions\VoidLegacyIncomeDocument;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
 use App\Modules\Haberes\Http\Requests\FundInstallmentFromLegacyRequest;
+use App\Modules\Haberes\Http\Requests\VoidLegacySettlementRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Ledger\Models\FundReceipt;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -58,12 +61,32 @@ final class LegacyFundsController extends Controller
     }
 
     /**
+     * Anula un recibo de papel mal cargado, para cargar el correcto en el
+     * próximo apartado.
+     */
+    public function voidPaper(
+        VoidLegacySettlementRequest $request,
+        BeneficiaryInstallment $installment,
+        VoidLegacyIncomeDocument $anular,
+    ): RedirectResponse {
+        $anular->handle(
+            installment: $installment,
+            reason: (string) $request->validated('reason'),
+            actorId: $request->user()?->id,
+        );
+
+        Toast::success('Recibo de papel anulado.', 'Al volver a apartar se carga el correcto.');
+
+        return back();
+    }
+
+    /**
      * De dónde sale la plata.
      *
      * El efectivo y el depósito directo salen enteros: el importe es el de
      * la cuota y el navegador no tiene por qué proponer otro. Los cheques de
-     * la cartera dicen cuánto aporta cada uno, y el que se identifica ahora
-     * cubre lo que falta: tampoco ese importe se toma del navegador.
+     * la lista aportan su importe entero, y el que se identifica ahora cubre
+     * lo que falta: ningún importe se toma del navegador.
      *
      * @return list<array{amount: numeric-string, chequeReceiptId?: int|null, newCheque?: array{number: string, bank: string|null, issueDate: string|null}|null}>
      */
@@ -82,9 +105,13 @@ final class LegacyFundsController extends Controller
                 continue;
             }
 
+            /*
+             * Un cheque de la lista aporta su importe entero: el papel no se
+             * reparte. Se lee del cheque, no de la pantalla.
+             */
             if (isset($cheque['receiptId']) && is_numeric($cheque['receiptId'])) {
                 $deLaCartera[] = [
-                    'amount' => Decimal::parse((string) ($cheque['amount'] ?? '')) ?? '0.00',
+                    'amount' => Decimal::scale((string) (FundReceipt::query()->whereKey((int) $cheque['receiptId'])->value('amount') ?? '0')),
                     'chequeReceiptId' => (int) $cheque['receiptId'],
                 ];
 
@@ -109,6 +136,8 @@ final class LegacyFundsController extends Controller
         if ($nuevo === null) {
             return $deLaCartera;
         }
+
+        // El cheque nuevo cubre lo que falta; los de la lista no pueden pasarse.
 
         $falta = $installment->importeEsperado();
 

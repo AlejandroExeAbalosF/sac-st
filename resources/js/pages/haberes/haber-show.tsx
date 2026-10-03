@@ -169,6 +169,7 @@ export default function MostrarHaber({
         permisos: {
             registrar: canRecordLegacy && haber.status === 'active',
             anular: canVoidLegacy,
+            anularPapel: fondosAnteriores !== null,
             apartar:
                 fondosAnteriores !== null &&
                 haber.status === 'active' &&

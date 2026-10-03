@@ -189,10 +189,19 @@ papel** que se le dio al empleador, con su número de talonario y su fecha. Ese
 papel hace las veces del recibo del sistema: la cuota no lleva los dos, y la Orden
 de Pago imprime el número del talonario.
 
-Si la apertura declaró los cheques como un total, sin detallarlos uno por uno, el
-cheque se identifica en el mismo momento con su número, banco y fecha. Sale de lo
-que la apertura dejó sin detallar y entra a la cartera en custodia, como cualquier
-otro cheque.
+Un cheque se aparta **entero**: es un papel que se entrega o se deposita completo,
+así que no se reparte entre cuotas. Si la cuota se cubre con varios cheques, se
+eligen todos. Si la apertura declaró los cheques como un total, sin detallarlos,
+el cheque se identifica en el mismo momento con su número —el banco y la fecha
+son opcionales— y cubre lo que falte de la cuota. Sale de lo que la apertura dejó
+sin detallar, entra a la cartera en custodia y, si se libera, vuelve a la lista
+para apartarse en otra cuota.
+
+Un depósito directo se aparta de **la cuenta elegida**, con su saldo: tener plata
+en otra cuenta del organismo no alcanza.
+
+Si el recibo de papel se cargó mal, se anula con motivo desde la tarjeta una vez
+liberada la plata que respalda, y el correcto se carga al volver a apartar.
 
 Desde ahí la cuota sigue el circuito de siempre: entrega por mostrador, traslado al
 banco, u Orden y transferencia. Si hay que liberar la plata —toda o el excedente
