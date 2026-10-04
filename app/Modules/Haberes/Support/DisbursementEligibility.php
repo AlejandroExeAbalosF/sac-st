@@ -61,6 +61,7 @@ final class DisbursementEligibility
         private readonly InstallmentFunding $financiacion,
         private readonly PaymentOrderSources $origen,
         private readonly TransferStage $etapa,
+        private readonly PartialCheques $chequesParciales,
     ) {}
 
     /**
@@ -87,7 +88,7 @@ final class DisbursementEligibility
              * del organismo todavía no lo tiene (§2.4.7).
              */
             applies: $canal !== PaymentChannel::Undetermined,
-            blockedReason: $this->traba($installment, $canal, $reciboIngreso, $orden),
+            blockedReason: $this->traba($installment, $canal, $medio, $reciboIngreso, $orden),
             method: $this->metodo($canal, $medio),
             /*
              * En el mostrador, lo asignado: en efectivo se entrega **todo**
@@ -115,6 +116,7 @@ final class DisbursementEligibility
     private function traba(
         BeneficiaryInstallment $installment,
         PaymentChannel $canal,
+        ?PaymentMedium $medio,
         ?IncomeEvidence $reciboIngreso,
         ?PaymentOrder $orden,
     ): ?string {
@@ -142,6 +144,21 @@ final class DisbursementEligibility
         if ($reciboIngreso === null) {
             return 'Falta emitir el recibo de ingreso. Los dos comprobantes son los dos extremos '
                 .'del mismo dinero y el expediente los archiva juntos.';
+        }
+
+        /*
+         * El cheque se entrega como cheque, y un papel no se parte: si la
+         * cuota tiene solo una parte, entregarlo le daría al beneficiario
+         * más de lo suyo y dejaría el resto en custodia sin papel que lo
+         * respalde. Va después del recibo y antes de la etiqueta: es un
+         * problema de qué se entrega, no de si se puede entregar.
+         */
+        if ($canal === PaymentChannel::Counter && $medio === PaymentMedium::Cheque) {
+            $parcial = $this->chequesParciales->first($installment);
+
+            if ($parcial !== null) {
+                return PartialCheques::message($parcial, 'se entrega');
+            }
         }
 
         /*

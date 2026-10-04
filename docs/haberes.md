@@ -104,6 +104,10 @@ van los dos. Un cheque viaja entero y cambia de estado con el traslado
 —depositado, acreditado, o de vuelta en custodia si el traslado se cancela—, así
 que la planilla de caja deja de listarlo apenas sale.
 
+Un cheque tampoco se entrega por partes: si la cuota tiene solo una parte de un
+cheque —por ejemplo, porque bajó y se liberó el excedente—, la tarjeta no ofrece
+entregarlo ni depositarlo y dice por qué.
+
 Regla: [canal de pago](haberes-reglas.md#canal-de-pago).
 
 <a id="orden-y-pase"></a>

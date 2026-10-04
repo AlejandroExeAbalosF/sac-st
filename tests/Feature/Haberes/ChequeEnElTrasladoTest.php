@@ -13,14 +13,17 @@ use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
+use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Actions\RegisterCashPayment;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -216,26 +219,74 @@ class ChequeEnElTrasladoTest extends TestCase
     /** Un cheque se deposita entero: la cuota tiene que tenerlo completo. */
     public function test_un_cheque_que_la_cuota_tiene_en_parte_no_se_deposita(): void
     {
-        $cuota = $this->cuotaCobradaConUnCheque();
-
-        // La cuota baja y el excedente se libera: queda una parte del cheque.
-        $cuota->forceFill(['expected_amount' => Decimal::sub($cuota->importeEsperado(), '1000')])->save();
-        app(UnallocateFunds::class)->handle(
-            allocation: FundingAllocation::query()->live()->firstOrFail(),
-            amount: '1000.00',
-            idempotencyKey: 'excedente-'.Str::random(8),
-            notes: 'La cuota se corrigió a la baja.',
-            actorId: $this->operador->id,
-        );
+        $cuota = $this->cuotaConUnaParteDelCheque();
 
         try {
-            $this->depositar($cuota->refresh());
+            $this->depositar($cuota);
             $this->fail('Depositó una parte de un cheque.');
         } catch (ValidationException $e) {
             $this->assertStringContainsString('un cheque se deposita entero', $e->errors()['installmentId'][0]);
         }
 
         $this->assertSame(ChequeStatus::InCustody, $this->cheques()->first()?->cheque_status);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | La entrega por mostrador
+    |--------------------------------------------------------------------------
+    */
+
+    /** Los dos cheques de la cuota cambian de manos. */
+    public function test_entregar_una_cuota_con_dos_cheques_entrega_los_dos(): void
+    {
+        $cuota = $this->cuotaCobradaConDosCheques();
+
+        $this->entregar($cuota);
+
+        $this->assertSame(
+            [ChequeStatus::Delivered, ChequeStatus::Delivered],
+            $this->cheques()->pluck('cheque_status')->all(),
+        );
+    }
+
+    /**
+     * Un cheque se entrega entero, igual que se deposita.
+     *
+     * Entregarlo con solo una parte en la cuota le daba al beneficiario
+     * el papel completo y dejaba el resto en `CHEQUES_IN_CUSTODY` sin
+     * ningún cheque que lo respalde.
+     */
+    public function test_un_cheque_que_la_cuota_tiene_en_parte_no_se_entrega(): void
+    {
+        $cuota = $this->cuotaConUnaParteDelCheque();
+
+        // La tarjeta lo dice antes de que alguien lo intente.
+        $estado = app(DisbursementEligibility::class)->for($cuota);
+        $this->assertStringContainsString('un cheque se entrega entero', (string) $estado->blockedReason);
+
+        try {
+            $this->entregar($cuota);
+            $this->fail('Entregó una parte de un cheque.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('un cheque se entrega entero', $e->errors()['installmentId'][0]);
+        }
+
+        $this->assertSame(ChequeStatus::InCustody, $this->cheques()->first()?->cheque_status);
+        $this->assertSame(0, Disbursement::query()->count());
+    }
+
+    /** La regla es del cheque: el efectivo se entrega aunque se haya liberado una parte. */
+    public function test_el_efectivo_con_una_parte_liberada_se_entrega(): void
+    {
+        $cuota = $this->cuota('cash');
+        $this->cobrar($cuota, $cuota->importeEsperado(), PaymentMedium::Cash);
+        $this->emitirRecibo($cuota);
+        $this->liberarElExcedente($cuota->refresh());
+
+        $this->entregar($cuota->refresh());
+
+        $this->assertSame(1, Disbursement::query()->count());
     }
 
     /*
@@ -321,6 +372,40 @@ class ChequeEnElTrasladoTest extends TestCase
         $this->emitirRecibo($cuota);
 
         return $cuota->refresh();
+    }
+
+    /** La cuota baja y el excedente se libera: le queda una parte del cheque. */
+    private function cuotaConUnaParteDelCheque(): BeneficiaryInstallment
+    {
+        $cuota = $this->cuotaCobradaConUnCheque();
+        $this->liberarElExcedente($cuota);
+
+        return $cuota->refresh();
+    }
+
+    private function liberarElExcedente(BeneficiaryInstallment $cuota): void
+    {
+        $cuota->forceFill(['expected_amount' => Decimal::sub($cuota->importeEsperado(), '1000')])->save();
+
+        app(UnallocateFunds::class)->handle(
+            allocation: FundingAllocation::query()
+                ->live()
+                ->where('beneficiary_installment_id', $cuota->id)
+                ->firstOrFail(),
+            amount: '1000.00',
+            idempotencyKey: 'excedente-'.Str::random(8),
+            notes: 'La cuota se corrigió a la baja.',
+            actorId: $this->operador->id,
+        );
+    }
+
+    private function entregar(BeneficiaryInstallment $cuota): void
+    {
+        app(DeliverToBeneficiary::class)->handle(
+            installment: $cuota,
+            idempotencyKey: 'entrega-'.Str::random(8),
+            actorId: $this->operador->id,
+        );
     }
 
     private function cobrar(

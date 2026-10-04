@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Haberes\Support\PartialCheques;
 use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
@@ -63,6 +64,7 @@ final class DepositCashToBank
         private readonly RecordAuditEvent $auditar,
         private readonly StoreAttachment $attachments,
         private readonly TransferredCheques $cheques,
+        private readonly PartialCheques $chequesParciales,
     ) {}
 
     /**
@@ -292,41 +294,19 @@ final class DepositCashToBank
             ]);
         }
 
-        foreach ($asignaciones as $asignacion) {
-            $this->assertChequeEntero($asignacion);
+        /*
+         * Un cheque se deposita entero: no hay forma de llevar al banco una
+         * parte del papel. Ver `PartialCheques`.
+         */
+        $parcial = $this->chequesParciales->first($installment);
+
+        if ($parcial !== null) {
+            throw ValidationException::withMessages([
+                'installmentId' => PartialCheques::message($parcial, 'se deposita'),
+            ]);
         }
 
         return $asignaciones;
-    }
-
-    /**
-     * Un cheque se deposita entero.
-     *
-     * Es un papel: no hay forma de llevar al banco una parte. Si lo que la
-     * cuota tiene de ese cheque no es el cheque completo —se liberó una
-     * parte, o lo comparte con otra cuota—, depositarlo con esta cuota
-     * movería del libro menos de lo que se lleva el banco, y lo marcaría
-     * depositado mientras el resto sigue figurando en custodia.
-     *
-     * @throws ValidationException
-     */
-    private function assertChequeEntero(FundingAllocation $asignacion): void
-    {
-        $recepcion = $asignacion->fundReceipt;
-        $enLaCuota = (string) $asignacion->getAttribute('remaining');
-
-        if ($recepcion->medium !== PaymentMedium::Cheque || Decimal::equals($enLaCuota, $recepcion->amount)) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'installmentId' => sprintf(
-                'El cheque n.º %s es de $ %s y esta cuota tiene $ %s de él: un cheque se deposita entero.',
-                $recepcion->cheque_number ?? '(sin número)',
-                Decimal::format($recepcion->amount),
-                Decimal::format(Decimal::scale($enLaCuota)),
-            ),
-        ]);
     }
 
     /**
