@@ -104,9 +104,12 @@ van los dos. Un cheque viaja entero y cambia de estado con el traslado
 —depositado, acreditado, o de vuelta en custodia si el traslado se cancela—, así
 que la planilla de caja deja de listarlo apenas sale.
 
-Un cheque tampoco se entrega por partes: si la cuota tiene solo una parte de un
-cheque —por ejemplo, porque bajó y se liberó el excedente—, la tarjeta no ofrece
-entregarlo ni depositarlo y dice por qué.
+Un cheque viaja como llegó a la Secretaría: entero. Si la cuota tiene solo una
+parte —por ejemplo, porque bajó y se liberó el excedente—, el traslado se lleva el
+cheque completo, y la pantalla aclara cuánto de lo depositado no es de la cuota.
+Esa parte sigue siendo de quien era, o sin dueño, pero ya en el banco. Por
+mostrador no se entrega: le daría al beneficiario más de lo suyo, así que la
+tarjeta lo bloquea y propone depositarlo y pagar por transferencia.
 
 Regla: [canal de pago](haberes-reglas.md#canal-de-pago).
 

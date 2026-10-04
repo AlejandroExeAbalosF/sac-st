@@ -16,7 +16,7 @@ use App\Modules\Banking\Support\CashDepositCandidate;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\IncomeEvidence;
-use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Haberes\Support\InstallmentDeposit;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -61,11 +61,16 @@ final class CashTransferController extends Controller
         $haber = $installment->haber;
         $expediente = $haber->expediente;
 
+        // Lo mismo que va a asentar el Action: un cheque viaja entero.
+        $items = app(InstallmentDeposit::class)->items($installment);
+
         return Inertia::render('haberes/traslados/create', [
             'cuota' => [
                 'id' => $installment->id,
                 'number' => $installment->installment_number,
-                'amount' => app(InstallmentFunding::class)->allocated($installment),
+                'amount' => InstallmentDeposit::total($items),
+                // El resto de un cheque que la cuota tiene en parte.
+                'carriedAmount' => InstallmentDeposit::carried($items),
                 'concept' => $installment->description ?? $haber->concept,
                 // Un recibo de papel no tiene número del sistema: va el del talonario.
                 'receiptNumber' => $recibo->systemNumber() ?? $recibo->talonarioNumber(),

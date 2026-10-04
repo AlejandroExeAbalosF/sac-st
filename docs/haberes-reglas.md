@@ -146,7 +146,9 @@ cheque depositado (`rejected`) no tiene circuito todavía.
 | Regla | Action | Base |
 |---|---|---|
 | El estado del cheque coincide con el de su traslado vigente, y sin traslado no figura en el banco | `DepositCashToBank`, `CancelCashToBankTransfer`, `ConfirmCashDepositCredit` vía `TransferredCheques` | `cheque_follows_transfer`, diferido, desde el ítem, el traslado y el cheque |
-| Un cheque se deposita o se entrega entero: la cuota tiene que tenerlo completo, sumado por cheque | `PartialCheques`, desde `DepositCashToBank` y `DisbursementEligibility` (la tarjeta muestra el motivo) | — |
+| Un cheque se deposita entero, como llegó: si la cuota tiene solo una parte, el traslado lleva también la de otra cuota y la que no tiene dueño | `InstallmentDeposit`, desde `DepositCashToBank` y la pantalla del traslado | `cheque_travels_whole`, diferido: los ítems vigentes de un cheque suman cero o el cheque, en un solo traslado |
+| Un cheque no se entrega por mostrador si la cuota tiene solo una parte, sumado por cheque | `PartialCheques`, desde `DisbursementEligibility` (la tarjeta muestra el motivo) | — |
+| Una cuota cuyo cheque viajó en el traslado de otra ve su plata en el banco, aunque su asignación no esté en ningún ítem | `PaymentOrderSources::transfersFor()` | — |
 | El traslado sale de una sola caja, a una cuenta en la moneda del haber | `DepositCashToBank` | `journal_lines_bank_currency` (moneda) |
 | La acreditación deja el dinero en el banco de la caja del traslado | `ConfirmCashDepositCredit` | — |
 

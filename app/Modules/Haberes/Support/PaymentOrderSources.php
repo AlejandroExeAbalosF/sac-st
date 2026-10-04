@@ -206,16 +206,43 @@ final class PaymentOrderSources
             return [];
         }
 
+        /** @var array<int, int> $cuotaDeAsignacion */
+        $cuotaDeAsignacion = FundingAllocation::query()
+            ->live()
+            ->whereIn('beneficiary_installment_id', $installmentIds)
+            ->pluck('beneficiary_installment_id', 'id')
+            ->all();
+
+        /*
+         * ── Y por cheque, no solo por asignación ─────────────────────────
+         *
+         * Un cheque viaja entero: el traslado de una cuota se lleva también
+         * la parte que todavía no tenía dueño. Si esa parte se asigna
+         * después a otra cuota, su asignación no figura en ningún ítem,
+         * pero su plata está en el banco igual. Sin esto la cuota ofrecería
+         * entregar por mostrador un cheque que ya no está en la caja.
+         *
+         * Solo con saldo en pie: una asignación liberada del todo ya no es
+         * plata de la cuota, viaje donde viaje el cheque. El efectivo no
+         * entra acá: se divide, y lo que no se llevó sigue en el cajón.
+         */
+        $cuotasDeCheque = [];
+
+        foreach (FundingAllocation::query()
+            ->withRemainingBalance()
+            ->whereIn('beneficiary_installment_id', $installmentIds)
+            ->join('fund_receipts', 'fund_receipts.id', '=', 'funding_allocations.fund_receipt_id')
+            ->where('fund_receipts.medium', PaymentMedium::Cheque->value)
+            ->get(['funding_allocations.beneficiary_installment_id', 'funding_allocations.fund_receipt_id']) as $fila) {
+            $cuotasDeCheque[(int) $fila->fund_receipt_id][] = (int) $fila->beneficiary_installment_id;
+        }
+
         $items = CashToBankTransferItem::query()
-            ->with(['transfer', 'fundingAllocation:id,beneficiary_installment_id'])
+            ->with('transfer')
             ->whereRelation('transfer', 'status', '!=', CashTransferStatus::Cancelled->value)
-            ->whereIn(
-                'funding_allocation_id',
-                FundingAllocation::query()
-                    ->live()
-                    ->whereIn('beneficiary_installment_id', $installmentIds)
-                    ->select('id'),
-            )
+            ->where(fn ($query) => $query
+                ->whereIn('funding_allocation_id', array_keys($cuotaDeAsignacion))
+                ->orWhereIn('fund_receipt_id', array_keys($cuotasDeCheque)))
             /*
              * El más nuevo primero. Una cuota con dos traslados vigentes ya
              * sería un problema anterior a esta consulta, pero si pasara, el
@@ -227,7 +254,15 @@ final class PaymentOrderSources
         $porCuota = [];
 
         foreach ($items as $item) {
-            $porCuota[(int) $item->fundingAllocation->beneficiary_installment_id] ??= $item->transfer;
+            $cuotas = $cuotasDeCheque[$item->fund_receipt_id] ?? [];
+
+            if ($item->funding_allocation_id !== null && isset($cuotaDeAsignacion[$item->funding_allocation_id])) {
+                $cuotas[] = $cuotaDeAsignacion[$item->funding_allocation_id];
+            }
+
+            foreach ($cuotas as $cuota) {
+                $porCuota[$cuota] ??= $item->transfer;
+            }
         }
 
         return $porCuota;
@@ -290,10 +325,21 @@ final class PaymentOrderSources
      */
     private function rowFromCashDeposit(FundingAllocation $asignacion, string $importeVigente): FundingSourceRow
     {
+        /*
+         * Por la asignación, o por el cheque si viajó en el traslado de otra
+         * cuota: un cheque se deposita entero y arrastra la parte que
+         * después se le asignó a esta. Ver `transfersFor()`.
+         */
         $item = CashToBankTransferItem::query()
             ->with('transfer.bankAccount')
-            ->where('funding_allocation_id', $asignacion->id)
             ->whereRelation('transfer', 'status', '!=', CashTransferStatus::Cancelled->value)
+            ->where(fn ($query) => $query
+                ->where('funding_allocation_id', $asignacion->id)
+                ->when(
+                    $asignacion->fundReceipt->medium === PaymentMedium::Cheque,
+                    fn ($query) => $query->orWhere('fund_receipt_id', $asignacion->fund_receipt_id),
+                ))
+            ->orderByDesc('cash_to_bank_transfer_id')
             ->first();
 
         $traslado = $item?->transfer;

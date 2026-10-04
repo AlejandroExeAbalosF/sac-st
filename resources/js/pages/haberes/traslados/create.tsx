@@ -16,7 +16,7 @@ import {
 import TicketPhotoPanel, {
     useTicketPhoto,
 } from '@/features/haberes/components/ticket-photo-panel';
-import { businessToday, money } from '@/lib/format';
+import { businessToday, isNonZero, money } from '@/lib/format';
 import { transfer as trasladar } from '@/routes/haberes/installments';
 
 type Props = {
@@ -24,6 +24,11 @@ type Props = {
         id: number;
         number: number;
         amount: string;
+        /**
+         * Lo que viaja sin ser de la cuota: el resto de un cheque que tiene
+         * solo en parte. Un cheque se deposita entero, como llegó.
+         */
+        carriedAmount: string;
         concept: string | null;
         receiptNumber: string;
     };
@@ -128,6 +133,13 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                                 <dd className="font-mono text-lg font-semibold tabular-nums">
                                     {money(cuota.amount)}
                                 </dd>
+                                {isNonZero(cuota.carriedAmount) && (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Incluye {money(cuota.carriedAmount)} que
+                                        no son de esta cuota: el cheque se
+                                        deposita completo, como llegó.
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <dt className="text-xs text-field-label">

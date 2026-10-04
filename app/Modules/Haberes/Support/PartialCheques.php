@@ -11,11 +11,12 @@ use Illuminate\Support\Facades\DB;
 /**
  * Los cheques que una cuota tiene solo en parte.
  *
- * Un cheque es un papel: se entrega o se deposita entero. Si lo que la
+ * Un cheque es un papel y se entrega como llegó: entero. Si lo que la
  * cuota tiene de un cheque no es el cheque completo —se liberó el
- * excedente de una cuota que bajó, o lo comparte con otra—, moverlo con
- * esta cuota sacaría del libro menos de lo que se lleva el papel: el resto
- * quedaría en `CHEQUES_IN_CUSTODY` sin ningún cheque que lo respalde.
+ * excedente de una cuota que bajó, o lo comparte con otra—, entregarlo le
+ * daría al beneficiario más de lo suyo y dejaría el resto en
+ * `CHEQUES_IN_CUSTODY` sin ningún cheque que lo respalde. El depósito no
+ * tiene ese problema: lleva el papel completo (`InstallmentDeposit`).
  *
  * Se suma por cheque, no por asignación: dos asignaciones del mismo cheque
  * a la misma cuota que juntas lo completan son un cheque entero.
@@ -59,19 +60,20 @@ final class PartialCheques
     }
 
     /**
-     * La explicación para quien intenta moverlo.
+     * La explicación para quien intenta entregarlo, con la salida: el
+     * depósito lleva el cheque entero (`InstallmentDeposit`) y la cuota se
+     * paga por transferencia.
      *
      * @param  array{number: string|null, amount: numeric-string, held: numeric-string}  $cheque
-     * @param  string  $acto  «se deposita» o «se entrega».
      */
-    public static function message(array $cheque, string $acto): string
+    public static function message(array $cheque): string
     {
         return sprintf(
-            'El cheque n.º %s es de $ %s y esta cuota tiene $ %s de él: un cheque %s entero.',
+            'El cheque n.º %s es de $ %s y esta cuota tiene $ %s de él: un cheque se entrega entero, '
+                .'como llegó. Se puede depositar completo y pagar la cuota por transferencia.',
             $cheque['number'] ?? '(sin número)',
             Decimal::format($cheque['amount']),
             Decimal::format($cheque['held']),
-            $acto,
         );
     }
 }

@@ -10,15 +10,18 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\DepositItem;
 use App\Modules\Haberes\Support\IncomeEvidence;
+use App\Modules\Haberes\Support\InstallmentDeposit;
 use App\Modules\Haberes\Support\InstallmentFunding;
-use App\Modules\Haberes\Support\PartialCheques;
 use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
@@ -43,6 +46,11 @@ use Throwable;
  * del mismo beneficiario y sigue imputado a la misma cuota:
  * `BENEFICIARY_FUNDS` no se toca. Lo único que cambia es dónde está.
  *
+ * **Un cheque viaja como llegó: entero.** Si la cuota tiene solo una parte
+ * de un cheque, el papel se deposita completo y lleva consigo el resto —la
+ * parte de otra cuota, o la que todavía no tiene dueño—. Ver
+ * `InstallmentDeposit`.
+ *
  * **Y el recibo de ingreso no se toca nunca.** Sigue diciendo «Efectivo»,
  * porque eso fue lo que ocurrió y el empleador tiene su copia firmada.
  * Este es un hecho nuevo, no una corrección de aquel. Ver
@@ -64,7 +72,7 @@ final class DepositCashToBank
         private readonly RecordAuditEvent $auditar,
         private readonly StoreAttachment $attachments,
         private readonly TransferredCheques $cheques,
-        private readonly PartialCheques $chequesParciales,
+        private readonly InstallmentDeposit $deposito,
     ) {}
 
     /**
@@ -107,16 +115,9 @@ final class DepositCashToBank
                     return $yaTrasladado;
                 }
 
-                $asignaciones = $this->asignacionesEnCaja($installment);
-                $importe = array_reduce(
-                    $asignaciones,
-                    static fn (string $total, FundingAllocation $a): string => Decimal::add(
-                        $total,
-                        (string) $a->getAttribute('remaining'),
-                    ),
-                    '0.00',
-                );
-                $cajaId = $asignaciones[0]->fundReceipt->cash_box_id;
+                $items = $this->loQueViaja($installment);
+                $importe = InstallmentDeposit::total($items);
+                $cajaId = $items[0]->receipt->cash_box_id;
                 $moneda = $installment->currency();
 
                 // La base lo rechaza igual (`journal_lines_bank_currency`).
@@ -134,7 +135,7 @@ final class DepositCashToBank
                             ->in($moneda)
                             ->onBankAccount($ticket['bankAccountId'])
                             ->onCashBox($cajaId),
-                        ...$this->salidas($asignaciones, $moneda, $cajaId),
+                        ...$this->salidas($items, $moneda, $cajaId),
                     ],
                     date: $ticket['depositDate'],
                     cashBoxId: $cajaId,
@@ -156,12 +157,12 @@ final class DepositCashToBank
                     'status' => CashTransferStatus::Deposited,
                 ]);
 
-                foreach ($asignaciones as $asignacion) {
+                foreach ($items as $item) {
                     CashToBankTransferItem::query()->create([
                         'cash_to_bank_transfer_id' => $traslado->id,
-                        'fund_receipt_id' => $asignacion->fund_receipt_id,
-                        'funding_allocation_id' => $asignacion->id,
-                        'amount' => Decimal::scale((string) $asignacion->getAttribute('remaining')),
+                        'fund_receipt_id' => $item->receipt->id,
+                        'funding_allocation_id' => $item->allocationId,
+                        'amount' => $item->amount,
                     ]);
                 }
 
@@ -189,6 +190,8 @@ final class DepositCashToBank
                     'bank_account_id' => $traslado->bank_account_id,
                     'deposit_date' => $traslado->deposit_date->toDateString(),
                     'beneficiary_installment_id' => $installment->id,
+                    // El resto de los cheques, que viaja con el papel.
+                    'carried_amount' => InstallmentDeposit::carried($items),
                 ], actorId: $actorId);
 
                 return $traslado;
@@ -206,21 +209,18 @@ final class DepositCashToBank
     }
 
     /**
-     * Lo de esta cuota que todavía está en la caja: **todas** sus
-     * asignaciones con saldo, no la primera. Una cuota cubierta con dos
-     * cheques los lleva a los dos; depositar uno solo dejaba el otro en
-     * custodia y el traslado por una parte de la cuota.
+     * Lo que sale de la caja: **todo** lo que la cuota tiene en pie, y el
+     * resto de cada uno de sus cheques. Ver `InstallmentDeposit`.
      *
-     * Cada una por lo que le queda en pie: una asignación liberada en parte
-     * —el excedente de una cuota que bajó— deposita lo que sigue siendo del
-     * beneficiario, no lo que alguna vez se le asignó. Y una liberada del
-     * todo no cuenta: antes se podía tomar como «la» asignación de la cuota.
+     * Una cuota cubierta con dos cheques los lleva a los dos, cada
+     * asignación por lo que le queda en pie, y un cheque que la cuota tiene
+     * solo en parte viaja entero, como llegó a la Secretaría.
      *
-     * @return non-empty-list<FundingAllocation>
+     * @return non-empty-list<DepositItem>
      *
      * @throws ValidationException
      */
-    private function asignacionesEnCaja(BeneficiaryInstallment $installment): array
+    private function loQueViaja(BeneficiaryInstallment $installment): array
     {
         if (! $this->financiacion->isFullyFunded($installment)) {
             throw ValidationException::withMessages([
@@ -248,32 +248,21 @@ final class DepositCashToBank
             ]);
         }
 
-        $asignaciones = array_values(FundingAllocation::query()
-            ->withRemainingBalance()
-            ->with('fundReceipt')
-            ->where('beneficiary_installment_id', $installment->id)
-            ->select('funding_allocations.*')
-            ->selectRaw(
-                'funding_allocations.amount - COALESCE(('
-                .'SELECT SUM(reversions.amount) FROM funding_allocations AS reversions '
-                .'WHERE reversions.reversal_of_id = funding_allocations.id'
-                .'), 0) AS remaining',
-            )
-            ->orderBy('funding_allocations.id')
-            ->get()
-            ->all());
+        $this->assertChequesEnCustodia($installment);
 
-        if ($asignaciones === []) {
+        $items = $this->deposito->items($installment);
+
+        if ($items === []) {
             throw ValidationException::withMessages([
                 'installmentId' => 'La cuota no tiene ninguna asignación vigente.',
             ]);
         }
 
         $yaDepositada = CashToBankTransferItem::query()
-            ->whereIn('funding_allocation_id', array_map(
-                static fn (FundingAllocation $a): int => $a->id,
-                $asignaciones,
-            ))
+            ->whereIn('funding_allocation_id', array_values(array_filter(array_map(
+                static fn (DepositItem $item): ?int => $item->allocationId,
+                $items,
+            ))))
             ->whereRelation('transfer', 'status', '!=', CashTransferStatus::Cancelled)
             ->exists();
 
@@ -284,8 +273,8 @@ final class DepositCashToBank
         }
 
         $cajas = array_unique(array_map(
-            static fn (FundingAllocation $a): ?int => $a->fundReceipt->cash_box_id,
-            $asignaciones,
+            static fn (DepositItem $item): ?int => $item->receipt->cash_box_id,
+            $items,
         ));
 
         if (count($cajas) > 1) {
@@ -294,19 +283,41 @@ final class DepositCashToBank
             ]);
         }
 
-        /*
-         * Un cheque se deposita entero: no hay forma de llevar al banco una
-         * parte del papel. Ver `PartialCheques`.
-         */
-        $parcial = $this->chequesParciales->first($installment);
+        return $items;
+    }
 
-        if ($parcial !== null) {
-            throw ValidationException::withMessages([
-                'installmentId' => PartialCheques::message($parcial, 'se deposita'),
-            ]);
+    /**
+     * Los cheques de la cuota, bloqueados y en custodia.
+     *
+     * El bloqueo serializa dos depósitos que comparten un cheque: el
+     * segundo lo encuentra ya depositado. Y uno entregado o depositado no
+     * está en la caja, así que no se puede llevar al banco.
+     *
+     * @throws ValidationException
+     */
+    private function assertChequesEnCustodia(BeneficiaryInstallment $installment): void
+    {
+        $cheques = FundReceipt::query()
+            ->whereIn('id', FundingAllocation::query()
+                ->withRemainingBalance()
+                ->where('beneficiary_installment_id', $installment->id)
+                ->select('fund_receipt_id'))
+            ->where('medium', PaymentMedium::Cheque->value)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($cheques as $cheque) {
+            if ($cheque->cheque_status !== ChequeStatus::InCustody) {
+                throw ValidationException::withMessages([
+                    'installmentId' => sprintf(
+                        'El cheque n.º %s ya no está en la caja: figura %s.',
+                        $cheque->cheque_number ?? '(sin número)',
+                        $cheque->cheque_status?->label() ?? 'sin estado',
+                    ),
+                ]);
+            }
         }
-
-        return $asignaciones;
     }
 
     /**
@@ -316,22 +327,19 @@ final class DepositCashToBank
      * entraron por lados distintos al recibirse. El cheque sigue el
      * circuito del efectivo (§2.5), y esta es la línea donde eso se nota.
      *
-     * @param  non-empty-list<FundingAllocation>  $asignaciones
+     * @param  non-empty-list<DepositItem>  $items
      * @return list<EntryLine>
      */
-    private function salidas(array $asignaciones, Currency $moneda, ?int $cajaId): array
+    private function salidas(array $items, Currency $moneda, ?int $cajaId): array
     {
         $porCuenta = [];
 
-        foreach ($asignaciones as $asignacion) {
-            $cuenta = $asignacion->fundReceipt->medium === PaymentMedium::Cheque
+        foreach ($items as $item) {
+            $cuenta = $item->receipt->medium === PaymentMedium::Cheque
                 ? LedgerAccount::ChequesInCustody
                 : LedgerAccount::CashOnHand;
 
-            $porCuenta[$cuenta->value] = Decimal::add(
-                $porCuenta[$cuenta->value] ?? '0.00',
-                (string) $asignacion->getAttribute('remaining'),
-            );
+            $porCuenta[$cuenta->value] = Decimal::add($porCuenta[$cuenta->value] ?? '0.00', $item->amount);
         }
 
         $lineas = [];

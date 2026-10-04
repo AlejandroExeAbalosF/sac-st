@@ -12,18 +12,21 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Actions\RegisterCashPayment;
 use App\Modules\Haberes\Actions\UnallocateFunds;
+use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DisbursementEligibility;
+use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -38,6 +41,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 /**
@@ -217,18 +221,106 @@ class ChequeEnElTrasladoTest extends TestCase
     }
 
     /** Un cheque se deposita entero: la cuota tiene que tenerlo completo. */
-    public function test_un_cheque_que_la_cuota_tiene_en_parte_no_se_deposita(): void
+    /**
+     * Un cheque se deposita como llegó: entero.
+     *
+     * La cuota bajó y se liberó el excedente, así que tiene solo una parte
+     * del cheque. El papel viaja completo igual, y la parte liberada va con
+     * él sin dueño: sigue en fondos sin identificar, pero ya en el banco.
+     */
+    public function test_un_cheque_que_la_cuota_tiene_en_parte_se_deposita_entero(): void
+    {
+        $cheque = $this->cuota()->importeEsperado();
+        $cuota = $this->cuotaConUnaParteDelCheque();
+        $caja = (int) $this->cheques()->value('cash_box_id');
+        $sinIdentificar = $this->saldo(LedgerAccount::UnassignedFunds, $caja);
+
+        $traslado = $this->depositar($cuota);
+
+        $this->assertSame($cheque, $traslado->amount);
+        $this->assertSame(
+            [[$cuota->importeEsperado(), true], ['1000.00', false]],
+            CashToBankTransferItem::query()
+                ->where('cash_to_bank_transfer_id', $traslado->id)
+                ->orderBy('id')
+                ->get()
+                ->map(fn (CashToBankTransferItem $i): array => [$i->amount, $i->funding_allocation_id !== null])
+                ->all(),
+        );
+        $this->assertSame(ChequeStatus::Deposited, $this->cheques()->first()?->cheque_status);
+        $this->assertTrue(Decimal::equals($this->saldo(LedgerAccount::ChequesInCustody, $caja), '0'));
+        // El traslado mueve el papel, no cambia de quién es la plata.
+        $this->assertSame($sinIdentificar, $this->saldo(LedgerAccount::UnassignedFunds, $caja));
+
+        // El banco acredita el cheque completo.
+        $confirmado = app(ConfirmCashDepositCredit::class)->handle(
+            transfer: $traslado,
+            transaction: $this->credito($cheque, '2026-08-26'),
+            idempotencyKey: 'acreditacion-'.Str::random(8),
+            actorId: $this->operador->id,
+        );
+
+        $this->assertSame(ChequeStatus::Cleared, $this->cheques()->first()?->cheque_status);
+        $this->assertSame($cheque, $this->saldo(LedgerAccount::BankAccount, $confirmado->cash_box_id));
+    }
+
+    /**
+     * La parte que viajó sin dueño, asignada después, está en el banco.
+     *
+     * Su asignación no figura en ningún ítem del traslado, pero el cheque
+     * sí. Sin buscar por cheque, la otra cuota ofrecería entregar por
+     * mostrador un papel que ya no está en la caja.
+     */
+    public function test_la_parte_asignada_despues_del_deposito_figura_en_el_banco(): void
+    {
+        $this->depositar($this->cuotaConUnaParteDelCheque());
+
+        $otra = $this->otraCuota();
+        app(AllocateFundsToInstallment::class)->handle(
+            receipt: $this->cheques()->firstOrFail(),
+            installment: $otra,
+            amount: '1000.00',
+            idempotencyKey: 'resto-'.Str::random(8),
+            actorId: $this->operador->id,
+        );
+
+        $this->assertSame(PaymentChannel::Undetermined, app(PaymentOrderSources::class)->channel($otra->refresh()));
+    }
+
+    /** Si el resto ya era de otra cuota, viaja con su asignación. */
+    public function test_el_resto_de_otra_cuota_viaja_con_su_asignacion(): void
     {
         $cuota = $this->cuotaConUnaParteDelCheque();
+        $otra = $this->otraCuota();
+        $resto = app(AllocateFundsToInstallment::class)->handle(
+            receipt: $this->cheques()->firstOrFail(),
+            installment: $otra,
+            amount: '1000.00',
+            idempotencyKey: 'resto-'.Str::random(8),
+            actorId: $this->operador->id,
+        );
 
-        try {
-            $this->depositar($cuota);
-            $this->fail('Depositó una parte de un cheque.');
-        } catch (ValidationException $e) {
-            $this->assertStringContainsString('un cheque se deposita entero', $e->errors()['installmentId'][0]);
-        }
+        $traslado = $this->depositar($cuota);
 
-        $this->assertSame(ChequeStatus::InCustody, $this->cheques()->first()?->cheque_status);
+        $this->assertTrue(CashToBankTransferItem::query()
+            ->where('cash_to_bank_transfer_id', $traslado->id)
+            ->where('funding_allocation_id', $resto->id)
+            ->exists());
+        $this->assertSame(PaymentChannel::Undetermined, app(PaymentOrderSources::class)->channel($otra->refresh()));
+    }
+
+    /** La pantalla muestra lo que se va a asentar, con lo que viaja de más. */
+    public function test_la_pantalla_del_traslado_muestra_el_cheque_completo(): void
+    {
+        $cheque = $this->cuota()->importeEsperado();
+        $cuota = $this->cuotaConUnaParteDelCheque();
+
+        $this->actingAs($this->operador)
+            ->get(route('haberes.installments.transfer.create', $cuota))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('cuota.amount', $cheque)
+                ->where('cuota.carriedAmount', '1000.00'));
     }
 
     /*
@@ -295,6 +387,25 @@ class ChequeEnElTrasladoTest extends TestCase
     |--------------------------------------------------------------------------
     */
 
+    public function test_la_base_rechaza_depositar_una_parte_de_un_cheque(): void
+    {
+        // Un renglón más del mismo cheque: el traslado llevaría más que el papel.
+        $traslado = $this->depositar($this->cuotaCobradaConUnCheque());
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('un cheque se deposita entero');
+
+        DB::table('cash_to_bank_transfer_items')->insert([
+            'cash_to_bank_transfer_id' => $traslado->id,
+            'fund_receipt_id' => $this->cheques()->value('id'),
+            'funding_allocation_id' => null,
+            'amount' => '1000.00',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+    }
+
     public function test_la_base_rechaza_un_cheque_depositado_sin_traslado(): void
     {
         $this->cuotaCobradaConUnCheque();
@@ -350,6 +461,21 @@ class ChequeEnElTrasladoTest extends TestCase
         $cuota->forceFill(['expected_medium' => $medio])->save();
 
         return $cuota->refresh();
+    }
+
+    /** Otra cuota del mismo haber, que también se cobra con cheque. */
+    private function otraCuota(): BeneficiaryInstallment
+    {
+        $cuota = $this->cuota();
+        $otra = BeneficiaryInstallment::query()
+            ->where('haber_id', $cuota->haber_id)
+            ->where('id', '!=', $cuota->id)
+            ->orderBy('installment_number')
+            ->firstOrFail();
+
+        $otra->forceFill(['expected_medium' => 'cheque'])->save();
+
+        return $otra->refresh();
     }
 
     private function cuotaCobradaConUnCheque(): BeneficiaryInstallment

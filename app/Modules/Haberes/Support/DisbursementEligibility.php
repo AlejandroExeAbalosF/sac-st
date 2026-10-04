@@ -157,7 +157,7 @@ final class DisbursementEligibility
             $parcial = $this->chequesParciales->first($installment);
 
             if ($parcial !== null) {
-                return PartialCheques::message($parcial, 'se entrega');
+                return PartialCheques::message($parcial);
             }
         }
 
