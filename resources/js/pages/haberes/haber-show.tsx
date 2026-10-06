@@ -77,6 +77,8 @@ type Props = {
     canVoidLegacy: boolean;
     /** De dónde apartar plata del sistema anterior; nulo sin permiso. */
     fondosAnteriores: App.Modules.Haberes.Data.LegacyFundsOptionsData | null;
+    /** La apertura de la caja de Haberes: el corte de lo histórico. */
+    corteHistorico: string | null;
 };
 
 const TONO: Record<HaberStatus, StatusTone> = {
@@ -135,6 +137,7 @@ export default function MostrarHaber({
     canRecordLegacy,
     canVoidLegacy,
     fondosAnteriores,
+    corteHistorico,
 }: Props) {
     const { openDrawer } = useDrawer();
     const [baja, setBaja] = useState(false);
@@ -170,11 +173,10 @@ export default function MostrarHaber({
             registrar: canRecordLegacy && haber.status === 'active',
             anular: canVoidLegacy,
             anularPapel: fondosAnteriores !== null,
-            apartar:
-                fondosAnteriores !== null &&
-                haber.status === 'active' &&
-                compareAmounts(fondosAnteriores.pending, '0.00') === 1,
+            apartar: fondosAnteriores !== null && haber.status === 'active',
         },
+        saldoAnterior: fondosAnteriores?.pending ?? null,
+        apertura: corteHistorico,
     };
 
     const anulado = haber.status === 'cancelled';

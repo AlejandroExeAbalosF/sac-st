@@ -7,7 +7,6 @@ import {
     History,
     Lock,
     Pencil,
-    PiggyBank,
     Receipt,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -23,6 +22,11 @@ import {
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { salidaDe } from '@/features/haberes/installment-channel';
 import { ETAPA, TONO_ETAPA } from '@/features/haberes/installment-stage';
+import type { CaminoHistorico } from '@/features/haberes/legacy-options';
+import {
+    ofreceGuiaHistorica,
+    opcionesHistoricas,
+} from '@/features/haberes/legacy-options';
 import type {
     EgresoProps,
     HistoricoProps,
@@ -36,6 +40,7 @@ import InstallmentIncome from './installment-income';
 import InstallmentTimeline from './installment-timeline';
 import type { Firmante } from './issue-receipt-dialog';
 import LegacyFundsDialog from './legacy-funds-dialog';
+import LegacyInstallmentGuide from './legacy-installment-guide';
 import LegacySettlementDialog from './legacy-settlement-dialog';
 import LegacySettlementPanel from './legacy-settlement-panel';
 import PaymentOrderPanel from './payment-order-panel';
@@ -134,6 +139,8 @@ export default function InstallmentCard({
     const [destrabar, setDestrabar] = useState(false);
     const [pagoAnterior, setPagoAnterior] = useState(false);
     const [apartando, setApartando] = useState(false);
+    const [guia, setGuia] = useState(false);
+    const [camino, setCamino] = useState<CaminoHistorico | null>(null);
     const anulada = cuota.status === 'cancelled';
     const estadoOrden = orden.estados[cuota.id];
     const estadoEgreso = egreso.estados[cuota.id];
@@ -160,20 +167,21 @@ export default function InstallmentCard({
         ) ?? null;
 
     /*
-     * Apartar solo en una cuota pendiente sin plata ni recibo del sistema:
-     * no se mezcla dinero del sistema anterior con dinero actual.
+     * Lo que se le puede hacer como cuota del sistema anterior, y por qué
+     * no. Lo decide una función pura —con sus pruebas— para que la tarjeta
+     * y el formulario guiado lean la misma respuesta.
      */
-    const puedeApartar =
-        historico.permisos.apartar &&
-        cuota.status === 'active' &&
-        !isNonZero(cuota.fundedAmount) &&
-        cuota.incomeReceipt === null;
-
-    const puedeRegistrarAnterior =
-        historico.permisos.registrar &&
-        cuota.status === 'active' &&
-        estadoHistorico !== undefined &&
-        estadoHistorico.obstacle === null;
+    const entradaHistorica = {
+        estado: cuota.status,
+        financiada: isNonZero(cuota.fundedAmount),
+        conReciboDelSistema: cuota.incomeReceipt !== null,
+        obstaculo: estadoHistorico?.obstacle,
+        puedeRegistrar: historico.permisos.registrar,
+        puedeReservar: historico.permisos.apartar,
+        saldoAnterior: historico.saldoAnterior,
+        apertura: historico.apertura,
+    };
+    const ofreceGuia = ofreceGuiaHistorica(entradaHistorica);
 
     /*
      * Con la Orden y el Pase emitidos el expediente salió del área. La
@@ -459,45 +467,21 @@ export default function InstallmentCard({
                 </Button>
 
                 {/*
-                 * Para cargar un expediente histórico: la cuota ya se pagó
-                 * y hay que dejarlo registrado con sus papeles.
+                 * Un solo botón para la carga histórica: la diferencia entre
+                 * dar la cuota por pagada y reservarle plata la resuelve una
+                 * pregunta en el formulario guiado, no el nombre del botón.
                  */}
-                {/*
-                 * Los dos botones de la carga histórica llevan su explicación
-                 * en un globo: los nombres son cortos para caber al pie de la
-                 * tarjeta, y la diferencia entre uno y otro —ya se pagó, o la
-                 * plata todavía está en la caja— es justo lo que hay que
-                 * tener claro antes de apretar.
-                 */}
-                {puedeApartar && (
-                    <ConAyuda texto="El beneficiario todavía no cobró y su plata está en la caja desde antes del sistema: en efectivo, en un cheque o en la cuenta. Se reserva para esta cuota y se le paga por el circuito normal.">
+                {ofreceGuia && (
+                    <ConAyuda texto="Para cargar una cuota de un expediente del sistema anterior. Una pregunta —si el beneficiario ya cobró— lleva al formulario que corresponde.">
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             className="h-8 text-xs"
-                            onClick={() => setApartando(true)}
-                        >
-                            <PiggyBank
-                                className="size-3.5"
-                                aria-hidden="true"
-                            />
-                            Registrar cuota histórica pendiente
-                        </Button>
-                    </ConAyuda>
-                )}
-
-                {puedeRegistrarAnterior && (
-                    <ConAyuda texto="El beneficiario ya cobró esta cuota, antes de usar el sistema o desde Pagos anteriores. Se cargan los papeles como registro histórico: no mueve plata de la caja.">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-xs"
-                            onClick={() => setPagoAnterior(true)}
+                            onClick={() => setGuia(true)}
                         >
                             <Archive className="size-3.5" aria-hidden="true" />
-                            Registrar cuota histórica pagada
+                            Cuota del sistema anterior
                         </Button>
                     </ConAyuda>
                 )}
@@ -528,12 +512,40 @@ export default function InstallmentCard({
                 )}
             </div>
 
+            {/*
+             * Paso 1: la pregunta. Paso 2: el formulario de la respuesta,
+             * con su «Volver» a la pregunta y lo elegido recordado.
+             */}
+            {guia && (
+                <LegacyInstallmentGuide
+                    cuota={cuota}
+                    opciones={opcionesHistoricas(entradaHistorica)}
+                    elegidoAntes={camino}
+                    abierto
+                    onCerrar={() => setGuia(false)}
+                    onContinuar={(elegido) => {
+                        setCamino(elegido);
+                        setGuia(false);
+
+                        if (elegido === 'pagada') {
+                            setPagoAnterior(true);
+                        } else {
+                            setApartando(true);
+                        }
+                    }}
+                />
+            )}
+
             {apartando && (
                 <LegacyFundsDialog
                     cuota={cuota}
                     reciboDePapel={reciboDePapel}
                     abierto
                     onCerrar={() => setApartando(false)}
+                    onVolver={() => {
+                        setApartando(false);
+                        setGuia(true);
+                    }}
                 />
             )}
 
@@ -543,6 +555,10 @@ export default function InstallmentCard({
                     estado={estadoHistorico}
                     abierto
                     onCerrar={() => setPagoAnterior(false)}
+                    onVolver={() => {
+                        setPagoAnterior(false);
+                        setGuia(true);
+                    }}
                 />
             )}
 

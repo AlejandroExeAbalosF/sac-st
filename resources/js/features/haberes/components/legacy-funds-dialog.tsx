@@ -1,5 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { PiggyBank } from 'lucide-react';
+import { ArrowLeft, PiggyBank } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
@@ -86,12 +86,18 @@ export default function LegacyFundsDialog({
     reciboDePapel,
     abierto,
     onCerrar,
+    onVolver,
 }: {
     cuota: Cuota;
     /** El recibo de papel que la cuota ya tiene, si se apartó antes y se liberó. */
     reciboDePapel: Papel | null;
     abierto: boolean;
     onCerrar: () => void;
+    /**
+     * Volver a la pregunta del formulario guiado. Sin esto el diálogo se
+     * abre solo, sin el «Paso 2 de 2».
+     */
+    onVolver?: () => void;
 }) {
     const { fondosAnteriores, corteHistorico } = usePage().props as unknown as {
         fondosAnteriores: Opciones | null;
@@ -225,6 +231,11 @@ export default function LegacyFundsDialog({
         <Dialog open={abierto} onOpenChange={(v) => !v && cerrar()}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
+                    {onVolver !== undefined && (
+                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                            Paso 2 de 2
+                        </p>
+                    )}
                     <DialogTitle>
                         Cuota {cuota.number}: reservar fondos
                     </DialogTitle>
@@ -662,6 +673,20 @@ export default function LegacyFundsDialog({
                 </form>
 
                 <DialogFooter className="gap-2">
+                    {onVolver !== undefined && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="sm:mr-auto"
+                            onClick={() => {
+                                form.clearErrors();
+                                onVolver();
+                            }}
+                        >
+                            <ArrowLeft className="size-4" aria-hidden="true" />
+                            Volver a la pregunta
+                        </Button>
+                    )}
                     <Button type="button" variant="outline" onClick={cerrar}>
                         Cancelar
                     </Button>

@@ -153,8 +153,10 @@ export type HistoricoProps = {
         /** Anular ese registro: la cuota vuelve a estar por pagar. */
         anular: boolean;
         /**
-         * Apartar del saldo anterior la plata de una cuota en custodia.
-         * Falso también cuando no queda nada que apartar.
+         * Reservar del saldo anterior la plata de una cuota en custodia.
+         * Es solo el permiso: si queda saldo lo dice `saldoAnterior`, para
+         * que el formulario guiado pueda explicar cuál de las dos cosas
+         * falta.
          */
         apartar: boolean;
         /**
@@ -163,4 +165,8 @@ export type HistoricoProps = {
          */
         anularPapel: boolean;
     };
+    /** Lo que queda del sistema anterior sin reservar; nulo sin permiso. */
+    saldoAnterior: string | null;
+    /** La apertura de la caja de Haberes; nula si todavía no abrió. */
+    apertura: string | null;
 };

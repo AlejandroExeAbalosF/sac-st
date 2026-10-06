@@ -163,16 +163,26 @@ Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 Un expediente del sistema anterior se carga con las pantallas de siempre: el
 expediente, sus haberes y sus cuotas. Lo que cambia es qué se dice de cada cuota.
 
-La tarjeta de la cuota ofrece dos botones, y lo que los separa es una sola
-pregunta: **¿el beneficiario ya cobró?**
+La tarjeta de la cuota ofrece un solo botón, «Cuota del sistema anterior», que abre
+un formulario guiado de dos pasos. El primero es una sola pregunta: **¿el
+beneficiario ya cobró esta cuota?**
 
-| Botón | Cuándo |
+| Respuesta | Segundo paso |
 | --- | --- |
-| «Registrar cuota histórica pagada» | Ya cobró, antes de usar el sistema o desde Pagos anteriores. Registro histórico: no mueve plata |
-| «Registrar cuota histórica pendiente» | Todavía no cobró y su plata está en la caja desde antes del sistema. Se reserva para la cuota y se le paga por el circuito normal |
+| Sí, ya cobró | Pago histórico: antes de usar el sistema o desde Pagos anteriores. Registro histórico: no mueve plata |
+| No, todavía no cobró | Reservar fondos: su plata está en la caja desde antes del sistema. Se reserva para la cuota y se le paga por el circuito normal |
 
-Una cuota que **ya se pagó fuera del circuito** se registra con «Registrar cuota
-histórica pagada», de una de dos maneras:
+Se pregunta en vez de ofrecer dos botones porque elegir mal no se nota: una cuota
+registrada como pagada cuya plata seguía en la caja deja esa plata sin dueño en el
+saldo del sistema anterior. La respuesta que no se puede tomar aparece apagada con
+su motivo —sin permiso, sin apertura, sin saldo anterior, o lo que el servidor
+diga que impide darla por pagada—, y el segundo paso tiene «Volver a la
+pregunta». El botón no
+aparece en una cuota que ya tiene plata o recibo del circuito actual, ni para quien
+no tiene ninguno de los dos permisos. Lo decide `features/haberes/legacy-options.ts`.
+
+Una cuota que **ya se pagó fuera del circuito** se registra respondiendo «Sí, ya
+cobró», de una de dos maneras:
 
 | Modalidad | Cuándo | Qué se carga |
 | --- | --- | --- |
@@ -201,8 +211,7 @@ Reglas: [cuotas pagadas fuera del circuito](haberes-reglas.md#historicos).
 
 Una cuota histórica que **todavía no se pagó** y cuya plata está en la caja —en
 el cajón, en un cheque de la cartera de la apertura o como depósito directo en la
-cuenta— se financia desde su tarjeta con «Registrar cuota histórica pendiente»:
-se **reservan** fondos del sistema anterior para la cuota. En el código el acto se
+cuenta— se financia respondiendo «No, todavía no cobró»: se **reservan** fondos del sistema anterior para la cuota. En el código el acto se
 llama *apartar* (`SetAsideLegacyFunds`, `legacy_funds_allocated`).
 
 Reservar no mueve el dinero: deja de ser «del sistema anterior» y pasa a ser de la
