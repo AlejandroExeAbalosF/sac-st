@@ -12,6 +12,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\LegacyFundsByPlace;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Person;
@@ -41,6 +42,7 @@ final class LegacyDisbursementController extends Controller
     public function __construct(
         private readonly CashBalance $saldos,
         private readonly PayLegacyBeneficiary $pagar,
+        private readonly LegacyFundsByPlace $porLugar,
     ) {}
 
     public function index(Request $request): Response
@@ -72,6 +74,7 @@ final class LegacyDisbursementController extends Controller
                  */
                 'bank' => $this->saldos->of(LedgerAccount::BankAccount, $id, $moneda),
             ],
+            'legacyByPlace' => $this->legacyByPlace($id, $moneda),
             'bankAccounts' => $this->bankAccounts(),
             'payments' => $this->history($id, $moneda),
             'setAside' => $this->setAside($id, $moneda),
@@ -236,6 +239,27 @@ final class LegacyDisbursementController extends Controller
         }
 
         return $lista;
+    }
+
+    /**
+     * Dónde está lo que queda del sistema anterior.
+     *
+     * Cada lugar guarda también plata que entró después, así que el saldo
+     * de la tarjeta no dice cuánto de eso es viejo. Esto sí: es el tope de
+     * lo que se paga o se aparta de cada lugar.
+     *
+     * @return array{cash: numeric-string, cheques: numeric-string, bank: numeric-string}
+     */
+    private function legacyByPlace(int $cashBoxId, Currency $currency): array
+    {
+        $lugares = $this->porLugar->breakdown($cashBoxId, $currency);
+        $banco = '0.00';
+
+        foreach ($lugares['banks'] as $queda) {
+            $banco = Decimal::add($banco, $queda);
+        }
+
+        return ['cash' => $lugares['cash'], 'cheques' => $lugares['cheques'], 'bank' => $banco];
     }
 
     /**

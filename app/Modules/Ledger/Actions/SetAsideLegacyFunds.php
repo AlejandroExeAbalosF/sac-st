@@ -14,6 +14,7 @@ use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\LegacyFundsByPlace;
 use App\Modules\Ledger\Support\LegacyFundsLock;
 use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Support\BusinessDate;
@@ -51,6 +52,7 @@ final class SetAsideLegacyFunds
         private readonly CashBalance $saldos,
         private readonly LegacyFundsLock $bloqueo,
         private readonly UndetailedCheques $sinDetallar,
+        private readonly LegacyFundsByPlace $porLugar,
     ) {}
 
     /**
@@ -227,6 +229,23 @@ final class SetAsideLegacyFunds
                 ),
             ]);
         }
+
+        /*
+         * Y que sea plata vieja: el cajón guarda también lo cobrado
+         * después, que es de otros beneficiarios. Ver `LegacyFundsByPlace`.
+         */
+        $viejo = $this->porLugar->cash($cashBoxId, $currency);
+
+        if (Decimal::isNegative(Decimal::sub($viejo, $amount))) {
+            throw ValidationException::withMessages([
+                'amount' => sprintf(
+                    'Del sistema anterior quedan %s en efectivo y esto es por %s. '
+                        .'El resto del cajón es plata que entró después.',
+                    Decimal::format($viejo),
+                    Decimal::format($amount),
+                ),
+            ]);
+        }
     }
 
     /**
@@ -325,6 +344,21 @@ final class SetAsideLegacyFunds
                     'En la cuenta «%s» hay %s y esto es por %s.',
                     $cuenta->label,
                     Decimal::format($disponible),
+                    Decimal::format($amount),
+                ),
+            ]);
+        }
+
+        // Y que sea plata vieja de esa cuenta, no un depósito posterior.
+        $viejo = $this->porLugar->bankAccount($cashBoxId, $currency, $bankAccountId);
+
+        if (Decimal::isNegative(Decimal::sub($viejo, $amount))) {
+            throw ValidationException::withMessages([
+                'bankAccountId' => sprintf(
+                    'Del sistema anterior quedan %s en la cuenta «%s» y esto es por %s. '
+                        .'El resto de la cuenta es plata que entró después.',
+                    Decimal::format($viejo),
+                    $cuenta->label,
                     Decimal::format($amount),
                 ),
             ]);

@@ -309,6 +309,7 @@ estado ([canal y traslado](#canal-de-pago))—, así que no altera la resta.
 | Un cheque del sistema anterior se asigna y se libera entero: lo asignado es cero o el cheque completo | `FundInstallmentFromLegacy`, `UnallocateFunds` | `legacy_cheque_stays_whole`, diferido |
 | Un cheque identificado y liberado vuelve a poder apartarse; el efectivo y el depósito apartados son de un solo uso | `SetAsideLegacyFunds`, `LegacyFundsOptions` | `allocation_respects_origin` |
 | El depósito directo se aparta del saldo de la cuenta elegida, activa y en la moneda del haber | `SetAsideLegacyFunds`, `CashBalance::ofBankAccount` | `fund_receipts_bank_account_currency` (moneda) |
+| Del efectivo y de cada cuenta se aparta o se paga solo lo que queda **del sistema anterior** en ese lugar: lo declarado en la apertura, menos lo pagado desde Pagos anteriores y lo apartado neto de lo liberado | `SetAsideLegacyFunds`, `PayLegacyBeneficiary`, `LegacyFundsByPlace` | `legacy_funds_at`, dentro de `legacy_funds_balance_check` (diferido, con el bloqueo por caja y moneda) |
 | Un recibo de papel suelto se anula con motivo solo si ya no respalda plata ni lo cita una Orden | `VoidLegacyIncomeDocument` | `legacy_income_document_keeps_backing` |
 | El saldo libre de un cheque no se asigna dos veces | `FundInstallmentFromLegacy`, que bloquea los cheques en orden | `allocation_within_receipt`, ahora con `FOR UPDATE` sobre la recepción |
 | Se aparta con financiación cero y por el importe completo | `FundInstallmentFromLegacy` | — |
@@ -325,6 +326,18 @@ movimiento del extracto que la confirme.
 
 Lo apartado no figura en la recaudación del día ni en `/recepciones`: ya estaba en
 la caja. Se ve en Pagos anteriores, con lo liberado al lado.
+
+<a id="saldo-anterior-por-lugar"></a>
+
+El saldo del sistema anterior es uno solo, pero la plata vieja está en lugares
+concretos que además guardan lo que entró después. Por eso no alcanza con que el
+cajón tenga billetes y que el saldo viejo alcance: el cajón puede tenerlos por un
+cobro de hoy y el saldo viejo puede alcanzar por lo que está en el banco. Lo que
+queda en cada lugar sale de datos que ya existen —la línea de lugar de la apertura
+y de cada pago anterior, y la recepción `legacy` de cada apartado con su
+liberación— sin columnas nuevas. Los cheques se controlan de a uno, por papel, y
+lo que queda en cheques es el resto del total. El diálogo de apartar y Pagos
+anteriores muestran lo que queda en cada lugar.
 
 Evidencia: [esquema](../database/migrations/2026_10_01_020000_allow_allocating_legacy_funds.php),
 [FundInstallmentFromLegacy](../app/Modules/Haberes/Actions/FundInstallmentFromLegacy.php),

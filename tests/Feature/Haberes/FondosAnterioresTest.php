@@ -205,6 +205,119 @@ class FondosAnterioresTest extends TestCase
         $this->assertSame(1, FundReceipt::query()->where('origin', 'legacy')->count());
     }
 
+    /*
+     * ── Lo que queda del sistema anterior en cada lugar ───────────────
+     *
+     * El cajón y la cuenta guardan también plata que entró después, y el
+     * saldo del sistema anterior es uno solo para los tres lugares. Que el
+     * cajón tenga billetes y que el saldo viejo alcance no dice que quede
+     * plata vieja en el cajón.
+     */
+
+    /**
+     * El caso que motivó el control.
+     *
+     * Se abrió con $ 300.000 en efectivo y ya se apartaron $ 200.000: del
+     * sistema anterior quedan $ 100.000 en efectivo. El cajón sigue
+     * teniendo $ 300.000 —apartar no saca billetes— y el saldo viejo
+     * alcanza por lo que hay en el banco. Ninguno de los dos controles de
+     * antes lo frenaba.
+     */
+    public function test_no_se_aparta_efectivo_viejo_que_ya_se_aparto(): void
+    {
+        $this->abrirLibros(efectivo: '300000.00', banco: '1000000.00', cuentaBancaria: $this->cuentaBancaria());
+        $primera = $this->cuotaPor('301/2024', '200000.00', ExpectedMedium::Cash);
+        $segunda = $this->cuotaPor('302/2024', '200000.00', ExpectedMedium::Cash);
+        $this->apartar($primera, PaymentMedium::Cash);
+
+        try {
+            $this->apartar($segunda, PaymentMedium::Cash, talonario: '3122');
+            $this->fail('Se apartó como efectivo viejo plata que ya tenía dueño.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('quedan 100.000,00 en efectivo', $e->errors()['amount'][0]);
+        }
+
+        // Liberar la primera devuelve su efectivo al sistema anterior.
+        app(UnallocateFunds::class)->handle(
+            FundingAllocation::query()->where('beneficiary_installment_id', $primera->id)->sole(),
+            '200000.00',
+            'test-liberar-301',
+            'Se apartó para la cuota equivocada.',
+        );
+
+        $this->apartar($segunda, PaymentMedium::Cash, talonario: '3122');
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($segunda));
+    }
+
+    /** Lo mismo con el depósito directo, cuenta por cuenta. */
+    public function test_no_se_aparta_de_una_cuenta_mas_de_lo_viejo_que_le_queda(): void
+    {
+        $cuenta = $this->cuentaBancaria();
+        $this->abrirLibros(banco: '300000.00', cuentaBancaria: $cuenta);
+        $primera = $this->cuotaPor('303/2024', '200000.00', ExpectedMedium::Bank);
+        $segunda = $this->cuotaPor('304/2024', '200000.00', ExpectedMedium::Bank);
+        $this->apartar($primera, PaymentMedium::Bank, bankAccountId: $cuenta);
+
+        try {
+            $this->apartar($segunda, PaymentMedium::Bank, bankAccountId: $cuenta, talonario: '3122');
+            $this->fail('Se apartó de la cuenta más plata vieja de la que quedaba.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('quedan 100.000,00 en la cuenta', $e->errors()['bankAccountId'][0]);
+        }
+    }
+
+    /** La base lo rechaza aunque no se pase por el Action. */
+    public function test_la_base_no_deja_apartar_mas_efectivo_viejo_del_que_queda(): void
+    {
+        $this->abrirLibros(efectivo: '300000.00', banco: '1000000.00', cuentaBancaria: $this->cuentaBancaria());
+        $cuota = $this->cuotaPor('305/2024', '400000.00', ExpectedMedium::Cash);
+        $evento = $this->eventoApartado($cuota, '400000.00');
+        $this->recepcionLegacy($evento, '400000.00');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('no queda tanto en efectivo');
+
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+    }
+
+    /** El diálogo dice cuánto queda en cada lugar: es el tope de lo que se aparta. */
+    public function test_el_dialogo_informa_lo_que_queda_en_cada_lugar(): void
+    {
+        $cuenta = $this->cuentaBancaria();
+        $this->abrirLibros(efectivo: '300000.00', banco: '1000000.00', cuentaBancaria: $cuenta);
+        $cuota = $this->cuotaPor('306/2024', '200000.00', ExpectedMedium::Cash);
+        $this->apartar($cuota, PaymentMedium::Cash);
+
+        $opciones = app(LegacyFundsOptions::class)->for($cuota->haber);
+
+        $this->assertSame('100000.00', $opciones->cash);
+        $this->assertSame(
+            [['id' => $cuenta, 'label' => 'Cta. Cte. 310000123456789', 'available' => '1000000.00']],
+            $opciones->bankAccounts,
+        );
+    }
+
+    /** Y Pagos anteriores muestra, en cada saldo, la parte del sistema anterior. */
+    public function test_pagos_anteriores_muestra_lo_viejo_de_cada_lugar(): void
+    {
+        $this->abrirLibros(
+            efectivo: '300000.00',
+            banco: '1000000.00',
+            cuentaBancaria: $this->cuentaBancaria(),
+            chequesSinDetalle: '50000.00',
+        );
+        $this->apartar($this->cuotaPor('307/2024', '200000.00', ExpectedMedium::Cash), PaymentMedium::Cash);
+
+        $this->actingAs($this->operador('contador'))
+            ->get('/caja/pagos-anteriores')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('balances.cash', '300000.00')
+                ->where('legacyByPlace.cash', '100000.00')
+                ->where('legacyByPlace.cheques', '50000.00')
+                ->where('legacyByPlace.bank', '1000000.00'));
+    }
+
     /** El depósito directo tiene que estar en la cuenta elegida, no en cualquiera. */
     public function test_el_deposito_directo_mira_el_saldo_de_la_cuenta_elegida(): void
     {
@@ -736,6 +849,7 @@ class FondosAnterioresTest extends TestCase
         PaymentMedium $medio,
         ?array $sources = null,
         ?int $bankAccountId = null,
+        string $talonario = '3121',
     ): array {
         return app(FundInstallmentFromLegacy::class)->handle(
             installment: $cuota,
@@ -744,7 +858,7 @@ class FondosAnterioresTest extends TestCase
             income: new LegacyPaper(
                 LegacyDocumentKind::IncomeReceipt,
                 'income',
-                '3121',
+                $talonario,
                 CarbonImmutable::parse('2025-03-10'),
                 $cuota->importeEsperado(),
             ),

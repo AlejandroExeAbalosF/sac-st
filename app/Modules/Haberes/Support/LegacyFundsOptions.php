@@ -15,6 +15,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\LegacyFundsByPlace;
 use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
@@ -23,7 +24,9 @@ use App\Support\Money\Decimal;
  * De dónde se puede apartar plata del sistema anterior.
  *
  * El efectivo y el depósito directo no se listan: en la apertura entraron
- * como un total y no hay forma de saber qué billete es de quién. Los
+ * como un total y no hay forma de saber qué billete es de quién. Sí se
+ * informa cuánto queda **del sistema anterior** en cada lugar, que es el
+ * tope de lo que se puede apartar de ahí. Los
  * cheques sí: son papeles con número, y se elige cuál. Si la apertura los
  * declaró como un total, sin detalle, se informa cuánto queda sin
  * identificar para cargar el cheque en el momento.
@@ -34,6 +37,7 @@ final class LegacyFundsOptions
         private readonly CashBalance $saldos,
         private readonly InstallmentFunding $financiacion,
         private readonly UndetailedCheques $sinDetallar,
+        private readonly LegacyFundsByPlace $porLugar,
     ) {}
 
     public function for(Haber $haber): LegacyFundsOptionsData
@@ -75,11 +79,16 @@ final class LegacyFundsOptions
         $cuentas = [];
 
         foreach (BankAccount::query()->where('is_active', true)->where('currency', $moneda->value)->orderBy('label')->get(['id', 'label']) as $cuenta) {
-            $cuentas[] = ['id' => (int) $cuenta->id, 'label' => (string) $cuenta->label];
+            $cuentas[] = [
+                'id' => (int) $cuenta->id,
+                'label' => (string) $cuenta->label,
+                'available' => $this->porLugar->bankAccount($caja, $moneda, (int) $cuenta->id),
+            ];
         }
 
         return new LegacyFundsOptionsData(
             pending: $this->saldos->of(LedgerAccount::LegacyFunds, $caja, $moneda),
+            cash: $this->porLugar->cash($caja, $moneda),
             cheques: $cheques,
             undetailedCheques: $this->sinDetallar->amount($caja, $moneda),
             bankAccounts: $cuentas,

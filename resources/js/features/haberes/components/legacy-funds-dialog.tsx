@@ -271,6 +271,18 @@ export default function LegacyFundsDialog({
                             </SelectContent>
                         </Select>
                         <InputError message={errores.medium} />
+                        {/*
+                         * El tope es lo que queda del sistema anterior en el
+                         * cajón, no lo que hay en el cajón: lo cobrado después
+                         * es de otros beneficiarios.
+                         */}
+                        {form.data.medium === 'cash' && (
+                            <p className="text-xs text-muted-foreground">
+                                Del sistema anterior quedan{' '}
+                                <Money value={fondosAnteriores.cash} /> en
+                                efectivo.
+                            </p>
+                        )}
                     </div>
 
                     {form.data.medium === 'bank' && (
@@ -296,7 +308,9 @@ export default function LegacyFundsDialog({
                                                 key={cuenta.id}
                                                 value={String(cuenta.id)}
                                             >
-                                                {cuenta.label}
+                                                {cuenta.label} · quedan{' '}
+                                                {money(cuenta.available)} del
+                                                sistema anterior
                                             </SelectItem>
                                         ),
                                     )}

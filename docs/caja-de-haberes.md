@@ -316,9 +316,14 @@ acá se cierra el mes, que es donde se lo está mirando.
 Egresos contra `LEGACY_FUNDS`, el saldo previo al sistema. Exige referencia al
 registro manual, porque la única evidencia es la planilla en papel.
 
-No se paga más de lo que queda. El Action lo explica y la base lo impide aunque
-el asiento no pase por él; dos pagos simultáneos se ordenan con un bloqueo por
-caja y moneda, el mismo en los dos lados (`LegacyFundsLock`).
+No se paga más de lo que queda, **ni en total ni en el lugar de donde sale**: en
+efectivo, solo el efectivo que queda del sistema anterior; por transferencia, lo
+que queda en la cuenta elegida. Cada tarjeta de saldo muestra, debajo, la parte
+que es del sistema anterior; el resto es plata que entró después y es de otros
+beneficiarios ([saldo por lugar](haberes-reglas.md#saldo-anterior-por-lugar)). El
+Action lo explica y la base lo impide aunque el asiento no pase por él; dos pagos
+simultáneos se ordenan con un bloqueo por caja y moneda, el mismo en los dos
+lados (`LegacyFundsLock`).
 
 Cuando después se carga el expediente histórico, sus cuotas se vinculan a estos
 recibos desde la ficha del haber
@@ -364,7 +369,9 @@ legible; el trigger impide el desastre.
 - No se cierra un día sin arqueo resuelto, ni un mes con días sin cerrar.
 - El total del arqueo sale de sus denominaciones: un total tipeado no se audita.
 - `LEGACY_FUNDS` **nunca queda negativo** por caja y moneda: del sistema anterior
-  no sale más de lo que se declaró al abrir los libros.
+  no sale más de lo que se declaró al abrir los libros…
+- …ni de un lugar más de lo que se declaró en ese lugar: el efectivo viejo y el de
+  cada cuenta se llevan por separado.
 - Apartar plata del sistema anterior **no mueve dinero de lugar**: el asiento solo
   toca `LEGACY_FUNDS` y `BENEFICIARY_FUNDS`, así que no cambia el arqueo.
 - Un cheque de la cartera de la apertura no se asigna por el camino normal: nunca

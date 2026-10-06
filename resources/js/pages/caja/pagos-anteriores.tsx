@@ -65,6 +65,12 @@ type Props = {
         cheques: string;
         bank: string;
     };
+    /**
+     * Cuánto de lo que queda del sistema anterior está en cada lugar. Es
+     * el tope de lo que se paga o se aparta de ahí: el resto de cada saldo
+     * es plata que entró después.
+     */
+    legacyByPlace: { cash: string; cheques: string; bank: string };
     bankAccounts: { id: number; label: string }[];
     payments: Pago[];
     /** Lo apartado para cuotas de expedientes históricos. */
@@ -87,6 +93,7 @@ type Props = {
 export default function PagosAnteriores({
     selected,
     balances,
+    legacyByPlace,
     bankAccounts,
     payments,
     setAside,
@@ -136,12 +143,21 @@ export default function PagosAnteriores({
                         </p>
                     </div>
 
-                    <Saldo titulo="Efectivo en caja" valor={balances.cash} />
+                    <Saldo
+                        titulo="Efectivo en caja"
+                        valor={balances.cash}
+                        delAnterior={legacyByPlace.cash}
+                    />
                     <Saldo
                         titulo="Cheques en custodia"
                         valor={balances.cheques}
+                        delAnterior={legacyByPlace.cheques}
                     />
-                    <Saldo titulo="Depósitos directos" valor={balances.bank} />
+                    <Saldo
+                        titulo="Depósitos directos"
+                        valor={balances.bank}
+                        delAnterior={legacyByPlace.bank}
+                    />
                 </div>
 
                 {!quedaAlgo &&
@@ -281,7 +297,21 @@ export default function PagosAnteriores({
     );
 }
 
-function Saldo({ titulo, valor }: { titulo: string; valor: string }) {
+/**
+ * Un saldo de la caja, con la parte que es del sistema anterior.
+ *
+ * El saldo mezcla plata vieja con la que entró después; lo que se paga o
+ * se aparta del sistema anterior sale solo de la parte vieja.
+ */
+function Saldo({
+    titulo,
+    valor,
+    delAnterior,
+}: {
+    titulo: string;
+    valor: string;
+    delAnterior: string;
+}) {
     return (
         <div className="rounded-lg border bg-card p-4">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -289,6 +319,9 @@ function Saldo({ titulo, valor }: { titulo: string; valor: string }) {
             </p>
             <p className="mt-2 text-2xl">
                 <Money value={valor} dimWhenZero />
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+                Del sistema anterior sin asignar: <Money value={delAnterior} />
             </p>
         </div>
     );

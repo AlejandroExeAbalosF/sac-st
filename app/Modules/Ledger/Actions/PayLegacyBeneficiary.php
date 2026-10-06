@@ -11,6 +11,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\LegacyFundsByPlace;
 use App\Modules\Ledger\Support\LegacyFundsLock;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
@@ -72,6 +73,7 @@ final class PayLegacyBeneficiary
         private readonly CashBalance $saldos,
         private readonly RecordAuditEvent $auditar,
         private readonly LegacyFundsLock $bloqueo,
+        private readonly LegacyFundsByPlace $porLugar,
     ) {}
 
     /** @throws ValidationException */
@@ -265,12 +267,12 @@ final class PayLegacyBeneficiary
         }
 
         /*
-         * Y tampoco se entrega lo que no está. El cajón guarda plata de
-         * los dos circuitos —la vieja y la nueva—, así que este control es
-         * sobre el total disponible, no sobre la parte que le toca al
-         * sistema anterior.
+         * Y tampoco se entrega lo que no está. Por banco, en **la cuenta
+         * elegida**: el total de todas las cuentas no dice nada de una.
          */
-        $disponible = $this->saldos->of($origen, $cashBoxId, $currency);
+        $disponible = $origen === LedgerAccount::BankAccount
+            ? $this->saldos->ofBankAccount($cashBoxId, $currency, $bankAccountId)
+            : $this->saldos->of($origen, $cashBoxId, $currency);
 
         if (bccomp($amount, $disponible, 2) === 1) {
             throw ValidationException::withMessages([
@@ -278,6 +280,33 @@ final class PayLegacyBeneficiary
                     'En «%s» hay %s y este pago es de %s.',
                     $origen->label(),
                     Decimal::format($disponible),
+                    Decimal::format($amount),
+                ),
+            ]);
+        }
+
+        /*
+         * Y que sea plata vieja de ese lugar. El cajón y la cuenta guardan
+         * también lo que entró después, que es de otros beneficiarios: el
+         * saldo total del sistema anterior puede alcanzar por plata que
+         * está en otro lado. Ver `LegacyFundsByPlace`.
+         *
+         * El cheque no entra: este pago no dice cuál se entrega, así que
+         * no hay un papel contra el cual controlarlo.
+         */
+        $viejo = match (true) {
+            $origen === LedgerAccount::CashOnHand => $this->porLugar->cash($cashBoxId, $currency),
+            $origen === LedgerAccount::BankAccount => $this->porLugar->bankAccount($cashBoxId, $currency, $bankAccountId),
+            default => null,
+        };
+
+        if ($viejo !== null && bccomp($amount, $viejo, 2) === 1) {
+            throw ValidationException::withMessages([
+                'amount' => sprintf(
+                    'Del sistema anterior quedan %s en «%s» y este pago es de %s. '
+                        .'El resto es plata que entró después.',
+                    Decimal::format($viejo),
+                    $origen->label(),
                     Decimal::format($amount),
                 ),
             ]);

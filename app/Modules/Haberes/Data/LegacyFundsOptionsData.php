@@ -23,6 +23,14 @@ final class LegacyFundsOptionsData extends Data
          * @var numeric-string
          */
         public string $pending,
+        /**
+         * Lo que queda del sistema anterior en efectivo: el tope de lo que
+         * se aparta del cajón, aunque el cajón tenga más por cobros
+         * posteriores.
+         *
+         * @var numeric-string
+         */
+        public string $cash,
         /** @var list<LegacyChequeOptionData> */
         public array $cheques,
         /**
@@ -32,7 +40,11 @@ final class LegacyFundsOptionsData extends Data
          * @var numeric-string
          */
         public string $undetailedCheques,
-        /** @var list<array{id: int, label: string}> */
+        /**
+         * Las cuentas, cada una con lo que le queda del sistema anterior.
+         *
+         * @var list<array{id: int, label: string, available: numeric-string}>
+         */
         public array $bankAccounts,
     ) {}
 }

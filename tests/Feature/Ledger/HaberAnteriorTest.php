@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Ledger;
 
+use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\CashBalance;
@@ -152,6 +153,46 @@ class HaberAnteriorTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->post('/caja/pagos-anteriores', $this->pago('100000.00'))
+            ->assertSessionHasErrors('amount');
+    }
+
+    /**
+     * Y lo que se paga en efectivo tiene que ser efectivo viejo.
+     *
+     * Un cobro de hoy llena el cajón con plata de otro beneficiario, y el
+     * saldo viejo alcanza por lo que está en el banco: ninguno de los dos
+     * dice que quede efectivo del sistema anterior.
+     */
+    public function test_no_se_paga_en_efectivo_plata_vieja_que_esta_en_el_banco(): void
+    {
+        $this->abrirLibros('100000.00', banco: '1000000.00', cuentaBancaria: $this->cuentaBancaria());
+        app(RegisterCashFundReceipt::class)->handle(
+            amount: '500000.00',
+            idempotencyKey: 'test-cobro-de-hoy',
+            cashBoxId: $this->caja(),
+            receivedDate: CarbonImmutable::parse('2026-06-05'),
+        );
+
+        $this->actingAs($this->operador('contador'))
+            ->post('/caja/pagos-anteriores', $this->pago('300000.00'))
+            ->assertSessionHasErrors(['amount' => 'Del sistema anterior quedan 100.000,00 en «Efectivo en caja» y este pago es de 300.000,00. El resto es plata que entró después.']);
+    }
+
+    /** Por transferencia, el saldo que importa es el de la cuenta elegida. */
+    public function test_el_pago_por_transferencia_mira_la_cuenta_elegida(): void
+    {
+        $this->abrirLibros(null, banco: '1000000.00', cuentaBancaria: $this->cuentaBancaria());
+        $vacia = (int) DB::table('bank_accounts')->insertGetId([
+            'label' => 'Cta. Cte. vacía', 'bank_name' => 'Banco Macro', 'account_number' => '310000999999999',
+            'currency' => 'ARS', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->operador('contador'))
+            ->post('/caja/pagos-anteriores', [
+                ...$this->pago('100000.00'),
+                'medium' => 'bank',
+                'bankAccountId' => $vacia,
+            ])
             ->assertSessionHasErrors('amount');
     }
 
