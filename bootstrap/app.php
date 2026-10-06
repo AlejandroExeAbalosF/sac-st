@@ -12,7 +12,6 @@ use App\Modules\Ledger\Exceptions\ClosedPeriodException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -53,7 +52,13 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureAccountIsUsable::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
-            AddLinkHeadersForPreloadedAssets::class,
+            /*
+             * Sin `AddLinkHeadersForPreloadedAssets`, que trae el starter
+             * kit: repetía en una cabecera `Link` cada precarga que el HTML
+             * ya lleva. Solo sirve con Early Hints, que nadie usa acá, y con
+             * 75 archivos medía 12 KB: el Apache del data center rechaza
+             * cabeceras de más de 8190 bytes y `/login` salía como 502.
+             */
             /*
              * Va al final del grupo `web` y no en el de `auth`: la marca
              * hay que mirarla en toda pantalla con sesion, y el propio

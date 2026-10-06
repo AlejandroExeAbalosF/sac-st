@@ -375,4 +375,31 @@ class SecurityHeadersTest extends TestCase
 
         $this->get(route('login'))->assertHeaderMissing('Content-Security-Policy');
     }
+
+    /**
+     * Regresión: las cabeceras tienen que pasar por el proxy del data center.
+     *
+     * El starter kit mandaba una cabecera `Link` con cada archivo a precargar
+     * —75 cuando se publicó, 12 KB—, y el Apache del data center rechaza toda
+     * cabecera de respuesta de más de 8190 bytes (`LimitRequestFieldSize`):
+     * `/` respondía su 302, pero `/login` salía como 502 Bad Gateway, con un
+     * 200 en el log de nuestro nginx. El total se mide contra 4 KB, el
+     * `proxy_buffer_size` por defecto de nginx en x86, por si el proxy cambia.
+     *
+     * Lo atrapa porque los tests dibujan la pantalla con el build real.
+     */
+    public function test_the_response_headers_fit_through_a_default_reverse_proxy()
+    {
+        $headers = (string) $this->get(route('login'))->assertOk()->baseResponse->headers;
+
+        foreach (array_filter(explode("\r\n", $headers)) as $line) {
+            $this->assertLessThanOrEqual(
+                8190,
+                strlen($line),
+                'Una cabecera supera lo que acepta Apache: '.substr($line, 0, 60).'…',
+            );
+        }
+
+        $this->assertLessThanOrEqual(4096, strlen($headers), 'Las cabeceras de respuesta superan los 4 KB.');
+    }
 }
