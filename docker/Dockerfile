@@ -47,11 +47,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Node 22 y pnpm 10: las mismas versiones que usa CI y que lee el
-# `lockfileVersion: 9.0` de pnpm-lock.yaml.
+# Node 22 y pnpm 12, como CI. La imagen se arma sin el package.json del
+# proyecto, así que la versión exacta no se fija acá: dentro del proyecto,
+# pnpm se cambia solo a la que declara `packageManager`.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g pnpm@10 \
+    && npm install -g pnpm@12 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

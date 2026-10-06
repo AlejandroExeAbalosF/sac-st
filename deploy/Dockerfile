@@ -80,14 +80,12 @@ WORKDIR /var/www/html
 # del front no tiene de dónde sacarlos.
 FROM base AS build
 
-# Node 22 y pnpm 10, las mismas versiones que CI y el entorno de desarrollo.
-# Se toma el binario de la imagen oficial (misma Debian, misma glibc) en vez
-# de instalar un repositorio más.
+# Node 22, el mismo que CI y el entorno de desarrollo. Se toma el binario de
+# la imagen oficial (misma Debian, misma glibc) en vez de instalar un
+# repositorio más.
 COPY --from=node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
-    && npm install -g pnpm@10.34.5 \
-    && npm cache clean --force
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 COPY --from=composer:2@sha256:9715c7f69044da2a212a5fbde29ee7da24e364d426560ae6367b060236f847d7 /usr/bin/composer /usr/local/bin/composer
 
@@ -96,8 +94,13 @@ COPY --from=composer:2@sha256:9715c7f69044da2a212a5fbde29ee7da24e364d426560ae636
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --no-progress --prefer-dist
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile
+# pnpm en la versión exacta de `packageManager`, la misma que CI.
+# `ignoreScripts` viene en pnpm-workspace.yaml: ninguna dependencia ejecuta
+# código al instalarse.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN npm install -g "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")" \
+    && npm cache clean --force \
+    && pnpm install --frozen-lockfile
 
 COPY . .
 

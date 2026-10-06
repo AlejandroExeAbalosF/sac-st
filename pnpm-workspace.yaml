@@ -1,6 +1,11 @@
 packages:
   - '.'
 
+# Ningún script corre al instalar: ni los de las dependencias ni los del
+# proyecto. Desde pnpm 11 esto se lee de acá y no de .npmrc; ahí quedaba
+# ignorado sin ningún aviso.
+ignoreScripts: true
+
 publicHoistPattern:
   - '@inertiajs/core'
 
