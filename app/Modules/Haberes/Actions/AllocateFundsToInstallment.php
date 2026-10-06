@@ -212,7 +212,7 @@ final class AllocateFundsToInstallment
     {
         if ($receipt->origin->isLegacy()) {
             throw ValidationException::withMessages([
-                'receiptId' => 'Esa plata es del sistema anterior: se asigna apartándola desde la cuota.',
+                'receiptId' => 'Esa plata es del sistema anterior: se reserva desde la cuota, con «Registrar cuota histórica pendiente».',
             ]);
         }
 

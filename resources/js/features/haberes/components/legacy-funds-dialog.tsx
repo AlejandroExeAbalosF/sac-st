@@ -226,14 +226,14 @@ export default function LegacyFundsDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
-                        Apartar fondos del sistema anterior para la cuota{' '}
-                        {cuota.number}
+                        Cuota {cuota.number}: reservar fondos
                     </DialogTitle>
                     <DialogDescription>
-                        Se apartan <Money value={cuota.expectedAmount} /> del
-                        saldo anterior, que hoy tiene{' '}
-                        <Money value={fondosAnteriores.pending} /> sin asignar.
-                        La plata no se mueve: cambia de dueño.
+                        Se reservan <Money value={cuota.expectedAmount} /> del
+                        saldo del sistema anterior, que hoy tiene{' '}
+                        <Money value={fondosAnteriores.pending} /> sin reservar.
+                        La plata no se mueve: queda reservada para este
+                        beneficiario hasta que se le pague.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -328,7 +328,7 @@ export default function LegacyFundsDialog({
                             {fondosAnteriores.cheques.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
                                     No hay cheques de la apertura cargados uno
-                                    por uno con saldo sin asignar.
+                                    por uno sin reservar.
                                 </p>
                             ) : (
                                 <ul className="divide-y rounded-lg border">
@@ -361,7 +361,7 @@ export default function LegacyFundsDialog({
                                                         <> · {cheque.bank}</>
                                                     )}
                                                     <span className="block text-xs text-muted-foreground">
-                                                        Se aparta entero
+                                                        Se reserva entero
                                                         {cheque.expediente && (
                                                             <>
                                                                 {' '}
@@ -671,7 +671,7 @@ export default function LegacyFundsDialog({
                         disabled={form.processing}
                     >
                         <PiggyBank className="size-4" aria-hidden="true" />
-                        Apartar
+                        Reservar
                     </Button>
                 </DialogFooter>
             </DialogContent>

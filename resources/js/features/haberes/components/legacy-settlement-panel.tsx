@@ -183,7 +183,7 @@ function AnularDialog({
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        Anular el pago anterior de la cuota {numero}
+                        Anular el pago histórico de la cuota {numero}
                     </DialogTitle>
                     <DialogDescription>
                         La cuota vuelve a quedar por pagar y sus papeles quedan

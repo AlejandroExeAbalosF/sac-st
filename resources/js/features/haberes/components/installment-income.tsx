@@ -235,7 +235,7 @@ function ReciboDePapel({
                         onClick={() => setLiberando(true)}
                     >
                         <Undo2 className="size-3.5" />
-                        Liberar la plata apartada
+                        Quitar la reserva
                     </Button>
                 )}
                 {puedeAnular && (
@@ -292,7 +292,7 @@ function AnularPapelDialog({
                     </DialogTitle>
                     <DialogDescription>
                         Queda anulado con su motivo, no se borra. Al volver a
-                        apartar fondos se carga el papel correcto.
+                        reservar fondos se carga el papel correcto.
                     </DialogDescription>
                 </DialogHeader>
                 <form

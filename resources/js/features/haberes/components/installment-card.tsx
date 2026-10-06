@@ -470,7 +470,7 @@ export default function InstallmentCard({
                  * tener claro antes de apretar.
                  */}
                 {puedeApartar && (
-                    <ConAyuda texto="La cuota todavía no se pagó y su plata del sistema anterior sigue en la caja: efectivo, un cheque de la cartera o un depósito directo. Se aparta para esta cuota, con su recibo de ingreso de papel, y desde ahí sigue el circuito normal para pagarla.">
+                    <ConAyuda texto="El beneficiario todavía no cobró y su plata está en la caja desde antes del sistema: en efectivo, en un cheque o en la cuenta. Se reserva para esta cuota y se le paga por el circuito normal.">
                         <Button
                             type="button"
                             variant="ghost"
@@ -482,13 +482,13 @@ export default function InstallmentCard({
                                 className="size-3.5"
                                 aria-hidden="true"
                             />
-                            Apartar fondos anteriores
+                            Registrar cuota histórica pendiente
                         </Button>
                     </ConAyuda>
                 )}
 
                 {puedeRegistrarAnterior && (
-                    <ConAyuda texto="La cuota ya se pagó fuera del circuito: en papel antes de la apertura, o desde Pagos anteriores. Se cargan los papeles con su número de talonario y la cuota queda pagada, sin mover plata.">
+                    <ConAyuda texto="El beneficiario ya cobró esta cuota, antes de usar el sistema o desde Pagos anteriores. Se cargan los papeles como registro histórico: no mueve plata de la caja.">
                         <Button
                             type="button"
                             variant="ghost"
@@ -497,7 +497,7 @@ export default function InstallmentCard({
                             onClick={() => setPagoAnterior(true)}
                         >
                             <Archive className="size-3.5" aria-hidden="true" />
-                            Registrar pago anterior
+                            Registrar cuota histórica pagada
                         </Button>
                     </ConAyuda>
                 )}

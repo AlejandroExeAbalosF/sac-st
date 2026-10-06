@@ -67,13 +67,13 @@ final class VoidLegacyIncomeDocument
 
             if ($papel === null) {
                 throw ValidationException::withMessages([
-                    'reason' => 'La cuota no tiene un recibo de papel cargado al apartar fondos.',
+                    'reason' => 'La cuota no tiene un recibo de papel cargado al reservar fondos.',
                 ]);
             }
 
             if (! Decimal::equals($this->financiacion->allocated($cuota), '0')) {
                 throw ValidationException::withMessages([
-                    'reason' => 'El papel respalda plata apartada: primero hay que liberarla.',
+                    'reason' => 'El papel respalda plata reservada: primero hay que quitar la reserva.',
                 ]);
             }
 

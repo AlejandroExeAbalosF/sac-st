@@ -163,8 +163,16 @@ Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 Un expediente del sistema anterior se carga con las pantallas de siempre: el
 expediente, sus haberes y sus cuotas. Lo que cambia es qué se dice de cada cuota.
 
-Una cuota que **ya se pagó fuera del circuito** se registra desde su tarjeta con
-«Registrar pago anterior», de una de dos maneras:
+La tarjeta de la cuota ofrece dos botones, y lo que los separa es una sola
+pregunta: **¿el beneficiario ya cobró?**
+
+| Botón | Cuándo |
+| --- | --- |
+| «Registrar cuota histórica pagada» | Ya cobró, antes de usar el sistema o desde Pagos anteriores. Registro histórico: no mueve plata |
+| «Registrar cuota histórica pendiente» | Todavía no cobró y su plata está en la caja desde antes del sistema. Se reserva para la cuota y se le paga por el circuito normal |
+
+Una cuota que **ya se pagó fuera del circuito** se registra con «Registrar cuota
+histórica pagada», de una de dos maneras:
 
 | Modalidad | Cuándo | Qué se carga |
 | --- | --- | --- |
@@ -193,32 +201,38 @@ Reglas: [cuotas pagadas fuera del circuito](haberes-reglas.md#historicos).
 
 Una cuota histórica que **todavía no se pagó** y cuya plata está en la caja —en
 el cajón, en un cheque de la cartera de la apertura o como depósito directo en la
-cuenta— se financia desde su tarjeta con «Apartar fondos anteriores».
+cuenta— se financia desde su tarjeta con «Registrar cuota histórica pendiente»:
+se **reservan** fondos del sistema anterior para la cuota. En el código el acto se
+llama *apartar* (`SetAsideLegacyFunds`, `legacy_funds_allocated`).
 
-Apartar no mueve el dinero: deja de ser «del sistema anterior» y pasa a ser de la
-cuota. Se aparta el importe completo, y el respaldo es **el recibo de ingreso de
+Reservar no mueve el dinero: deja de ser «del sistema anterior» y pasa a ser de la
+cuota. Se reserva el importe completo, y el respaldo es **el recibo de ingreso de
 papel** que se le dio al empleador, con su número de talonario y su fecha. Ese
 papel hace las veces del recibo del sistema: la cuota no lleva los dos, y la Orden
 de Pago imprime el número del talonario.
 
-Un cheque se aparta **entero**: es un papel que se entrega o se deposita completo,
+Un cheque se reserva **entero**: es un papel que se entrega o se deposita completo,
 así que no se reparte entre cuotas. Si la cuota se cubre con varios cheques, se
 eligen todos. Si la apertura declaró los cheques como un total, sin detallarlos,
 el cheque se identifica en el mismo momento con su número —el banco y la fecha
 son opcionales— y cubre lo que falte de la cuota. Sale de lo que la apertura dejó
 sin detallar, entra a la cartera en custodia y, si se libera, vuelve a la lista
-para apartarse en otra cuota.
+para reservarse en otra cuota.
 
-Un depósito directo se aparta de **la cuenta elegida**, con su saldo: tener plata
-en otra cuenta del organismo no alcanza.
+Un depósito directo se reserva de **la cuenta elegida**, con su saldo: tener plata
+en otra cuenta del organismo no alcanza. Y del efectivo y de cada cuenta se
+reserva solo lo que queda **del sistema anterior** en ese lugar: el cajón y la
+cuenta guardan también plata que entró después, que es de otros beneficiarios. El
+diálogo muestra cuánto queda en cada lugar
+([saldo por lugar](haberes-reglas.md#saldo-anterior-por-lugar)).
 
 Si el recibo de papel se cargó mal, se anula con motivo desde la tarjeta una vez
-liberada la plata que respalda, y el correcto se carga al volver a apartar.
+quitada la reserva que respalda, y el correcto se carga al volver a reservar.
 
 Desde ahí la cuota sigue el circuito de siempre: entrega por mostrador, traslado al
-banco, u Orden y transferencia. Si hay que liberar la plata —toda o el excedente
-de una corrección—, vuelve al saldo del sistema anterior, no a los fondos sin
-identificar; el papel queda y se reutiliza si se vuelve a apartar.
+banco, u Orden y transferencia. Si hay que quitar la reserva —toda o el excedente
+de una corrección—, la plata vuelve al saldo del sistema anterior, no a los fondos
+sin identificar; el papel queda y se reutiliza si se vuelve a reservar.
 
 Reglas: [fondos del sistema anterior](haberes-reglas.md#fondos-anteriores).
 

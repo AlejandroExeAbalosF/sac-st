@@ -73,7 +73,7 @@ enum FinancialEventType: string
             self::LegacyDisbursement => 'Pago de haber anterior',
             self::Reversal => 'Reversión',
             self::AuthorizedAdjustment => 'Ajuste autorizado',
-            self::LegacyFundsAllocated => 'Apartado del sistema anterior',
+            self::LegacyFundsAllocated => 'Reservado del sistema anterior',
         };
     }
 

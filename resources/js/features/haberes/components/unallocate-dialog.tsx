@@ -99,10 +99,14 @@ export default function UnallocateDialog({
         <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Liberar dinero de esta cuota</DialogTitle>
+                    <DialogTitle>
+                        {delSistemaAnterior
+                            ? 'Quitar la reserva de esta cuota'
+                            : 'Liberar dinero de esta cuota'}
+                    </DialogTitle>
                     <DialogDescription>
                         {delSistemaAnterior
-                            ? 'El dinero se queda en el organismo: deja de estar apartado para este beneficiario y vuelve al saldo del sistema anterior, para apartarlo para la cuota que corresponda. Un cheque se libera entero. El asiento se registra con la fecha de hoy.'
+                            ? 'El dinero se queda en el organismo: deja de estar reservado para este beneficiario y vuelve al saldo del sistema anterior, para reservarlo para la cuota que corresponda. Un cheque se libera entero. El asiento se registra con la fecha de hoy.'
                             : 'El dinero se queda en el organismo: deja de estar imputado a este beneficiario y vuelve a la cola de fondos sin identificar, para que lo tome la cuota que corresponda. El asiento se registra con la fecha de hoy.'}
                     </DialogDescription>
                 </DialogHeader>

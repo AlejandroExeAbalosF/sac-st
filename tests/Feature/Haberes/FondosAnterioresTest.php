@@ -149,7 +149,7 @@ class FondosAnterioresTest extends TestCase
             ]);
             $this->fail('Se apartó un cheque en parte.');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('se aparta entero', $e->errors()['sources'][0]);
+            $this->assertStringContainsString('se reserva entero', $e->errors()['sources'][0]);
         }
 
         $evento = $this->eventoApartado($cuota, '35000.00');
@@ -372,7 +372,7 @@ class FondosAnterioresTest extends TestCase
             app(VoidLegacyIncomeDocument::class)->handle($cuota, 'El número del talonario estaba mal tipeado.');
             $this->fail('Se anuló un papel que respalda plata apartada.');
         } catch (ValidationException $e) {
-            $this->assertStringContainsString('primero hay que liberarla', $e->errors()['reason'][0]);
+            $this->assertStringContainsString('primero hay que quitar la reserva', $e->errors()['reason'][0]);
         }
 
         app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-236', 'El papel estaba mal cargado.');

@@ -330,11 +330,11 @@ recibos desde la ficha del haber
 ([expedientes históricos](haberes.md#historicos)). El vínculo es documental: no
 mueve el libro, y un recibo con vínculos vigentes no se puede anular.
 
-El saldo también baja cuando se **aparta** plata para una cuota histórica que
-todavía no se pagó ([fondos anteriores](haberes.md#fondos-anteriores)). Apartar no
+El saldo también baja cuando se **reserva** plata para una cuota histórica que
+todavía no se pagó ([fondos anteriores](haberes.md#fondos-anteriores)). Reservar no
 mueve el dinero: sigue en el cajón, la cartera o la cuenta hasta que se le pague a
-la cuota por el circuito. La pantalla lista lo apartado con lo liberado al lado,
-y el saldo se rotula «sin asignar».
+la cuota por el circuito. La pantalla lista lo reservado con lo liberado al lado,
+y el saldo se rotula «Del sistema anterior, sin reservar».
 
 ---
 

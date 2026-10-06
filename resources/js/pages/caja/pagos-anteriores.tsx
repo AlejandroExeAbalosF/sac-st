@@ -131,14 +131,14 @@ export default function PagosAnteriores({
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-lg border-2 border-primary/30 bg-card p-4">
                         <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Queda sin asignar
+                            Del sistema anterior, sin reservar
                         </p>
                         <p className="mt-2 text-2xl">
                             <Money value={balances.pending} dimWhenZero />
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground">
                             {quedaAlgo
-                                ? 'Baja con cada pago y con cada apartado para un expediente histórico. En cero, no queda ningún caso viejo sin resolver.'
+                                ? 'Baja con cada pago y con cada reserva para una cuota histórica. En cero, no queda ningún caso viejo sin resolver.'
                                 : 'No queda nada del sistema anterior.'}
                         </p>
                     </div>
@@ -231,7 +231,7 @@ export default function PagosAnteriores({
             {setAside.length > 0 && (
                 <section className="flex flex-col gap-2 px-4 pb-6 sm:px-6">
                     <h2 className="text-sm font-semibold">
-                        Apartado para expedientes
+                        Reservado para cuotas históricas
                     </h2>
                     <p className="text-xs text-muted-foreground">
                         Plata del sistema anterior que ya tiene dueño: una cuota
@@ -250,7 +250,7 @@ export default function PagosAnteriores({
                                             Para
                                         </th>
                                         <th className="px-4 py-2 text-right font-medium">
-                                            Apartado
+                                            Reservado
                                         </th>
                                         <th className="px-4 py-2 text-right font-medium">
                                             Liberado
@@ -321,7 +321,8 @@ function Saldo({
                 <Money value={valor} dimWhenZero />
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-                Del sistema anterior sin asignar: <Money value={delAnterior} />
+                Del sistema anterior, sin reservar:{' '}
+                <Money value={delAnterior} />
             </p>
         </div>
     );

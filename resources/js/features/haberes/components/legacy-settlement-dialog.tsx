@@ -179,7 +179,7 @@ export default function LegacySettlementDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
-                        Pago anterior de la cuota {cuota.number}
+                        Cuota {cuota.number}: pago histórico
                     </DialogTitle>
                     <DialogDescription>
                         La cuota es de <Money value={cuota.expectedAmount} />.

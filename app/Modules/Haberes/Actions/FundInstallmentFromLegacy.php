@@ -136,7 +136,7 @@ final class FundInstallmentFromLegacy
                         bankAccountId: $bankAccountId,
                         newCheque: $fuente['newCheque'] ?? null,
                         description: sprintf(
-                            'Apartado para Expte. %s · %s · cuota %d',
+                            'Reservado para Expte. %s · %s · cuota %d',
                             $expediente->display_number,
                             $haber->beneficiary->name,
                             $cuota->installment_number,
@@ -153,7 +153,7 @@ final class FundInstallmentFromLegacy
                         'amount' => Decimal::scale($fuente['amount']),
                         'allocated_by' => $actorId,
                         'allocated_at' => now(),
-                        'notes' => 'Apartado del sistema anterior',
+                        'notes' => 'Reservado del sistema anterior',
                     ]);
                 }
 
@@ -229,7 +229,7 @@ final class FundInstallmentFromLegacy
         $motivo = match (true) {
             $expediente->status === ExpedienteStatus::Cancelled => 'El expediente está anulado.',
             $haber->workflow_status !== HaberWorkflowStatus::Active => 'El haber no está activo.',
-            $cuota->workflow_status !== InstallmentWorkflowStatus::Active => 'Solo se aparta plata para una cuota pendiente.',
+            $cuota->workflow_status !== InstallmentWorkflowStatus::Active => 'Solo se reserva plata para una cuota pendiente.',
             ! Decimal::equals($this->financiacion->allocated($cuota), '0') => 'La cuota ya tiene dinero asignado: no se mezcla con el del sistema anterior.',
             IncomeEvidence::of($cuota)?->isPaper() === false => 'La cuota ya tiene un recibo de ingreso del sistema.',
             default => null,
@@ -328,7 +328,7 @@ final class FundInstallmentFromLegacy
             if (! Decimal::equals($libre, $cheque->amount) || ! Decimal::equals($fuente['amount'], $cheque->amount)) {
                 throw ValidationException::withMessages([
                     'sources' => sprintf(
-                        'El cheque %s es de %s y se aparta entero: no se reparte entre cuotas.',
+                        'El cheque %s es de %s y se reserva entero: no se reparte entre cuotas.',
                         $cheque->cheque_number,
                         Decimal::format($cheque->amount),
                     ),
@@ -339,7 +339,7 @@ final class FundInstallmentFromLegacy
         if (! Decimal::equals($total, $cuota->importeEsperado())) {
             throw ValidationException::withMessages([
                 'sources' => sprintf(
-                    'Se apartan %s y la cuota es de %s: las cuotas se pagan enteras.',
+                    'Se reservan %s y la cuota es de %s: las cuotas se pagan enteras.',
                     Decimal::format($total),
                     Decimal::format($cuota->importeEsperado()),
                 ),
@@ -400,7 +400,7 @@ final class FundInstallmentFromLegacy
 
         if ($apertura === null) {
             throw ValidationException::withMessages([
-                'installment' => 'La caja de Haberes todavía no tiene apertura: sin ella no hay plata del sistema anterior que apartar.',
+                'installment' => 'La caja de Haberes todavía no tiene apertura: sin ella no hay plata del sistema anterior que reservar.',
             ]);
         }
 

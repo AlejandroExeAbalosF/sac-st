@@ -315,8 +315,8 @@ export default function CajaIndex({
 
                 {/*
                  * Lo que queda del sistema anterior sin dueño, mientras quede
-                 * algo. Baja con cada pago y con cada apartado para un
-                 * expediente histórico; el día que llega a cero se apaga la
+                 * algo. Baja con cada pago y con cada reserva para una
+                 * cuota histórica; el día que llega a cero se apaga la
                  * planilla en paralelo.
                  */}
                 {/[1-9]/.test(legacyPending) && (
@@ -324,7 +324,7 @@ export default function CajaIndex({
                         <HandCoins className="size-4 shrink-0 text-muted-foreground" />
                         <span>
                             Quedan <Money value={legacyPending} /> del sistema
-                            anterior sin asignar.
+                            anterior sin reservar.
                         </span>
                         {can.payLegacy && (
                             <Button

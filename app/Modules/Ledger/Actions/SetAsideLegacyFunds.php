@@ -86,7 +86,7 @@ final class SetAsideLegacyFunds
 
         if (Decimal::isNegative($importe) || Decimal::equals($importe, '0')) {
             throw ValidationException::withMessages([
-                'amount' => 'Apartar tiene que ser por un importe mayor que cero.',
+                'amount' => 'La reserva tiene que ser por un importe mayor que cero.',
             ]);
         }
 
@@ -103,7 +103,7 @@ final class SetAsideLegacyFunds
             if (Decimal::isNegative(Decimal::sub($pendiente, $importe))) {
                 throw ValidationException::withMessages([
                     'amount' => sprintf(
-                        'Del sistema anterior quedan sin asignar %s y esto es por %s.',
+                        'Del sistema anterior quedan sin reservar %s y esto es por %s.',
                         Decimal::format($pendiente),
                         Decimal::format($importe),
                     ),
@@ -204,7 +204,7 @@ final class SetAsideLegacyFunds
                 || $cheque->currency !== $currency->value
             ) {
                 throw ValidationException::withMessages([
-                    'source' => 'El cheque tiene que ser uno del sistema anterior, todavía en custodia, y se aparta entero.',
+                    'source' => 'El cheque tiene que ser uno del sistema anterior, todavía en custodia, y se reserva entero.',
                 ]);
             }
 

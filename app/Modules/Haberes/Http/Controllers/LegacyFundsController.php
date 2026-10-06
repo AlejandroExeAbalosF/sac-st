@@ -55,7 +55,7 @@ final class LegacyFundsController extends Controller
             confirmDuplicates: $request->boolean('confirmDuplicates'),
         );
 
-        Toast::success('Plata apartada.', 'La cuota quedó financiada con fondos del sistema anterior.');
+        Toast::success('Fondos reservados.', 'La cuota quedó financiada con fondos del sistema anterior.');
 
         return back();
     }
@@ -75,7 +75,7 @@ final class LegacyFundsController extends Controller
             actorId: $request->user()?->id,
         );
 
-        Toast::success('Recibo de papel anulado.', 'Al volver a apartar se carga el correcto.');
+        Toast::success('Recibo de papel anulado.', 'Al volver a reservar fondos se carga el correcto.');
 
         return back();
     }
