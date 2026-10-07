@@ -13,7 +13,6 @@ use App\Modules\Haberes\Http\Requests\VoidLegacySettlementRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -34,11 +33,11 @@ final class LegacySettlementController extends Controller
     ): RedirectResponse {
         $registrar->handle(
             installment: $installment,
-            income: $this->paper($request, 'income', LegacyDocumentKind::IncomeReceipt),
+            income: $this->paper($request, $installment, 'income', LegacyDocumentKind::IncomeReceipt),
             paidOn: CarbonImmutable::parse((string) $request->validated('paidOn')),
             paymentMedium: PaymentMedium::from((string) $request->validated('paymentMedium')),
-            order: $this->paper($request, 'order', LegacyDocumentKind::PaymentOrder),
-            expense: $this->paper($request, 'expense', LegacyDocumentKind::ExpenseReceipt),
+            order: $this->paper($request, $installment, 'order', LegacyDocumentKind::PaymentOrder),
+            expense: $this->paper($request, $installment, 'expense', LegacyDocumentKind::ExpenseReceipt),
             notes: $request->validated('notes'),
             actorId: $request->user()?->id,
             confirmDuplicates: $request->boolean('confirmDuplicates'),
@@ -65,9 +64,18 @@ final class LegacySettlementController extends Controller
         return back();
     }
 
-    /** El papel de un prefijo, si se cargó su número. */
-    private function paper(RecordLegacySettlementRequest $request, string $prefijo, LegacyDocumentKind $tipo): ?LegacyPaper
-    {
+    /**
+     * El papel de un prefijo, si se cargó su número.
+     *
+     * Su importe es el de la cuota: se pagan enteras, y un importe tipeado
+     * solo podía estar mal.
+     */
+    private function paper(
+        RecordLegacySettlementRequest $request,
+        BeneficiaryInstallment $installment,
+        string $prefijo,
+        LegacyDocumentKind $tipo,
+    ): ?LegacyPaper {
         $numero = $request->validated($prefijo.'Number');
 
         if (! is_string($numero)) {
@@ -79,7 +87,7 @@ final class LegacySettlementController extends Controller
             field: $prefijo,
             number: $numero,
             issuedOn: CarbonImmutable::parse((string) $request->validated($prefijo.'Date')),
-            amount: Decimal::parse((string) $request->validated($prefijo.'Amount')) ?? '0.00',
+            amount: $installment->importeEsperado(),
             photo: $request->file($prefijo.'Photo'),
         );
     }

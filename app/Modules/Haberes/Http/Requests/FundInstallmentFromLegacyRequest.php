@@ -47,11 +47,11 @@ final class FundInstallmentFromLegacyRequest extends FormRequest
             'cheques.*.number' => ['nullable', 'required_without:cheques.*.receiptId', 'string', 'max:50'],
             'cheques.*.bank' => ['nullable', 'string', 'max:120'],
             'cheques.*.issueDate' => ['nullable', 'date', 'before_or_equal:'.$hoy],
-            // Ningún cheque trae importe: el de la lista es el del cheque, y el
-            // nuevo cubre lo que falta. Los fija el controlador.
+            // Nada trae importe: el cheque de la lista es por lo que dice, el
+            // nuevo cubre lo que falta y el recibo de papel es por la cuota.
+            // Los fija el controlador.
             'incomeNumber' => ['nullable', 'string', 'max:40'],
             'incomeDate' => ['nullable', 'required_with:incomeNumber', 'date', 'before_or_equal:'.$hoy],
-            'incomeAmount' => ['nullable', 'required_with:incomeNumber', 'numeric', 'gt:0'],
             'incomePhoto' => ScannedDocument::rules(required: false),
             'idempotencyKey' => ['required', 'string', 'max:100'],
             'confirmDuplicates' => ['boolean'],
@@ -73,7 +73,6 @@ final class FundInstallmentFromLegacyRequest extends FormRequest
             'cheques.*.issueDate' => 'fecha del cheque',
             'incomeNumber' => 'número del recibo de ingreso',
             'incomeDate' => 'fecha del recibo de ingreso',
-            'incomeAmount' => 'importe del recibo de ingreso',
             'incomePhoto' => 'foto del recibo de ingreso',
             'idempotencyKey' => 'clave de la operación',
             'confirmDuplicates' => 'confirmación',
@@ -93,7 +92,6 @@ final class FundInstallmentFromLegacyRequest extends FormRequest
             'cheques.*.issueDate.before_or_equal' => 'La fecha del cheque no puede ser futura.',
             'incomeDate.required_with' => 'Falta la fecha del recibo.',
             'incomeDate.before_or_equal' => 'La fecha no puede ser futura.',
-            'incomeAmount.required_with' => 'Falta el importe del recibo.',
             ...ScannedDocument::messages('incomePhoto'),
         ];
     }

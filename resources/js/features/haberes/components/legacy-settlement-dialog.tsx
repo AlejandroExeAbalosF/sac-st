@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { businessToday, date, money, parseAmount } from '@/lib/format';
+import { businessToday, date } from '@/lib/format';
 import { legacySettlement as registrarPagoAnterior } from '@/routes/haberes/installments';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
@@ -32,15 +32,12 @@ type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;
 type Formulario = {
     incomeNumber: string;
     incomeDate: string;
-    incomeAmount: string;
     incomePhoto: File | null;
     orderNumber: string;
     orderDate: string;
-    orderAmount: string;
     orderPhoto: File | null;
     expenseNumber: string;
     expenseDate: string;
-    expenseAmount: string;
     expensePhoto: File | null;
     paidOn: string;
     paymentMedium: string;
@@ -95,16 +92,12 @@ export default function LegacySettlementDialog({
     const form = useForm<Formulario>({
         incomeNumber: '',
         incomeDate: '',
-        // Las cuotas se pagan enteras: el recibo es por el importe de la cuota.
-        incomeAmount: money(cuota.expectedAmount, { symbol: false }),
         incomePhoto: null,
         orderNumber: '',
         orderDate: '',
-        orderAmount: money(cuota.expectedAmount, { symbol: false }),
         orderPhoto: null,
         expenseNumber: '',
         expenseDate: '',
-        expenseAmount: money(cuota.expectedAmount, { symbol: false }),
         expensePhoto: null,
         paidOn: '',
         paymentMedium: 'cash',
@@ -137,7 +130,6 @@ export default function LegacySettlementDialog({
                       'income',
                       datos.incomeNumber,
                       datos.incomeDate,
-                      datos.incomeAmount,
                       datos.incomePhoto,
                   )
                 : {}),
@@ -146,7 +138,6 @@ export default function LegacySettlementDialog({
                       'order',
                       datos.orderNumber,
                       datos.orderDate,
-                      datos.orderAmount,
                       datos.orderPhoto,
                   )
                 : {}),
@@ -155,7 +146,6 @@ export default function LegacySettlementDialog({
                       'expense',
                       datos.expenseNumber,
                       datos.expenseDate,
-                      datos.expenseAmount,
                       datos.expensePhoto,
                   )
                 : {}),
@@ -231,19 +221,15 @@ export default function LegacySettlementDialog({
                                 hoy={hoy}
                                 numero={form.data.incomeNumber}
                                 fecha={form.data.incomeDate}
-                                importe={form.data.incomeAmount}
+                                importe={cuota.expectedAmount}
                                 onNumero={(v) =>
                                     form.setData('incomeNumber', v)
                                 }
                                 onFecha={(v) => form.setData('incomeDate', v)}
-                                onImporte={(v) =>
-                                    form.setData('incomeAmount', v)
-                                }
                                 onFoto={(f) => form.setData('incomePhoto', f)}
                                 errores={{
                                     numero: form.errors.incomeNumber,
                                     fecha: form.errors.incomeDate,
-                                    importe: form.errors.incomeAmount,
                                     foto: form.errors.incomePhoto,
                                 }}
                             />
@@ -316,17 +302,13 @@ export default function LegacySettlementDialog({
                                 hoy={hoy}
                                 numero={form.data.orderNumber}
                                 fecha={form.data.orderDate}
-                                importe={form.data.orderAmount}
+                                importe={cuota.expectedAmount}
                                 onNumero={(v) => form.setData('orderNumber', v)}
                                 onFecha={(v) => form.setData('orderDate', v)}
-                                onImporte={(v) =>
-                                    form.setData('orderAmount', v)
-                                }
                                 onFoto={(f) => form.setData('orderPhoto', f)}
                                 errores={{
                                     numero: form.errors.orderNumber,
                                     fecha: form.errors.orderDate,
-                                    importe: form.errors.orderAmount,
                                     foto: form.errors.orderPhoto,
                                 }}
                             />
@@ -344,19 +326,15 @@ export default function LegacySettlementDialog({
                                 hoy={hoy}
                                 numero={form.data.expenseNumber}
                                 fecha={form.data.expenseDate}
-                                importe={form.data.expenseAmount}
+                                importe={cuota.expectedAmount}
                                 onNumero={(v) =>
                                     form.setData('expenseNumber', v)
                                 }
                                 onFecha={(v) => form.setData('expenseDate', v)}
-                                onImporte={(v) =>
-                                    form.setData('expenseAmount', v)
-                                }
                                 onFoto={(f) => form.setData('expensePhoto', f)}
                                 errores={{
                                     numero: form.errors.expenseNumber,
                                     fecha: form.errors.expenseDate,
-                                    importe: form.errors.expenseAmount,
                                     foto: form.errors.expensePhoto,
                                 }}
                             />
@@ -436,18 +414,21 @@ export default function LegacySettlementDialog({
     );
 }
 
-/** Los cuatro campos de un papel, con el prefijo que espera el servidor. */
+/**
+ * Los campos de un papel, con el prefijo que espera el servidor.
+ *
+ * El importe no viaja: las cuotas se pagan enteras, así que cada papel es
+ * por la cuota y lo pone el servidor.
+ */
 function papel(
     prefijo: 'income' | 'order' | 'expense',
     numero: string,
     fecha: string,
-    importe: string,
     foto: File | null,
 ): Record<string, string | File | null> {
     return {
         [`${prefijo}Number`]: numero,
         [`${prefijo}Date`]: fecha,
-        [`${prefijo}Amount`]: parseAmount(importe),
         [`${prefijo}Photo`]: foto,
     };
 }
@@ -494,7 +475,12 @@ function OptativoPapel({
     );
 }
 
-/** Número, fecha, importe y foto de un papel del sistema anterior. */
+/**
+ * Número, fecha y foto de un papel del sistema anterior, con su importe.
+ *
+ * El importe se muestra y no se edita: es el de la cuota, porque se pagan
+ * enteras. Un campo para escribirlo solo servía para equivocarse.
+ */
 function Papel({
     id,
     titulo,
@@ -505,7 +491,6 @@ function Papel({
     importe,
     onNumero,
     onFecha,
-    onImporte,
     onFoto,
     errores,
 }: {
@@ -515,15 +500,14 @@ function Papel({
     hoy: string;
     numero: string;
     fecha: string;
+    /** El de la cuota. */
     importe: string;
     onNumero: (valor: string) => void;
     onFecha: (valor: string) => void;
-    onImporte: (valor: string) => void;
     onFoto: (archivo: File | null) => void;
     errores: {
         numero?: string;
         fecha?: string;
-        importe?: string;
         foto?: string;
     };
 }) {
@@ -558,19 +542,19 @@ function Papel({
                     />
                 </div>
                 <div className="grid gap-1.5">
-                    <Label htmlFor={`${id}-importe`}>Importe del papel</Label>
-                    <Input
-                        id={`${id}-importe`}
-                        inputMode="decimal"
-                        className="text-right font-mono tabular-nums"
-                        value={importe}
-                        onChange={(e) => onImporte(e.target.value)}
-                    />
+                    <span className="text-sm leading-none font-medium">
+                        Importe
+                    </span>
+                    <p
+                        className="flex h-9 items-center justify-end rounded-md border bg-muted/40 px-3 text-sm"
+                        title="Es el de la cuota: se pagan enteras"
+                    >
+                        <Money value={importe} />
+                    </p>
                 </div>
             </div>
             <InputError message={errores.numero} />
             <InputError message={errores.fecha} />
-            <InputError message={errores.importe} />
             <div className="grid gap-1.5">
                 <Label htmlFor={`${id}-foto`}>
                     Foto

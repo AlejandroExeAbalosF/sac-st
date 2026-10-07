@@ -56,10 +56,8 @@ class CuotaHistoricaTest extends TestCase
                 'incomePhoto' => UploadedFile::fake()->image('ingreso.jpg'),
                 'orderNumber' => 'OP 3121',
                 'orderDate' => '2025-03-15',
-                'orderAmount' => '85000.00',
                 'expenseNumber' => '5521',
                 'expenseDate' => '2025-03-20',
-                'expenseAmount' => '85000.00',
                 'expensePhoto' => UploadedFile::fake()->image('egreso.jpg', 20, 20),
             ])
             ->assertRedirect()
@@ -196,14 +194,52 @@ class CuotaHistoricaTest extends TestCase
 
     /* ── Reglas del pago ─────────────────────────────────────────────── */
 
-    public function test_el_recibo_de_ingreso_tiene_que_ser_por_la_cuota_entera(): void
+    /**
+     * Los papeles son por la cuota entera, y el importe no se tipea: un
+     * importe que llegue en el formulario se ignora y cada papel queda por
+     * el de la cuota.
+     */
+    public function test_los_papeles_toman_el_importe_de_la_cuota(): void
     {
         $this->abrirLibros();
         $cuota = $this->cuota('131/2024', '85000.00');
 
         $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($cuota), [...$this->pagoEnPapel(), 'incomeAmount' => '40000.00'])
-            ->assertSessionHasErrors('incomeAmount');
+            ->post($this->url($cuota), [
+                ...$this->pagoEnPapel(),
+                'incomeAmount' => '40000.00',
+                'orderNumber' => 'OP 3122',
+                'orderDate' => '2025-03-15',
+                'orderAmount' => '1.00',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            ['85000.00', '85000.00'],
+            LegacyDocument::query()->orderBy('id')->pluck('amount')->all(),
+        );
+    }
+
+    /** El Action lo sostiene igual para quien lo llame sin el formulario. */
+    public function test_el_action_rechaza_un_recibo_de_ingreso_por_otro_importe(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuota('132/2024', '85000.00');
+
+        $this->expectException(ValidationException::class);
+
+        app(RecordLegacySettlement::class)->handle(
+            installment: $cuota,
+            income: new LegacyPaper(
+                LegacyDocumentKind::IncomeReceipt,
+                'income',
+                '0001235',
+                CarbonImmutable::parse('2025-03-10'),
+                '40000.00',
+            ),
+            paidOn: CarbonImmutable::parse('2025-03-20'),
+            paymentMedium: PaymentMedium::Cash,
+        );
     }
 
     public function test_no_se_paga_antes_de_que_el_empleador_deposite(): void
@@ -428,7 +464,6 @@ class CuotaHistoricaTest extends TestCase
         return [
             'incomeNumber' => '0001234',
             'incomeDate' => '2025-03-10',
-            'incomeAmount' => '85000.00',
             'paidOn' => '2025-03-20',
             'paymentMedium' => 'cash',
         ];

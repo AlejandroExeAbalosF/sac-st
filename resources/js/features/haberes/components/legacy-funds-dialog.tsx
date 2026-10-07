@@ -62,7 +62,6 @@ type Formulario = {
     chequeNuevo: ChequeNuevo | null;
     incomeNumber: string;
     incomeDate: string;
-    incomeAmount: string;
     incomePhoto: File | null;
     idempotencyKey: string;
     confirmDuplicates: boolean;
@@ -119,7 +118,6 @@ export default function LegacyFundsDialog({
         chequeNuevo: null,
         incomeNumber: '',
         incomeDate: '',
-        incomeAmount: money(cuota.expectedAmount, { symbol: false }),
         incomePhoto: null,
         idempotencyKey: clave,
         confirmDuplicates: false,
@@ -162,7 +160,6 @@ export default function LegacyFundsDialog({
                 ? {
                       incomeNumber: datos.incomeNumber,
                       incomeDate: datos.incomeDate,
-                      incomeAmount: parseAmount(datos.incomeAmount),
                       incomePhoto: datos.incomePhoto,
                   }
                 : {}),
@@ -600,29 +597,24 @@ export default function LegacyFundsDialog({
                                         }
                                     />
                                 </div>
+                                {/*
+                                 * El importe del papel es el de la cuota: se
+                                 * paga entera. Se muestra y no se edita.
+                                 */}
                                 <div className="grid gap-1.5">
-                                    <Label
-                                        htmlFor={`apartar-importe-${cuota.id}`}
+                                    <span className="text-sm leading-none font-medium">
+                                        Importe
+                                    </span>
+                                    <p
+                                        className="flex h-9 items-center justify-end rounded-md border bg-muted/40 px-3 text-sm"
+                                        title="Es el de la cuota: se paga entera"
                                     >
-                                        Importe del papel
-                                    </Label>
-                                    <Input
-                                        id={`apartar-importe-${cuota.id}`}
-                                        inputMode="decimal"
-                                        className="text-right font-mono tabular-nums"
-                                        value={form.data.incomeAmount}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'incomeAmount',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
+                                        <Money value={cuota.expectedAmount} />
+                                    </p>
                                 </div>
                             </div>
                             <InputError message={errores.incomeNumber} />
                             <InputError message={errores.incomeDate} />
-                            <InputError message={errores.incomeAmount} />
                             <div className="grid gap-1.5">
                                 <Label htmlFor={`apartar-foto-${cuota.id}`}>
                                     Foto

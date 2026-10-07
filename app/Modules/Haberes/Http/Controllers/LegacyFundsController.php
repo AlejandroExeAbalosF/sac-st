@@ -45,7 +45,8 @@ final class LegacyFundsController extends Controller
                     field: 'income',
                     number: $numero,
                     issuedOn: CarbonImmutable::parse((string) $request->validated('incomeDate')),
-                    amount: Decimal::parse((string) $request->validated('incomeAmount')) ?? '0.00',
+                    // Por la cuota: se paga entera.
+                    amount: $installment->importeEsperado(),
                     photo: $request->file('incomePhoto'),
                 )
                 : null,

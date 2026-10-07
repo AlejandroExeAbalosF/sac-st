@@ -436,7 +436,6 @@ class FondosAnterioresTest extends TestCase
                 'cheques' => [['number' => '00045871', 'bank' => '', 'issueDate' => '2025-03-01', 'amount' => '1.00']],
                 'incomeNumber' => '3121',
                 'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
                 'idempotencyKey' => 'test-importe-fijo',
             ])
             ->assertSessionHasNoErrors();
@@ -810,7 +809,6 @@ class FondosAnterioresTest extends TestCase
                 'medium' => 'cash',
                 'incomeNumber' => '3121',
                 'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
                 'idempotencyKey' => 'test-permiso',
             ])
             ->assertForbidden();
@@ -820,17 +818,6 @@ class FondosAnterioresTest extends TestCase
                 'medium' => 'cash',
                 'incomeNumber' => '3121',
                 'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85.000,00',
-                'idempotencyKey' => 'test-permiso',
-            ])
-            ->assertSessionHasErrors('incomeAmount');
-
-        $this->actingAs($this->operador('contador'))
-            ->post("/haberes/cuotas/{$cuota->id}/fondos-anteriores", [
-                'medium' => 'cash',
-                'incomeNumber' => '3121',
-                'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
                 'idempotencyKey' => 'test-permiso',
             ])
             ->assertSessionHasNoErrors();

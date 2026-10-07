@@ -187,7 +187,8 @@ y el medio del pago.
 
 Los papeles van con **el número de talonario y la fecha que tienen impresos**,
 nunca con numeración del sistema, y la foto si está a mano. El recibo de ingreso
-es obligatorio y por el importe de la cuota: las cuotas se pagan enteras.
+es obligatorio. El importe de cada papel es el de la cuota —se pagan enteras— y
+la pantalla lo muestra sin dejar editarlo.
 
 No mueve dinero: el pago ocurrió antes de la apertura, así que esa plata nunca
 estuvo en el saldo con que la caja abrió los libros.

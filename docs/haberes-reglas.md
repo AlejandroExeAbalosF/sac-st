@@ -258,7 +258,7 @@ a un pago suelto, se retiró con ese pago.
 | Estado y registro dicen lo mismo; el importe de la cuota no cambia mientras está saldada | `RecordLegacySettlement`, `VoidLegacySettlement` | `legacy_settlement_coherence`, diferido |
 | Solo se salda una cuota pendiente sin asignaciones, recibos, Orden, egreso ni comprobante de depósito | `InstallmentMovements` | `legacy_settlement_requires_clean_installment`, con `FOR UPDATE` sobre la cuota |
 | Una cuota saldada no acepta asignaciones, Órdenes, egresos, comprobantes ni recibos nuevos | `AllocateFundsToInstallment`, elegibilidades, `RegisterDepositTicket` | `reject_movement_on_legacy_settled_installment`, con `FOR SHARE` |
-| Recibo de ingreso de papel obligatorio y por la cuota entera | `RecordLegacySettlement` | La obligatoriedad, en la coherencia; el importe, solo en el Action |
+| Recibo de ingreso de papel obligatorio y por la cuota entera; cada papel, por el importe de la cuota | El controlador pone el importe de la cuota —no se tipea—, y `RecordLegacySettlement` y `FundInstallmentFromLegacy` lo vuelven a exigir | La obligatoriedad, en la coherencia; el importe, solo en PHP |
 | Papeles y pago anteriores a la primera apertura de la caja de Haberes; sin apertura no se cargan | `LegacyCutoff`, `LegacyPaperCheck` | `legacy_paper_before_opening` y `opening_after_legacy_papers` |
 | El mismo papel —tipo, número y fecha— no se carga dos veces | `LegacyPaperCheck` | índice `legacy_documents_paper_unique` |
 | El mismo número con otra fecha, o una foto ya cargada, avisa y pasa con confirmación | `LegacyPaperCheck` | — |
