@@ -4,6 +4,7 @@ import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import { conMoneda } from '@/features/caja/moneda';
+import { useDrawer } from '@/features/drawer/drawer-context';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
@@ -14,6 +15,8 @@ type Reserva = {
     description: string | null;
     amount: string;
     released: string;
+    /** La cuota para la que se reservó, para abrirla en el panel lateral. */
+    installmentId: number | null;
 };
 
 type Props = {
@@ -36,6 +39,8 @@ type Props = {
     legacyByPlace: { cash: string; cheques: string; bank: string };
     /** Lo reservado para cuotas de expedientes históricos. */
     setAside: Reserva[];
+    /** Si puede abrir la cuota de cada reserva: hace falta ver expedientes. */
+    canViewInstallments: boolean;
 };
 
 /**
@@ -52,7 +57,9 @@ export default function SaldoAnterior({
     balances,
     legacyByPlace,
     setAside,
+    canViewInstallments,
 }: Props) {
+    const { openDrawer } = useDrawer();
     const quedaAlgo = /[1-9]/.test(balances.pending);
 
     return (
@@ -160,7 +167,32 @@ export default function SaldoAnterior({
                                                     {formatDate(reserva.date)}
                                                 </td>
                                                 <td className="px-4 py-2">
-                                                    {reserva.description}
+                                                    {/*
+                                                     * La descripción nombra la
+                                                     * cuota; con permiso, la abre
+                                                     * en el panel lateral sin
+                                                     * dejar esta pantalla.
+                                                     */}
+                                                    {canViewInstallments &&
+                                                    reserva.installmentId !==
+                                                        null ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                openDrawer({
+                                                                    kind: 'installment',
+                                                                    id: reserva.installmentId as number,
+                                                                })
+                                                            }
+                                                            className="text-left text-primary underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                                                        >
+                                                            {
+                                                                reserva.description
+                                                            }
+                                                        </button>
+                                                    ) : (
+                                                        reserva.description
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-2 text-right">
                                                     <Money

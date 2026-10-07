@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Haberes\Http\Controllers\CashTransferController;
+use App\Modules\Haberes\Http\Controllers\ChequeInventoryController;
 use App\Modules\Haberes\Http\Controllers\DepositTicketController;
 use App\Modules\Haberes\Http\Controllers\DisbursementController;
 use App\Modules\Haberes\Http\Controllers\ExpedienteController;
@@ -12,6 +13,7 @@ use App\Modules\Haberes\Http\Controllers\HaberController;
 use App\Modules\Haberes\Http\Controllers\HaberHistoryController;
 use App\Modules\Haberes\Http\Controllers\InstallmentController;
 use App\Modules\Haberes\Http\Controllers\InstallmentHistoryController;
+use App\Modules\Haberes\Http\Controllers\InstallmentPanelController;
 use App\Modules\Haberes\Http\Controllers\LegacyFundsController;
 use App\Modules\Haberes\Http\Controllers\LegacySettlementController;
 use App\Modules\Haberes\Http\Controllers\PaymentOrderController;
@@ -280,6 +282,26 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('haberes/expedientes/{expediente}/haber/{haber}/historial', HaberHistoryController::class)
             ->whereNumber('haber')
             ->name('haberes.haber.history');
+
+        /*
+         * La cuota para el panel lateral, cuando se la nombra desde otra
+         * pantalla —la cartera de cheques, lo reservado del sistema
+         * anterior—. Es lectura, con el permiso de ver la cuota.
+         */
+        Route::get('haberes/cuotas/{installment}/panel', InstallmentPanelController::class)
+            ->whereNumber('installment')
+            ->name('haberes.installments.panel');
+    });
+
+    /*
+     * La cartera de cheques de la caja, para el modal de la caja del día.
+     * Va con `caja.ver`: es el detalle del saldo que esa pantalla ya
+     * muestra, y vive acá porque decir para qué cuota es cada cheque es
+     * hablar de Haberes.
+     */
+    Route::middleware('can:caja.ver')->group(function (): void {
+        Route::get('haberes/cheques-en-custodia', ChequeInventoryController::class)
+            ->name('haberes.cheques-en-custodia');
     });
 
     /*

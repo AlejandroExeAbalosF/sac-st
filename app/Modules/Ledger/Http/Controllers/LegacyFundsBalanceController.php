@@ -67,6 +67,8 @@ final class LegacyFundsBalanceController extends Controller
             ],
             'legacyByPlace' => $this->legacyByPlace($id, $moneda),
             'setAside' => $this->setAside($id, $moneda),
+            // Quien puede ver cuotas abre la de cada reserva en el panel lateral.
+            'canViewInstallments' => $request->user()?->can('expedientes.ver') ?? false,
         ]);
     }
 
@@ -79,7 +81,11 @@ final class LegacyFundsBalanceController extends Controller
      * liberado después vuelve al saldo, y se muestra al lado para que la
      * suma cierre.
      *
-     * @return list<array{id: int, date: string, description: string|null, amount: numeric-string, released: numeric-string}>
+     * La cuota de cada reserva sale de la línea de `BENEFICIARY_FUNDS` del
+     * mismo asiento: el id viaja en el libro, y abrirla en el panel es
+     * trabajo de la pantalla, no de este módulo.
+     *
+     * @return list<array{id: int, date: string, description: string|null, amount: numeric-string, released: numeric-string, installmentId: int|null}>
      */
     private function setAside(int $cashBoxId, Currency $currency): array
     {
@@ -109,15 +115,24 @@ final class LegacyFundsBalanceController extends Controller
             ->selectRaw('financial_events.reversal_of_id AS apartado, SUM(journal_lines.credit) AS liberado')
             ->pluck('liberado', 'apartado');
 
+        $cuotas = DB::table('journal_lines')
+            ->whereIn('financial_event_id', $eventos->pluck('id'))
+            ->where('account_code', LedgerAccount::BeneficiaryFunds->value)
+            ->whereNotNull('beneficiary_installment_id')
+            ->pluck('beneficiary_installment_id', 'financial_event_id');
+
         $lista = [];
 
         foreach ($eventos as $evento) {
+            $cuota = $cuotas[$evento->id] ?? null;
+
             $lista[] = [
                 'id' => (int) $evento->id,
                 'date' => CarbonImmutable::parse((string) $evento->event_date)->toDateString(),
                 'description' => is_string($evento->description) ? $evento->description : null,
                 'amount' => Decimal::scale((string) $evento->importe),
                 'released' => Decimal::scale((string) ($liberado[$evento->id] ?? '0')),
+                'installmentId' => $cuota === null ? null : (int) $cuota,
             ];
         }
 

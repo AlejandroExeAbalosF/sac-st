@@ -119,6 +119,32 @@ declare namespace App {
         }
         namespace Haberes {
             namespace Data {
+                export type ChequeAssignmentData = {
+                    installmentId: number;
+                    installmentNumber: number;
+                    expedienteNumber: string;
+                    beneficiaryName: string;
+                    amount: string;
+                    reserved: boolean;
+                };
+                export type ChequeInCustodyData = {
+                    id: number;
+                    number: string | null;
+                    bank: string | null;
+                    issueDate: string | null;
+                    amount: string;
+                    receivedDate: string;
+                    origin: App.Modules.Ledger.Enums.FundReceiptOrigin;
+                    depositorName: string | null;
+                    assignments: App.Modules.Haberes.Data.ChequeAssignmentData[];
+                    unassigned: string;
+                };
+                export type ChequeInventoryData = {
+                    cheques: App.Modules.Haberes.Data.ChequeInCustodyData[];
+                    detailed: string;
+                    undetailed: string;
+                    total: string;
+                };
                 export type CounterPayoutRowData = {
                     installmentId: number;
                     expedienteId: number;
@@ -381,6 +407,16 @@ declare namespace App {
                     incomeReceiptPrintsTalonario: boolean;
                     editLocked: boolean;
                     editUnlockReason: string | null;
+                };
+                export type InstallmentPanelData = {
+                    subject: App.Modules.Haberes.Data.ReceiptSubjectData;
+                    installmentsTotal: number;
+                    expectedAmount: string;
+                    fundedAmount: string;
+                    fundedFromLegacy: boolean;
+                    expectedMedium: string;
+                    dueDate: string | null;
+                    stage: App.Modules.Haberes.Enums.InstallmentStage;
                 };
                 export type InstallmentReceiptData = {
                     id: number;

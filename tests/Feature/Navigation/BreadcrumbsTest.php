@@ -79,6 +79,8 @@ const RUTAS_SIN_PANTALLA = [
     'expedientes.history',
     'haberes.haber.history',
     'recibos.panel',
+    'haberes.installments.panel',
+    'haberes.cheques-en-custodia',
     'haberes.installments.disbursement.debits',
 
     /*

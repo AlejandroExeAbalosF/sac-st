@@ -1,6 +1,7 @@
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import ReceiptPanel from '@/features/caja/components/receipt-panel';
 import HistoryPanel from '@/features/haberes/components/history-panel';
+import InstallmentPanel from '@/features/haberes/components/installment-panel';
 import { useDrawer } from './drawer-context';
 
 /**
@@ -41,6 +42,13 @@ export default function DrawerHost() {
                     <ReceiptPanel
                         key={`receipt-${subject.id}`}
                         receiptId={subject.id}
+                    />
+                )}
+
+                {subject?.kind === 'installment' && (
+                    <InstallmentPanel
+                        key={`installment-${subject.id}`}
+                        installmentId={subject.id}
                     />
                 )}
 

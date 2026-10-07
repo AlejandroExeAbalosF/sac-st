@@ -8,17 +8,19 @@ import {
     Lock,
     Scale,
 } from 'lucide-react';
+import { useState } from 'react';
 import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import ChequeInventoryDialog from '@/features/caja/components/cheque-inventory-dialog';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import DayActivity from '@/features/caja/components/day-activity';
 import type { DayActivityEntry } from '@/features/caja/components/day-activity';
 import FlujoDelDia from '@/features/caja/components/day-workflow';
 import { conMoneda } from '@/features/caja/moneda';
 import { useDrawer } from '@/features/drawer/drawer-context';
-import { businessToday, date as formatDate } from '@/lib/format';
+import { businessToday, date as formatDate, isNonZero } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 import { calendario, dia as caja } from '@/routes/caja';
 import { index as apertura } from '@/routes/caja/apertura';
@@ -117,6 +119,7 @@ export default function CajaIndex({
      */
     const hoy = businessToday();
     const moneda = selected.currency;
+    const [viendoCheques, setViendoCheques] = useState(false);
 
     /** Cualquier dirección de la Caja conserva el libro que se está viendo. */
     const enlace = (url: string) => conMoneda(url, moneda);
@@ -302,7 +305,26 @@ export default function CajaIndex({
                         valor={state.cash}
                         destacado
                     />
-                    <Saldo titulo="Cheques en custodia" valor={state.cheques} />
+                    <Saldo
+                        titulo="Cheques en custodia"
+                        valor={state.cheques}
+                        accion={
+                            /*
+                             * El saldo no dice cuáles ni para quién: reservar un
+                             * cheque no lo mueve. El detalle se abre acá.
+                             */
+                            isNonZero(state.cheques) && (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto px-0 text-xs"
+                                    onClick={() => setViendoCheques(true)}
+                                >
+                                    Ver los cheques
+                                </Button>
+                            )
+                        }
+                    />
                     <Saldo titulo="En la cuenta" valor={state.bank} />
                     <Saldo
                         titulo="Sin identificar"
@@ -374,6 +396,15 @@ export default function CajaIndex({
                     </aside>
                 </div>
             </div>
+            {viendoCheques && (
+                <ChequeInventoryDialog
+                    abierto
+                    onCerrar={() => setViendoCheques(false)}
+                    moneda={moneda}
+                    fechaMirada={selected.date}
+                    hoy={hoy}
+                />
+            )}
         </EnMoneda>
     );
 }
@@ -382,11 +413,14 @@ function Saldo({
     titulo,
     valor,
     nota,
+    accion,
     destacado = false,
 }: {
     titulo: string;
     valor: string;
     nota?: string;
+    /** Lo que se puede hacer con ese saldo: abrir su detalle. */
+    accion?: React.ReactNode;
     destacado?: boolean;
 }) {
     return (
@@ -406,6 +440,7 @@ function Saldo({
             {nota && (
                 <p className="mt-2 text-xs text-muted-foreground">{nota}</p>
             )}
+            {accion && <div className="mt-1">{accion}</div>}
         </div>
     );
 }

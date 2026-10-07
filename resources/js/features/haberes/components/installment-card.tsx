@@ -468,7 +468,7 @@ export default function InstallmentCard({
                  * pregunta en el formulario guiado, no el nombre del botón.
                  */}
                 {ofreceGuia && (
-                    <ConAyuda texto="Para cargar una cuota de un expediente del sistema anterior. Una pregunta —si el beneficiario ya cobró— lleva al formulario que corresponde.">
+                    <ConAyuda texto="Para cargar una cuota de un expediente del sistema anterior.">
                         <Button
                             type="button"
                             variant="ghost"

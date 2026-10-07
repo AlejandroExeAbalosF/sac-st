@@ -24,6 +24,7 @@ use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\LegacyFundsOptions;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
+use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
@@ -796,7 +797,87 @@ class FondosAnterioresTest extends TestCase
                 ->where('balances.pending', $this->restoDelSistemaAnterior('80000.00'))
                 ->where('setAside.0.amount', '100000.00')
                 ->where('setAside.0.released', '20000.00')
-                ->where('setAside.0.description', fn (string $texto): bool => str_contains($texto, '222/2024')));
+                ->where('setAside.0.description', fn (string $texto): bool => str_contains($texto, '222/2024'))
+                // La reserva nombra su cuota, que se abre en el panel lateral.
+                ->where('setAside.0.installmentId', $cuota->id)
+                ->where('canViewInstallments', true));
+    }
+
+    /* ── La cartera de cheques y el panel de la cuota ────────────────── */
+
+    /**
+     * Reservar un cheque no mueve el saldo: el papel sigue en la caja. La
+     * cartera lo abre y dice para quién es cada uno.
+     */
+    public function test_la_cartera_de_cheques_dice_para_quien_es_cada_uno(): void
+    {
+        $this->abrirLibros(cheques: [['A-1', '85000.00'], ['A-2', '40000.00']]);
+        $cuota = $this->cuotaPor('230/2024', '85000.00', ExpectedMedium::Cheque);
+        $primero = FundReceipt::query()->where('cheque_number', 'A-1')->sole();
+        $this->apartar($cuota, PaymentMedium::Cheque, sources: [
+            ['amount' => '85000.00', 'chequeReceiptId' => $primero->id],
+        ]);
+
+        // Un cheque cobrado por el circuito que todavía no tiene dueño.
+        app(RegisterCashFundReceipt::class)->handle(
+            amount: '10000.00',
+            idempotencyKey: 'test-cheque-sin-dueno',
+            cashBoxId: $this->caja(),
+            receivedDate: BusinessDate::today(),
+            medium: PaymentMedium::Cheque,
+            cheque: ['number' => 'C-9', 'bank' => 'Nación', 'issueDate' => null],
+        );
+
+        $this->actingAs($this->operador('administrativo'))
+            ->getJson('/haberes/cheques-en-custodia?currency=ARS')
+            ->assertOk()
+            ->assertJsonCount(3, 'cheques')
+            ->assertJsonPath('cheques.0.number', 'A-1')
+            ->assertJsonPath('cheques.0.origin', 'opening')
+            ->assertJsonPath('cheques.0.assignments.0.installmentId', $cuota->id)
+            ->assertJsonPath('cheques.0.assignments.0.expedienteNumber', '230/2024')
+            ->assertJsonPath('cheques.0.assignments.0.reserved', true)
+            ->assertJsonPath('cheques.0.unassigned', '0.00')
+            ->assertJsonPath('cheques.1.assignments', [])
+            ->assertJsonPath('cheques.1.unassigned', '40000.00')
+            ->assertJsonPath('cheques.2.origin', 'received')
+            ->assertJsonPath('cheques.2.unassigned', '10000.00')
+            ->assertJsonPath('detailed', '135000.00')
+            ->assertJsonPath('undetailed', '0.00')
+            ->assertJsonPath('total', '135000.00');
+    }
+
+    /** Lo que la apertura declaró como total también es parte de la cartera. */
+    public function test_la_cartera_suma_lo_que_la_apertura_dejo_sin_detallar(): void
+    {
+        $this->abrirLibros(chequesSinDetalle: '200000.00');
+
+        $this->actingAs($this->operador('contador'))
+            ->getJson('/haberes/cheques-en-custodia?currency=ARS')
+            ->assertOk()
+            ->assertJsonPath('cheques', [])
+            ->assertJsonPath('detailed', '0.00')
+            ->assertJsonPath('undetailed', '200000.00')
+            ->assertJsonPath('total', '200000.00');
+    }
+
+    /** El panel lateral de la cuota: de quién es, cuánto y en qué etapa. */
+    public function test_el_panel_de_la_cuota_dice_de_quien_es_y_donde_esta(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuota('231/2024', '85000.00');
+        $this->apartar($cuota, PaymentMedium::Cash);
+
+        $this->actingAs($this->operador('consulta'))
+            ->getJson("/haberes/cuotas/{$cuota->id}/panel")
+            ->assertOk()
+            ->assertJsonPath('subject.installmentId', $cuota->id)
+            ->assertJsonPath('subject.expedienteNumber', '231/2024')
+            ->assertJsonPath('installmentsTotal', 1)
+            ->assertJsonPath('expectedAmount', '85000.00')
+            ->assertJsonPath('fundedAmount', '85000.00')
+            ->assertJsonPath('fundedFromLegacy', true)
+            ->assertJsonPath('stage', 'in_cash_box');
     }
 
     public function test_quien_no_paga_haberes_anteriores_no_aparta(): void

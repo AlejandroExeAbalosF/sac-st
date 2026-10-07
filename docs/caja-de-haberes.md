@@ -88,6 +88,17 @@ el libro cambió y no hay comprobante que lo respalde —una reversión, por eje
 
 `/caja` redirige acá conservando los filtros.
 
+**«Cheques en custodia» se abre con «Ver los cheques».** El saldo no dice cuáles
+ni para quién —reservar o asignar un cheque no lo mueve: el papel sigue en la
+caja, cambia de dueño—. El modal lista cada cheque con su número, banco, fechas y
+de dónde vino (cobrado en el circuito, de la apertura o identificado al
+reservar), y **para quién es**: la cuota a la que está asignado o reservado, o lo
+que todavía no tiene dueño. Al pie, lo que la apertura declaró como total sin
+detallar, y el total, que es el saldo de la tarjeta. Cada cuota se abre en el
+panel lateral. Es la cartera de hoy: mirando un día pasado lo avisa, porque el
+estado de un cheque es el de ahora. Lo arma Haberes (`ChequeInventory`), que es
+quien sabe de cuotas.
+
 **El traslado al banco lleva la foto del ticket del cajero**, y es obligatoria:
 es la única prueba de que el efectivo salió de la caja. Se acepta JPG, PNG, WEBP
 o PDF, y se valida **por lo que el archivo es, no por cómo se llama** —un
@@ -321,7 +332,8 @@ quien ve la caja (`caja.ver`), y el aviso de la caja del día lleva a ella.
 - **Cada saldo —efectivo, cheques, depósitos directos— con su parte vieja
   debajo:** el resto es plata que entró después y es de otros beneficiarios
   ([saldo por lugar](haberes-reglas.md#saldo-anterior-por-lugar)).
-- **Lo reservado para cuotas históricas**, con lo liberado al lado.
+- **Lo reservado para cuotas históricas**, con lo liberado al lado. Quien puede
+  ver expedientes abre la cuota de cada reserva en el panel lateral.
 
 Nada se paga desde acá. La única forma en que baja el saldo es **reservar** plata
 para una cuota histórica que todavía no se pagó

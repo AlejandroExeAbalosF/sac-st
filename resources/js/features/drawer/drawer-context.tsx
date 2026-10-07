@@ -25,6 +25,8 @@ import type { HistorySubject } from '@/features/haberes/components/history-panel
  */
 export type DrawerSubject =
     | { kind: 'receipt'; id: number }
+    /** Una cuota nombrada desde otra pantalla: la cartera, lo reservado. */
+    | { kind: 'installment'; id: number }
     | {
           kind: 'history';
           subject: HistorySubject;
