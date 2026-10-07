@@ -153,7 +153,6 @@ final class CashController extends Controller
             'suggestedDenominations' => CashCountLine::suggestedDenominations($moneda),
             'can' => [
                 'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
-                'payLegacy' => $usuario?->can('caja.pagar-anterior') ?? false,
                 'count' => $usuario?->can('caja.arquear') ?? false,
                 'review' => $usuario?->can('caja.revisar-arqueo') ?? false,
                 'adjust' => $usuario?->can('caja.ajustar-diferencia') ?? false,

@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Modules\Haberes\Actions\RecordLegacySettlement;
 use App\Modules\Haberes\Actions\VoidLegacySettlement;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
-use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Haberes\Http\Requests\RecordLegacySettlementRequest;
 use App\Modules\Haberes\Http\Requests\VoidLegacySettlementRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
@@ -33,20 +32,13 @@ final class LegacySettlementController extends Controller
         BeneficiaryInstallment $installment,
         RecordLegacySettlement $registrar,
     ): RedirectResponse {
-        $modo = LegacySettlementMode::from((string) $request->validated('mode'));
-        $medio = $request->validated('paymentMedium');
-        $fecha = $request->validated('paidOn');
-        $recibo = $request->validated('receiptId');
-
         $registrar->handle(
             installment: $installment,
-            mode: $modo,
             income: $this->paper($request, 'income', LegacyDocumentKind::IncomeReceipt),
+            paidOn: CarbonImmutable::parse((string) $request->validated('paidOn')),
+            paymentMedium: PaymentMedium::from((string) $request->validated('paymentMedium')),
             order: $this->paper($request, 'order', LegacyDocumentKind::PaymentOrder),
             expense: $this->paper($request, 'expense', LegacyDocumentKind::ExpenseReceipt),
-            paidOn: is_string($fecha) ? CarbonImmutable::parse($fecha) : null,
-            paymentMedium: is_string($medio) ? PaymentMedium::from($medio) : null,
-            receiptId: is_numeric($recibo) ? (int) $recibo : null,
             notes: $request->validated('notes'),
             actorId: $request->user()?->id,
             confirmDuplicates: $request->boolean('confirmDuplicates'),

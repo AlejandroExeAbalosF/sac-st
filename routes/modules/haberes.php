@@ -623,9 +623,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     });
 
     /*
-     * Apartar del saldo del sistema anterior la plata de una cuota que
-     * todavía está en custodia. Va con el criterio de quien paga los
-     * haberes anteriores: es la misma plata, y sale del mismo saldo.
+     * Reservar del saldo del sistema anterior la plata de una cuota que
+     * todavía está en custodia. Es la única forma en que baja ese saldo.
      */
     Route::middleware('can:caja.apartar-anterior')->group(function (): void {
         Route::post('haberes/cuotas/{installment}/fondos-anteriores', [LegacyFundsController::class, 'store'])

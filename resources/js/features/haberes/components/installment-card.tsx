@@ -153,10 +153,6 @@ export default function InstallmentCard({
     const saldada = cuota.status === 'legacy_settled';
 
     /*
-     * Ofrecer registrar el pago anterior solo donde el servidor dice que se
-     * puede: pendiente y sin ningún movimiento adentro del sistema.
-     */
-    /*
      * El recibo de ingreso de papel, si la plata se apartó del sistema
      * anterior. Hace las veces del recibo del sistema en el tramo de
      * ingreso.

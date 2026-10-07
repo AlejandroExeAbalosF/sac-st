@@ -28,7 +28,6 @@ const ICONO: Record<string, LucideIcon> = {
     legacy_funds_allocated: Scale,
     cash_disbursement: ArrowUpRight,
     bank_disbursement: ArrowUpRight,
-    legacy_disbursement: ArrowUpRight,
     cash_deposited_to_bank: Landmark,
     cash_deposit_credited: Landmark,
     opening_balance: Banknote,

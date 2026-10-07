@@ -25,7 +25,6 @@ export const ETAPA: Record<Etapa, string> = {
     ready_to_validate: 'Lista para validar',
     paid: 'Pagada',
     paid_before_opening: 'Pagada antes de la apertura',
-    paid_from_legacy: 'Pagada desde Pagos anteriores',
 };
 
 /**
@@ -55,5 +54,4 @@ export const TONO_ETAPA: Record<Etapa, StatusTone> = {
     ready_to_validate: 'action',
     paid: 'done',
     paid_before_opening: 'done',
-    paid_from_legacy: 'done',
 };

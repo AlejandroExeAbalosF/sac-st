@@ -22,14 +22,9 @@ type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;
 type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
 
 /**
- * Duplican los `label()` del servidor, como el resto de los enums de
+ * Duplica los `label()` del servidor, como el resto de los enums de
  * dominio del front: el transformador exporta los valores, no los rótulos.
  */
-const MODO: Record<App.Modules.Haberes.Enums.LegacySettlementMode, string> = {
-    before_opening: 'Pagada antes de la apertura',
-    legacy_disbursement: 'Pagada desde Pagos anteriores',
-};
-
 const PAPEL: Record<App.Modules.Haberes.Enums.LegacyDocumentKind, string> = {
     income_receipt: 'Recibo de ingreso',
     payment_order: 'Orden de Pago',
@@ -44,7 +39,7 @@ const MEDIO: Record<string, string> = {
 };
 
 /**
- * Una cuota pagada fuera del circuito: cómo, cuándo y con qué papeles.
+ * Una cuota pagada antes de la apertura: cuándo, con qué y con qué papeles.
  *
  * Reemplaza en la tarjeta a los tramos de ingreso, Orden y egreso. No es
  * que no correspondan: ya pasaron, afuera, y lo que queda de ellos son
@@ -71,24 +66,12 @@ export default function LegacySettlementPanel({
     return (
         <div className="grid gap-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-medium">{MODO[registro.mode]}</p>
+                <p className="font-medium">Pagada antes de la apertura</p>
                 <p className="text-xs text-muted-foreground">
-                    {registro.paidOn && <>Pagada el {date(registro.paidOn)}</>}
-                    {registro.paymentMedium && (
-                        <> · {MEDIO[registro.paymentMedium]}</>
-                    )}
+                    Pagada el {date(registro.paidOn)} ·{' '}
+                    {MEDIO[registro.paymentMedium]}
                 </p>
             </div>
-
-            {registro.receiptNumber && (
-                <p className="text-xs text-muted-foreground">
-                    Recibo de egreso del sistema n.º{' '}
-                    <span className="font-mono">{registro.receiptNumber}</span>
-                    {registro.receiptReference && (
-                        <> · {registro.receiptReference}</>
-                    )}
-                </p>
-            )}
 
             <ul className="divide-y rounded-lg border">
                 {estado.documents.map((papel) => (
@@ -187,8 +170,7 @@ function AnularDialog({
                     </DialogTitle>
                     <DialogDescription>
                         La cuota vuelve a quedar por pagar y sus papeles quedan
-                        anulados. Si se pagó desde Pagos anteriores, ese pago
-                        sigue en la caja: lo que se deshace es el vínculo.
+                        anulados, con su motivo. No se borra nada.
                     </DialogDescription>
                 </DialogHeader>
 

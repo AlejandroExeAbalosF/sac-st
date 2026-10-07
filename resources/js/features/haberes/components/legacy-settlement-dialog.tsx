@@ -28,11 +28,8 @@ import { legacySettlement as registrarPagoAnterior } from '@/routes/haberes/inst
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;
-type Opcion = App.Modules.Haberes.Data.LegacyReceiptOptionData;
-type Modo = App.Modules.Haberes.Enums.LegacySettlementMode;
 
 type Formulario = {
-    mode: Modo;
     incomeNumber: string;
     incomeDate: string;
     incomeAmount: string;
@@ -47,7 +44,6 @@ type Formulario = {
     expensePhoto: File | null;
     paidOn: string;
     paymentMedium: string;
-    receiptId: string;
     notes: string;
     confirmDuplicates: boolean;
 };
@@ -61,9 +57,8 @@ type Formulario = {
  * del sistema no se toca: esos papeles se buscan en el archivo por su
  * número, no por uno que el sistema les pondría hoy.
  *
- * Dos maneras de haberse pagado, y la pantalla pide lo que cada una tiene:
- * en papel, la fecha y el medio del pago; desde «Pagos anteriores», el
- * recibo del sistema que ya registró ese egreso.
+ * La cuota se pagó antes de que la caja abriera sus libros: además de los
+ * papeles se carga cuándo y con qué se le pagó al beneficiario.
  */
 export default function LegacySettlementDialog({
     cuota,
@@ -83,12 +78,10 @@ export default function LegacySettlementDialog({
     onVolver?: () => void;
 }) {
     /*
-     * Se leen de la página y no por props: solo este diálogo los mira, y
-     * enhebrarlos por la lista y la tarjeta sería pasamanos.
+     * Se lee de la página y no por props: solo este diálogo lo mira, y
+     * enhebrarlo por la lista y la tarjeta sería pasamanos.
      */
-    const { recibosAnteriores, corteHistorico } = usePage()
-        .props as unknown as {
-        recibosAnteriores: Opcion[];
+    const { corteHistorico } = usePage().props as unknown as {
         corteHistorico: string | null;
     };
 
@@ -100,7 +93,6 @@ export default function LegacySettlementDialog({
     const [conEgreso, setConEgreso] = useState(false);
 
     const form = useForm<Formulario>({
-        mode: 'before_opening',
         incomeNumber: '',
         incomeDate: '',
         // Las cuotas se pagan enteras: el recibo es por el importe de la cuota.
@@ -116,12 +108,10 @@ export default function LegacySettlementDialog({
         expensePhoto: null,
         paidOn: '',
         paymentMedium: 'cash',
-        receiptId: '',
         notes: '',
         confirmDuplicates: false,
     });
 
-    const enPapel = form.data.mode === 'before_opening';
     const limpiar = () => {
         form.reset();
         form.clearErrors();
@@ -142,7 +132,6 @@ export default function LegacySettlementDialog({
          * no está, y mandarlo con el importe sugerido lo haría parecer uno.
          */
         form.transform((datos) => ({
-            mode: datos.mode,
             ...(ingresoCargado === null
                 ? papel(
                       'income',
@@ -161,7 +150,7 @@ export default function LegacySettlementDialog({
                       datos.orderPhoto,
                   )
                 : {}),
-            ...(enPapel && conEgreso
+            ...(conEgreso
                 ? papel(
                       'expense',
                       datos.expenseNumber,
@@ -170,9 +159,8 @@ export default function LegacySettlementDialog({
                       datos.expensePhoto,
                   )
                 : {}),
-            ...(enPapel
-                ? { paidOn: datos.paidOn, paymentMedium: datos.paymentMedium }
-                : { receiptId: datos.receiptId }),
+            paidOn: datos.paidOn,
+            paymentMedium: datos.paymentMedium,
             notes: datos.notes,
             confirmDuplicates: datos.confirmDuplicates,
         }));
@@ -198,8 +186,9 @@ export default function LegacySettlementDialog({
                     </DialogTitle>
                     <DialogDescription>
                         La cuota es de <Money value={cuota.expectedAmount} />.
-                        Queda pagada fuera del circuito y el sistema no la
-                        vuelve a ofrecer para cobrar ni para pagar.
+                        Se pagó antes de que la caja abriera sus libros: queda
+                        registrada como pagada y el sistema no la vuelve a
+                        ofrecer para cobrar ni para pagar.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -233,31 +222,6 @@ export default function LegacySettlementDialog({
                                 ).installment
                             }
                         />
-
-                        <div className="grid gap-2">
-                            <Label htmlFor={`modo-${cuota.id}`}>
-                                Cómo se pagó
-                            </Label>
-                            <Select
-                                value={form.data.mode}
-                                onValueChange={(valor) =>
-                                    form.setData('mode', valor as Modo)
-                                }
-                            >
-                                <SelectTrigger id={`modo-${cuota.id}`}>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="before_opening">
-                                        En papel, antes de la apertura
-                                    </SelectItem>
-                                    <SelectItem value="legacy_disbursement">
-                                        Desde Pagos anteriores, con recibo del
-                                        sistema
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
 
                         {ingresoCargado === null ? (
                             <Papel
@@ -294,96 +258,52 @@ export default function LegacySettlementDialog({
                             </p>
                         )}
 
-                        {enPapel ? (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="grid gap-2">
-                                    <Label htmlFor={`pagado-${cuota.id}`}>
-                                        Cuándo se le pagó
-                                    </Label>
-                                    <Input
-                                        id={`pagado-${cuota.id}`}
-                                        type="date"
-                                        max={hoy}
-                                        value={form.data.paidOn}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'paidOn',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <InputError message={form.errors.paidOn} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor={`medio-${cuota.id}`}>
-                                        Con qué se le pagó
-                                    </Label>
-                                    <Select
-                                        value={form.data.paymentMedium}
-                                        onValueChange={(valor) =>
-                                            form.setData('paymentMedium', valor)
-                                        }
-                                    >
-                                        <SelectTrigger id={`medio-${cuota.id}`}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="cash">
-                                                Efectivo
-                                            </SelectItem>
-                                            <SelectItem value="cheque">
-                                                Cheque
-                                            </SelectItem>
-                                            <SelectItem value="bank">
-                                                Transferencia
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError
-                                        message={form.errors.paymentMedium}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
-                                <Label htmlFor={`recibo-${cuota.id}`}>
-                                    Recibo de Pagos anteriores
+                                <Label htmlFor={`pagado-${cuota.id}`}>
+                                    Cuándo se le pagó
                                 </Label>
-                                {recibosAnteriores.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No hay pagos de Pagos anteriores a este
-                                        beneficiario con importe sin vincular.
-                                    </p>
-                                ) : (
-                                    <Select
-                                        value={form.data.receiptId}
-                                        onValueChange={(valor) =>
-                                            form.setData('receiptId', valor)
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id={`recibo-${cuota.id}`}
-                                        >
-                                            <SelectValue placeholder="Elegí el recibo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {recibosAnteriores.map((opcion) => (
-                                                <SelectItem
-                                                    key={opcion.id}
-                                                    value={String(opcion.id)}
-                                                >
-                                                    {`N.º ${opcion.number} · ${date(opcion.date)} · quedan ${money(opcion.available)}`}
-                                                    {opcion.reference
-                                                        ? ` · ${opcion.reference}`
-                                                        : ''}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                                <InputError message={form.errors.receiptId} />
+                                <Input
+                                    id={`pagado-${cuota.id}`}
+                                    type="date"
+                                    max={hoy}
+                                    value={form.data.paidOn}
+                                    onChange={(e) =>
+                                        form.setData('paidOn', e.target.value)
+                                    }
+                                />
+                                <InputError message={form.errors.paidOn} />
                             </div>
-                        )}
+                            <div className="grid gap-2">
+                                <Label htmlFor={`medio-${cuota.id}`}>
+                                    Con qué se le pagó
+                                </Label>
+                                <Select
+                                    value={form.data.paymentMedium}
+                                    onValueChange={(valor) =>
+                                        form.setData('paymentMedium', valor)
+                                    }
+                                >
+                                    <SelectTrigger id={`medio-${cuota.id}`}>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="cash">
+                                            Efectivo
+                                        </SelectItem>
+                                        <SelectItem value="cheque">
+                                            Cheque
+                                        </SelectItem>
+                                        <SelectItem value="bank">
+                                            Transferencia
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError
+                                    message={form.errors.paymentMedium}
+                                />
+                            </div>
+                        </div>
 
                         <OptativoPapel
                             activo={conOrden}
@@ -412,45 +332,35 @@ export default function LegacySettlementDialog({
                             />
                         </OptativoPapel>
 
-                        {/*
-                         * Desde Pagos anteriores el egreso ya tiene su recibo
-                         * del sistema: uno de papel diría dos veces lo mismo.
-                         */}
-                        {enPapel && (
-                            <OptativoPapel
-                                activo={conEgreso}
-                                onActivar={setConEgreso}
-                                etiqueta="Agregar el recibo de egreso de papel"
-                            >
-                                <Papel
-                                    id={`egreso-${cuota.id}`}
-                                    titulo="Recibo de egreso"
-                                    ayuda="El que firmó el beneficiario."
-                                    hoy={hoy}
-                                    numero={form.data.expenseNumber}
-                                    fecha={form.data.expenseDate}
-                                    importe={form.data.expenseAmount}
-                                    onNumero={(v) =>
-                                        form.setData('expenseNumber', v)
-                                    }
-                                    onFecha={(v) =>
-                                        form.setData('expenseDate', v)
-                                    }
-                                    onImporte={(v) =>
-                                        form.setData('expenseAmount', v)
-                                    }
-                                    onFoto={(f) =>
-                                        form.setData('expensePhoto', f)
-                                    }
-                                    errores={{
-                                        numero: form.errors.expenseNumber,
-                                        fecha: form.errors.expenseDate,
-                                        importe: form.errors.expenseAmount,
-                                        foto: form.errors.expensePhoto,
-                                    }}
-                                />
-                            </OptativoPapel>
-                        )}
+                        <OptativoPapel
+                            activo={conEgreso}
+                            onActivar={setConEgreso}
+                            etiqueta="Agregar el recibo de egreso de papel"
+                        >
+                            <Papel
+                                id={`egreso-${cuota.id}`}
+                                titulo="Recibo de egreso"
+                                ayuda="El que firmó el beneficiario."
+                                hoy={hoy}
+                                numero={form.data.expenseNumber}
+                                fecha={form.data.expenseDate}
+                                importe={form.data.expenseAmount}
+                                onNumero={(v) =>
+                                    form.setData('expenseNumber', v)
+                                }
+                                onFecha={(v) => form.setData('expenseDate', v)}
+                                onImporte={(v) =>
+                                    form.setData('expenseAmount', v)
+                                }
+                                onFoto={(f) => form.setData('expensePhoto', f)}
+                                errores={{
+                                    numero: form.errors.expenseNumber,
+                                    fecha: form.errors.expenseDate,
+                                    importe: form.errors.expenseAmount,
+                                    foto: form.errors.expensePhoto,
+                                }}
+                            />
+                        </OptativoPapel>
 
                         <div className="grid gap-2">
                             <Label htmlFor={`notas-pago-anterior-${cuota.id}`}>

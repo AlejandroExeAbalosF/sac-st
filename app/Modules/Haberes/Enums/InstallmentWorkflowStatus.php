@@ -20,9 +20,9 @@ enum InstallmentWorkflowStatus: string
     case Paid = 'paid';
 
     /**
-     * Pagada **fuera del circuito**: en papel antes de la apertura, o desde
-     * «Pagos anteriores». Cómo, lo dice su `LegacySettlement`; el estado
-     * solo dice que a esta cuota ya no se le paga nada más.
+     * Pagada **fuera del circuito**, en papel antes de la apertura. Cuándo
+     * y con qué, lo dice su `LegacySettlement`; el estado solo dice que a
+     * esta cuota ya no se le paga nada más.
      */
     case LegacySettled = 'legacy_settled';
 

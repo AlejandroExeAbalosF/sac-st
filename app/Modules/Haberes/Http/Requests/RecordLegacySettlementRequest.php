@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
-use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Support\BusinessDate;
 use App\Support\Validation\ScannedDocument;
@@ -31,23 +30,8 @@ final class RecordLegacySettlementRequest extends FormRequest
         $hoy = BusinessDate::today()->toDateString();
 
         $reglas = [
-            'mode' => ['required', Rule::enum(LegacySettlementMode::class)],
-            'paidOn' => [
-                'nullable',
-                'required_if:mode,'.LegacySettlementMode::BeforeOpening->value,
-                'date',
-                'before_or_equal:'.$hoy,
-            ],
-            'paymentMedium' => [
-                'nullable',
-                'required_if:mode,'.LegacySettlementMode::BeforeOpening->value,
-                Rule::enum(PaymentMedium::class),
-            ],
-            'receiptId' => [
-                'nullable',
-                'required_if:mode,'.LegacySettlementMode::LegacyDisbursement->value,
-                'integer',
-            ],
+            'paidOn' => ['required', 'date', 'before_or_equal:'.$hoy],
+            'paymentMedium' => ['required', Rule::enum(PaymentMedium::class)],
             'notes' => ['nullable', 'string', 'max:500'],
             'confirmDuplicates' => ['boolean'],
         ];
@@ -68,10 +52,8 @@ final class RecordLegacySettlementRequest extends FormRequest
     public function attributes(): array
     {
         $nombres = [
-            'mode' => 'cómo se pagó',
             'paidOn' => 'fecha del pago',
             'paymentMedium' => 'medio del pago',
-            'receiptId' => 'recibo de Pagos anteriores',
             'notes' => 'observaciones',
             'confirmDuplicates' => 'confirmación',
         ];
@@ -93,9 +75,8 @@ final class RecordLegacySettlementRequest extends FormRequest
     public function messages(): array
     {
         $mensajes = [
-            'paidOn.required_if' => 'Falta la fecha en que se le pagó al beneficiario.',
-            'paymentMedium.required_if' => 'Falta cómo se le pagó.',
-            'receiptId.required_if' => 'Elegí el recibo de Pagos anteriores con que se pagó la cuota.',
+            'paidOn.required' => 'Falta la fecha en que se le pagó al beneficiario.',
+            'paymentMedium.required' => 'Falta cómo se le pagó.',
         ];
 
         foreach (self::PAPELES as $papel) {

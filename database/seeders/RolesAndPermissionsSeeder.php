@@ -248,19 +248,10 @@ class RolesAndPermissionsSeeder extends Seeder
          */
         'cierres.regenerar-planilla' => ['administrador'],
 
-        // Pagar un haber que entró antes de que el sistema existiera.
-        //
-        // No va con `egresos.registrar` aunque sea el mismo mostrador: en un
-        // egreso normal el sistema tiene el expediente, la cuota y el recibo
-        // de ingreso contra los cuales verificar. Acá **no hay nada de eso**
-        // —la única evidencia es la planilla manual— y por eso el pago exige
-        // el criterio del contador, no el del que atiende.
-        'caja.pagar-anterior' => ['administrador', 'contador'],
-
-        // Apartar del saldo del sistema anterior la plata de una cuota
-        // histórica que todavía está en custodia. Es la misma plata que
-        // paga `caja.pagar-anterior`, y baja el mismo saldo: el mismo
-        // criterio del contador.
+        // Reservar del saldo del sistema anterior la plata de una cuota
+        // histórica que todavía está en custodia. Es la única forma en que
+        // baja ese saldo —el pago suelto, sin cuota, se retiró— y decide de
+        // quién es plata que el sistema no recibió: el criterio del contador.
         'caja.apartar-anterior' => ['administrador', 'contador'],
 
         // Abrir los libros con el saldo que ya está en el cajón. Se hace

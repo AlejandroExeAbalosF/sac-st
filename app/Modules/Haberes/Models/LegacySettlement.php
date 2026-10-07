@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Models;
 
 use App\Models\User;
-use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Que una cuota se pagó fuera del circuito, y cómo.
+ * Que una cuota se pagó antes de la apertura, y cómo.
  *
  * Append-only con anulación: un registro equivocado se anula con motivo y
  * la cuota vuelve a quedar pendiente.
@@ -23,11 +21,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property int $haber_id
  * @property int $beneficiary_installment_id
- * @property LegacySettlementMode $mode
  * @property numeric-string $amount
- * @property CarbonInterface|null $paid_on
- * @property PaymentMedium|null $payment_medium
- * @property int|null $legacy_disbursement_receipt_id
+ * @property CarbonInterface $paid_on
+ * @property PaymentMedium $payment_medium
  * @property string|null $notes
  * @property int|null $recorded_by
  * @property CarbonInterface $recorded_at
@@ -42,11 +38,9 @@ final class LegacySettlement extends Model
     protected $fillable = [
         'haber_id',
         'beneficiary_installment_id',
-        'mode',
         'amount',
         'paid_on',
         'payment_medium',
-        'legacy_disbursement_receipt_id',
         'notes',
         'recorded_by',
         'recorded_at',
@@ -70,12 +64,6 @@ final class LegacySettlement extends Model
         return $this->belongsTo(BeneficiaryInstallment::class, 'beneficiary_installment_id');
     }
 
-    /** @return BelongsTo<Receipt, $this> */
-    public function legacyDisbursementReceipt(): BelongsTo
-    {
-        return $this->belongsTo(Receipt::class, 'legacy_disbursement_receipt_id');
-    }
-
     /** @return BelongsTo<User, $this> */
     public function recorder(): BelongsTo
     {
@@ -92,7 +80,6 @@ final class LegacySettlement extends Model
     protected function casts(): array
     {
         return [
-            'mode' => LegacySettlementMode::class,
             'amount' => 'decimal:2',
             'paid_on' => 'date',
             'payment_medium' => PaymentMedium::class,

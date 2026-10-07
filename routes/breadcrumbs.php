@@ -55,9 +55,9 @@ Breadcrumbs::for('caja.apertura.index', fn (): array => [
     Crumb::make('Apertura'),
 ]);
 
-Breadcrumbs::for('caja.pagos-anteriores.index', fn (): array => [
+Breadcrumbs::for('caja.saldo-anterior.index', fn (): array => [
     Crumb::make('Caja del día', route('caja.dia')),
-    Crumb::make('Haberes anteriores'),
+    Crumb::make('Saldo del sistema anterior'),
 ]);
 
 Breadcrumbs::for('caja.arqueos.index', fn (): array => [

@@ -249,8 +249,9 @@ Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 ## Cuotas pagadas fuera del circuito
 
 Una cuota saldada afuera está en `legacy_settled` y tiene un `legacy_settlement`
-vigente. Las dos modalidades —`before_opening` y `legacy_disbursement`— comparten
-las reglas; cambia de dónde salen la fecha y el medio del pago.
+vigente, con la fecha y el medio del pago, obligatorios. Es siempre un pago
+anterior a la apertura: la modalidad «desde Pagos anteriores», que ataba la cuota
+a un pago suelto, se retiró con ese pago.
 
 | Regla | Action | Base |
 | --- | --- | --- |
@@ -258,22 +259,26 @@ las reglas; cambia de dónde salen la fecha y el medio del pago.
 | Solo se salda una cuota pendiente sin asignaciones, recibos, Orden, egreso ni comprobante de depósito | `InstallmentMovements` | `legacy_settlement_requires_clean_installment`, con `FOR UPDATE` sobre la cuota |
 | Una cuota saldada no acepta asignaciones, Órdenes, egresos, comprobantes ni recibos nuevos | `AllocateFundsToInstallment`, elegibilidades, `RegisterDepositTicket` | `reject_movement_on_legacy_settled_installment`, con `FOR SHARE` |
 | Recibo de ingreso de papel obligatorio y por la cuota entera | `RecordLegacySettlement` | La obligatoriedad, en la coherencia; el importe, solo en el Action |
-| Desde Pagos anteriores no hay recibo de egreso de papel | `RecordLegacySettlement` | coherencia |
 | Papeles y pago anteriores a la primera apertura de la caja de Haberes; sin apertura no se cargan | `LegacyCutoff`, `LegacyPaperCheck` | `legacy_paper_before_opening` y `opening_after_legacy_papers` |
 | El mismo papel —tipo, número y fecha— no se carga dos veces | `LegacyPaperCheck` | índice `legacy_documents_paper_unique` |
 | El mismo número con otra fecha, o una foto ya cargada, avisa y pasa con confirmación | `LegacyPaperCheck` | — |
-| El recibo vinculado es un egreso de Pagos anteriores vigente, del beneficiario, en la moneda del haber, y no se vincula más que su importe | `LegacyDisbursementReceipts` | `legacy_settlement_receipt_link`, con `FOR UPDATE` sobre el recibo |
-| Un recibo con vínculos vigentes no se anula | — | `receipts_keep_legacy_settlement_links` |
+| Fecha y medio del pago, obligatorios | `RecordLegacySettlementRequest` | `NOT NULL` en `paid_on` y `payment_medium` |
+| No hay pagos sueltos del sistema anterior | — | `financial_events_type_check` sin `legacy_disbursement` |
 | Registros y papeles no se borran ni se editan: se anulan una vez | `VoidLegacySettlement` | `legacy_records_append_only` |
 | Anular un haber o un expediente no barre cuotas saldadas | `CancelHaber`, `CancelExpediente` | coherencia |
 
-Anular el registro es documental: si la cuota se pagó desde Pagos anteriores, el
-asiento sigue y el recibo recupera su disponible. Los papeles que el registro
-trajo se anulan con él; un recibo de ingreso cargado antes, por otra vía, no.
+Anular el registro es documental: no hay asiento que deshacer. Los papeles que el
+registro trajo se anulan con él; un recibo de ingreso cargado antes, por otra vía,
+no.
 
-La carrera entre dos vínculos al mismo recibo no se reproduce en los tests —el
-recibo nace dentro de la transacción del test y otra conexión no lo ve—; se
-verifica que el Action lo bloquee antes de leer su disponible.
+Retiro del pago suelto: [migración](../database/migrations/2026_10_07_000000_remove_loose_legacy_payments.php).
+Se detiene si encuentra pagos sueltos o cuotas vinculadas a ellos, y no se
+revierte, porque con el esquema se fue el código que lo escribía.
+
+La carrera entre dos reservas sobre el mismo saldo no se reproduce entera en los
+tests —otra conexión no ve lo que la transacción del test escribe—; se verifica que
+la guarda retenga el bloqueo hasta confirmar
+([saldo no negativo](../tests/Feature/Ledger/SaldoAnteriorNoNegativoTest.php)).
 
 Evidencia: [esquema](../database/migrations/2026_10_01_010000_create_legacy_settlement_tables.php),
 [RecordLegacySettlement](../app/Modules/Haberes/Actions/RecordLegacySettlement.php),
@@ -309,7 +314,7 @@ estado ([canal y traslado](#canal-de-pago))—, así que no altera la resta.
 | Un cheque del sistema anterior se asigna y se libera entero: lo asignado es cero o el cheque completo | `FundInstallmentFromLegacy`, `UnallocateFunds` | `legacy_cheque_stays_whole`, diferido |
 | Un cheque identificado y liberado vuelve a poder apartarse; el efectivo y el depósito apartados son de un solo uso | `SetAsideLegacyFunds`, `LegacyFundsOptions` | `allocation_respects_origin` |
 | El depósito directo se aparta del saldo de la cuenta elegida, activa y en la moneda del haber | `SetAsideLegacyFunds`, `CashBalance::ofBankAccount` | `fund_receipts_bank_account_currency` (moneda) |
-| Del efectivo y de cada cuenta se aparta o se paga solo lo que queda **del sistema anterior** en ese lugar: lo declarado en la apertura, menos lo pagado desde Pagos anteriores y lo apartado neto de lo liberado | `SetAsideLegacyFunds`, `PayLegacyBeneficiary`, `LegacyFundsByPlace` | `legacy_funds_at`, dentro de `legacy_funds_balance_check` (diferido, con el bloqueo por caja y moneda) |
+| Del efectivo y de cada cuenta se reserva solo lo que queda **del sistema anterior** en ese lugar: lo declarado en la apertura, menos lo reservado neto de lo liberado | `SetAsideLegacyFunds`, `LegacyFundsByPlace` | `legacy_funds_at`, dentro de `legacy_funds_balance_check` (diferido, con el bloqueo por caja y moneda) |
 | Un recibo de papel suelto se anula con motivo solo si ya no respalda plata ni lo cita una Orden | `VoidLegacyIncomeDocument` | `legacy_income_document_keeps_backing` |
 | El saldo libre de un cheque no se asigna dos veces | `FundInstallmentFromLegacy`, que bloquea los cheques en orden | `allocation_within_receipt`, ahora con `FOR UPDATE` sobre la recepción |
 | Se aparta con financiación cero y por el importe completo | `FundInstallmentFromLegacy` | — |
@@ -325,7 +330,7 @@ es. La Orden por banco toma la cuenta del organismo de la recepción cuando no h
 movimiento del extracto que la confirme.
 
 Lo apartado no figura en la recaudación del día ni en `/recepciones`: ya estaba en
-la caja. Se ve en Pagos anteriores, con lo liberado al lado.
+la caja. Se ve en «Saldo del sistema anterior», con lo liberado al lado.
 
 <a id="saldo-anterior-por-lugar"></a>
 

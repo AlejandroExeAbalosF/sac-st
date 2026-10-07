@@ -43,6 +43,8 @@ const RUTAS_SIN_PANTALLA = [
 
     // Acceso anterior a la caja del día; ahora redirige a su URL canónica.
     'caja.index',
+    // La dirección de cuando el saldo del sistema anterior también pagaba.
+    'caja.pagos-anteriores',
 
     // Comprobantes en PDF, para imprimir o previsualizar.
     'ordenes.print',
@@ -135,7 +137,7 @@ test('las pantallas hermanas de caja tienen una sola miga', function (): void {
 });
 
 test('las pantallas auxiliares vuelven a caja del día', function (): void {
-    foreach (['caja.apertura.index', 'caja.pagos-anteriores.index'] as $ruta) {
+    foreach (['caja.apertura.index', 'caja.saldo-anterior.index'] as $ruta) {
         expect(Breadcrumbs::resolve($ruta)[0])->toBe([
             'title' => 'Caja del día',
             'href' => route('caja.dia'),

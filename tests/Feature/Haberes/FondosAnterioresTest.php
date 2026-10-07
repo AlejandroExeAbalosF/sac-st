@@ -297,7 +297,7 @@ class FondosAnterioresTest extends TestCase
         );
     }
 
-    /** Y Pagos anteriores muestra, en cada saldo, la parte del sistema anterior. */
+    /** Y el saldo del sistema anterior muestra, en cada lugar, la parte vieja. */
     public function test_pagos_anteriores_muestra_lo_viejo_de_cada_lugar(): void
     {
         $this->abrirLibros(
@@ -309,7 +309,7 @@ class FondosAnterioresTest extends TestCase
         $this->apartar($this->cuotaPor('307/2024', '200000.00', ExpectedMedium::Cash), PaymentMedium::Cash);
 
         $this->actingAs($this->operador('contador'))
-            ->get('/caja/pagos-anteriores')
+            ->get('/caja/saldo-anterior')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('balances.cash', '300000.00')
@@ -781,7 +781,7 @@ class FondosAnterioresTest extends TestCase
         );
     }
 
-    /** Pagos anteriores muestra lo apartado y lo liberado, y el saldo cierra. */
+    /** El saldo del sistema anterior muestra lo reservado y lo liberado, y cierra. */
     public function test_pagos_anteriores_lista_lo_apartado_con_lo_liberado(): void
     {
         $this->abrirLibros();
@@ -791,7 +791,7 @@ class FondosAnterioresTest extends TestCase
         app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '20000.00', 'test-lista-222', 'La cuota bajó a 80.000.');
 
         $this->actingAs($this->operador('contador'))
-            ->get('/caja/pagos-anteriores')
+            ->get('/caja/saldo-anterior')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('balances.pending', $this->restoDelSistemaAnterior('80000.00'))

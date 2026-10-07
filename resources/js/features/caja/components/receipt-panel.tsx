@@ -162,12 +162,7 @@ export default function ReceiptPanel({ receiptId }: { receiptId: number }) {
                                 conceptoDelPapel={datos.concept}
                             />
                         ) : (
-                            /*
-                             * Un pago de haber anterior no cuelga de ninguna
-                             * cuota: lo que el papel llama expediente es la
-                             * referencia al registro manual, y no lleva a
-                             * ninguna pantalla.
-                             */
+                            // Sin cuota en el sistema: se muestra lo que dice el papel.
                             <Bloque titulo="A qué corresponde">
                                 <Dato etiqueta="Beneficiario">
                                     {datos.beneficiaryNameOnPaper ?? '—'}
@@ -176,9 +171,8 @@ export default function ReceiptPanel({ receiptId }: { receiptId: number }) {
                                     {datos.expedienteNumberOnPaper ?? '—'}
                                 </Dato>
                                 <p className="col-span-2 text-xs text-muted-foreground">
-                                    Es un pago de un haber anterior: se registró
-                                    fuera del circuito y no tiene expediente en
-                                    el sistema.
+                                    El comprobante no está asociado a ninguna
+                                    cuota del sistema.
                                 </p>
                             </Bloque>
                         )}

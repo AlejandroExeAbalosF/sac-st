@@ -24,7 +24,7 @@ import { calendario, dia as caja } from '@/routes/caja';
 import { index as apertura } from '@/routes/caja/apertura';
 import { index as arqueos } from '@/routes/caja/arqueos';
 import { index as cierres } from '@/routes/caja/cierres';
-import { index as pagosAnteriores } from '@/routes/caja/pagos-anteriores';
+import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
 
 type Estado = App.Modules.Ledger.Data.CashBoxStateData;
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
@@ -34,9 +34,8 @@ type Fila = {
     number: string;
     receiptId: number;
     /**
-     * Nulo en los pagos de haberes anteriores, que no cuelgan de ninguna
-     * cuota. Decide qué fila abre panel: ofrecer uno que no lleva a ningún
-     * lado es peor que no ofrecerlo.
+     * Nulo si el comprobante no tiene cuota. Decide qué fila abre panel:
+     * ofrecer uno que no lleva a ningún lado es peor que no ofrecerlo.
      */
     installmentId: number | null;
     cash: string;
@@ -73,7 +72,6 @@ type Props = {
     suggestedDenominations: number[];
     can: {
         open: boolean;
-        payLegacy: boolean;
         regenerate: boolean;
         count: boolean;
         review: boolean;
@@ -315,8 +313,7 @@ export default function CajaIndex({
 
                 {/*
                  * Lo que queda del sistema anterior sin dueño, mientras quede
-                 * algo. Baja con cada pago y con cada reserva para una
-                 * cuota histórica; el día que llega a cero se apaga la
+                 * algo. Baja con cada reserva para una cuota histórica; el día que llega a cero se apaga la
                  * planilla en paralelo.
                  */}
                 {/[1-9]/.test(legacyPending) && (
@@ -326,18 +323,16 @@ export default function CajaIndex({
                             Quedan <Money value={legacyPending} /> del sistema
                             anterior sin reservar.
                         </span>
-                        {can.payLegacy && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="ml-auto"
-                                asChild
-                            >
-                                <Link href={pagosAnteriores().url}>
-                                    Ver haberes anteriores
-                                </Link>
-                            </Button>
-                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto"
+                            asChild
+                        >
+                            <Link href={saldoAnterior().url}>
+                                Ver el detalle
+                            </Link>
+                        </Button>
                     </div>
                 )}
 
@@ -532,8 +527,8 @@ function Bloque({
 /**
  * El número del comprobante, que abre su panel cuando hay de qué hablar.
  *
- * Sin `installmentId` queda como texto: es un pago de haber anterior y el
- * panel no tendría a qué apuntar. Un número que parece clicable y no hace
+ * Sin `installmentId` queda como texto: el panel no tendría a qué
+ * apuntar. Un número que parece clicable y no hace
  * nada es peor que uno que no lo parece.
  */
 function ReciboLink({ fila }: { fila: Fila }) {

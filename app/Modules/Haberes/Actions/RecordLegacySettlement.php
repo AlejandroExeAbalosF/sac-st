@@ -8,7 +8,6 @@ use App\Modules\Haberes\Enums\ExpedienteStatus;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
-use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
@@ -16,7 +15,6 @@ use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Haberes\Support\InstallmentMovements;
 use App\Modules\Haberes\Support\LegacyCutoff;
-use App\Modules\Haberes\Support\LegacyDisbursementReceipts;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Haberes\Support\LegacyPaperCheck;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -38,9 +36,8 @@ use Throwable;
  * pagadas quedan registradas con los papeles que lo prueban, y el
  * sistema no las vuelve a ofrecer para cobrar ni para pagar.
  *
- * **No mueve dinero.** En `before_opening` la plata entró y salió antes de
- * la apertura; en `legacy_disbursement` el egreso ya está en el libro,
- * como un pago de «Pagos anteriores», y esto solo lo ata a su cuota.
+ * **No mueve dinero.** La plata entró y salió antes de la apertura: nunca
+ * estuvo en el saldo con que la caja abrió los libros.
  *
  * ─── Lo que exige ───────────────────────────────────────────────────────
  *
@@ -48,9 +45,8 @@ use Throwable;
  *   una cuota que ya se movió adentro no se declara pagada afuera.
  * - El recibo de ingreso de papel, por el importe de la cuota —se pagan
  *   enteras—. Si la cuota ya tiene uno vigente, se reutiliza.
- * - Fechas anteriores a la apertura de la caja.
- * - En `legacy_disbursement`, un recibo del mismo beneficiario, en la
- *   moneda del haber y con disponible suficiente.
+ * - La fecha y el medio del pago, y fechas anteriores a la apertura de la
+ *   caja.
  *
  * Todo lo que acá se explica, la base lo vuelve a imponer.
  */
@@ -59,7 +55,6 @@ final class RecordLegacySettlement
     public function __construct(
         private readonly InstallmentMovements $movimientos,
         private readonly LegacyCutoff $corte,
-        private readonly LegacyDisbursementReceipts $recibosAnteriores,
         private readonly LegacyPaperCheck $papeles,
         private readonly StoreAttachment $adjuntos,
         private readonly RecordAuditEvent $auditar,
@@ -75,13 +70,11 @@ final class RecordLegacySettlement
      */
     public function handle(
         BeneficiaryInstallment $installment,
-        LegacySettlementMode $mode,
         ?LegacyPaper $income,
+        CarbonInterface $paidOn,
+        PaymentMedium $paymentMedium,
         ?LegacyPaper $order = null,
         ?LegacyPaper $expense = null,
-        ?CarbonInterface $paidOn = null,
-        ?PaymentMedium $paymentMedium = null,
-        ?int $receiptId = null,
         ?string $notes = null,
         ?int $actorId = null,
         bool $confirmDuplicates = false,
@@ -91,15 +84,15 @@ final class RecordLegacySettlement
 
         try {
             return DB::transaction(function () use (
-                $installment, $mode, $income, $order, $expense, $paidOn, $paymentMedium,
-                $receiptId, $notes, $actorId, $confirmDuplicates, &$guardados,
+                $installment, $income, $order, $expense, $paidOn, $paymentMedium,
+                $notes, $actorId, $confirmDuplicates, &$guardados,
             ): LegacySettlement {
                 [$haber, $cuota] = $this->lockChain($installment);
 
                 $this->assertSettleable($haber, $cuota);
 
                 $ingresoVigente = $this->movimientos->currentLegacyDocument($cuota->id, LegacyDocumentKind::IncomeReceipt);
-                $papeles = $this->papersToStore($ingresoVigente, $income, $order, $expense, $mode);
+                $papeles = $this->papersToStore($ingresoVigente, $income, $order, $expense);
 
                 $apertura = $this->corte->date();
 
@@ -113,14 +106,14 @@ final class RecordLegacySettlement
                 $this->assertIncomeMatches($ingresoVigente, $income, $cuota);
                 $this->papeles->assertNotLoaded($papeles, $confirmDuplicates);
 
-                $datosDelPago = $this->paymentFor($mode, $haber, $cuota, $paidOn, $paymentMedium, $receiptId, $apertura, $ingresoVigente, $income);
+                $this->assertPaidOn($paidOn, $apertura, $ingresoVigente, $income);
 
                 $registro = LegacySettlement::query()->create([
                     'haber_id' => $haber->id,
                     'beneficiary_installment_id' => $cuota->id,
-                    'mode' => $mode,
                     'amount' => $cuota->importeEsperado(),
-                    ...$datosDelPago,
+                    'paid_on' => $paidOn,
+                    'payment_medium' => $paymentMedium,
                     'notes' => $notes,
                     'recorded_by' => $actorId,
                     'recorded_at' => now(),
@@ -157,11 +150,9 @@ final class RecordLegacySettlement
                 $cuota->forceFill(['workflow_status' => InstallmentWorkflowStatus::LegacySettled])->save();
 
                 $this->auditar->handle('cuota.pagada-fuera-del-circuito', $cuota, after: [
-                    'mode' => $mode->value,
                     'amount' => $registro->amount,
-                    'paid_on' => $registro->paid_on?->toDateString(),
-                    'payment_medium' => $registro->payment_medium?->value,
-                    'legacy_disbursement_receipt_id' => $registro->legacy_disbursement_receipt_id,
+                    'paid_on' => $registro->paid_on->toDateString(),
+                    'payment_medium' => $registro->payment_medium->value,
                 ], metadata: [
                     'papeles' => implode(', ', array_map(
                         fn (LegacyPaper $papel): string => $papel->kind->label().' '.$papel->number,
@@ -236,9 +227,8 @@ final class RecordLegacySettlement
      * Qué papeles nuevos se guardan.
      *
      * El recibo de ingreso se pide solo si la cuota no tiene uno vigente:
-     * si se cargó antes, al apartar fondos, es el mismo papel y cargarlo de
-     * nuevo chocaría con la unicidad. Un pago desde «Pagos anteriores» no
-     * lleva recibo de egreso de papel: su egreso es el recibo del sistema.
+     * si se cargó antes, al reservar fondos, es el mismo papel y cargarlo de
+     * nuevo chocaría con la unicidad.
      *
      * @return list<LegacyPaper>
      *
@@ -249,7 +239,6 @@ final class RecordLegacySettlement
         ?LegacyPaper $income,
         ?LegacyPaper $order,
         ?LegacyPaper $expense,
-        LegacySettlementMode $mode,
     ): array {
         if ($ingresoVigente === null && $income === null) {
             throw ValidationException::withMessages([
@@ -264,12 +253,6 @@ final class RecordLegacySettlement
                     $ingresoVigente->number,
                     $ingresoVigente->issued_on->format('d/m/Y'),
                 ),
-            ]);
-        }
-
-        if ($mode === LegacySettlementMode::LegacyDisbursement && $expense !== null) {
-            throw ValidationException::withMessages([
-                'expenseNumber' => 'Un pago hecho desde Pagos anteriores ya tiene su recibo de egreso del sistema.',
             ]);
         }
 
@@ -300,76 +283,28 @@ final class RecordLegacySettlement
     }
 
     /**
-     * La fecha y el medio del pago, o el recibo que los trae.
-     *
-     * @return array<string, mixed>
+     * El pago es anterior a la apertura, y posterior a que el empleador pagó.
      *
      * @throws ValidationException
      */
-    private function paymentFor(
-        LegacySettlementMode $mode,
-        Haber $haber,
-        BeneficiaryInstallment $cuota,
-        ?CarbonInterface $paidOn,
-        ?PaymentMedium $paymentMedium,
-        ?int $receiptId,
+    private function assertPaidOn(
+        CarbonInterface $paidOn,
         CarbonInterface $apertura,
         ?LegacyDocument $ingresoVigente,
         ?LegacyPaper $income,
-    ): array {
-        if ($mode === LegacySettlementMode::BeforeOpening) {
-            if ($paidOn === null || $paymentMedium === null) {
-                throw ValidationException::withMessages(array_filter([
-                    'paidOn' => $paidOn === null ? 'Falta la fecha en que se le pagó al beneficiario.' : null,
-                    'paymentMedium' => $paymentMedium === null ? 'Falta cómo se le pagó.' : null,
-                ]));
-            }
-
-            if ($paidOn->greaterThanOrEqualTo($apertura)) {
-                throw ValidationException::withMessages([
-                    'paidOn' => sprintf('El pago tiene que ser anterior a la apertura de la caja (%s).', $apertura->format('d/m/Y')),
-                ]);
-            }
-
-            $cobro = $income->issuedOn ?? $ingresoVigente?->issued_on;
-
-            if ($cobro !== null && $paidOn->lessThan($cobro)) {
-                throw ValidationException::withMessages([
-                    'paidOn' => 'Se le pagó al beneficiario antes de que el empleador depositara: revisá las fechas.',
-                ]);
-            }
-
-            return [
-                'paid_on' => $paidOn,
-                'payment_medium' => $paymentMedium,
-            ];
-        }
-
-        if ($receiptId === null) {
+    ): void {
+        if ($paidOn->greaterThanOrEqualTo($apertura)) {
             throw ValidationException::withMessages([
-                'receiptId' => 'Elegí el recibo de Pagos anteriores con que se pagó la cuota.',
+                'paidOn' => sprintf('El pago tiene que ser anterior a la apertura de la caja (%s).', $apertura->format('d/m/Y')),
             ]);
         }
 
-        $candidato = $this->recibosAnteriores->lockedCandidate($haber, $receiptId);
+        $cobro = $income->issuedOn ?? $ingresoVigente?->issued_on;
 
-        if ($candidato === null) {
+        if ($cobro !== null && $paidOn->lessThan($cobro)) {
             throw ValidationException::withMessages([
-                'receiptId' => 'Ese recibo no es un pago de Pagos anteriores vigente de este beneficiario en la moneda del haber.',
+                'paidOn' => 'Se le pagó al beneficiario antes de que el empleador depositara: revisá las fechas.',
             ]);
         }
-
-        if (Decimal::isNegative(Decimal::sub($candidato['available'], $cuota->importeEsperado()))) {
-            throw ValidationException::withMessages([
-                'receiptId' => sprintf(
-                    'Al recibo %s le quedan %s sin vincular y la cuota es de %s.',
-                    $candidato['receipt']->formatted_number,
-                    Decimal::format($candidato['available']),
-                    Decimal::format($cuota->importeEsperado()),
-                ),
-            ]);
-        }
-
-        return ['legacy_disbursement_receipt_id' => $candidato['receipt']->id];
     }
 }

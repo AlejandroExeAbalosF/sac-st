@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Modules\Ledger\Http\Controllers\CashCalendarController;
 use App\Modules\Ledger\Http\Controllers\CashController;
 use App\Modules\Ledger\Http\Controllers\CashCountController;
-use App\Modules\Ledger\Http\Controllers\LegacyDisbursementController;
+use App\Modules\Ledger\Http\Controllers\LegacyFundsBalanceController;
 use App\Modules\Ledger\Http\Controllers\OpeningBalanceController;
 use App\Modules\Ledger\Http\Controllers\PeriodClosingController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +29,16 @@ Route::middleware(['auth', 'verified'])->prefix('caja')->name('caja.')->group(fu
         Route::get('/', [CashController::class, 'redirect'])->name('index');
         Route::get('dia', [CashController::class, 'index'])->name('dia');
         Route::get('arqueos', [CashCountController::class, 'index'])->name('arqueos.index');
+
+        /*
+         * El saldo del sistema anterior: cuánto queda sin reservar, dónde
+         * está y qué se reservó para cuotas históricas. Es de consulta: un
+         * caso viejo se paga cargando su expediente, no desde acá.
+         */
+        Route::get('saldo-anterior', [LegacyFundsBalanceController::class, 'index'])
+            ->name('saldo-anterior.index');
+        // La dirección de cuando la pantalla también pagaba.
+        Route::redirect('pagos-anteriores', '/caja/saldo-anterior')->name('pagos-anteriores');
     });
 
     /*
@@ -39,18 +49,6 @@ Route::middleware(['auth', 'verified'])->prefix('caja')->name('caja.')->group(fu
     Route::middleware('can:caja.abrir-saldo-inicial')->group(function (): void {
         Route::get('apertura', [OpeningBalanceController::class, 'index'])->name('apertura.index');
         Route::post('apertura', [OpeningBalanceController::class, 'store'])->name('apertura.store');
-    });
-
-    /*
-     * Los pagos del sistema anterior: la única salida de `LEGACY_FUNDS`.
-     * Sin ellos esa cuenta sube y no baja, y los casos viejos se siguen
-     * pagando por planilla en paralelo.
-     */
-    Route::middleware('can:caja.pagar-anterior')->group(function (): void {
-        Route::get('pagos-anteriores', [LegacyDisbursementController::class, 'index'])
-            ->name('pagos-anteriores.index');
-        Route::post('pagos-anteriores', [LegacyDisbursementController::class, 'store'])
-            ->name('pagos-anteriores.store');
     });
 
     Route::middleware('can:caja.arquear')->group(function (): void {

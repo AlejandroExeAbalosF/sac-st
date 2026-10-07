@@ -34,7 +34,7 @@ final class LegacyInstallments
 
         $registros = LegacySettlement::query()
             ->current()
-            ->with(['recorder:id,name', 'legacyDisbursementReceipt'])
+            ->with(['recorder:id,name'])
             ->whereIn('beneficiary_installment_id', $installmentIds)
             ->get()
             ->keyBy('beneficiary_installment_id');

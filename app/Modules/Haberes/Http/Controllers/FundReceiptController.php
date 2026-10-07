@@ -60,8 +60,8 @@ final class FundReceiptController extends Controller
             /*
              * Solo lo que entró por el circuito. La plata del sistema
              * anterior —los cheques de la apertura, lo apartado— no espera
-             * dueño en esta cola: se asigna desde la cuota, y su saldo se
-             * mira en Pagos anteriores.
+             * dueño en esta cola: se reserva desde la cuota, y su saldo se
+             * mira en «Saldo del sistema anterior».
              */
             ->where('origin', FundReceiptOrigin::Received->value)
             /*

@@ -17,10 +17,9 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * mientras se concilia.
  *
  * Trae las dos caras: lo que el papel dice —congelado el día de la
- * emisión— y a qué apunta hoy en el circuito. El segundo puede faltar y
- * eso no es un hueco: los pagos de haberes anteriores no cuelgan de
- * ninguna cuota del sistema, y su número de expediente es la referencia
- * al registro manual.
+ * emisión— y a qué apunta hoy en el circuito. El segundo puede faltar si
+ * la cuota del comprobante ya no está, y el panel muestra igual lo que el
+ * papel dice.
  */
 #[TypeScript]
 final class ReceiptPanelData extends Data
@@ -37,11 +36,7 @@ final class ReceiptPanelData extends Data
         public ?string $beneficiaryNameOnPaper,
         /** El número de expediente tal como salió impreso. */
         public ?string $expedienteNumberOnPaper,
-        /**
-         * A qué apunta hoy. Ausente en los pagos de haberes anteriores,
-         * donde lo impreso es una referencia y no un expediente del
-         * sistema.
-         */
+        /** A qué apunta hoy. Ausente si el comprobante no tiene cuota. */
         public ?ReceiptSubjectData $subject,
     ) {}
 

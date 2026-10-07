@@ -66,7 +66,6 @@ final class ClosePeriod
         FinancialEventType::CashDepositCredited->value => 'received',
         FinancialEventType::CashDisbursement->value => 'disbursed',
         FinancialEventType::BankDisbursement->value => 'disbursed',
-        FinancialEventType::LegacyDisbursement->value => 'disbursed',
         FinancialEventType::CashDepositedToBank->value => 'deposited',
         /*
          * La asignación no mueve ninguna de las tres columnas: cambia de

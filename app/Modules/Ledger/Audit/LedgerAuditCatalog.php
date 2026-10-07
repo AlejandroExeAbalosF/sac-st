@@ -53,12 +53,6 @@ final class LedgerAuditCatalog implements AuditCatalogContributor
             new AuditActionDefinition('periodo.cerrado', 'Se cerró el período', 'Caja'),
             new AuditActionDefinition('periodo.reabierto', 'Se reabrió el período', 'Caja', AuditSeverity::Critical),
             new AuditActionDefinition('planilla.regenerada', 'Se rehízo la planilla del cierre', 'Caja', AuditSeverity::Critical),
-            new AuditActionDefinition(
-                'caja.haber-anterior-pagado',
-                'Se pagó un haber anterior al sistema',
-                'Caja',
-                metadata: ['referencia' => 'Referencia'],
-            ),
         );
 
         $catalog->registerSubject(new CashCountSubject);

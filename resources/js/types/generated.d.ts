@@ -457,24 +457,11 @@ declare namespace App {
                         available: string;
                     }[];
                 };
-                export type LegacyReceiptOptionData = {
-                    id: number;
-                    number: string;
-                    date: string;
-                    medium: string | null;
-                    reference: string | null;
-                    amount: string;
-                    available: string;
-                };
                 export type LegacySettlementData = {
                     id: number;
-                    mode: App.Modules.Haberes.Enums.LegacySettlementMode;
                     amount: string;
-                    paidOn: string | null;
-                    paymentMedium: App.Modules.Ledger.Enums.PaymentMedium | null;
-                    receiptId: number | null;
-                    receiptNumber: string | null;
-                    receiptReference: string | null;
+                    paidOn: string;
+                    paymentMedium: App.Modules.Ledger.Enums.PaymentMedium;
                     notes: string | null;
                     recordedBy: string | null;
                     recordedAt: string;
@@ -637,8 +624,7 @@ declare namespace App {
                     | 'debit_observed'
                     | 'ready_to_validate'
                     | 'paid'
-                    | 'paid_before_opening'
-                    | 'paid_from_legacy';
+                    | 'paid_before_opening';
                 export type InstallmentWorkflowStatus =
                     | 'active'
                     | 'suspended'
@@ -648,8 +634,6 @@ declare namespace App {
                     | 'legacy_settled';
                 export type LegacyDocumentKind =
                     'income_receipt' | 'payment_order' | 'expense_receipt';
-                export type LegacySettlementMode =
-                    'before_opening' | 'legacy_disbursement';
                 export type PaseStatus =
                     'draft' | 'generated' | 'signed' | 'archived' | 'voided';
                 export type PaymentChannel =
@@ -820,7 +804,6 @@ declare namespace App {
                     | 'cash_deposit_credited'
                     | 'cash_adjustment'
                     | 'opening_balance'
-                    | 'legacy_disbursement'
                     | 'reversal'
                     | 'authorized_adjustment'
                     | 'legacy_funds_allocated';

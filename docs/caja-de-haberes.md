@@ -311,30 +311,25 @@ día** —no una copia de solo lectura— y lista los asientos que lo movieron, 
 rótulo, su importe y, si fue revertido, el día en que se revirtió. También desde
 acá se cierra el mes, que es donde se lo está mirando.
 
-### Pagos anteriores · `/caja/pagos-anteriores`
+### Saldo del sistema anterior · `/caja/saldo-anterior`
 
-Egresos contra `LEGACY_FUNDS`, el saldo previo al sistema. Exige referencia al
-registro manual, porque la única evidencia es la planilla en papel.
+Pantalla **de consulta** sobre `LEGACY_FUNDS`, el saldo previo al sistema. La ve
+quien ve la caja (`caja.ver`), y el aviso de la caja del día lleva a ella.
 
-No se paga más de lo que queda, **ni en total ni en el lugar de donde sale**: en
-efectivo, solo el efectivo que queda del sistema anterior; por transferencia, lo
-que queda en la cuenta elegida. Cada tarjeta de saldo muestra, debajo, la parte
-que es del sistema anterior; el resto es plata que entró después y es de otros
-beneficiarios ([saldo por lugar](haberes-reglas.md#saldo-anterior-por-lugar)). El
-Action lo explica y la base lo impide aunque el asiento no pase por él; dos pagos
-simultáneos se ordenan con un bloqueo por caja y moneda, el mismo en los dos
-lados (`LegacyFundsLock`).
+- **«Del sistema anterior, sin reservar»:** lo que todavía no tiene dueño. El día
+  que llega a cero se apaga la planilla en paralelo.
+- **Cada saldo —efectivo, cheques, depósitos directos— con su parte vieja
+  debajo:** el resto es plata que entró después y es de otros beneficiarios
+  ([saldo por lugar](haberes-reglas.md#saldo-anterior-por-lugar)).
+- **Lo reservado para cuotas históricas**, con lo liberado al lado.
 
-Cuando después se carga el expediente histórico, sus cuotas se vinculan a estos
-recibos desde la ficha del haber
-([expedientes históricos](haberes.md#historicos)). El vínculo es documental: no
-mueve el libro, y un recibo con vínculos vigentes no se puede anular.
-
-El saldo también baja cuando se **reserva** plata para una cuota histórica que
-todavía no se pagó ([fondos anteriores](haberes.md#fondos-anteriores)). Reservar no
-mueve el dinero: sigue en el cajón, la cartera o la cuenta hasta que se le pague a
-la cuota por el circuito. La pantalla lista lo reservado con lo liberado al lado,
-y el saldo se rotula «Del sistema anterior, sin reservar».
+Nada se paga desde acá. La única forma en que baja el saldo es **reservar** plata
+para una cuota histórica que todavía no se pagó
+([fondos anteriores](haberes.md#fondos-anteriores)); reservar no mueve el dinero,
+que sigue en el cajón, la cartera o la cuenta hasta que se le pague a la cuota por
+el circuito. La pantalla pagaba también un caso viejo suelto, sin expediente;
+ese pago se retiró sin haberse usado, y su dirección vieja
+(`/caja/pagos-anteriores`) lleva a esta.
 
 ---
 

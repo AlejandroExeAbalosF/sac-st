@@ -169,7 +169,7 @@ beneficiario ya cobró esta cuota?**
 
 | Respuesta | Segundo paso |
 | --- | --- |
-| Sí, ya cobró | Pago histórico: antes de usar el sistema o desde Pagos anteriores. Registro histórico: no mueve plata |
+| Sí, ya cobró | Pago histórico: antes de que la caja abriera sus libros. Registro histórico: no mueve plata |
 | No, todavía no cobró | Reservar fondos: su plata está en la caja desde antes del sistema. Se reserva para la cuota y se le paga por el circuito normal |
 
 Se pregunta en vez de ofrecer dos botones porque elegir mal no se nota: una cuota
@@ -181,27 +181,26 @@ pregunta». El botón no
 aparece en una cuota que ya tiene plata o recibo del circuito actual, ni para quien
 no tiene ninguno de los dos permisos. Lo decide `features/haberes/legacy-options.ts`.
 
-Una cuota que **ya se pagó fuera del circuito** se registra respondiendo «Sí, ya
-cobró», de una de dos maneras:
-
-| Modalidad | Cuándo | Qué se carga |
-| --- | --- | --- |
-| Antes de la apertura | Se pagó en papel, antes de que la caja abriera los libros | Recibo de ingreso; Orden y recibo de egreso si están; fecha y medio del pago |
-| Desde Pagos anteriores | Se pagó con `/caja/pagos-anteriores`, contra el saldo del sistema anterior | Recibo de ingreso y el recibo del sistema que registró ese egreso |
+Una cuota que **ya se pagó antes de la apertura** se registra respondiendo «Sí, ya
+cobró»: el recibo de ingreso, la Orden y el recibo de egreso si están, y la fecha
+y el medio del pago.
 
 Los papeles van con **el número de talonario y la fecha que tienen impresos**,
 nunca con numeración del sistema, y la foto si está a mano. El recibo de ingreso
 es obligatorio y por el importe de la cuota: las cuotas se pagan enteras.
 
-No mueve dinero. En la primera modalidad el pago ocurrió antes de la apertura; en
-la segunda el egreso ya está en el libro y lo único que se agrega es el vínculo.
-Un recibo de Pagos anteriores puede respaldar varias cuotas del mismo beneficiario,
-hasta su importe.
+No mueve dinero: el pago ocurrió antes de la apertura, así que esa plata nunca
+estuvo en el saldo con que la caja abrió los libros.
 
 La cuota queda en `legacy_settled` y su tarjeta muestra los papeles en lugar de
 los tramos de ingreso, Orden y egreso. Un registro mal cargado se anula con motivo
-y la cuota vuelve a estar pendiente; si venía de Pagos anteriores, el pago sigue
-en la caja.
+y la cuota vuelve a estar pendiente.
+
+Un caso viejo **siempre** se paga así, con su expediente cargado: no hay un pago
+suelto, sin cuota, contra el saldo del sistema anterior. Existió («Pagos
+anteriores») y se retiró sin haberse usado, porque dejaba el pago atado a una
+referencia de texto que nadie verificaba y permitía pagar dos veces el mismo
+caso. El saldo se consulta en `/caja/saldo-anterior`.
 
 Reglas: [cuotas pagadas fuera del circuito](haberes-reglas.md#historicos).
 

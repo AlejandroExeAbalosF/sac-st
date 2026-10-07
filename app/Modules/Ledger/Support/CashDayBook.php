@@ -93,9 +93,7 @@ final class CashDayBook
                 'number' => (string) ($fila->talonario_number ?? $fila->formatted_number),
                 'receiptId' => (int) $fila->id,
                 /*
-                 * Nulo en los pagos de haberes anteriores: no cuelgan de
-                 * ninguna cuota del sistema y su `expediente_number_snapshot`
-                 * es una referencia al registro manual. La pantalla lo usa
+                 * Nulo si el comprobante no tiene cuota. La pantalla lo usa
                  * para decidir qué fila abre panel y cuál no —ofrecer uno
                  * que no lleva a ningún lado es peor que no ofrecerlo—.
                  */

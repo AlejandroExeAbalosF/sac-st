@@ -20,12 +20,10 @@ use Illuminate\Validation\ValidationException;
  * Es la salida para un error de carga: la cuota vuelve a quedar pendiente
  * y sus papeles quedan anulados, con motivo. Nada se borra.
  *
- * **Es documental.** Si el pago vino de «Pagos anteriores», el egreso
- * contable sigue en el libro y el recibo vuelve a tener disponible para
- * respaldar otra cuota: lo que se deshace es el vínculo, no el pago.
+ * **Es documental**, como el registro: no hay asiento que deshacer.
  *
  * Los papeles que la cuota tenía de antes —un recibo de ingreso cargado al
- * apartar fondos— no son del registro y no caen con él.
+ * reservar fondos— no son del registro y no caen con él.
  */
 final class VoidLegacySettlement
 {
@@ -77,9 +75,9 @@ final class VoidLegacySettlement
             $cuota->forceFill(['workflow_status' => InstallmentWorkflowStatus::Active])->save();
 
             $this->auditar->handle('cuota.pago-fuera-del-circuito-anulado', $cuota, before: [
-                'mode' => $registro->mode->value,
                 'amount' => $registro->amount,
-                'legacy_disbursement_receipt_id' => $registro->legacy_disbursement_receipt_id,
+                'paid_on' => $registro->paid_on->toDateString(),
+                'payment_medium' => $registro->payment_medium->value,
             ], metadata: ['reason' => $motivo], actorId: $actorId);
 
             return $registro;

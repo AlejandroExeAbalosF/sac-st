@@ -73,9 +73,6 @@ enum InstallmentStage: string
     /** En papel, antes de que el sistema abriera los libros. */
     case PaidBeforeOpening = 'paid_before_opening';
 
-    /** Desde «Pagos anteriores», con su recibo de egreso del sistema. */
-    case PaidFromLegacy = 'paid_from_legacy';
-
     public function label(): string
     {
         return match ($this) {
@@ -93,7 +90,6 @@ enum InstallmentStage: string
             self::ReadyToValidate => 'Lista para validar',
             self::Paid => 'Pagada',
             self::PaidBeforeOpening => 'Pagada antes de la apertura',
-            self::PaidFromLegacy => 'Pagada desde Pagos anteriores',
         };
     }
 

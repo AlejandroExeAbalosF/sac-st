@@ -40,14 +40,12 @@ use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Actions\AdjustCashDifference;
 use App\Modules\Ledger\Actions\ClosePeriod;
-use App\Modules\Ledger\Actions\PayLegacyBeneficiary;
 use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReopenPeriod;
 use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
-use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashDayTakings;
@@ -112,7 +110,6 @@ use RuntimeException;
  * | Cobro en efectivo y cobro con cheque en custodia | 02/07, 04/08 |
  * | Depósito directo del empleador, imputado | 08/07, 16/07, 21/08 |
  * | Crédito que entra **sin dueño**, en la cola de trabajo | 23/07 |
- * | Haber anterior al sistema, contra el saldo de apertura | 10/07 |
  * | Egreso por mostrador | 15/07, 27/08, 03/09 |
  * | Orden de Pago y su Pase, con CBU verificado | 06/08 |
  * | Egreso por transferencia: informe, débito y validación | 11/08 |
@@ -427,21 +424,6 @@ class OperacionDemoSeeder extends Seeder
         // El depósito directo del empleador: entra por el extracto.
         $this->jornada('2026-07-08', function (): void {
             $this->recibirDelBanco('cardozo-2', '2026-07-08', '600000.00', 'metalurgica');
-        });
-
-        // Un caso del sistema anterior, pagado contra el saldo de apertura.
-        $this->jornada('2026-07-10', function (): void {
-            app(PayLegacyBeneficiary::class)->handle(
-                cashBoxId: $this->caja,
-                beneficiary: Person::query()->findOrFail($this->personas['sosa']),
-                amount: '300000.00',
-                legacyReference: '131010/2023',
-                paymentDate: CarbonImmutable::now(),
-                medium: PaymentMedium::Cash,
-                actorId: $this->contadora->id,
-                talonarioNumber: '76410',
-                printsTalonarioNumber: true,
-            );
         });
 
         // La plata sale hacia su dueño, por mostrador.

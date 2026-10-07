@@ -9,22 +9,17 @@ use App\Modules\Haberes\Actions\RecordLegacySettlement;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
-use App\Modules\Haberes\Enums\LegacySettlementMode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\LegacyPaper;
-use App\Modules\Ledger\Actions\PayLegacyBeneficiary;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
-use App\Modules\Shared\Models\Person;
-use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,7 +69,7 @@ class CuotaHistoricaTest extends TestCase
         $registro = LegacySettlement::query()->sole();
 
         $this->assertSame(InstallmentWorkflowStatus::LegacySettled, $cuota->workflow_status);
-        $this->assertSame(LegacySettlementMode::BeforeOpening, $registro->mode);
+        $this->assertSame('2025-03-20', $registro->paid_on->toDateString());
         $this->assertSame('85000.00', $registro->amount);
         $this->assertSame(PaymentMedium::Cash, $registro->payment_medium);
         $this->assertSame(3, LegacyDocument::query()->where('legacy_settlement_id', $registro->id)->count());
@@ -246,7 +241,6 @@ class CuotaHistoricaTest extends TestCase
         DB::table('legacy_settlements')->insert([
             'haber_id' => $cuota->haber_id,
             'beneficiary_installment_id' => $cuota->id,
-            'mode' => 'before_opening',
             'amount' => '85000.00',
             'paid_on' => '2025-03-20',
             'payment_medium' => 'cash',
@@ -363,204 +357,49 @@ class CuotaHistoricaTest extends TestCase
         DB::table('legacy_documents')->update(['amount' => '1.00']);
     }
 
-    /* ── Pagada desde «Pagos anteriores» ─────────────────────────────── */
-
-    public function test_vincula_una_cuota_con_un_pago_de_pagos_anteriores(): void
+    /** La base ya no tiene dónde guardar un pago desde «Pagos anteriores». */
+    public function test_la_base_solo_registra_cuotas_pagadas_antes_de_la_apertura(): void
     {
         $this->abrirLibros();
         $cuota = $this->cuota('141/2024', '85000.00');
-        $recibo = $this->pagoAnterior($cuota, '85000.00');
-        $pendiente = app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja());
-
-        $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($cuota), [
-                'mode' => 'legacy_disbursement',
-                'receiptId' => $recibo->id,
-                'incomeNumber' => '1234',
-                'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $registro = LegacySettlement::query()->sole();
-
-        $this->assertSame($recibo->id, $registro->legacy_disbursement_receipt_id);
-        $this->assertNull($registro->paid_on);
-        $this->assertNull($registro->payment_medium);
-        // Es documental: el libro no se mueve.
-        $this->assertSame($pendiente, app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja()));
-        $this->assertSame(
-            InstallmentStage::PaidFromLegacy,
-            app(InstallmentStages::class)->forMany(collect([$cuota->refresh()]))[$cuota->id],
-        );
-    }
-
-    public function test_un_pago_desde_pagos_anteriores_no_lleva_recibo_de_egreso_de_papel(): void
-    {
-        $this->abrirLibros();
-        $cuota = $this->cuota('142/2024', '85000.00');
-        $recibo = $this->pagoAnterior($cuota, '85000.00');
-
-        $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($cuota), [
-                'mode' => 'legacy_disbursement',
-                'receiptId' => $recibo->id,
-                'incomeNumber' => '1234',
-                'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
-                'expenseNumber' => '9',
-                'expenseDate' => '2025-03-20',
-                'expenseAmount' => '85000.00',
-            ])
-            ->assertSessionHasErrors('expenseNumber');
-    }
-
-    public function test_el_recibo_vinculado_tiene_que_ser_del_mismo_beneficiario(): void
-    {
-        $this->abrirLibros();
-        $cuota = $this->cuota('143/2024', '85000.00');
-        $ajena = $this->cuota('144/2024', '85000.00');
-        $recibo = $this->pagoAnterior($ajena, '85000.00');
-
-        $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($cuota), [
-                'mode' => 'legacy_disbursement',
-                'receiptId' => $recibo->id,
-                'incomeNumber' => '1234',
-                'incomeDate' => '2025-03-10',
-                'incomeAmount' => '85000.00',
-            ])
-            ->assertSessionHasErrors('receiptId');
-
-        $this->insertarPapel($cuota, LegacyDocumentKind::IncomeReceipt, '1234', '2025-03-10');
 
         $this->expectException(QueryException::class);
-        $this->expectExceptionMessage('se le pagó a otra persona');
+        $this->expectExceptionMessage('paid_on');
 
-        $this->insertarVinculo($cuota, $recibo, '85000.00');
-    }
-
-    /** Un recibo puede cubrir varias cuotas, pero no más de lo que pagó. */
-    public function test_un_recibo_no_cubre_mas_de_su_importe(): void
-    {
-        $this->abrirLibros();
-        [$primera, $segunda] = $this->dosCuotas('145/2024', '60000.00');
-        $recibo = $this->pagoAnterior($primera, '100000.00');
-
-        $this->vincular($primera, $recibo, '1001');
-
-        $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($segunda), [
-                'mode' => 'legacy_disbursement',
-                'receiptId' => $recibo->id,
-                'incomeNumber' => '1002',
-                'incomeDate' => '2025-03-10',
-                'incomeAmount' => '60000.00',
-            ])
-            ->assertSessionHasErrors('receiptId');
-
-        $this->insertarPapel($segunda, LegacyDocumentKind::IncomeReceipt, '1002', '2025-03-10');
-
-        $this->expectException(QueryException::class);
-        $this->expectExceptionMessage('no alcanza para');
-
-        $this->insertarVinculo($segunda, $recibo, '60000.00');
-    }
-
-    public function test_un_recibo_con_vinculos_vigentes_no_se_anula(): void
-    {
-        $this->abrirLibros();
-        $cuota = $this->cuota('146/2024', '85000.00');
-        $recibo = $this->pagoAnterior($cuota, '85000.00');
-        $this->vincular($cuota, $recibo, '1003');
-
-        $this->expectException(QueryException::class);
-        $this->expectExceptionMessage('primero hay que anular esos vínculos');
-
-        DB::table('receipts')->where('id', $recibo->id)->update([
-            'status' => 'voided',
-            'voided_at' => now(),
-            'voided_by' => $this->operador('contador')->id,
-            'void_reason' => 'Prueba',
+        DB::table('legacy_settlements')->insert([
+            'haber_id' => $cuota->haber_id,
+            'beneficiary_installment_id' => $cuota->id,
+            'amount' => '85000.00',
+            'payment_medium' => 'cash',
         ]);
-    }
-
-    /** Anular el vínculo es documental: el pago sigue en el libro. */
-    public function test_anular_el_vinculo_no_toca_el_pago_y_libera_el_recibo(): void
-    {
-        $this->abrirLibros();
-        $cuota = $this->cuota('147/2024', '85000.00');
-        $recibo = $this->pagoAnterior($cuota, '85000.00');
-        $this->vincular($cuota, $recibo, '1004');
-        $pendiente = app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja());
-
-        $this->actingAs($this->operador('contador'))
-            ->post($this->url($cuota).'/anular', ['reason' => 'El recibo era de otra cuota.'])
-            ->assertSessionHasNoErrors();
-
-        $this->assertSame($pendiente, app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja()));
-        $this->assertSame(Receipt::query()->find($recibo->id)?->status, $recibo->status);
-
-        // Y el recibo vuelve a estar disponible para la cuota correcta.
-        $this->vincular($cuota->refresh(), $recibo, '1005');
-        $this->assertSame(1, LegacySettlement::query()->current()->count());
-    }
-
-    /**
-     * El Action bloquea el recibo antes de leer su disponible, igual que el
-     * trigger. La carrera entre dos conexiones no se puede reproducir acá
-     * —el recibo se crea dentro de la transacción del test y otra conexión
-     * no lo ve—; lo verificable es que el bloqueo esté.
-     */
-    public function test_vincular_bloquea_el_recibo_antes_de_leer_su_disponible(): void
-    {
-        $this->abrirLibros();
-        $cuota = $this->cuota('148/2024', '85000.00');
-        $recibo = $this->pagoAnterior($cuota, '85000.00');
-        $bloqueos = [];
-
-        DB::listen(function ($query) use (&$bloqueos): void {
-            $sql = strtolower($query->sql);
-
-            if (str_contains($sql, 'for update') && str_contains($sql, '"receipts"')) {
-                $bloqueos[] = $sql;
-            }
-        });
-
-        $this->vincular($cuota, $recibo, '1006');
-
-        $this->assertNotEmpty($bloqueos);
     }
 
     /* ── La ficha del haber ──────────────────────────────────────────── */
 
-    public function test_la_ficha_del_haber_muestra_los_papeles_y_ofrece_los_recibos_anteriores(): void
+    public function test_la_ficha_del_haber_muestra_los_papeles(): void
     {
         $this->abrirLibros();
         [$primera, $segunda] = $this->dosCuotas('150/2024', '60000.00');
         $this->registrar($primera);
-        $recibo = $this->pagoAnterior($segunda, '60000.00');
         $haber = $primera->haber;
 
         $this->actingAs($this->operador('administrativo'))
             ->get(route('haberes.haber.show', [$haber->expediente, $haber]))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where("historicos.{$primera->id}.settlement.mode", 'before_opening')
+                ->where("historicos.{$primera->id}.settlement.paidOn", '2025-03-20')
+                ->where("historicos.{$primera->id}.settlement.paymentMedium", 'cash')
                 ->where("historicos.{$primera->id}.documents.0.number", '0001234')
                 ->where("historicos.{$segunda->id}.settlement", null)
                 ->where("historicos.{$segunda->id}.obstacle", null)
-                ->where('recibosAnteriores.0.id', $recibo->id)
-                ->where('recibosAnteriores.0.available', '60000.00')
+                ->missing('recibosAnteriores')
                 ->where('corteHistorico', '2026-06-01')
                 ->where('canRecordLegacy', true)
                 ->where('canVoidLegacy', false)
                 ->where('haber.installments.0.stage', 'paid_before_opening'));
 
-        // Los recibos listan pagos con su beneficiario: solo viajan a quien los usa.
         $this->actingAs($this->operador('consulta'))
             ->get(route('haberes.haber.show', [$haber->expediente, $haber]))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('recibosAnteriores', [])
                 ->where('canRecordLegacy', false));
     }
 
@@ -587,7 +426,6 @@ class CuotaHistoricaTest extends TestCase
     private function pagoEnPapel(): array
     {
         return [
-            'mode' => 'before_opening',
             'incomeNumber' => '0001234',
             'incomeDate' => '2025-03-10',
             'incomeAmount' => '85000.00',
@@ -600,7 +438,6 @@ class CuotaHistoricaTest extends TestCase
     {
         return app(RecordLegacySettlement::class)->handle(
             installment: $cuota,
-            mode: LegacySettlementMode::BeforeOpening,
             income: new LegacyPaper(
                 LegacyDocumentKind::IncomeReceipt,
                 'income',
@@ -610,22 +447,6 @@ class CuotaHistoricaTest extends TestCase
             ),
             paidOn: CarbonImmutable::parse('2025-03-20'),
             paymentMedium: PaymentMedium::Cash,
-        );
-    }
-
-    private function vincular(BeneficiaryInstallment $cuota, Receipt $recibo, string $numeroDeIngreso): LegacySettlement
-    {
-        return app(RecordLegacySettlement::class)->handle(
-            installment: $cuota,
-            mode: LegacySettlementMode::LegacyDisbursement,
-            income: new LegacyPaper(
-                LegacyDocumentKind::IncomeReceipt,
-                'income',
-                $numeroDeIngreso,
-                CarbonImmutable::parse('2025-03-10'),
-                $cuota->importeEsperado(),
-            ),
-            receiptId: $recibo->id,
         );
     }
 
@@ -639,32 +460,6 @@ class CuotaHistoricaTest extends TestCase
             'issued_on' => $fecha,
             'amount' => $cuota->importeEsperado(),
         ]);
-    }
-
-    private function insertarVinculo(BeneficiaryInstallment $cuota, Receipt $recibo, string $importe): void
-    {
-        DB::table('legacy_settlements')->insert([
-            'haber_id' => $cuota->haber_id,
-            'beneficiary_installment_id' => $cuota->id,
-            'mode' => 'legacy_disbursement',
-            'amount' => $importe,
-            'legacy_disbursement_receipt_id' => $recibo->id,
-        ]);
-    }
-
-    /** Un pago hecho desde «Pagos anteriores» al beneficiario de la cuota. */
-    private function pagoAnterior(BeneficiaryInstallment $cuota, string $importe): Receipt
-    {
-        /** @var Person $beneficiario */
-        $beneficiario = $cuota->haber->beneficiary;
-
-        return app(PayLegacyBeneficiary::class)->handle(
-            cashBoxId: $this->caja(),
-            beneficiary: $beneficiario,
-            amount: $importe,
-            legacyReference: 'Planilla 2025 · fila '.$cuota->id,
-            paymentDate: CarbonImmutable::parse('2026-06-05'),
-        );
     }
 
     /**

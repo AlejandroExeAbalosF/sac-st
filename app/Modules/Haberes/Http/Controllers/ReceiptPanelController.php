@@ -45,10 +45,9 @@ final class ReceiptPanelController extends Controller
     /**
      * La cuota que originó el comprobante, con su contexto.
      *
-     * Devuelve `null` en dos casos distintos y los dos son normales: el
-     * pago de un haber anterior, que nunca tuvo cuota, y el comprobante
-     * cuya cuota ya no está. El panel muestra igual lo que el papel dice;
-     * lo único que pierde es a dónde ir.
+     * Devuelve `null` si el comprobante no tiene cuota o si su cuota ya no
+     * está. El panel muestra igual lo que el papel dice; lo único que
+     * pierde es a dónde ir.
      */
     private function sujetoDe(Receipt $receipt): ?ReceiptSubjectData
     {

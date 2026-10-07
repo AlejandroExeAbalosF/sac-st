@@ -141,8 +141,7 @@ export type EgresoProps = {
  * Lo del sistema anterior de cada cuota, en un solo bulto.
  *
  * Viaja como la Orden y el egreso: la página lo arma, la lista lo pasa y la
- * tarjeta lo usa. Los recibos de Pagos anteriores y la fecha de corte no
- * van acá: los lee el diálogo de la página, que es el único que los mira.
+ * tarjeta lo usa.
  */
 export type HistoricoProps = {
     /** Los papeles y el pago fuera del circuito de cada cuota, por su id. */

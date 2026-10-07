@@ -42,9 +42,6 @@ enum FinancialEventType: string
     /** El saldo con el que el sistema empieza a contar. */
     case OpeningBalance = 'opening_balance';
 
-    /** Pago de un haber que viene del sistema anterior. */
-    case LegacyDisbursement = 'legacy_disbursement';
-
     /** La contracara de un evento anterior. No lo borra: lo resta. */
     case Reversal = 'reversal';
 
@@ -52,7 +49,7 @@ enum FinancialEventType: string
     case AuthorizedAdjustment = 'authorized_adjustment';
 
     /**
-     * Plata del sistema anterior que se apartó para una cuota.
+     * Plata del sistema anterior que se reservó para una cuota.
      *
      * No mueve el dinero de lugar: deja de ser de `LEGACY_FUNDS` y pasa a
      * `BENEFICIARY_FUNDS`. Desde ahí la cuota sigue el circuito.
@@ -70,7 +67,6 @@ enum FinancialEventType: string
             self::CashDepositCredited => 'Acreditación del depósito',
             self::CashAdjustment => 'Ajuste de arqueo',
             self::OpeningBalance => 'Saldo inicial',
-            self::LegacyDisbursement => 'Pago de haber anterior',
             self::Reversal => 'Reversión',
             self::AuthorizedAdjustment => 'Ajuste autorizado',
             self::LegacyFundsAllocated => 'Reservado del sistema anterior',
@@ -92,7 +88,6 @@ enum FinancialEventType: string
         return in_array($this, [
             self::CashDisbursement,
             self::BankDisbursement,
-            self::LegacyDisbursement,
         ], true);
     }
 }

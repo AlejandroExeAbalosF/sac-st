@@ -30,8 +30,9 @@ use Illuminate\Validation\ValidationException;
  * El contraasiento va a `LEGACY_FUNDS`, que es exactamente para esto:
  * *«saldos que vienen del sistema anterior sin respaldo documental
  * completo, separados para no ensuciar lo que sí se puede probar»*. Su
- * saldo baja a cero a medida que los casos viejos se pagan con
- * `legacy_disbursement`, y ahí se apaga la operación en paralelo.
+ * saldo baja a cero a medida que la plata de los casos viejos se reserva
+ * para las cuotas de sus expedientes históricos, y ahí se apaga la
+ * operación en paralelo.
  *
  * Con la planilla del 01/06/2026, el asiento es:
  *
@@ -493,9 +494,9 @@ final class RegisterOpeningBalance
          * viejo que el operador no pidió.
          *
          * Se busca **el asiento de apertura**, no el saldo de
-         * `LEGACY_FUNDS`: ese saldo baja a cero a medida que los casos
-         * viejos se pagan con `legacy_disbursement`, y el día que llegara a
-         * cero una comprobación por saldo daría vía libre para abrir la
+         * `LEGACY_FUNDS`: ese saldo baja a cero a medida que la plata de
+         * los casos viejos se reserva para sus cuotas, y el día que llegara
+         * a cero una comprobación por saldo daría vía libre para abrir la
          * caja de nuevo.
          */
         $yaAbierta = FinancialEvent::query()

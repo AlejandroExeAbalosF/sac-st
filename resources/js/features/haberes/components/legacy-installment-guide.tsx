@@ -29,7 +29,7 @@ const RESPUESTAS: {
         camino: 'pagada',
         titulo: 'Sí, ya cobró',
         explicacion:
-            'Antes de usar el sistema o desde Pagos anteriores. Se cargan los papeles como registro histórico: no mueve plata de la caja.',
+            'Antes de que la caja abriera sus libros en el sistema. Se cargan los papeles como registro histórico: no mueve plata de la caja.',
     },
     {
         camino: 'pendiente',

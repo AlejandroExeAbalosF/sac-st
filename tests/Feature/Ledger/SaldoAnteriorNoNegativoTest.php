@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Ledger;
 
+use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -17,50 +18,55 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
 
 /**
- * Del sistema anterior no se paga más de lo que se declaró al abrir los
+ * Del sistema anterior no se reserva más de lo que se declaró al abrir los
  * libros, lo intente quien lo intente.
  *
- * `PayLegacyBeneficiary` da el mensaje legible —lo cubre
- * `HaberAnteriorTest`—; acá se prueba la base, escribiendo el asiento sin
+ * Reservar para una cuota histórica es la única forma en que baja ese
+ * saldo. `SetAsideLegacyFunds` da el mensaje legible —lo cubre
+ * `FondosAnterioresTest`—; acá se prueba la base, escribiendo el asiento sin
  * pasar por ese Action. El trigger es diferido y `RefreshDatabase` nunca
  * confirma: cada test pasa a `IMMEDIATE`, que dispara en ese momento lo que
  * estaba pendiente.
  */
 class SaldoAnteriorNoNegativoTest extends TestCase
 {
+    use CollectsInstallments;
     use RefreshDatabase;
 
-    public function test_la_base_no_deja_pagar_mas_de_lo_que_queda_del_sistema_anterior(): void
+    private ?BeneficiaryInstallment $cuotaHistorica = null;
+
+    public function test_la_base_no_deja_reservar_mas_de_lo_que_queda_del_sistema_anterior(): void
     {
         $this->abrirLibros('1000.00');
 
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('Del sistema anterior no queda tanto por pagar');
 
-        $this->pagarSinElAction('1500.00');
+        $this->reservarSinElAction('1500.00');
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
     }
 
-    public function test_pagar_exactamente_lo_que_queda_lo_deja_en_cero(): void
+    public function test_reservar_exactamente_lo_que_queda_lo_deja_en_cero(): void
     {
         $this->abrirLibros('1000.00');
 
-        $this->pagarSinElAction('1000.00');
+        $this->reservarSinElAction('1000.00');
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
 
         $this->assertSame('0.00', app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja()));
     }
 
-    /** La suma es del saldo acumulado, no de cada pago por separado. */
-    public function test_dos_pagos_que_juntos_superan_el_saldo_se_rechazan(): void
+    /** La suma es del saldo acumulado, no de cada reserva por separado. */
+    public function test_dos_reservas_que_juntas_superan_el_saldo_se_rechazan(): void
     {
         $this->abrirLibros('1000.00');
 
-        $this->pagarSinElAction('600.00', 'a');
-        $this->pagarSinElAction('600.00', 'b');
+        $this->reservarSinElAction('600.00', 'a');
+        $this->reservarSinElAction('600.00', 'b');
 
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('Del sistema anterior no queda tanto por pagar');
@@ -79,7 +85,7 @@ class SaldoAnteriorNoNegativoTest extends TestCase
         $evento = (int) DB::table('financial_events')->insertGetId([
             'public_id' => (string) Str::ulid(),
             'cash_box_id' => $this->caja(),
-            'event_type' => FinancialEventType::LegacyDisbursement->value,
+            'event_type' => FinancialEventType::LegacyFundsAllocated->value,
             'event_date' => '2026-06-02',
             'status' => 'draft',
             'idempotency_key' => 'test-borrador-anterior',
@@ -87,10 +93,8 @@ class SaldoAnteriorNoNegativoTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('journal_lines')->insert([
-            $this->linea($evento, LedgerAccount::LegacyFunds, debit: '1500.00'),
-            $this->linea($evento, LedgerAccount::CashOnHand, credit: '1500.00'),
-        ]);
+        DB::table('journal_lines')->insert($this->linea($evento, LedgerAccount::LegacyFunds, debit: '1500.00'));
+        DB::table('journal_lines')->insert($this->lineaDeCuota($evento, '1500.00'));
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
 
         $this->expectException(QueryException::class);
@@ -130,7 +134,7 @@ class SaldoAnteriorNoNegativoTest extends TestCase
             $evento = (int) DB::table('financial_events')->insertGetId([
                 'public_id' => (string) Str::ulid(),
                 'cash_box_id' => $this->caja(),
-                'event_type' => FinancialEventType::LegacyDisbursement->value,
+                'event_type' => FinancialEventType::LegacyFundsAllocated->value,
                 'event_date' => '2026-06-02',
                 'status' => 'posted',
                 'posted_at' => now(),
@@ -139,10 +143,8 @@ class SaldoAnteriorNoNegativoTest extends TestCase
                 'updated_at' => now(),
             ]);
 
-            DB::table('journal_lines')->insert([
-                $this->linea($evento, LedgerAccount::LegacyFunds, debit: '300.00'),
-                $this->linea($evento, LedgerAccount::CashOnHand, credit: '300.00'),
-            ]);
+            DB::table('journal_lines')->insert($this->linea($evento, LedgerAccount::LegacyFunds, debit: '300.00'));
+            DB::table('journal_lines')->insert($this->lineaDeCuota($evento, '300.00'));
             DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
 
             $this->assertFalse($this->otraConexionPuedeConsumir($otra), 'La guarda tiene que retener el bloqueo hasta confirmar.');
@@ -162,15 +164,19 @@ class SaldoAnteriorNoNegativoTest extends TestCase
         return (bool) $fila->libre;
     }
 
-    /** Asienta un pago del sistema anterior sin los controles de `PayLegacyBeneficiary`. */
-    private function pagarSinElAction(string $importe, string $clave = 'unico'): void
+    /** Asienta una reserva del sistema anterior sin los controles de `SetAsideLegacyFunds`. */
+    private function reservarSinElAction(string $importe, string $clave = 'unico'): void
     {
+        $cuota = $this->cuotaHistorica();
+
         app(PostJournalEntry::class)->handle(
-            type: FinancialEventType::LegacyDisbursement,
-            idempotencyKey: "test-pago-anterior-{$clave}",
+            type: FinancialEventType::LegacyFundsAllocated,
+            idempotencyKey: "test-reserva-anterior-{$clave}",
             lines: [
                 EntryLine::debit(LedgerAccount::LegacyFunds, $importe)->onCashBox($this->caja()),
-                EntryLine::credit(LedgerAccount::CashOnHand, $importe)->onCashBox($this->caja()),
+                EntryLine::credit(LedgerAccount::BeneficiaryFunds, $importe)
+                    ->forInstallment($cuota->haber_id, $cuota->id)
+                    ->onCashBox($this->caja()),
             ],
             date: CarbonImmutable::parse('2026-06-02'),
             cashBoxId: $this->caja(),
@@ -188,6 +194,24 @@ class SaldoAnteriorNoNegativoTest extends TestCase
             'cash_box_id' => $this->caja(),
             'currency' => 'ARS',
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function lineaDeCuota(int $evento, string $importe): array
+    {
+        $cuota = $this->cuotaHistorica();
+
+        return [
+            ...$this->linea($evento, LedgerAccount::BeneficiaryFunds, credit: $importe),
+            'haber_id' => $cuota->haber_id,
+            'beneficiary_installment_id' => $cuota->id,
+        ];
+    }
+
+    /** La cuota para la que se reserva: el saldo es lo que se prueba, no ella. */
+    private function cuotaHistorica(): BeneficiaryInstallment
+    {
+        return $this->cuotaHistorica ??= $this->cuota('900/2024', '1500.00');
     }
 
     private function caja(): int

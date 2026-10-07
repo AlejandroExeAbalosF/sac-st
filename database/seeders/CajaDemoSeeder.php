@@ -51,10 +51,11 @@ use RuntimeException;
  * día: ese dinero entró antes, cuando el sistema no existía. Lo mismo con
  * los cheques, que ya vienen en el saldo inicial.
  *
- * Reproducirlo exigiría `legacy_disbursement`, que está declarado y todavía
- * no tiene Action. Así que **el 01/06 es la costura**: ahí se cobran los
- * cuatro arrastres en efectivo y los cuatro cheques, con talonarios 72186 a
- * 72189 —por debajo del primero real— para que se distingan de un vistazo.
+ * Reproducirlo exigiría cargar esos expedientes como históricos y
+ * reservarles la plata del saldo de apertura. Así que **el 01/06 es la
+ * costura**: ahí se cobran los cuatro arrastres en efectivo y los cuatro
+ * cheques, con talonarios 72186 a 72189 —por debajo del primero real— para
+ * que se distingan de un vistazo.
  * La apertura se calcula hacia atrás para que el día cierre en los
  * 6.852.300 que dice el papel.
  *
