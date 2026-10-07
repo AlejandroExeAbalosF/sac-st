@@ -7,12 +7,14 @@ namespace App\Modules\Ledger\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RegisterOpeningBalanceRequest;
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,9 +27,9 @@ use Inertia\Response;
  *
  * Ocurre una sola vez; el porqué, en la página `caja/apertura`.
  *
- * **Si la caja ya está abierta no hay formulario**: hay un asiento que
- * mostrar. Corregirlo no es volver a abrir —eso duplicaría el saldo— sino
- * revertir el asiento por el camino de siempre y abrir de nuevo.
+ * **Si el libro ya está abierto no hay formulario**: hay una apertura que
+ * mostrar. No se rehace —duplicaría el saldo histórico—, y
+ * `cash_book_openings` es append-only.
  */
 final class OpeningBalanceController extends Controller
 {
@@ -75,24 +77,27 @@ final class OpeningBalanceController extends Controller
              * de Banking, y es el mismo criterio con el que `journal_lines`
              * le pone una FK sin conocer su modelo.
              */
-            'bankAccounts' => $this->bankAccounts(),
+            'bankAccounts' => $this->bankAccounts($moneda),
             'bankAccountCode' => LedgerAccount::BankAccount->value,
             'existing' => $apertura === null ? null : [
-                'date' => $apertura->event_date->toDateString(),
-                'postedAt' => $apertura->posted_at?->toIso8601String(),
-                'description' => $apertura->description,
-                'lines' => $this->linesOf((int) $apertura->id),
+                'date' => $apertura->opened_on->toDateString(),
+                'postedAt' => $apertura->created_at->toIso8601String(),
+                'description' => $apertura->notes,
+                'isEmpty' => $apertura->isEmpty(),
+                'lines' => $this->linesOf((int) $caja->id, $moneda),
             ],
         ]);
     }
 
     public function store(RegisterOpeningBalanceRequest $request): RedirectResponse
     {
+        $moneda = Currency::from((string) $request->validated('currency'));
+
         $this->abrir->handle(
             cashBoxId: (int) $this->cashBox()->id,
             balances: $request->balances(),
             date: CarbonImmutable::parse((string) $request->validated('date')),
-            currency: Currency::from((string) $request->validated('currency')),
+            currency: $moneda,
             bankAccountId: $request->validated('bankAccountId') === null
                 ? null
                 : (int) $request->validated('bankAccountId'),
@@ -100,20 +105,31 @@ final class OpeningBalanceController extends Controller
             cheques: $request->cheques(),
             denominations: $request->denominations(),
             notes: $request->validated('notes'),
+            declaredEmpty: $request->boolean('declaredEmpty'),
         );
 
-        return to_route('caja.dia')->with('status', 'Libros abiertos con el saldo declarado.');
+        /*
+         * De vuelta al libro que se acaba de abrir: quien abrió los dólares
+         * viene a operar en dólares. Los pesos no se anotan en la dirección.
+         */
+        return to_route('caja.dia', $moneda === Currency::Ars ? [] : ['moneda' => mb_strtolower($moneda->value)])
+            ->with('status', 'Libros abiertos con el saldo declarado.');
     }
 
     /**
-     * Las cuentas del organismo, para la pata bancaria.
+     * Las cuentas del organismo en la moneda del libro, para la pata bancaria.
+     *
+     * Dólares en una cuenta en pesos no existen, y la base rechazaría la
+     * línea. Si no hay ninguna en esa moneda la lista llega vacía y la
+     * pantalla apaga el renglón.
      *
      * @return list<array{id: int, label: string}>
      */
-    private function bankAccounts(): array
+    private function bankAccounts(Currency $moneda): array
     {
         $cuentas = DB::table('bank_accounts')
             ->where('is_active', true)
+            ->where('currency', $moneda->value)
             ->orderBy('label')
             ->get(['id', 'bank_name', 'account_number']);
 
@@ -130,32 +146,40 @@ final class OpeningBalanceController extends Controller
     }
 
     /**
-     * Las patas del asiento, para poder mostrarlo tal como quedó.
+     * Lo que la apertura declaró, por cuenta.
+     *
+     * Suma todos los asientos de apertura del libro: el principal y el de
+     * cada cheque detallado. Mirar solo el principal dejaba afuera la
+     * cartera cuando se detallaba, y no mostraba nada cuando solo había
+     * cheques.
      *
      * @return list<array{account: string, label: string, amount: numeric-string}>
      */
-    private function linesOf(int $eventId): array
+    private function linesOf(int $cashBoxId, Currency $moneda): array
     {
-        $lineas = [];
+        $porCuenta = [];
 
         $filas = JournalLine::query()
-            ->where('financial_event_id', $eventId)
-            ->where('debit', '>', 0)
-            ->orderBy('id')
-            ->get(['account_code', 'debit']);
+            ->join('financial_events', 'financial_events.id', '=', 'journal_lines.financial_event_id')
+            ->where('financial_events.event_type', FinancialEventType::OpeningBalance->value)
+            ->where('financial_events.cash_box_id', $cashBoxId)
+            ->where('journal_lines.currency', $moneda->value)
+            ->where('journal_lines.debit', '>', 0)
+            ->orderBy('journal_lines.id')
+            ->get(['journal_lines.account_code', 'journal_lines.debit']);
 
         foreach ($filas as $linea) {
             // El modelo ya lo devuelve como enum: `account_code` está casteado.
             $cuenta = $linea->account_code;
 
-            $lineas[] = [
+            $porCuenta[$cuenta->value] = [
                 'account' => $cuenta->value,
                 'label' => $cuenta->label(),
-                'amount' => $linea->debit,
+                'amount' => Decimal::add($porCuenta[$cuenta->value]['amount'] ?? '0.00', $linea->debit),
             ];
         }
 
-        return $lineas;
+        return array_values($porCuenta);
     }
 
     /**

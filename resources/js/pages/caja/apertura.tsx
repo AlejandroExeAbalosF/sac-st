@@ -11,6 +11,7 @@ import InputError from '@/components/input-error';
 import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,6 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { nombreDeMoneda } from '@/features/caja/apertura';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import { conMoneda } from '@/features/caja/moneda';
 import { businessToday, date as formatDate } from '@/lib/format';
@@ -116,6 +118,8 @@ type Props = {
         date: string;
         postedAt: string | null;
         description: string | null;
+        /** Se abrió declarando que no había nada en esta moneda. */
+        isEmpty: boolean;
         lines: { account: string; label: string; amount: string }[];
     } | null;
 };
@@ -148,8 +152,9 @@ export default function CajaApertura({
         balances: Record<string, string>;
         denominations: Record<string, number>;
         cheques: Cheque[];
-        bankAccountId: number;
+        bankAccountId: number | null;
         notes: string;
+        declaredEmpty: boolean;
     }>({
         cashBoxId: selected.cashBoxId,
         currency: selected.currency,
@@ -157,9 +162,32 @@ export default function CajaApertura({
         balances: {},
         denominations: {},
         cheques: [],
-        bankAccountId: bankAccounts.length === 1 ? bankAccounts[0].id : 0,
+        bankAccountId: bankAccounts.length === 1 ? bankAccounts[0].id : null,
         notes: '',
+        declaredEmpty: false,
     });
+
+    const nombre = nombreDeMoneda(selected.currency);
+
+    /*
+     * Sin cuenta bancaria en esta moneda no hay dónde estar depositado: el
+     * renglón se apaga en vez de ofrecer cuentas de la otra moneda, que la
+     * base rechazaría. Hoy pasa con los dólares.
+     */
+    const sinCuentaEnLaMoneda = bankAccounts.length === 0;
+
+    /*
+     * «No había nada al abrir» vacía lo cargado: un saldo escrito y después
+     * declarado inexistente no puede viajar, y el Action lo rechazaría.
+     */
+    const declararVacio = (vacio: boolean) =>
+        form.setData({
+            ...form.data,
+            declaredEmpty: vacio,
+            balances: vacio ? {} : form.data.balances,
+            denominations: vacio ? {} : form.data.denominations,
+            cheques: vacio ? [] : form.data.cheques,
+        });
 
     /*
      * «DEPOSITOS DIRECTOS» es lo que las empresas depositaron derecho en la
@@ -250,23 +278,39 @@ export default function CajaApertura({
      * todo lo que ningún campo reclamó.
      */
     const sinLugar = useMemo(() => {
+        /*
+         * Solo cuentan los campos que están a la vista: con «no había nada
+         * al abrir» marcado, los saldos y la cuenta se ocultan, y un error
+         * suyo quedaría debajo de algo que no se ve.
+         */
         const conCampo = new Set([
             'date',
             'notes',
-            'balances',
-            'bankAccountId',
-            ...accounts.map((cuenta) => `balances.${cuenta.code}`),
-            ...form.data.cheques.flatMap((_, indice) =>
-                Object.keys(CHEQUE_VACIO).map(
-                    (campo) => `cheques.${indice}.${campo}`,
-                ),
-            ),
+            'declaredEmpty',
+            ...(form.data.declaredEmpty
+                ? []
+                : [
+                      'balances',
+                      ...(declaraBanco ? ['bankAccountId'] : []),
+                      ...accounts.map((cuenta) => `balances.${cuenta.code}`),
+                      ...form.data.cheques.flatMap((_, indice) =>
+                          Object.keys(CHEQUE_VACIO).map(
+                              (campo) => `cheques.${indice}.${campo}`,
+                          ),
+                      ),
+                  ]),
         ]);
 
         return Object.entries(errores)
             .filter(([clave]) => !conCampo.has(clave))
             .map(([, mensaje]) => mensaje);
-    }, [errores, accounts, form.data.cheques]);
+    }, [
+        errores,
+        accounts,
+        form.data.cheques,
+        form.data.declaredEmpty,
+        declaraBanco,
+    ]);
 
     const total = useMemo(
         () =>
@@ -311,12 +355,26 @@ export default function CajaApertura({
                         <form
                             onSubmit={(e) => {
                                 e.preventDefault();
+                                /*
+                                 * La cuenta viaja solo si hay depósitos
+                                 * directos: sin ellos no hay pata bancaria,
+                                 * y un selector vacío —no hay cuentas en esta
+                                 * moneda— no es una cuenta que validar.
+                                 */
+                                form.transform((datos) => ({
+                                    ...datos,
+                                    bankAccountId: declaraBanco
+                                        ? datos.bankAccountId
+                                        : null,
+                                }));
                                 form.post(store().url);
                             }}
                             className="flex flex-col gap-6"
                         >
                             <div className="grid gap-2 sm:max-w-xs">
-                                <Label htmlFor="date">Fecha del saldo</Label>
+                                <Label htmlFor="date">
+                                    Fecha de la apertura
+                                </Label>
                                 <Input
                                     id="date"
                                     type="date"
@@ -327,219 +385,313 @@ export default function CajaApertura({
                                     }
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    La víspera del primer movimiento: lo que hay
-                                    en el cajón antes de empezar.
+                                    El primer día que opera el sistema. Los
+                                    saldos son los del cierre del día anterior,
+                                    y los papeles hasta ese cierre se cargan
+                                    como cuota histórica.
                                 </p>
                                 <InputError message={form.errors.date} />
                             </div>
 
-                            <div className="overflow-hidden rounded-lg border">
-                                <div className="border-b bg-muted/50 px-4 py-2">
-                                    <h2 className="text-sm font-semibold">
-                                        Dónde está el dinero
-                                    </h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        Solo cuentas de ubicación. De quién es
-                                        cada peso se determina después, con su
-                                        expediente.
-                                    </p>
-                                </div>
+                            {/*
+                             * El día que se abre un libro puede no haber nada
+                             * en esa moneda —el primer dólar es el cobro que
+                             * recién entra—. Sin apertura el libro no opera,
+                             * así que se abre igual, pero declarándolo: un
+                             * formulario en cero también podría ser un saldo
+                             * que nadie cargó.
+                             */}
+                            <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
+                                <Checkbox
+                                    id="declaredEmpty"
+                                    className="mt-0.5"
+                                    checked={form.data.declaredEmpty}
+                                    onCheckedChange={(v) =>
+                                        declararVacio(v === true)
+                                    }
+                                />
+                                <span>
+                                    <span className="font-medium">
+                                        No hay {nombre} al abrir los libros
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                                        Ni en el cajón, ni en cheques, ni en la
+                                        cuenta. La apertura queda registrada sin
+                                        saldo, con tu nombre y la fecha.
+                                    </span>
+                                </span>
+                            </label>
+                            <InputError message={errores['declaredEmpty']} />
 
-                                {accounts.map((cuenta) => (
-                                    <div
-                                        key={cuenta.code}
-                                        className="border-b px-4 py-2.5 last:border-b-0"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <Label
-                                                htmlFor={cuenta.code}
-                                                className="flex-1 font-normal"
+                            {!form.data.declaredEmpty && (
+                                <>
+                                    <div className="overflow-hidden rounded-lg border">
+                                        <div className="border-b bg-muted/50 px-4 py-2">
+                                            <h2 className="text-sm font-semibold">
+                                                Dónde está el dinero
+                                            </h2>
+                                            <p className="text-xs text-muted-foreground">
+                                                Solo cuentas de ubicación. De
+                                                quién es cada peso se determina
+                                                después, con su expediente.
+                                            </p>
+                                        </div>
+
+                                        {accounts.map((cuenta) => (
+                                            <div
+                                                key={cuenta.code}
+                                                className="border-b px-4 py-2.5 last:border-b-0"
                                             >
-                                                {cuenta.label}
-                                                {AYUDAS[cuenta.code] && (
-                                                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                                                        {AYUDAS[cuenta.code]}
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-4">
+                                                    <Label
+                                                        htmlFor={cuenta.code}
+                                                        className="flex-1 font-normal"
+                                                    >
+                                                        {cuenta.label}
+                                                        {AYUDAS[
+                                                            cuenta.code
+                                                        ] && (
+                                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                                                {
+                                                                    AYUDAS[
+                                                                        cuenta
+                                                                            .code
+                                                                    ]
+                                                                }
+                                                            </span>
+                                                        )}
+                                                        {cuenta.code ===
+                                                            bankAccountCode &&
+                                                            sinCuentaEnLaMoneda && (
+                                                                <span className="mt-0.5 block text-xs font-normal text-warning-strong">
+                                                                    No hay
+                                                                    cuenta
+                                                                    bancaria en{' '}
+                                                                    {nombre}{' '}
+                                                                    registrada.
+                                                                    Se da de
+                                                                    alta en
+                                                                    Banco ›
+                                                                    Cuentas.
+                                                                </span>
+                                                            )}
+                                                    </Label>
+                                                    <Input
+                                                        id={cuenta.code}
+                                                        inputMode="decimal"
+                                                        placeholder="0.00"
+                                                        readOnly={
+                                                            cuenta.code ===
+                                                            EFECTIVO
+                                                        }
+                                                        disabled={
+                                                            cuenta.code ===
+                                                                bankAccountCode &&
+                                                            sinCuentaEnLaMoneda
+                                                        }
+                                                        className="w-44 text-right font-mono tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground"
+                                                        value={
+                                                            cuenta.code ===
+                                                            EFECTIVO
+                                                                ? contado
+                                                                : (form.data
+                                                                      .balances[
+                                                                      cuenta
+                                                                          .code
+                                                                  ] ?? '')
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'balances',
+                                                                {
+                                                                    ...form.data
+                                                                        .balances,
+                                                                    [cuenta.code]:
+                                                                        e.target
+                                                                            .value,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                {/*
+                                                 * El error de un importe va debajo de
+                                                 * su importe. La regla `balances.*`
+                                                 * devuelve la clave con el nombre de
+                                                 * la cuenta —`balances.CASH_ON_HAND`—
+                                                 * y esa clave no está en el tipo del
+                                                 * formulario, así que se lee del mapa.
+                                                 */}
+                                                <InputError
+                                                    className="mt-1"
+                                                    message={
+                                                        errores[
+                                                            `balances.${cuenta.code}`
+                                                        ]
+                                                    }
+                                                />
+                                            </div>
+                                        ))}
+
+                                        <div className="flex items-baseline justify-between border-t bg-muted/40 px-4 py-3">
+                                            <div>
+                                                <p className="text-sm font-medium">
+                                                    Fondos del sistema anterior
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    El contraasiento: plata que
+                                                    existe y todavía no tiene
+                                                    dueño asignado.
+                                                </p>
+                                            </div>
+                                            <Money
+                                                value={total}
+                                                className="text-base font-semibold"
+                                            />
+                                        </div>
+                                    </div>
+                                    <InputError
+                                        message={form.errors.balances}
+                                    />
+
+                                    {/*
+                                     * Contar el cajón. El efectivo de arriba sale de
+                                     * acá: es la única vez que se cuenta, y lo que le
+                                     * da composición al fajo que después se arrastra.
+                                     */}
+                                    <div className="overflow-hidden rounded-lg border">
+                                        <div className="border-b px-4 py-3">
+                                            <p className="text-sm font-medium">
+                                                Billetes en el cajón
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                De acá sale el efectivo
+                                                declarado arriba.
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-[1fr_6rem_1fr] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                            <span>Billete</span>
+                                            <span className="text-center">
+                                                Cantidad
+                                            </span>
+                                            <span className="text-right">
+                                                Subtotal
+                                            </span>
+                                        </div>
+
+                                        <div className="max-h-72 overflow-y-auto">
+                                            {suggestedDenominations.map(
+                                                (billete) => {
+                                                    const cantidad =
+                                                        form.data.denominations[
+                                                            billete
+                                                        ] ?? 0;
+
+                                                    return (
+                                                        <div
+                                                            key={billete}
+                                                            className="grid grid-cols-[1fr_6rem_1fr] items-center gap-2 border-b px-4 py-1.5 last:border-b-0"
+                                                        >
+                                                            <Money
+                                                                value={`${billete}.00`}
+                                                            />
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                inputMode="numeric"
+                                                                className="h-8 text-center"
+                                                                value={
+                                                                    cantidad ||
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    contarBillete(
+                                                                        billete,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                aria-label={`Cantidad de billetes de ${billete}`}
+                                                            />
+                                                            <span className="text-right">
+                                                                <Money
+                                                                    value={`${billete * cantidad}.00`}
+                                                                    dimWhenZero
+                                                                />
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                    <InputError
+                                        message={errores['denominations']}
+                                    />
+
+                                    {declaraCheques && (
+                                        <CarteraDeCheques
+                                            cheques={form.data.cheques}
+                                            declarado={
+                                                form.data.balances[CHEQUES] ??
+                                                ''
+                                            }
+                                            errores={errores}
+                                            onChange={(cheques) =>
+                                                form.setData('cheques', cheques)
+                                            }
+                                        />
+                                    )}
+
+                                    {declaraBanco && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="bankAccountId">
+                                                En qué cuenta están los
+                                                depósitos directos
                                             </Label>
-                                            <Input
-                                                id={cuenta.code}
-                                                inputMode="decimal"
-                                                placeholder="0.00"
-                                                readOnly={
-                                                    cuenta.code === EFECTIVO
-                                                }
-                                                className="w-44 text-right font-mono tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground"
+                                            <Select
                                                 value={
-                                                    cuenta.code === EFECTIVO
-                                                        ? contado
-                                                        : (form.data.balances[
-                                                              cuenta.code
-                                                          ] ?? '')
+                                                    form.data.bankAccountId
+                                                        ? String(
+                                                              form.data
+                                                                  .bankAccountId,
+                                                          )
+                                                        : ''
                                                 }
-                                                onChange={(e) =>
-                                                    form.setData('balances', {
-                                                        ...form.data.balances,
-                                                        [cuenta.code]:
-                                                            e.target.value,
-                                                    })
+                                                onValueChange={(valor) =>
+                                                    form.setData(
+                                                        'bankAccountId',
+                                                        Number(valor),
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger id="bankAccountId">
+                                                    <SelectValue placeholder="Elegí la cuenta" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {bankAccounts.map(
+                                                        (cuenta) => (
+                                                            <SelectItem
+                                                                key={cuenta.id}
+                                                                value={String(
+                                                                    cuenta.id,
+                                                                )}
+                                                            >
+                                                                {cuenta.label}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError
+                                                message={
+                                                    form.errors.bankAccountId
                                                 }
                                             />
                                         </div>
-                                        {/*
-                                         * El error de un importe va debajo de
-                                         * su importe. La regla `balances.*`
-                                         * devuelve la clave con el nombre de
-                                         * la cuenta —`balances.CASH_ON_HAND`—
-                                         * y esa clave no está en el tipo del
-                                         * formulario, así que se lee del mapa.
-                                         */}
-                                        <InputError
-                                            className="mt-1"
-                                            message={
-                                                errores[
-                                                    `balances.${cuenta.code}`
-                                                ]
-                                            }
-                                        />
-                                    </div>
-                                ))}
-
-                                <div className="flex items-baseline justify-between border-t bg-muted/40 px-4 py-3">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            Fondos del sistema anterior
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            El contraasiento: plata que existe y
-                                            todavía no tiene dueño asignado.
-                                        </p>
-                                    </div>
-                                    <Money
-                                        value={total}
-                                        className="text-base font-semibold"
-                                    />
-                                </div>
-                            </div>
-                            <InputError message={form.errors.balances} />
-
-                            {/*
-                             * Contar el cajón. El efectivo de arriba sale de
-                             * acá: es la única vez que se cuenta, y lo que le
-                             * da composición al fajo que después se arrastra.
-                             */}
-                            <div className="overflow-hidden rounded-lg border">
-                                <div className="border-b px-4 py-3">
-                                    <p className="text-sm font-medium">
-                                        Billetes en el cajón
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        De acá sale el efectivo declarado
-                                        arriba.
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-[1fr_6rem_1fr] gap-2 border-b bg-muted/50 px-4 py-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                    <span>Billete</span>
-                                    <span className="text-center">
-                                        Cantidad
-                                    </span>
-                                    <span className="text-right">Subtotal</span>
-                                </div>
-
-                                <div className="max-h-72 overflow-y-auto">
-                                    {suggestedDenominations.map((billete) => {
-                                        const cantidad =
-                                            form.data.denominations[billete] ??
-                                            0;
-
-                                        return (
-                                            <div
-                                                key={billete}
-                                                className="grid grid-cols-[1fr_6rem_1fr] items-center gap-2 border-b px-4 py-1.5 last:border-b-0"
-                                            >
-                                                <Money
-                                                    value={`${billete}.00`}
-                                                />
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    inputMode="numeric"
-                                                    className="h-8 text-center"
-                                                    value={cantidad || ''}
-                                                    onChange={(e) =>
-                                                        contarBillete(
-                                                            billete,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    aria-label={`Cantidad de billetes de ${billete}`}
-                                                />
-                                                <span className="text-right">
-                                                    <Money
-                                                        value={`${billete * cantidad}.00`}
-                                                        dimWhenZero
-                                                    />
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                            <InputError message={errores['denominations']} />
-
-                            {declaraCheques && (
-                                <CarteraDeCheques
-                                    cheques={form.data.cheques}
-                                    declarado={
-                                        form.data.balances[CHEQUES] ?? ''
-                                    }
-                                    errores={errores}
-                                    onChange={(cheques) =>
-                                        form.setData('cheques', cheques)
-                                    }
-                                />
-                            )}
-
-                            {declaraBanco && (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="bankAccountId">
-                                        En qué cuenta están los depósitos
-                                        directos
-                                    </Label>
-                                    <Select
-                                        value={
-                                            form.data.bankAccountId
-                                                ? String(
-                                                      form.data.bankAccountId,
-                                                  )
-                                                : ''
-                                        }
-                                        onValueChange={(valor) =>
-                                            form.setData(
-                                                'bankAccountId',
-                                                Number(valor),
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger id="bankAccountId">
-                                            <SelectValue placeholder="Elegí la cuenta" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {bankAccounts.map((cuenta) => (
-                                                <SelectItem
-                                                    key={cuenta.id}
-                                                    value={String(cuenta.id)}
-                                                >
-                                                    {cuenta.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError
-                                        message={form.errors.bankAccountId}
-                                    />
-                                </div>
+                                    )}
+                                </>
                             )}
 
                             <div className="grid gap-2">
@@ -776,9 +928,10 @@ function Advertencia() {
                 <p className="font-medium">Esto se hace una sola vez.</p>
                 <p>
                     Define todos los saldos posteriores: contra este número se
-                    compara cada arqueo y cada cierre. Si después resulta
-                    equivocado no se edita — se revierte el asiento y se abre de
-                    nuevo.
+                    compara cada arqueo y cada cierre. Hasta que no se haga, el
+                    libro de esta moneda no admite movimientos. Una vez
+                    registrada no se edita ni se vuelve a cargar: revisala antes
+                    de confirmar.
                 </p>
             </div>
         </div>
@@ -795,25 +948,30 @@ function YaAbierta({ existing }: { existing: NonNullable<Props['existing']> }) {
                         Esta caja ya tiene sus libros abiertos.
                     </p>
                     <p>
-                        Con fecha {formatDate(existing.date)}. Para corregirlo
-                        hay que revertir el asiento, no cargarlo de nuevo:
-                        volver a abrir duplicaría el saldo histórico.
+                        Con fecha {formatDate(existing.date)}
+                        {existing.isEmpty
+                            ? ', sin saldo: se declaró que no había nada en esta moneda.'
+                            : '.'}{' '}
+                        No se vuelve a cargar: abrir de nuevo duplicaría el
+                        saldo histórico.
                     </p>
                 </div>
             </div>
 
-            <table className="w-full text-sm">
-                <tbody className="divide-y">
-                    {existing.lines.map((linea) => (
-                        <tr key={linea.account}>
-                            <td className="px-4 py-2">{linea.label}</td>
-                            <td className="px-4 py-2 text-right">
-                                <Money value={linea.amount} />
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            {existing.lines.length > 0 && (
+                <table className="w-full text-sm">
+                    <tbody className="divide-y">
+                        {existing.lines.map((linea) => (
+                            <tr key={linea.account}>
+                                <td className="px-4 py-2">{linea.label}</td>
+                                <td className="px-4 py-2 text-right">
+                                    <Money value={linea.amount} />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
 
             {existing.description && (
                 <p className="border-t px-4 py-2 text-xs text-muted-foreground">

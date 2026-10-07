@@ -282,6 +282,8 @@ class OperacionDemoSeeder extends Seeder
             'bank_statement_imports',
             'journal_lines',
             'financial_events',
+            // La apertura de cada libro: sin borrarla, sembrar de nuevo no podría abrir.
+            'cash_book_openings',
             'attachments',
             'audit_events',
             'beneficiary_installments',

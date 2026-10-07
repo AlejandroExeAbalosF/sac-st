@@ -46,6 +46,8 @@ class GuardasDelCircuitoTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo();
+
         $this->seed(HaberesDemoSeeder::class);
     }
 

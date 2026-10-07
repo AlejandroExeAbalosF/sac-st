@@ -11,6 +11,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
 use App\Modules\Ledger\Enums\PeriodType;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\PeriodClosing;
@@ -104,6 +105,12 @@ final class ClosePeriod
             $desde = $type->startsOn($date);
             $hasta = $type->endsOn($date);
 
+            /*
+             * Un libro sin apertura no tiene saldo inicial que congelar. El
+             * mes en que se abrió sí se cierra: alcanza con que termine el
+             * día de la apertura o después.
+             */
+            CashBookOpening::assertOpen($cashBoxId, $currency, $hasta);
             $this->assertClosable($cashBoxId, $desde, $hasta, $type, $currency);
 
             $vispera = $desde->subDay();

@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import ClosedPeriodDialog from '@/components/closed-period-dialog';
+import MissingOpeningDialog from '@/components/missing-opening-dialog';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
@@ -26,9 +27,10 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                 {/*
                  * Cualquier operación que mueva dinero puede toparse con un
                  * período cerrado, así que la explicación vive acá y no en
-                 * cada pantalla.
+                 * cada pantalla. Lo mismo un libro sin apertura.
                  */}
                 <ClosedPeriodDialog />
+                <MissingOpeningDialog />
             </AppContent>
         </AppShell>
     );

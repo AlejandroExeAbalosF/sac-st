@@ -38,6 +38,8 @@ class PanelDelReciboTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo();
+
         $this->seed(HaberesDemoSeeder::class);
     }
 

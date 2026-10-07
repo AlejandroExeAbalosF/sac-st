@@ -41,6 +41,8 @@ class DesasignarFondosTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo();
+
         $this->seed(HaberesDemoSeeder::class);
     }
 

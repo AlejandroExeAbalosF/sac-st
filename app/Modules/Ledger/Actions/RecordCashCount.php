@@ -9,6 +9,7 @@ use App\Modules\Ledger\Enums\CashCountStatus;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CarryRecount;
@@ -148,6 +149,12 @@ final class RecordCashCount
         ): CashCount {
             CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
 
+            /*
+             * Sin apertura no hay contra qué contar: el saldo teórico sería
+             * cero y la diferencia, todo el cajón. El arqueo de la apertura
+             * pasa porque se guarda después de ella.
+             */
+            CashBookOpening::assertOpen($cashBoxId, $currency, $fecha);
             $this->assertPeriodOpen($cashBoxId, $currency, $fecha);
 
             /*

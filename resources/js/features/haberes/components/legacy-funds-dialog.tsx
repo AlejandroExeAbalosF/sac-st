@@ -274,8 +274,21 @@ export default function LegacyFundsDialog({
                                 <SelectItem value="cheque">
                                     Cheques de la cartera
                                 </SelectItem>
-                                <SelectItem value="bank">
+                                {/*
+                                 * Solo llegan cuentas de la moneda del haber.
+                                 * Sin ninguna —hoy, los dólares— no hay
+                                 * depósito directo del que reservar.
+                                 */}
+                                <SelectItem
+                                    value="bank"
+                                    disabled={
+                                        fondosAnteriores.bankAccounts.length ===
+                                        0
+                                    }
+                                >
                                     Depósito directo en la cuenta
+                                    {fondosAnteriores.bankAccounts.length ===
+                                        0 && ' (no hay cuenta en esta moneda)'}
                                 </SelectItem>
                             </SelectContent>
                         </Select>

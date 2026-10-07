@@ -140,6 +140,25 @@ class HandleInertiaRequests extends Middleware
                         'occurrence' => (string) Str::uuid(),
                     ];
                 },
+                /*
+                 * El libro sin apertura que frenó una operación. Abrirlo es
+                 * del administrador: el diálogo ofrece ir a la apertura solo
+                 * a quien puede hacerla, y al resto le dice a quién pedírsela.
+                 */
+                'missingOpening' => function () use ($request): ?array {
+                    $aviso = $request->session()->get('missingOpening');
+
+                    if (! is_array($aviso)) {
+                        return null;
+                    }
+
+                    return [
+                        ...$aviso,
+                        'canOpen' => $request->user()?->can('caja.abrir-saldo-inicial') ?? false,
+                        // Ver el comentario de `closedPeriod`.
+                        'occurrence' => (string) Str::uuid(),
+                    ];
+                },
             ],
 
             /*

@@ -6,6 +6,7 @@ namespace Tests;
 
 use App\Models\User;
 use App\Modules\Ledger\Actions\RecordCashCount;
+use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
@@ -13,6 +14,7 @@ use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayTakings;
+use App\Modules\Shared\Models\CashBox;
 use App\Support\Ui\ToastType;
 use Carbon\CarbonImmutable;
 use Database\Seeders\CatalogosSeeder;
@@ -180,6 +182,35 @@ abstract class TestCase extends BaseTestCase
         }
 
         return $billetes;
+    }
+
+    /**
+     * Abre los libros de la caja de Haberes sin saldo, para los tests que
+     * mueven plata y no tienen nada que probar sobre la apertura.
+     *
+     * Sin apertura el libro no admite movimientos (`PostJournalEntry`,
+     * `journal_lines_require_opening`), así que un escenario que cobra o
+     * paga tiene que abrir primero. Se abre en cero y con fecha bien
+     * anterior a cualquier escenario: así no le agrega saldo a ninguna
+     * cuenta ni le corre la fecha de corte al sistema anterior, que sale
+     * del asiento de apertura y acá no hay asiento.
+     *
+     * No va en el `setUp` de la suite a propósito: escondería la regla y
+     * chocaría con los tests que abren con el saldo de la planilla.
+     */
+    protected function abrirLibrosSinSaldo(Currency ...$monedas): void
+    {
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
+
+        foreach ($monedas === [] ? [Currency::Ars] : $monedas as $moneda) {
+            app(RegisterOpeningBalance::class)->handle(
+                cashBoxId: $caja,
+                balances: [],
+                date: CarbonImmutable::parse('2000-01-01'),
+                currency: $moneda,
+                declaredEmpty: true,
+            );
+        }
     }
 
     /** Un arqueo real y revisado para los tests cuyo objeto principal es el cierre. */

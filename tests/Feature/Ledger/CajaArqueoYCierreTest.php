@@ -216,8 +216,10 @@ class CajaArqueoYCierreTest extends TestCase
             denominations: [20_000 => 101, 10_000 => 1, 1_000 => 4, 500 => 1, 200 => 1, 100 => 1],
         );
 
-        // Sin apertura en dólares el saldo teórico es cero, así que un
-        // conteo vacío cuadra. Lo que se prueba es que convive.
+        // El libro en dólares se abre sin saldo: un conteo vacío cuadra.
+        // Lo que se prueba es que convive con el de pesos.
+        $this->abrirLibrosSinSaldo(Currency::Usd);
+
         $enDolares = app(RecordCashCount::class)->handle(
             cashBoxId: $this->caja(),
             countedOn: CarbonImmutable::parse('2026-06-30'),
@@ -504,6 +506,8 @@ class CajaArqueoYCierreTest extends TestCase
             currency: Currency::Ars,
         );
 
+        $this->abrirLibrosSinSaldo(Currency::Usd);
+
         app(PostJournalEntry::class)->handle(
             type: FinancialEventType::FundsReceived,
             idempotencyKey: 'cobro-usd-despues-del-cierre-ars',
@@ -538,6 +542,7 @@ class CajaArqueoYCierreTest extends TestCase
         $this->abrirLibros(efectivo: '1000.00', cheques: '0.00', fecha: '2026-06-01');
         $this->arqueoListoParaCerrar($this->caja(), '2026-06-02');
 
+        $this->abrirLibrosSinSaldo(Currency::Usd);
         $this->borradorCrudo('2026-06-02', Currency::Usd);
 
         $cierre = app(ClosePeriod::class)->handle(
@@ -563,6 +568,13 @@ class CajaArqueoYCierreTest extends TestCase
     public function test_la_base_rechaza_lineas_agregadas_a_un_evento_posteado_y_cerrado(): void
     {
         $this->abrirLibros(efectivo: '1000.00', cheques: '0.00', fecha: '2026-06-01');
+
+        /*
+         * Las guardas diferidas de la apertura se verifican acá, como al
+         * confirmarla. Si no, saltarían recién al final, después del
+         * cierre, y el rechazo que se mira no sería el de las líneas.
+         */
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
         $this->arqueoListoParaCerrar($this->caja(), '2026-06-02');
 
         app(ClosePeriod::class)->handle(
@@ -881,6 +893,7 @@ class CajaArqueoYCierreTest extends TestCase
      */
     public function test_un_cajon_vacio_se_puede_arquear_y_cerrar(): void
     {
+        $this->abrirLibrosSinSaldo();
         $contador = User::factory()->create();
 
         $arqueo = app(RecordCashCount::class)->handle(

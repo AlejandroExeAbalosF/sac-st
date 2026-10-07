@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import DetalleComposicionDelFajo from '@/features/caja/components/carry-composition';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
+import OpeningRequired from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
@@ -32,7 +33,8 @@ type Props = {
         defaultDate: string;
     };
     counts: Arqueo[];
-    can: { review: boolean; adjust: boolean };
+    needsOpening: boolean;
+    can: { review: boolean; adjust: boolean; open: boolean };
 };
 
 /**
@@ -41,7 +43,12 @@ type Props = {
  * El conteo nuevo se inicia en Caja del día, con fecha y saldo a la vista.
  * Este listado permite consultar, revisar e imputar arqueos existentes.
  */
-export default function CajaArqueos({ selected, counts, can }: Props) {
+export default function CajaArqueos({
+    selected,
+    counts,
+    needsOpening,
+    can,
+}: Props) {
     const [imputando, setImputando] = useState<Arqueo | null>(null);
 
     return (
@@ -70,69 +77,76 @@ export default function CajaArqueos({ selected, counts, can }: Props) {
                     }
                 />
 
-                <div className="overflow-hidden rounded-lg border bg-card">
-                    {counts.length === 0 ? (
-                        <div className="flex flex-col items-center gap-4 px-4 py-12 text-center">
-                            <p className="text-sm text-muted-foreground">
-                                Todavía no se registró ningún arqueo.
-                            </p>
-                            <Button variant="outline" asChild>
-                                <Link
-                                    href={conMoneda(
-                                        caja({
-                                            query: {
-                                                fecha: selected.defaultDate,
-                                            },
-                                        }).url,
-                                        selected.currency,
-                                    )}
-                                >
-                                    Ir a Caja del día
-                                </Link>
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left font-medium">
-                                            Fecha
-                                        </th>
-                                        <th className="px-4 py-2 text-right font-medium">
-                                            Contado
-                                        </th>
-                                        <th className="px-4 py-2 text-right font-medium">
-                                            No recontado
-                                        </th>
-                                        <th className="px-4 py-2 text-right font-medium">
-                                            Saldo del libro
-                                        </th>
-                                        <th className="px-4 py-2 text-right font-medium">
-                                            Diferencia
-                                        </th>
-                                        <th className="px-4 py-2 text-left font-medium">
-                                            Estado
-                                        </th>
-                                        <th className="px-4 py-2" />
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {counts.map((arqueo) => (
-                                        <Renglon
-                                            key={arqueo.id}
-                                            arqueo={arqueo}
-                                            can={can}
-                                            onImputar={() =>
-                                                setImputando(arqueo)
-                                            }
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                {needsOpening ? (
+                    <OpeningRequired
+                        moneda={selected.currency}
+                        puedeAbrir={can.open}
+                    />
+                ) : (
+                    <div className="overflow-hidden rounded-lg border bg-card">
+                        {counts.length === 0 ? (
+                            <div className="flex flex-col items-center gap-4 px-4 py-12 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    Todavía no se registró ningún arqueo.
+                                </p>
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={conMoneda(
+                                            caja({
+                                                query: {
+                                                    fecha: selected.defaultDate,
+                                                },
+                                            }).url,
+                                            selected.currency,
+                                        )}
+                                    >
+                                        Ir a Caja del día
+                                    </Link>
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left font-medium">
+                                                Fecha
+                                            </th>
+                                            <th className="px-4 py-2 text-right font-medium">
+                                                Contado
+                                            </th>
+                                            <th className="px-4 py-2 text-right font-medium">
+                                                No recontado
+                                            </th>
+                                            <th className="px-4 py-2 text-right font-medium">
+                                                Saldo del libro
+                                            </th>
+                                            <th className="px-4 py-2 text-right font-medium">
+                                                Diferencia
+                                            </th>
+                                            <th className="px-4 py-2 text-left font-medium">
+                                                Estado
+                                            </th>
+                                            <th className="px-4 py-2" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {counts.map((arqueo) => (
+                                            <Renglon
+                                                key={arqueo.id}
+                                                arqueo={arqueo}
+                                                can={can}
+                                                onImputar={() =>
+                                                    setImputando(arqueo)
+                                                }
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <DialogoImputacion

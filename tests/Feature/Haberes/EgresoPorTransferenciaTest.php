@@ -26,6 +26,7 @@ use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Ledger\Actions\ClosePeriod;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\PersonBankAccount;
@@ -70,6 +71,8 @@ class EgresoPorTransferenciaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->abrirLibrosSinSaldo(Currency::Ars, Currency::Usd);
 
         $this->seed(HaberesDemoSeeder::class);
 

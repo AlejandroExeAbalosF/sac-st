@@ -25,6 +25,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\HaberManagementLabel;
+use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Shared\Models\Person;
 use Database\Seeders\Concerns\SplitsPersonName;
 use Illuminate\Database\Seeder;
@@ -129,6 +130,7 @@ final class EscenariosDemoSeeder extends Seeder
 
         try {
             $this->vaciar();
+            $this->abrirLibros();
 
             $this->cuenta = BankAccount::query()->firstOrCreate(
                 ['account_number' => self::CUENTA],
@@ -165,6 +167,23 @@ final class EscenariosDemoSeeder extends Seeder
         }
     }
 
+    /**
+     * Sin apertura el libro no admite movimientos, y los escenarios cobran,
+     * depositan y anulan. Se abre sin saldo y bien antes del extracto: los
+     * escenarios no parten de una planilla, parten de cero.
+     */
+    private function abrirLibros(): void
+    {
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja,
+            balances: [],
+            date: Carbon::parse('2026-01-01'),
+            actorId: (int) $this->operador->id,
+            notes: 'Apertura sin saldo de los escenarios demo.',
+            declaredEmpty: true,
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Vaciar
@@ -194,6 +213,8 @@ final class EscenariosDemoSeeder extends Seeder
             'bank_statement_imports',
             'journal_lines',
             'financial_events',
+            // La apertura de cada libro: se vuelve a abrir después de vaciar.
+            'cash_book_openings',
             'attachments',
             'audit_events',
             'beneficiary_installments',

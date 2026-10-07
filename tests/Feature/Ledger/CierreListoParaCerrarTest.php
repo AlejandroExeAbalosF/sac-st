@@ -126,6 +126,8 @@ class CierreListoParaCerrarTest extends TestCase
 
     public function test_la_base_rechaza_cerrar_con_un_arqueo_sin_resolver(): void
     {
+        $this->abrirLibrosSinSaldo();
+
         DB::table('cash_counts')->insert([
             'cash_box_id' => $this->caja(),
             'counted_on' => '2026-06-10',
@@ -190,6 +192,8 @@ class CierreListoParaCerrarTest extends TestCase
     /** Una importación de otro mes no traba este cierre. */
     public function test_una_importacion_de_otro_periodo_no_traba_el_cierre(): void
     {
+        $this->abrirLibrosSinSaldo();
+
         $this->importacionEnCurso('2026-07-01', '2026-07-31');
 
         $this->cerrarCrudo('2026-06-10');
@@ -200,6 +204,8 @@ class CierreListoParaCerrarTest extends TestCase
     /** Y una ya terminada tampoco: no queda nada por llegar. */
     public function test_una_importacion_terminada_no_traba_el_cierre(): void
     {
+        $this->abrirLibrosSinSaldo();
+
         $this->importacionEnCurso('2026-06-01', '2026-06-30', 'completed');
 
         $this->cerrarCrudo('2026-06-10');

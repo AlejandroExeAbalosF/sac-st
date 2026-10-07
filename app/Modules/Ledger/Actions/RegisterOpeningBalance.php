@@ -10,9 +10,11 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +57,12 @@ use Illuminate\Validation\ValidationException;
  * Va como pata de `BANK_ACCOUNT` **con su cuenta bancaria**. Sin ella la
  * línea no dice dónde está el dinero, y `journal_lines` es append-only: no
  * se corrige después, se revierte.
+ *
+ * **La apertura es un hecho, no solo un asiento.** Se guarda en
+ * `cash_book_openings`, una por caja y moneda, y sin ella el libro no
+ * admite movimientos, arqueos ni cierres. El asiento puede no existir: el
+ * día que se abren los dólares puede no haber ninguno, y quien abre lo
+ * declara a propósito (`declaredEmpty`).
  */
 final class RegisterOpeningBalance
 {
@@ -69,6 +77,7 @@ final class RegisterOpeningBalance
      *                                           por el valor de `LedgerAccount`. Solo cuentas de ubicación.
      * @param  list<array{number: string, bank: string, issueDate: string, amount: string, expediente?: ?string, company?: ?string, beneficiary?: ?string}>  $cheques
      * @param  array<int|string, int|string>  $denominations  Los billetes del cajón, por denominación.
+     * @param  bool  $declaredEmpty  Quien abre declara que no había nada en esa moneda.
      *
      * @throws ValidationException
      */
@@ -82,13 +91,13 @@ final class RegisterOpeningBalance
         ?string $notes = null,
         array $cheques = [],
         array $denominations = [],
-    ): FinancialEvent {
-        $saldos = $this->assertUsable($balances, $cashBoxId, $currency, $bankAccountId);
+        bool $declaredEmpty = false,
+    ): CashBookOpening {
+        $saldos = $this->assertUsable($balances, $currency, $bankAccountId, $declaredEmpty);
         $carteraDeCheques = $this->assertChequesMatchTheBalance($cheques, $saldos);
         $billetes = $this->assertCashIsCounted($denominations, $saldos);
 
-        $lineas = [];
-        $total = '0.00';
+        $declarado = array_reduce($saldos, Decimal::add(...), '0.00');
 
         /*
          * Detallada la cartera, los cheques no van en este asiento: cada
@@ -101,6 +110,9 @@ final class RegisterOpeningBalance
         if ($carteraDeCheques !== []) {
             unset($saldos[LedgerAccount::ChequesInCustody->value]);
         }
+
+        $lineas = [];
+        $total = '0.00';
 
         foreach ($saldos as $cuenta => $importe) {
             $lineas[] = EntryLine::debit(LedgerAccount::from($cuenta), $importe)
@@ -116,16 +128,46 @@ final class RegisterOpeningBalance
             $total = Decimal::add($total, $importe);
         }
 
-        $lineas[] = EntryLine::credit(LedgerAccount::LegacyFunds, $total)
-            ->in($currency)
-            ->onCashBox($cashBoxId)
-            ->describedAs('Fondos del sistema anterior');
-
         return DB::transaction(function () use (
-            $lineas, $cashBoxId, $currency, $date, $notes, $actorId,
+            $lineas, $total, $declarado, $cashBoxId, $currency, $date, $notes, $actorId,
             $carteraDeCheques, $billetes
-        ): FinancialEvent {
-            $evento = $this->postOpeningEntry($lineas, $cashBoxId, $currency, $date, $notes, $actorId);
+        ): CashBookOpening {
+            /*
+             * El mismo candado que toma todo lo que escribe en la caja: dos
+             * aperturas simultáneas no leen las dos que falta abrir.
+             */
+            CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
+
+            $this->assertNotOpenedYet($cashBoxId, $currency);
+
+            /*
+             * Primero el hecho, después sus asientos: la base controla al
+             * confirmar que lo declarado coincide con lo asentado, y el
+             * arqueo de la apertura necesita que el libro ya esté abierto.
+             */
+            $apertura = CashBookOpening::query()->create([
+                'cash_box_id' => $cashBoxId,
+                'currency' => $currency,
+                'opened_on' => $date->toDateString(),
+                'declared_total' => $declarado,
+                'opened_by' => $actorId,
+                'notes' => self::texto($notes),
+            ]);
+
+            /*
+             * Sin asiento principal cuando no queda nada que asentar: una
+             * apertura sin saldo, o una que solo declara cheques detallados
+             * —cada uno lleva el suyo—. Un asiento con una sola línea en
+             * cero no existe.
+             */
+            if ($lineas !== []) {
+                $lineas[] = EntryLine::credit(LedgerAccount::LegacyFunds, $total)
+                    ->in($currency)
+                    ->onCashBox($cashBoxId)
+                    ->describedAs('Fondos del sistema anterior');
+
+                $this->postOpeningEntry($lineas, $cashBoxId, $currency, $date, $notes, $actorId);
+            }
 
             foreach ($carteraDeCheques as $cheque) {
                 $this->storeCheque($cheque, $cashBoxId, $currency, $date, $actorId);
@@ -133,7 +175,7 @@ final class RegisterOpeningBalance
 
             $this->countTheDrawer($billetes, $cashBoxId, $currency, $date, $actorId);
 
-            return $evento;
+            return $apertura;
         });
     }
 
@@ -424,9 +466,9 @@ final class RegisterOpeningBalance
      */
     private function assertUsable(
         array $balances,
-        int $cashBoxId,
         Currency $currency,
         ?int $bankAccountId,
+        bool $declaredEmpty,
     ): array {
         $saldos = [];
 
@@ -470,9 +512,30 @@ final class RegisterOpeningBalance
             $saldos[$cuenta->value] = $escalado;
         }
 
-        if ($saldos === []) {
+        /*
+         * Abrir sin saldo es una declaración, no un formulario vacío.
+         *
+         * El día que se abren los dólares puede no haber ninguno —el
+         * primer movimiento es el cobro que recién entra—, y sin apertura
+         * ese libro no opera. Pero un formulario que llega en cero también
+         * puede ser un saldo que nadie cargó, así que el cero se acepta
+         * solo cuando quien abre lo dice a propósito.
+         */
+        if ($declaredEmpty && $saldos !== []) {
             throw ValidationException::withMessages([
-                'balances' => 'La apertura necesita al menos un saldo distinto de cero.',
+                'balances' => sprintf(
+                    'Se declaró que no había %s al abrir, pero hay saldos cargados. Borralos o desmarcá la casilla.',
+                    mb_strtolower($currency->label()),
+                ),
+            ]);
+        }
+
+        if (! $declaredEmpty && $saldos === []) {
+            throw ValidationException::withMessages([
+                'balances' => sprintf(
+                    'La apertura necesita al menos un saldo distinto de cero, o que marques que no había %s al abrir.',
+                    mb_strtolower($currency->label()),
+                ),
             ]);
         }
 
@@ -488,46 +551,63 @@ final class RegisterOpeningBalance
         }
 
         /*
-         * Abrir dos veces duplicaría el saldo histórico, y la clave de
-         * idempotencia ya lo impide. Esto existe para decirlo con un
-         * mensaje entendible en vez de devolver en silencio un asiento
-         * viejo que el operador no pidió.
-         *
-         * Se busca **el asiento de apertura**, no el saldo de
-         * `LEGACY_FUNDS`: ese saldo baja a cero a medida que la plata de
-         * los casos viejos se reserva para sus cuotas, y el día que llegara
-         * a cero una comprobación por saldo daría vía libre para abrir la
-         * caja de nuevo.
+         * Y esa cuenta es de la moneda del libro: dólares en una cuenta en
+         * pesos no existen. `journal_lines_bank_currency` lo impide en la
+         * base; acá se dice al lado del campo. Se lee con `DB::table` por
+         * el mismo motivo que la pantalla: `bank_accounts` es el maestro
+         * del organismo, no dominio de Banking.
          */
-        $yaAbierta = FinancialEvent::query()
-            ->where('idempotency_key', self::keyFor($cashBoxId, $currency))
-            ->exists();
+        if (isset($saldos[LedgerAccount::BankAccount->value]) && $bankAccountId !== null) {
+            $monedaDeLaCuenta = DB::table('bank_accounts')->where('id', $bankAccountId)->value('currency');
 
-        if ($yaAbierta) {
-            throw ValidationException::withMessages([
-                'balances' => sprintf(
-                    'Esta caja ya tiene una apertura registrada en %s. Revertila antes de volver a abrirla.',
-                    $currency->label(),
-                ),
-            ]);
+            if ($monedaDeLaCuenta !== $currency->value) {
+                throw ValidationException::withMessages([
+                    'bankAccountId' => sprintf(
+                        'La cuenta elegida no es en %s: los depósitos directos de este libro tienen que estar en una cuenta de su moneda.',
+                        mb_strtolower($currency->label()),
+                    ),
+                ]);
+            }
         }
 
         return $saldos;
     }
 
     /**
-     * La apertura de una caja, si ya se hizo.
+     * Cada libro se abre una sola vez.
+     *
+     * Abrir dos veces duplicaría el saldo histórico, y el `UNIQUE (caja,
+     * moneda)` de `cash_book_openings` ya lo impide. Esto existe para
+     * decirlo con un mensaje entendible. Se pregunta por **la apertura**,
+     * no por el saldo de `LEGACY_FUNDS`: ese saldo baja a cero a medida
+     * que la plata de los casos viejos se reserva para sus cuotas, y el día
+     * que llegara a cero una comprobación por saldo daría vía libre para
+     * abrir la caja de nuevo.
+     *
+     * @throws ValidationException
+     */
+    private function assertNotOpenedYet(int $cashBoxId, Currency $currency): void
+    {
+        if (CashBookOpening::for($cashBoxId, $currency) !== null) {
+            throw ValidationException::withMessages([
+                'balances' => sprintf(
+                    'Esta caja ya tiene una apertura registrada en %s, y una apertura no se rehace.',
+                    mb_strtolower($currency->label()),
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * La apertura de un libro, si ya se hizo.
      *
      * Es pública porque la pantalla necesita la misma respuesta que el
-     * Action: si la caja ya está abierta no hay formulario que mostrar,
-     * hay un asiento que leer. Preguntarlo por separado —contando líneas,
-     * mirando saldos— abriría la puerta a que las dos den distinto.
+     * Action: si el libro ya está abierto no hay formulario que mostrar,
+     * hay una apertura que leer.
      */
-    public function existingFor(int $cashBoxId, Currency $currency = Currency::Ars): ?FinancialEvent
+    public function existingFor(int $cashBoxId, Currency $currency = Currency::Ars): ?CashBookOpening
     {
-        return FinancialEvent::query()
-            ->where('idempotency_key', self::keyFor($cashBoxId, $currency))
-            ->first();
+        return CashBookOpening::for($cashBoxId, $currency);
     }
 
     /** Una caja se abre una sola vez por moneda. */

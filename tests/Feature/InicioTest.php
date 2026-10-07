@@ -58,6 +58,13 @@ class InicioTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->abrirLibrosSinSaldo(Currency::Ars, Currency::Usd);
+    }
+
     private const CBU_VALIDO = '2850000300000000000017';
 
     public function test_los_invitados_van_al_login(): void

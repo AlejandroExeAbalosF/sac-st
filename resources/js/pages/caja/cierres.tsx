@@ -20,6 +20,7 @@ import {
     DialogoRehacerPlanilla,
 } from '@/features/caja/components/closing-dialogs';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
+import OpeningRequired from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
@@ -44,7 +45,9 @@ type Props = {
         reopen: boolean;
         export: boolean;
         regenerate: boolean;
+        open: boolean;
     };
+    needsOpening: boolean;
     /** La versión con la que dibuja el generador de hoy. */
     sheetVersion: string;
 };
@@ -61,6 +64,7 @@ export default function CajaCierres({
     pendingDaysByMonth,
     closings,
     can,
+    needsOpening,
     sheetVersion,
 }: Props) {
     /** Solo una fila reabierta abre el diálogo, con su tipo y fecha. */
@@ -108,7 +112,12 @@ export default function CajaCierres({
                     }
                 />
 
-                {closings.length === 0 ? (
+                {needsOpening ? (
+                    <OpeningRequired
+                        moneda={selected.currency}
+                        puedeAbrir={can.open}
+                    />
+                ) : closings.length === 0 ? (
                     <div className="flex flex-col items-center gap-4 rounded-lg border bg-card px-4 py-12 text-center">
                         <p className="text-sm text-muted-foreground">
                             Todavía no se cerró ningún período.

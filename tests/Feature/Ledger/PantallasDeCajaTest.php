@@ -465,6 +465,8 @@ class PantallasDeCajaTest extends TestCase
     /** La caja del arqueo la pone el servidor, no lo que manda el navegador. */
     public function test_el_arqueo_no_confia_en_la_caja_del_navegador(): void
     {
+        $this->abrirLibrosSinSaldo();
+
         $otraCaja = CashBox::query()->where('code', '!=', CashBox::HABERES)->firstOrFail();
 
         $this->actingAs($this->operador('administrativo'))

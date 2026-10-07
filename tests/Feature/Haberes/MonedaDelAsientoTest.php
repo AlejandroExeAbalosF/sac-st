@@ -46,6 +46,8 @@ class MonedaDelAsientoTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo(Currency::Ars, Currency::Usd);
+
         $this->seed(HaberesDemoSeeder::class);
     }
 

@@ -97,6 +97,13 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
      */
     const cuentaUnica = accounts.length <= 1;
 
+    /*
+     * Solo llegan cuentas de la moneda del haber: el depósito no cambia de
+     * moneda. Si no hay ninguna —hoy, los dólares— no hay a dónde llevar
+     * el efectivo, y se dice en vez de dejar un selector vacío.
+     */
+    const sinCuenta = accounts.length === 0;
+
     const enviar = (event: React.FormEvent) => {
         event.preventDefault();
         form.post(trasladar(cuota.id).url, { forceFormData: true });
@@ -205,7 +212,13 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {cuentaUnica ? (
+                            {sinCuenta ? (
+                                <p className="text-xs text-warning-strong">
+                                    No hay cuenta bancaria activa en la moneda
+                                    de este haber. Se da de alta en Banco ›
+                                    Cuentas.
+                                </p>
+                            ) : cuentaUnica ? (
                                 <p className="text-xs text-muted-foreground">
                                     Es la única cuenta activa del organismo.
                                 </p>
@@ -328,7 +341,11 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                         <div className="flex items-center gap-3">
                             <Button
                                 type="submit"
-                                disabled={form.processing || foto === null}
+                                disabled={
+                                    form.processing ||
+                                    foto === null ||
+                                    sinCuenta
+                                }
                             >
                                 <Landmark className="size-4" />
                                 Registrar el depósito

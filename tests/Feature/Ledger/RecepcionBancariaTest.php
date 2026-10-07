@@ -40,6 +40,13 @@ class RecepcionBancariaTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->abrirLibrosSinSaldo();
+    }
+
     private const CREDITO = '473191.20';
 
     public function test_registrar_una_recepcion_asienta_el_dinero_en_los_libros(): void

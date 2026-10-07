@@ -8,7 +8,9 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
+use App\Modules\Ledger\Exceptions\CashBookNotOpenedException;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Ledger\Models\PeriodClosing;
@@ -93,6 +95,7 @@ final class PostJournalEntry
                     CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
                 }
 
+                $this->assertBooksOpen($type, $cashBoxId, $date, $currencies);
                 $this->assertPeriodOpen($cashBoxId, $date, $currencies);
 
                 $evento = FinancialEvent::query()->create([
@@ -131,6 +134,32 @@ final class PostJournalEntry
             return FinancialEvent::query()
                 ->where('idempotency_key', $idempotencyKey)
                 ->firstOrFail();
+        }
+    }
+
+    /**
+     * El libro de cada moneda del asiento tiene que estar abierto.
+     *
+     * Sin la apertura el saldo teórico arranca en cero, y el primer arqueo
+     * daría una diferencia igual a todo lo que ya estaba en el cajón. La
+     * base lo impide con `journal_lines_require_opening`; esto lo dice con
+     * la salida a mano.
+     *
+     * El asiento de apertura no la pide —es ella—, y un evento sin caja no
+     * tiene libro que mirar, igual que en el trigger.
+     *
+     * @param  list<string>  $currencies
+     *
+     * @throws CashBookNotOpenedException
+     */
+    private function assertBooksOpen(FinancialEventType $type, ?int $cashBoxId, CarbonInterface $date, array $currencies): void
+    {
+        if ($cashBoxId === null || $type === FinancialEventType::OpeningBalance) {
+            return;
+        }
+
+        foreach ($currencies as $moneda) {
+            CashBookOpening::assertOpen($cashBoxId, Currency::from($moneda), $date);
         }
     }
 

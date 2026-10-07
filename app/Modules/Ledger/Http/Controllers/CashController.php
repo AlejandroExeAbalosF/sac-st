@@ -136,8 +136,8 @@ final class CashController extends Controller
              * tienen los tres saldos iniciales.
              */
             'opening' => $apertura === null ? null : [
-                'date' => $apertura->event_date->toDateString(),
-                'notes' => $apertura->description,
+                'date' => $apertura->opened_on->toDateString(),
+                'notes' => $apertura->notes,
             ],
             /*
              * Lo que queda del sistema anterior. Aparece mientras haya algo

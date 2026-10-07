@@ -16,6 +16,7 @@ use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Excel\CashSheetWorkbook;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RegenerateCashSheetRequest;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
@@ -108,7 +109,10 @@ final class PeriodClosingController extends Controller
                 'reopen' => $usuario?->can('cierres.reabrir') ?? false,
                 'export' => $usuario?->can('cierres.exportar') ?? false,
                 'regenerate' => $usuario?->can('cierres.regenerar-planilla') ?? false,
+                'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
             ],
+            /* Sin apertura no hay saldo inicial que congelar: no hay nada que cerrar. */
+            'needsOpening' => CashBookOpening::for((int) $caja->id, $moneda) === null,
             /*
              * La versión del dibujo que produce el generador de hoy. La
              * pantalla la compara contra la de cada planilla guardada: sin

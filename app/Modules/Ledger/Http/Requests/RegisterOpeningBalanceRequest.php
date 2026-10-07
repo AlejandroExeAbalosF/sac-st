@@ -94,10 +94,12 @@ final class RegisterOpeningBalanceRequest extends FormRequest
             'cashBoxId' => ['required', 'integer', Rule::exists('cash_boxes', 'id')->where('is_active', true)],
             'currency' => ['required', Rule::enum(Currency::class)],
             /*
-             * La fecha del saldo, que es la víspera del arranque: lo que
-             * hay en el cajón el día anterior al primer movimiento. No
-             * puede ser futura, y tampoco tiene por qué ser hoy — la carga
-             * suele hacerse unos días después de la fecha que declara.
+             * El primer día que opera el sistema, con los saldos del cierre
+             * del día anterior. No es la víspera: los papeles históricos
+             * tienen que ser anteriores a la apertura
+             * (`legacy_paper_before_opening`), y los del último día manual
+             * se cargan como cuota histórica. No puede ser futura, y
+             * tampoco tiene por qué ser hoy.
              */
             'date' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'balances' => ['present', 'array'],
@@ -113,6 +115,13 @@ final class RegisterOpeningBalanceRequest extends FormRequest
                 Rule::exists('bank_accounts', 'id')->where('is_active', true),
             ],
             'notes' => ['nullable', 'string', 'max:300'],
+
+            /*
+             * «No había nada en esta moneda al abrir.» Es lo único que
+             * permite una apertura sin saldo: el Action no acepta un
+             * formulario en cero que nadie declaró como tal.
+             */
+            'declaredEmpty' => ['sometimes', 'boolean'],
 
             /*
              * Los billetes del cajón. El efectivo de la apertura sale de
@@ -145,7 +154,7 @@ final class RegisterOpeningBalanceRequest extends FormRequest
     {
         $nombres = [
             'cashBoxId' => 'caja',
-            'date' => 'fecha del saldo',
+            'date' => 'fecha de la apertura',
             'balances' => 'saldos',
             'bankAccountId' => 'cuenta bancaria',
             'cheques' => 'cheques en cartera',

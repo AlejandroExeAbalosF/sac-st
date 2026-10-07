@@ -322,7 +322,7 @@ final class InicioController extends Controller
             date: $fecha->toDateString(),
             /*
              * La misma pregunta que hace la pantalla de Caja, contestada
-             * por el mismo lado: el asiento de apertura existe o no.
+             * por el mismo lado: la apertura del libro existe o no.
              * Contar líneas o mirar saldos abriría la puerta a que las dos
              * den distinto.
              */

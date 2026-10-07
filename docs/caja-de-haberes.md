@@ -32,7 +32,7 @@ Las cuatro primeras dicen **dónde está** la plata; las demás, **de quién es*
 ## El circuito del día
 
 ```
-Apertura (una sola vez)
+Apertura (una vez por moneda)
    ↓
 Movimientos del día  →  recibos de ingreso y egreso, traslados al banco
    ↓
@@ -51,6 +51,40 @@ Carga el saldo que ya estaba en el cajón el día que el sistema arranca. **Una 
 por caja y moneda**, y solo el administrador (`caja.abrir-saldo-inicial`). Sin
 esto todos los saldos son cero y el primer arqueo daría una diferencia igual a
 todo el saldo histórico.
+
+**Sin apertura, ese libro no opera.** Pesos y dólares son dos libros sobre el
+mismo cajón: mientras uno no se abra, no admite cobros, pagos, traslados,
+arqueos ni cierres, y tampoco nada con fecha anterior a su apertura. Lo impone la
+base y `PostJournalEntry` lo dice con salida. La Caja del día, Arqueos y Cierres
+muestran en ese libro un panel que lleva a la apertura —o dice que se la pidan a
+un administrador—, y una operación que choca desde otra pantalla abre un diálogo
+con lo mismo.
+
+La apertura se guarda como hecho propio en `cash_book_openings`: caja, moneda,
+fecha, quién la declaró y el total. Sus asientos —el principal y uno por cheque
+detallado— suman ese total, y la base lo controla. No se edita ni se rehace.
+
+**La fecha es el primer día que opera el libro, no la víspera.** Lo declarado es
+el cierre manual del día anterior. Los papeles hasta ese cierre son anteriores a
+la apertura y se cargan como cuota histórica, que no mueve plata; desde la fecha
+de la apertura todo va por el circuito. Un día anterior a la apertura se puede
+mirar en la Caja del día, pero sin flujo: un aviso lo explica y lleva al día de la
+apertura.
+
+**El primer día se trabaja completo.** A la mañana se abre con los saldos del
+cierre anterior, contando el cajón; ese conteo es el primer arqueo del día y nace
+revisado. Durante el día se cobra y se paga. A la noche se cuenta en un segundo
+turno solo lo que entró en el día —la plata de la apertura pasa como saldo del día
+anterior, sin recontar— y se cierra.
+
+**Los dólares se abren igual que los pesos**, con lo que haya: efectivo contado,
+cheques y depósitos directos. La cuenta de los depósitos directos tiene que ser
+de la moneda del libro; mientras no exista una cuenta en dólares el renglón
+aparece apagado, y la apertura en dólares es de efectivo y cheques. Si el día que
+se abre no hay nada en esa moneda —el primer dólar es el cobro que recién entra—,
+se abre igual **declarándolo**: «No hay dólares al abrir los libros». Un
+formulario en cero sin esa marca se rechaza, porque también podría ser un saldo
+que nadie cargó.
 
 **El efectivo no se escribe: se cuenta.** La pantalla pide el detalle por
 denominación y el importe sale de ahí. Es la única vez que contar el cajón sale
@@ -368,6 +402,12 @@ legible; el trigger impide el desastre.
 
 - `journal_lines` y `financial_events` son **append-only**; un asiento se revierte,
   no se edita.
+- **Un libro sin apertura no admite movimientos, arqueos ni cierres**, y nada con
+  fecha anterior a ella (`journal_lines_require_opening`,
+  `cash_counts_require_opening`, `period_closings_require_opening`). Pesos y
+  dólares se abren por separado.
+- La apertura es **una por caja y moneda**, append-only, y lo que declara coincide
+  con sus asientos; es el primer hecho de su libro (`cash_book_openings_consistent`).
 - Cada asiento **balancea por moneda**.
 - Un período cerrado **no admite movimientos** con fecha adentro…
 - …ni un movimiento anterior que **desactualice un cierre posterior**: la apertura

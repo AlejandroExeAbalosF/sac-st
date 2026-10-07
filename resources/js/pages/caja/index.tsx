@@ -1,6 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    BookOpen,
     CalendarDays,
     ChevronLeft,
     ChevronRight,
@@ -13,17 +12,20 @@ import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { esAnteriorALaApertura } from '@/features/caja/apertura';
 import ChequeInventoryDialog from '@/features/caja/components/cheque-inventory-dialog';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import DayActivity from '@/features/caja/components/day-activity';
 import type { DayActivityEntry } from '@/features/caja/components/day-activity';
 import FlujoDelDia from '@/features/caja/components/day-workflow';
+import OpeningRequired, {
+    BeforeOpening,
+} from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { businessToday, date as formatDate, isNonZero } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 import { calendario, dia as caja } from '@/routes/caja';
-import { index as apertura } from '@/routes/caja/apertura';
 import { index as arqueos } from '@/routes/caja/arqueos';
 import { index as cierres } from '@/routes/caja/cierres';
 import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
@@ -266,135 +268,135 @@ export default function CajaIndex({
                     </p>
                 )}
 
-                {needsOpening && (
-                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning-soft bg-warning-soft px-4 py-3 text-warning-strong">
-                        <BookOpen className="size-5 shrink-0" />
-                        <div className="min-w-0 text-sm">
-                            <p className="font-medium">
-                                Los libros de esta caja todavía no se abrieron.
-                            </p>
-                            <p>
-                                Hasta que se declare el saldo que ya está en el
-                                cajón, los saldos arrancan en cero y el primer
-                                arqueo va a dar una diferencia igual a todo el
-                                saldo histórico.
-                            </p>
-                        </div>
-                        {can.open && (
-                            <Button
-                                variant="outline"
-                                className="ml-auto"
-                                asChild
-                            >
-                                <Link href={enlace(apertura().url)}>
-                                    Abrir libros
-                                </Link>
-                            </Button>
+                {/*
+                 * Sin apertura no hay saldos que mostrar ni nada que hacer:
+                 * la base rechaza cobros, arqueos y cierres en ese libro. El
+                 * panel reemplaza al día; el selector de moneda sigue arriba.
+                 *
+                 * Lo mismo un día anterior a la apertura: ahí el libro no
+                 * tiene nada, y contar o cerrar ese día lo rechazaría la base.
+                 */}
+                {needsOpening ? (
+                    <OpeningRequired moneda={moneda} puedeAbrir={can.open} />
+                ) : opening !== null &&
+                  esAnteriorALaApertura(selected.date, opening) ? (
+                    <BeforeOpening
+                        moneda={moneda}
+                        fechaApertura={opening.date}
+                        hrefApertura={enlace(
+                            caja({ query: { fecha: opening.date } }).url,
                         )}
-                    </div>
-                )}
-
-                {/*
-                 * Los tres saldos de la planilla más la cola de trabajo.
-                 * Los tres primeros dicen dónde está la plata; el cuarto,
-                 * de quién todavía no se sabe.
-                 */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Saldo
-                        titulo="Efectivo en caja"
-                        valor={state.cash}
-                        destacado
                     />
-                    <Saldo
-                        titulo="Cheques en custodia"
-                        valor={state.cheques}
-                        accion={
-                            /*
-                             * El saldo no dice cuáles ni para quién: reservar un
-                             * cheque no lo mueve. El detalle se abre acá.
-                             */
-                            isNonZero(state.cheques) && (
+                ) : (
+                    <>
+                        {/*
+                         * Los tres saldos de la planilla más la cola de trabajo.
+                         * Los tres primeros dicen dónde está la plata; el cuarto,
+                         * de quién todavía no se sabe.
+                         */}
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <Saldo
+                                titulo="Efectivo en caja"
+                                valor={state.cash}
+                                destacado
+                            />
+                            <Saldo
+                                titulo="Cheques en custodia"
+                                valor={state.cheques}
+                                accion={
+                                    /*
+                                     * El saldo no dice cuáles ni para quién: reservar un
+                                     * cheque no lo mueve. El detalle se abre acá.
+                                     */
+                                    isNonZero(state.cheques) && (
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="h-auto px-0 text-xs"
+                                            onClick={() =>
+                                                setViendoCheques(true)
+                                            }
+                                        >
+                                            Ver los cheques
+                                        </Button>
+                                    )
+                                }
+                            />
+                            <Saldo titulo="En la cuenta" valor={state.bank} />
+                            <Saldo
+                                titulo="Sin identificar"
+                                valor={state.unassigned}
+                                nota="La cola de trabajo: entró y todavía no se sabe de quién es."
+                            />
+                        </div>
+
+                        {/*
+                         * Lo que queda del sistema anterior sin dueño, mientras quede
+                         * algo. Baja con cada reserva para una cuota histórica; el día que llega a cero se apaga la
+                         * planilla en paralelo.
+                         */}
+                        {/[1-9]/.test(legacyPending) && (
+                            <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
+                                <HandCoins className="size-4 shrink-0 text-muted-foreground" />
+                                <span>
+                                    Quedan <Money value={legacyPending} /> del
+                                    sistema anterior sin reservar.
+                                </span>
                                 <Button
-                                    variant="link"
+                                    variant="outline"
                                     size="sm"
-                                    className="h-auto px-0 text-xs"
-                                    onClick={() => setViendoCheques(true)}
+                                    className="ml-auto"
+                                    asChild
                                 >
-                                    Ver los cheques
+                                    <Link href={saldoAnterior().url}>
+                                        Ver el detalle
+                                    </Link>
                                 </Button>
-                            )
-                        }
-                    />
-                    <Saldo titulo="En la cuenta" valor={state.bank} />
-                    <Saldo
-                        titulo="Sin identificar"
-                        valor={state.unassigned}
-                        nota="La cola de trabajo: entró y todavía no se sabe de quién es."
-                    />
-                </div>
+                            </div>
+                        )}
 
-                {/*
-                 * Lo que queda del sistema anterior sin dueño, mientras quede
-                 * algo. Baja con cada reserva para una cuota histórica; el día que llega a cero se apaga la
-                 * planilla en paralelo.
-                 */}
-                {/[1-9]/.test(legacyPending) && (
-                    <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
-                        <HandCoins className="size-4 shrink-0 text-muted-foreground" />
-                        <span>
-                            Quedan <Money value={legacyPending} /> del sistema
-                            anterior sin reservar.
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="ml-auto"
-                            asChild
-                        >
-                            <Link href={saldoAnterior().url}>
-                                Ver el detalle
-                            </Link>
-                        </Button>
-                    </div>
+                        {/*
+                         * El tránsito solo aparece cuando existe. Casi siempre es
+                         * cero, y cuando no lo es explica por qué el arqueo cierra
+                         * con menos plata sin que haya salido un peso al beneficiario.
+                         */}
+                        {/[1-9]/.test(state.inTransit) && (
+                            <p className="rounded-md border border-info-soft bg-info-soft px-3 py-2 text-sm text-info-strong">
+                                <Money value={state.inTransit} /> salieron hacia
+                                el banco y todavía no fueron acreditados.
+                            </p>
+                        )}
+
+                        <div className="grid gap-4 lg:grid-cols-3">
+                            <section className="flex flex-col gap-4 lg:col-span-2">
+                                <Libro
+                                    income={book.income}
+                                    expense={book.expense}
+                                />
+                                <DayActivity entries={activity} />
+                            </section>
+
+                            <aside className="flex flex-col gap-4">
+                                <FlujoDelDia
+                                    fecha={selected.date}
+                                    cashBoxId={selected.cashBoxId}
+                                    cajaNombre={selected.cashBoxName}
+                                    currency={selected.currency}
+                                    arqueos={counts}
+                                    anterior={previousCount}
+                                    referenciaComposicion={compositionReference}
+                                    esperado={state.cash}
+                                    recaudacion={dayTakings}
+                                    cajonMovido={movedAfter}
+                                    cierre={closing}
+                                    denominaciones={suggestedDenominations}
+                                    sheetVersion={sheetVersion}
+                                    can={can}
+                                />
+                            </aside>
+                        </div>
+                    </>
                 )}
-
-                {/*
-                 * El tránsito solo aparece cuando existe. Casi siempre es
-                 * cero, y cuando no lo es explica por qué el arqueo cierra
-                 * con menos plata sin que haya salido un peso al beneficiario.
-                 */}
-                {/[1-9]/.test(state.inTransit) && (
-                    <p className="rounded-md border border-info-soft bg-info-soft px-3 py-2 text-sm text-info-strong">
-                        <Money value={state.inTransit} /> salieron hacia el
-                        banco y todavía no fueron acreditados.
-                    </p>
-                )}
-
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <section className="flex flex-col gap-4 lg:col-span-2">
-                        <Libro income={book.income} expense={book.expense} />
-                        <DayActivity entries={activity} />
-                    </section>
-
-                    <aside className="flex flex-col gap-4">
-                        <FlujoDelDia
-                            fecha={selected.date}
-                            cashBoxId={selected.cashBoxId}
-                            cajaNombre={selected.cashBoxName}
-                            currency={selected.currency}
-                            arqueos={counts}
-                            anterior={previousCount}
-                            referenciaComposicion={compositionReference}
-                            esperado={state.cash}
-                            recaudacion={dayTakings}
-                            cajonMovido={movedAfter}
-                            cierre={closing}
-                            denominaciones={suggestedDenominations}
-                            sheetVersion={sheetVersion}
-                            can={can}
-                        />
-                    </aside>
-                </div>
             </div>
             {viendoCheques && (
                 <ChequeInventoryDialog

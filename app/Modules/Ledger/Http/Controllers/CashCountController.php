@@ -12,6 +12,7 @@ use App\Modules\Ledger\Data\CashCountListItemData;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RecordCashCountRequest;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
@@ -57,9 +58,12 @@ final class CashCountController extends Controller
                 'defaultDate' => $fechaPredeterminada->toDateString(),
             ],
             'counts' => $arqueos->map(CashCountListItemData::fromModel(...))->values()->all(),
+            /* Sin apertura no hay contra qué contar: la pantalla lo dice en vez de listar. */
+            'needsOpening' => CashBookOpening::for((int) $caja->id, $moneda) === null,
             'can' => [
                 'review' => $usuario?->can('caja.revisar-arqueo') ?? false,
                 'adjust' => $usuario?->can('caja.ajustar-diferencia') ?? false,
+                'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
             ],
         ]);
     }

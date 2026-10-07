@@ -62,6 +62,8 @@ class ChequeEnElTrasladoTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo();
+
         $this->seed(HaberesDemoSeeder::class);
         $this->operador = $this->operador();
     }

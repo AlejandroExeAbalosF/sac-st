@@ -8,6 +8,7 @@ use App\Http\Middleware\ForcePasswordChange;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
+use App\Modules\Ledger\Exceptions\CashBookNotOpenedException;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -88,6 +89,21 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return back()->with('closedPeriod', $e->toArray());
+        });
+
+        /*
+         * Un libro sin apertura tampoco es una pantalla de error.
+         *
+         * Tiene salida —abrir los libros de esa moneda—, aunque no siempre
+         * la tenga quien estaba operando. Se vuelve a donde estaba con lo
+         * necesario para explicarlo y, si puede, llevarlo a la apertura.
+         */
+        $exceptions->render(function (CashBookNotOpenedException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return null;
+            }
+
+            return back()->with('missingOpening', $e->toArray());
         });
 
         /*

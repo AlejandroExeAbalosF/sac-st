@@ -228,6 +228,8 @@ class PlanillaDeCajaExcelTest extends TestCase
      */
     public function test_el_reverso_identifica_cada_cheque_en_custodia(): void
     {
+        $this->abrirLibrosSinSaldo();
+
         $cuota = $this->cuotaConCheque();
 
         app(CollectAndIssueReceipt::class)->handle(

@@ -46,6 +46,8 @@ class EtapaDeLaCuotaTest extends TestCase
     {
         parent::setUp();
 
+        $this->abrirLibrosSinSaldo();
+
         $this->seed(HaberesDemoSeeder::class);
 
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-06-10 09:00'));
