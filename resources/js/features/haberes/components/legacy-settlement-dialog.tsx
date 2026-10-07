@@ -25,6 +25,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { businessToday, date } from '@/lib/format';
 import { legacySettlement as registrarPagoAnterior } from '@/routes/haberes/installments';
+import PaperPhotoDropzone from './paper-photo-dropzone';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;
@@ -222,6 +223,7 @@ export default function LegacySettlementDialog({
                                 numero={form.data.incomeNumber}
                                 fecha={form.data.incomeDate}
                                 importe={cuota.expectedAmount}
+                                foto={form.data.incomePhoto}
                                 onNumero={(v) =>
                                     form.setData('incomeNumber', v)
                                 }
@@ -303,6 +305,7 @@ export default function LegacySettlementDialog({
                                 numero={form.data.orderNumber}
                                 fecha={form.data.orderDate}
                                 importe={cuota.expectedAmount}
+                                foto={form.data.orderPhoto}
                                 onNumero={(v) => form.setData('orderNumber', v)}
                                 onFecha={(v) => form.setData('orderDate', v)}
                                 onFoto={(f) => form.setData('orderPhoto', f)}
@@ -327,6 +330,7 @@ export default function LegacySettlementDialog({
                                 numero={form.data.expenseNumber}
                                 fecha={form.data.expenseDate}
                                 importe={cuota.expectedAmount}
+                                foto={form.data.expensePhoto}
                                 onNumero={(v) =>
                                     form.setData('expenseNumber', v)
                                 }
@@ -489,6 +493,7 @@ function Papel({
     numero,
     fecha,
     importe,
+    foto,
     onNumero,
     onFecha,
     onFoto,
@@ -502,6 +507,7 @@ function Papel({
     fecha: string;
     /** El de la cuota. */
     importe: string;
+    foto: File | null;
     onNumero: (valor: string) => void;
     onFecha: (valor: string) => void;
     onFoto: (archivo: File | null) => void;
@@ -555,21 +561,12 @@ function Papel({
             </div>
             <InputError message={errores.numero} />
             <InputError message={errores.fecha} />
-            <div className="grid gap-1.5">
-                <Label htmlFor={`${id}-foto`}>
-                    Foto
-                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        opcional · JPG, PNG, WEBP o PDF
-                    </span>
-                </Label>
-                <Input
-                    id={`${id}-foto`}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                    onChange={(e) => onFoto(e.target.files?.[0] ?? null)}
-                />
-                <InputError message={errores.foto} />
-            </div>
+            <PaperPhotoDropzone
+                id={`${id}-foto`}
+                foto={foto}
+                onElegir={onFoto}
+                error={errores.foto}
+            />
         </fieldset>
     );
 }

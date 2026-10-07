@@ -32,6 +32,7 @@ import {
     sumAmounts,
 } from '@/lib/format';
 import { legacyFunds as apartarFondos } from '@/routes/haberes/installments';
+import PaperPhotoDropzone from './paper-photo-dropzone';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Papel = App.Modules.Haberes.Data.LegacyDocumentData;
@@ -615,26 +616,14 @@ export default function LegacyFundsDialog({
                             </div>
                             <InputError message={errores.incomeNumber} />
                             <InputError message={errores.incomeDate} />
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`apartar-foto-${cuota.id}`}>
-                                    Foto
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                        opcional · JPG, PNG, WEBP o PDF
-                                    </span>
-                                </Label>
-                                <Input
-                                    id={`apartar-foto-${cuota.id}`}
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'incomePhoto',
-                                            e.target.files?.[0] ?? null,
-                                        )
-                                    }
-                                />
-                                <InputError message={errores.incomePhoto} />
-                            </div>
+                            <PaperPhotoDropzone
+                                id={`apartar-foto-${cuota.id}`}
+                                foto={form.data.incomePhoto}
+                                onElegir={(archivo) =>
+                                    form.setData('incomePhoto', archivo)
+                                }
+                                error={errores.incomePhoto}
+                            />
                         </fieldset>
                     ) : (
                         <p className="rounded-lg border bg-muted/30 p-3 text-sm">
