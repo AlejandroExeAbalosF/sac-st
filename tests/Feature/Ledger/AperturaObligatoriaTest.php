@@ -185,6 +185,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_los_dolares_se_abren_con_efectivo_igual_que_los_pesos(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '500.00'],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -209,6 +210,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_se_abre_declarando_solo_cheques_detallados(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::ChequesInCustody->value => '300.00'],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -230,6 +232,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_se_abre_sin_saldo_cuando_se_declara(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -255,6 +258,7 @@ class AperturaObligatoriaTest extends TestCase
         $this->expectExceptionMessage('que no había dólares al abrir');
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '0'],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -268,6 +272,7 @@ class AperturaObligatoriaTest extends TestCase
         $this->expectExceptionMessage('hay saldos cargados');
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '100.00'],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -291,6 +296,7 @@ class AperturaObligatoriaTest extends TestCase
         $this->expectExceptionMessage('no es en dólares');
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::BankAccount->value => '100.00'],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -547,6 +553,7 @@ class AperturaObligatoriaTest extends TestCase
     private function abrirConEfectivo(string $efectivo, string $fecha): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => $efectivo],
             denominations: $this->billetesPara($efectivo),

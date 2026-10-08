@@ -193,6 +193,7 @@ class RehacerPlanillaTest extends TestCase
         $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $caja,
             balances: [LedgerAccount::CashOnHand->value => '100000.00'],
             denominations: $this->billetesPara('100000.00'),

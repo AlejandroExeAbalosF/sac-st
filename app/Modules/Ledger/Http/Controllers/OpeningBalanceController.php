@@ -101,7 +101,7 @@ final class OpeningBalanceController extends Controller
             bankAccountId: $request->validated('bankAccountId') === null
                 ? null
                 : (int) $request->validated('bankAccountId'),
-            actorId: $request->user()?->id,
+            actorId: (int) $request->user()?->id,
             cheques: $request->cheques(),
             denominations: $request->denominations(),
             notes: $request->validated('notes'),

@@ -309,7 +309,14 @@ el libro no se haya movido desde ese arqueo.
 Para cerrar **un mes**: todos sus días con movimiento cerrados.
 
 **Reabrir** (`cierres.reabrir`) exige motivo y deja rastro. Cada cierre estrena
-planilla: la anterior queda archivada porque pudo haberse firmado.
+planilla: la anterior queda archivada porque pudo haberse firmado. Un día no se
+reabre mientras siga cerrado el mes **de su moneda** que lo abarca; el de la
+otra moneda no lo traba. Reabrir un cierre no reabre los siguientes: un
+movimiento con fecha anterior a varios cierres dice cuántos hay que reabrir.
+
+En el inicio, los días y los meses sin cerrar se cuentan **por moneda**: un día
+cerrado en pesos no cierra lo que se movió en dólares. El enlace lleva al libro
+donde está lo pendiente.
 
 ### Planilla
 

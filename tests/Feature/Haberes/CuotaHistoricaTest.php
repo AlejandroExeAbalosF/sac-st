@@ -139,6 +139,7 @@ class CuotaHistoricaTest extends TestCase
     public function test_una_apertura_sin_saldo_tambien_marca_el_corte(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [],
             date: CarbonImmutable::parse('2026-06-01'),
@@ -556,6 +557,7 @@ class CuotaHistoricaTest extends TestCase
     private function abrirLibros(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '1000000.00'],
             denominations: $this->billetesPara('1000000.00'),

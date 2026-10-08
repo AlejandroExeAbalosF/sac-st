@@ -222,6 +222,7 @@ class SaldoAnteriorNoNegativoTest extends TestCase
     private function abrirLibros(string $efectivo): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => $efectivo],
             denominations: $this->billetesPara($efectivo),

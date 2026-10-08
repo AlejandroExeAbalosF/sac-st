@@ -64,6 +64,8 @@ final class ReopenPeriod
             /* Un cierre mensual superior sigue bloqueando el día. */
             $mensualCerrado = PeriodClosing::query()
                 ->where('cash_box_id', $closing->cash_box_id)
+                // Los libros de pesos y de dólares se cierran por separado.
+                ->where('currency', $closing->currency)
                 ->whereKeyNot($closing->getKey())
                 ->where('status', PeriodClosingStatus::Closed)
                 ->whereDate('period_from', '<=', $closing->period_from)

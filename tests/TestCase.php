@@ -207,11 +207,26 @@ abstract class TestCase extends BaseTestCase
                 cashBoxId: $caja,
                 balances: [],
                 date: CarbonImmutable::parse('2000-01-01'),
+                actorId: $this->quienAbre(),
                 currency: $moneda,
                 declaredEmpty: true,
             );
         }
     }
+
+    /**
+     * El administrador que abre los libros en un test.
+     *
+     * La apertura exige quién la hace —atestigua el conteo—, y a los tests
+     * que no tratan de eso les da igual quién: alcanza con uno, y siempre
+     * el mismo dentro del test.
+     */
+    protected function quienAbre(): int
+    {
+        return $this->quienAbre ??= (int) $this->operador('administrador')->id;
+    }
+
+    private ?int $quienAbre = null;
 
     /** Un arqueo real y revisado para los tests cuyo objeto principal es el cierre. */
     protected function arqueoListoParaCerrar(

@@ -54,18 +54,21 @@ final class ClosedPeriodException extends Exception
      *
      * La apertura de cada cierre es el saldo del libro a su víspera, así
      * que un movimiento con fecha anterior lo deja diciendo otra cosa que
-     * el libro. El mensaje nombra el cierre que hay que reabrir, no el
-     * día del asiento: es ahí donde está la salida.
+     * el libro. El mensaje nombra el primer cierre afectado, no el día del
+     * asiento: es ahí donde está la salida. Y dice cuántos son, porque
+     * reabrir uno no reabre los siguientes.
      */
-    public static function invalidatedBy(PeriodClosing $closing, CarbonInterface $attemptedOn): self
+    public static function invalidatedBy(PeriodClosing $closing, CarbonInterface $attemptedOn, int $affected = 1): self
     {
         return new self($closing, $attemptedOn, sprintf(
-            'Un movimiento del %s cambiaría el saldo inicial del cierre %s del %s al %s, que ya está cerrado. '
-            .'Reabrilo antes de cargarlo.',
+            'Un movimiento del %s cambiaría el saldo inicial del cierre %s del %s al %s, que ya está cerrado. %s',
             $attemptedOn->format('d/m/Y'),
             mb_strtolower($closing->period_type->label()),
             $closing->period_from->format('d/m/Y'),
             $closing->period_to->format('d/m/Y'),
+            $affected > 1
+                ? sprintf('Hay %d cierres posteriores cerrados, desde ese: hay que reabrirlos todos antes de cargarlo.', $affected)
+                : 'Reabrilo antes de cargarlo.',
         ));
     }
 

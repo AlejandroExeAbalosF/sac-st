@@ -447,6 +447,7 @@ class CalendarioDeCajaTest extends TestCase
     private function abrirLibros(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '1000000.00'],
             denominations: $this->billetesPara('1000000.00'),

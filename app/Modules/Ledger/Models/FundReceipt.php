@@ -60,10 +60,10 @@ final class FundReceipt extends Model
         'depositor_id',
         'medium',
         /*
-         * La escribe la apertura, que es la única que sabe en qué libro
-         * está parada. El resto de las recepciones todavía son de pesos por
-         * construcción --sus Actions no reciben moneda-- y dependen del
-         * default de la columna.
+         * La moneda del libro donde entró la plata: la de la cuota en el
+         * cobro por mostrador, la de la cuenta en el crédito bancario y la
+         * del libro que se abre en la apertura. La base la ata a la de las
+         * líneas de su asiento.
          */
         'currency',
         'amount',

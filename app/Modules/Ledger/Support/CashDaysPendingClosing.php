@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Ledger\Support;
 
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
 use App\Modules\Ledger\Enums\PeriodType;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,29 +23,41 @@ use Illuminate\Support\Facades\DB;
  * Se pregunta por cada día y no por el último cierre: un período reabierto
  * deja un agujero en el medio, y `max(period_to)` lo pasaría por encima
  * como si estuviera cerrado.
+ *
+ * **Por moneda**, como `CashMonthsPendingClosing`: pesos y dólares se
+ * cierran por separado, y un día cerrado en dólares no cierra lo que se
+ * movió en pesos. Sin moneda cuenta los días que tienen algún libro
+ * pendiente, una vez cada uno.
  */
 final class CashDaysPendingClosing
 {
-    public function count(int $cashBoxId, CarbonInterface $before): int
+    public function count(int $cashBoxId, CarbonInterface $before, ?Currency $currency = null): int
     {
         $dias = DB::table('financial_events')
-            ->where('cash_box_id', $cashBoxId)
-            ->where('status', FinancialEventStatus::Posted->value)
-            ->whereDate('event_date', '<', $before)
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'financial_events.id')
+            ->where('financial_events.cash_box_id', $cashBoxId)
+            ->where('financial_events.status', FinancialEventStatus::Posted->value)
+            ->when(
+                $currency !== null,
+                fn (Builder $query): Builder => $query->where('journal_lines.currency', $currency->value),
+            )
+            ->whereDate('financial_events.event_date', '<', $before)
             ->distinct()
-            ->select('event_date');
+            ->selectRaw('financial_events.event_date AS dia, journal_lines.currency AS moneda');
 
         return DB::query()
             ->fromSub($dias, 'dias')
-            ->whereNotExists(function ($query) use ($cashBoxId): void {
+            ->whereNotExists(function (Builder $query) use ($cashBoxId): void {
                 $query->selectRaw('1')
                     ->from('period_closings')
                     ->where('cash_box_id', $cashBoxId)
                     ->where('period_type', PeriodType::Daily->value)
                     ->where('status', PeriodClosingStatus::Closed->value)
-                    ->whereColumn('period_closings.period_from', '<=', 'dias.event_date')
-                    ->whereColumn('period_closings.period_to', '>=', 'dias.event_date');
+                    ->whereColumn('period_closings.currency', '=', 'dias.moneda')
+                    ->whereColumn('period_closings.period_from', '<=', 'dias.dia')
+                    ->whereColumn('period_closings.period_to', '>=', 'dias.dia');
             })
-            ->count();
+            ->distinct()
+            ->count('dias.dia');
     }
 }

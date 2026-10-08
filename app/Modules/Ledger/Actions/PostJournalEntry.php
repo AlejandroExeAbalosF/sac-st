@@ -213,19 +213,20 @@ final class PostJournalEntry
          * importe, en silencio y con la planilla del 15 posiblemente ya
          * impresa.
          *
-         * Se nombra el más antiguo de los cierres afectados: es el que
-         * hay que reabrir, y reabriéndolo caen los que le siguen.
+         * Se nombra el más antiguo de los cierres afectados y se dice
+         * cuántos son: reabrir uno no reabre los siguientes, y cada uno
+         * que siga cerrado vuelve a frenar el movimiento.
          */
-        $posterior = PeriodClosing::query()
+        $posteriores = PeriodClosing::query()
             ->where('cash_box_id', $cashBoxId)
             ->whereIn('currency', $currencies)
             ->where('status', PeriodClosingStatus::Closed)
             ->whereDate('period_from', '>', $date)
             ->orderBy('period_from')
-            ->first();
+            ->get();
 
-        if ($posterior !== null) {
-            throw ClosedPeriodException::invalidatedBy($posterior, $date);
+        if ($posteriores->isNotEmpty()) {
+            throw ClosedPeriodException::invalidatedBy($posteriores->first(), $date, $posteriores->count());
         }
     }
 

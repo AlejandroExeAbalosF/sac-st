@@ -245,13 +245,19 @@ final class InicioController extends Controller
         }
 
         if ($user->can('cierres.ver')) {
+            $caja = (int) $this->cashBox()->id;
+
             $colas[] = WorkQueueData::resuelta(
                 key: 'caja_sin_cerrar',
                 title: 'Días de caja sin cerrar',
                 description: 'Días anteriores con movimientos que todavía no se cerraron',
-                count: $this->diasSinCerrar->count((int) $this->cashBox()->id, $fecha),
+                // Sin moneda: un día sin cerrar en dólares empuja igual que uno en pesos.
+                count: $this->diasSinCerrar->count($caja, $fecha),
                 tone: QueueTone::Action,
-                href: route('caja.cierres.index', absolute: false),
+                href: $this->closingsLink(
+                    pesos: $this->diasSinCerrar->count($caja, $fecha, Currency::Ars),
+                    dolares: $this->diasSinCerrar->count($caja, $fecha, Currency::Usd),
+                ),
             );
 
             /*
@@ -271,13 +277,32 @@ final class InicioController extends Controller
                 description: 'Meses terminados con movimientos que todavía no se cerraron',
                 // Sin moneda: un mes sin cerrar en dólares tiene que
                 // empujar igual que uno en pesos.
-                count: $this->mesesSinCerrar->count((int) $this->cashBox()->id, $fecha),
+                count: $this->mesesSinCerrar->count($caja, $fecha),
                 tone: QueueTone::Action,
-                href: route('caja.cierres.index', absolute: false),
+                href: $this->closingsLink(
+                    pesos: $this->mesesSinCerrar->count($caja, $fecha, Currency::Ars),
+                    dolares: $this->mesesSinCerrar->count($caja, $fecha, Currency::Usd),
+                ),
             );
         }
 
         return $colas;
+    }
+
+    /**
+     * Cierres, en el libro donde está lo pendiente.
+     *
+     * La pantalla de Cierres muestra una moneda por vez. Si lo único
+     * pendiente es en dólares, el enlace lleva a ese libro; si no, a pesos,
+     * que es donde está el trabajo o el libro de siempre.
+     */
+    private function closingsLink(int $pesos, int $dolares): string
+    {
+        return route(
+            'caja.cierres.index',
+            $pesos === 0 && $dolares > 0 ? ['moneda' => 'usd'] : [],
+            absolute: false,
+        );
     }
 
     /**

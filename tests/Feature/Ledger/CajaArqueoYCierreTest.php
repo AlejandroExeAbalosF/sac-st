@@ -80,6 +80,7 @@ class CajaArqueoYCierreTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::BeneficiaryFunds->value => '1000.00'],
             date: CarbonImmutable::parse('2026-05-31'),
@@ -613,6 +614,70 @@ class CajaArqueoYCierreTest extends TestCase
         ]);
 
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+    }
+
+    /** Reabrir un cierre no reabre los siguientes: el mensaje dice cuántos frenan. */
+    public function test_el_rechazo_dice_cuantos_cierres_posteriores_hay_que_reabrir(): void
+    {
+        $this->abrirLibros(efectivo: '1000.00', cheques: '0.00', fecha: '2026-06-01');
+
+        foreach (['2026-06-11', '2026-06-12'] as $dia) {
+            $this->arqueoListoParaCerrar($this->caja(), $dia);
+            app(ClosePeriod::class)->handle(cashBoxId: $this->caja(), date: CarbonImmutable::parse($dia));
+        }
+
+        try {
+            $this->cobrar('100.00', '2026-06-10');
+            $this->fail('Se asentó un movimiento que cambiaba dos cierres posteriores.');
+        } catch (ClosedPeriodException $e) {
+            $this->assertSame('2026-06-11', $e->closing->period_from->toDateString());
+            $this->assertStringContainsString('Hay 2 cierres posteriores cerrados', $e->getMessage());
+        }
+    }
+
+    /** El mes cerrado en dólares no traba reabrir un día en pesos; el de pesos, sí. */
+    public function test_reabrir_un_dia_solo_lo_traba_el_mes_de_su_moneda(): void
+    {
+        $this->abrirLibrosSinSaldo(Currency::Ars, Currency::Usd);
+        $usuario = User::factory()->create();
+
+        $this->arqueoListoParaCerrar($this->caja(), '2026-06-10', $usuario);
+        $dia = app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-10'),
+            actorId: $usuario->id,
+        );
+
+        app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-15'),
+            type: PeriodType::Monthly,
+            currency: Currency::Usd,
+            actorId: $usuario->id,
+        );
+
+        $reabierto = app(ReopenPeriod::class)->handle($dia, $usuario->id, 'Corrección de un recibo');
+
+        $this->assertSame(PeriodClosingStatus::Reopened, $reabierto->status);
+
+        // Con el día cerrado de nuevo y el mes en pesos cerrado, ese sí traba.
+        $this->arqueoListoParaCerrar($this->caja(), '2026-06-10', $usuario);
+        $dia = app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-10'),
+            actorId: $usuario->id,
+        );
+        app(ClosePeriod::class)->handle(
+            cashBoxId: $this->caja(),
+            date: CarbonImmutable::parse('2026-06-15'),
+            type: PeriodType::Monthly,
+            actorId: $usuario->id,
+        );
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Reabrilo primero');
+
+        app(ReopenPeriod::class)->handle($dia, $usuario->id, 'Corrección de un recibo');
     }
 
     public function test_reabrir_exige_motivo_y_deja_rastro(): void
@@ -1349,6 +1414,7 @@ class CajaArqueoYCierreTest extends TestCase
         }
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: $saldos,
             denominations: $this->billetesPara($saldos[LedgerAccount::CashOnHand->value]),

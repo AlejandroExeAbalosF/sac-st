@@ -77,6 +77,7 @@ final class RegisterOpeningBalance
      *                                           por el valor de `LedgerAccount`. Solo cuentas de ubicación.
      * @param  list<array{number: string, bank: string, issueDate: string, amount: string, expediente?: ?string, company?: ?string, beneficiary?: ?string}>  $cheques
      * @param  array<int|string, int|string>  $denominations  Los billetes del cajón, por denominación.
+     * @param  int  $actorId  Quien abre: atestigua el conteo, que por eso nace revisado.
      * @param  bool  $declaredEmpty  Quien abre declara que no había nada en esa moneda.
      *
      * @throws ValidationException
@@ -85,9 +86,14 @@ final class RegisterOpeningBalance
         int $cashBoxId,
         array $balances,
         CarbonInterface $date,
+        /*
+         * Obligatorio. Sin él el conteo de la apertura quedaba en borrador,
+         * y el primer arqueo del día lo reemplazaba: se perdía la
+         * composición del fajo, que es para lo que se cuenta.
+         */
+        int $actorId,
         Currency $currency = Currency::Ars,
         ?int $bankAccountId = null,
-        ?int $actorId = null,
         ?string $notes = null,
         array $cheques = [],
         array $denominations = [],
@@ -188,7 +194,7 @@ final class RegisterOpeningBalance
         Currency $currency,
         CarbonInterface $date,
         ?string $notes,
-        ?int $actorId,
+        int $actorId,
     ): FinancialEvent {
         return $this->postJournalEntry->handle(
             type: FinancialEventType::OpeningBalance,
@@ -224,7 +230,7 @@ final class RegisterOpeningBalance
         int $cashBoxId,
         Currency $currency,
         CarbonInterface $date,
-        ?int $actorId,
+        int $actorId,
     ): void {
         $evento = $this->postJournalEntry->handle(
             type: FinancialEventType::OpeningBalance,
@@ -354,7 +360,7 @@ final class RegisterOpeningBalance
         int $cashBoxId,
         Currency $currency,
         CarbonInterface $date,
-        ?int $actorId,
+        int $actorId,
     ): void {
         if ($denominations === []) {
             return;
@@ -368,9 +374,7 @@ final class RegisterOpeningBalance
             actorId: $actorId,
         );
 
-        if ($actorId !== null) {
-            $this->revisarElConteo->handle($arqueo, $actorId);
-        }
+        $this->revisarElConteo->handle($arqueo, $actorId);
     }
 
     /**

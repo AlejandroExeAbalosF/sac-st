@@ -974,6 +974,7 @@ class FondosAnterioresTest extends TestCase
         }
 
         app(RegisterOpeningBalance::class)->handle(
+            actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: $saldos,
             date: CarbonImmutable::parse('2026-06-01'),
