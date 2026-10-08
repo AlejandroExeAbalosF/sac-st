@@ -10,8 +10,10 @@ use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
+use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
 use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
+use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
 use App\Modules\Shared\Audit\SharedAuditCatalog;
@@ -48,6 +50,12 @@ class AppServiceProvider extends ServiceProvider
          * puede nombrar a Haberes.
          */
         $this->app->bind(CashTransferContents::class, TransferredCheques::class);
+
+        /*
+         * La apertura es de Ledger y los papeles del sistema anterior, de
+         * Haberes: Ledger pregunta si la fecha sirve sin nombrarlo.
+         */
+        $this->app->bind(OpeningDateRule::class, LegacyPapersBeforeOpening::class);
     }
 
     /**

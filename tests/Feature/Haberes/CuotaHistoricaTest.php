@@ -15,6 +15,7 @@ use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\LegacyPaper;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -127,6 +128,25 @@ class CuotaHistoricaTest extends TestCase
             'opened_on' => '2025-03-20',
             'declared_total' => '0.00',
         ]);
+    }
+
+    /** Lo mismo, dicho al lado del campo: abrir los dólares con una fecha vieja. */
+    public function test_abrir_otra_moneda_antes_de_un_papel_cargado_lo_dice_con_claridad(): void
+    {
+        $this->abrirLibros();
+        $this->registrar($this->cuota('127/2024', '85000.00'));
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Hay papeles del sistema anterior cargados con fecha hasta el 20/03/2025: la apertura tiene que ser posterior.');
+
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [],
+            date: CarbonImmutable::parse('2025-03-20'),
+            actorId: $this->quienAbre(),
+            currency: Currency::Usd,
+            declaredEmpty: true,
+        );
     }
 
     /**

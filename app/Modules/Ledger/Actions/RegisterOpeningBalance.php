@@ -14,6 +14,7 @@ use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
@@ -70,6 +71,7 @@ final class RegisterOpeningBalance
         private readonly PostJournalEntry $postJournalEntry,
         private readonly RecordCashCount $contarElCajon,
         private readonly ReviewCashCount $revisarElConteo,
+        private readonly OpeningDateRule $reglaDeFecha,
     ) {}
 
     /**
@@ -145,6 +147,7 @@ final class RegisterOpeningBalance
             CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
 
             $this->assertNotOpenedYet($cashBoxId, $currency);
+            $this->reglaDeFecha->assertAllows($cashBoxId, $date);
 
             /*
              * Primero el hecho, después sus asientos: la base controla al
