@@ -86,9 +86,10 @@ final class ValidateTransferDisbursement
             $importe = Decimal::scale($egreso->amount);
 
             /*
-             * La fecha del pago es la del débito, no la de hoy: lo que el
-             * libro tiene que decir es cuándo salió el dinero, y eso lo
-             * fija el banco.
+             * La fecha del pago es la del débito: cuándo salió el dinero lo
+             * fija el banco, y queda en el egreso. El asiento, en cambio, va
+             * con el día en que se valida —ver más abajo—, para que un
+             * débito de un día ya cerrado no obligue a reabrirlo.
              */
             $fecha = $movimiento->transaction_date
                 ?? ($egreso->report_received_at === null ? null : BusinessDate::fromInstant($egreso->report_received_at))
@@ -122,7 +123,7 @@ final class ValidateTransferDisbursement
                         ->onBankAccount($orden?->organism_bank_account_id)
                         ->onCashBox($caja),
                 ],
-                date: $fecha,
+                date: BusinessDate::today(),
                 cashBoxId: $caja,
                 description: 'Egreso por transferencia'
                     .($orden === null ? '' : " — Orden {$orden->formatted_number}"),

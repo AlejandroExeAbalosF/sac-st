@@ -85,6 +85,7 @@ final class RegisterCashPayment
                 idempotencyKey: $idempotencyKey.':asignacion',
                 actorId: $actorId,
                 notes: $notes,
+                date: $receivedDate,
             );
         });
     }

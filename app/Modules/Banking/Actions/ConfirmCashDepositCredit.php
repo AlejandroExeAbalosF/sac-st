@@ -20,6 +20,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -95,7 +96,8 @@ final class ConfirmCashDepositCredit
                         ->onBankAccount($transfer->bank_account_id)
                         ->onCashBox($transfer->cash_box_id),
                 ],
-                date: $transaction->transaction_date ?? $transfer->deposit_date,
+                // El día en que se confirma; la fecha del banco queda en el movimiento.
+                date: BusinessDate::today(),
                 cashBoxId: $transfer->cash_box_id,
                 description: 'Acreditación del depósito de efectivo',
                 actorId: $actorId,

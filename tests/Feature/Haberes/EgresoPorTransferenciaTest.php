@@ -254,20 +254,31 @@ class EgresoPorTransferenciaTest extends TestCase
     }
 
     /** Y por eso el cierre del día lo resta de la columna. */
+    /**
+     * El egreso sale en la planilla del día en que se valida.
+     *
+     * Se asienta con la fecha de la validación, no con la del débito: el
+     * día del débito pudo haberse cerrado. La fecha del pago sigue siendo
+     * la del banco, guardada en el egreso.
+     */
     public function test_el_cierre_resta_la_transferencia_de_los_depositos_directos(): void
     {
         $this->cuotaValidada();
 
-        $egreso = Disbursement::query()->firstOrFail();
+        $egreso = Disbursement::query()->with('financialEvent')->firstOrFail();
         $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
+        $diaDelAsiento = $egreso->financialEvent->event_date->toDateString();
+
+        $this->assertSame(BusinessDate::today()->toDateString(), $diaDelAsiento);
+        $this->assertNotNull($egreso->payment_date);
 
         // Un período se cierra cuando termina, así que el día tiene que pasar.
-        CarbonImmutable::setTestNow($egreso->payment_date->addDay());
-        $this->arqueoListoParaCerrar($caja, $egreso->payment_date->toDateString());
+        CarbonImmutable::setTestNow(CarbonImmutable::parse($diaDelAsiento)->addDay()->setTime(10, 0));
+        $this->arqueoListoParaCerrar($caja, $diaDelAsiento);
 
         $cierre = app(ClosePeriod::class)->handle(
             cashBoxId: $caja,
-            date: CarbonImmutable::parse($egreso->payment_date->toDateString()),
+            date: CarbonImmutable::parse($diaDelAsiento),
         );
 
         $this->assertSame($egreso->amount, $cierre->disbursed_bank_deposits);

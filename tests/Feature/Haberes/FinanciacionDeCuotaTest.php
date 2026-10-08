@@ -15,6 +15,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
@@ -23,7 +24,9 @@ use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Models\CashBox;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,6 +76,34 @@ class FinanciacionDeCuotaTest extends TestCase
         $this->assertSame('0.00', $financiacion->unallocated($recepcion->refresh()));
         $this->assertSame(PaymentMedium::Bank, $financiacion->medium($cuota));
         $this->assertSame(PaymentMedium::Bank, $financiacion->mediumForMany([$cuota->id])[$cuota->id]);
+    }
+
+    /**
+     * Lo que llega del banco se asienta el día en que se registra.
+     *
+     * El extracto llega después del cierre del día del crédito, y la
+     * cuota se imputa días más tarde. Antes las dos cosas se asentaban
+     * con la fecha del banco y chocaban con ese cierre; ahora van con la
+     * del registro, y la del banco queda en la recepción para conciliar.
+     */
+    public function test_un_credito_de_un_dia_cerrado_se_registra_y_se_imputa_sin_reabrir(): void
+    {
+        $cuota = $this->cuota();
+        $importe = $cuota->importeEsperado();
+
+        // El día del crédito ya está cerrado cuando llega el extracto.
+        $this->arqueoListoParaCerrar($this->cajaHaberes(), '2026-04-24');
+        app(ClosePeriod::class)->handle(cashBoxId: $this->cajaHaberes(), date: CarbonImmutable::parse('2026-04-24'));
+
+        $recepcion = $this->recepcionBancaria($importe);
+        $asignacion = $this->asignar($recepcion, $cuota, $importe);
+
+        $hoy = BusinessDate::today()->toDateString();
+
+        $this->assertSame('2026-04-24', $recepcion->received_date->toDateString());
+        $this->assertSame($hoy, $recepcion->financialEvent->event_date->toDateString());
+        $this->assertSame($hoy, $asignacion->allocationEvent->event_date->toDateString());
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota->refresh()));
     }
 
     public function test_no_se_asigna_dinero_a_una_cuota_anulada(): void

@@ -390,6 +390,25 @@ ese pago se retiró sin haberse usado, y su dirección vieja
 
 <a id="monedas"></a>
 
+## Fechas de lo que llega del banco
+
+**Todo se asienta el día en que se registra en el sistema.** El crédito de un
+extracto, la confirmación de un depósito en el banco, la imputación de plata a
+una cuota y la validación del egreso por transferencia van con la fecha del
+registro, no con la del banco. El extracto llega después del cierre del día del
+movimiento, y la imputación puede ser días más tarde: con la fecha del banco,
+cada uno chocaba con un día ya cerrado y obligaba a reabrirlo.
+
+La fecha del banco no se pierde: queda en el movimiento del extracto, en la
+recepción (`received_date`) y en el egreso (`payment_date`), y es la que se usa
+para conciliar y vincular cuotas con depósitos. En la planilla, cada hecho sale
+el día en que el área tomó conocimiento.
+
+Dos excepciones, porque ahí la fecha la pone quien opera: el cobro por
+mostrador —recibir e imputar son un solo acto, con la fecha del cobro— y el
+traslado del efectivo al banco y la entrega al beneficiario, que salen del cajón
+el día que se indica.
+
 ## Monedas
 
 El mismo cajón guarda pesos y dólares, y la base los lleva **separados en todo**:

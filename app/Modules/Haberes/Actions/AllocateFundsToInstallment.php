@@ -21,7 +21,10 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -68,6 +71,13 @@ final class AllocateFundsToInstallment
         ?string $notes = null,
         ?int $matchScore = null,
         ?array $matchExplanation = null,
+        /*
+         * Cuándo se imputa. Por defecto, hoy: se asienta el día en que se
+         * registra, no el día en que entró la plata —ese ya pudo cerrarse—.
+         * El cobro por mostrador la pasa porque recibir e imputar son ahí
+         * el mismo acto, con la fecha del cobro.
+         */
+        ?CarbonInterface $date = null,
     ): FundingAllocation {
         $importe = Decimal::scale($amount);
 
@@ -78,7 +88,7 @@ final class AllocateFundsToInstallment
         }
 
         return DB::transaction(function () use (
-            $receipt, $installment, $importe, $idempotencyKey, $actorId, $notes, $matchScore, $matchExplanation
+            $receipt, $installment, $importe, $idempotencyKey, $actorId, $notes, $matchScore, $matchExplanation, $date
         ): FundingAllocation {
             // Igual que en la recepción: primero se pregunta si este hecho
             // ya está asentado, porque en un segundo envío el disponible
@@ -135,7 +145,11 @@ final class AllocateFundsToInstallment
                         ->forInstallment($cuotaBloqueada->haber_id, $cuotaBloqueada->id)
                         ->onCashBox($recepcionBloqueada->cash_box_id),
                 ],
-                date: $recepcionBloqueada->received_date,
+                /*
+                 * Nunca antes de la recepción: no se imputa plata que todavía
+                 * no había entrado.
+                 */
+                date: $this->allocationDate($date, $recepcionBloqueada),
                 cashBoxId: $recepcionBloqueada->cash_box_id,
                 description: $notes,
                 actorId: $actorId,
@@ -283,5 +297,20 @@ final class AllocateFundsToInstallment
                 ),
             ]);
         }
+    }
+
+    /**
+     * La fecha del asiento de la imputación.
+     *
+     * Es la del registro, para que una recepción de un día ya cerrado se
+     * pueda imputar sin reabrirlo; la fecha en que entró la plata queda en
+     * la recepción, que es la que se usa para conciliar.
+     */
+    private function allocationDate(?CarbonInterface $date, FundReceipt $receipt): CarbonInterface
+    {
+        $fecha = CarbonImmutable::parse($date ?? BusinessDate::today())->startOfDay();
+        $recibida = CarbonImmutable::parse($receipt->received_date)->startOfDay();
+
+        return $fecha->lessThan($recibida) ? $recibida : $fecha;
     }
 }

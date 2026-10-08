@@ -132,7 +132,13 @@ final class RegisterBankFundReceipt
                         ->from($depositorId)
                         ->onCashBox($cashBoxId),
                 ],
-                date: $transaction->transaction_date ?? BusinessDate::today(),
+                /*
+                 * El día en que se registra, no el del banco: el área toma
+                 * conocimiento del depósito al leer el extracto, y ese día
+                 * puede ser posterior a un cierre. La fecha del banco queda
+                 * en la recepción y en el movimiento, para conciliar.
+                 */
+                date: BusinessDate::today(),
                 cashBoxId: $cashBoxId,
                 description: $notes,
                 actorId: $actorId,
