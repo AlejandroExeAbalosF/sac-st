@@ -8,6 +8,7 @@ use App\Modules\Ledger\Enums\CashCountStatus;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\CashCount;
+use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Models\CashBox;
@@ -46,6 +47,7 @@ final class AdjustCashDifference
     public function __construct(
         private readonly PostJournalEntry $postJournalEntry,
         private readonly RecordAuditEvent $recordAuditEvent,
+        private readonly CashBalance $cashBalance,
     ) {}
 
     /** @throws ValidationException */
@@ -69,6 +71,27 @@ final class AdjustCashDifference
             if ($cashCount->isBalanced()) {
                 throw ValidationException::withMessages([
                     'status' => 'Este arqueo cuadra con el libro: no hay diferencia que imputar.',
+                ]);
+            }
+
+            if (CashCount::query()
+                ->where('cash_box_id', $cashCount->cash_box_id)
+                ->where('currency', $cashCount->currency)
+                ->whereDate('counted_on', $cashCount->counted_on)
+                ->where('sequence', '>', $cashCount->sequence)
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'status' => 'Hay un turno posterior de este día. Solo se puede imputar el último arqueo; revisá el nuevo conteo.',
+                ]);
+            }
+
+            $saldo = $this->cashBalance->of(
+                LedgerAccount::CashOnHand, $cashCount->cash_box_id, $cashCount->currency, $cashCount->counted_on,
+            );
+
+            if (! Decimal::equals($saldo, $cashCount->expected_amount)) {
+                throw ValidationException::withMessages([
+                    'status' => 'El saldo del libro cambió desde este arqueo. Volvé a contar y revisar antes de imputar una diferencia.',
                 ]);
             }
 

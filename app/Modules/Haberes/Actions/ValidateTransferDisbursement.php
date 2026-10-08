@@ -9,6 +9,7 @@ use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Support\BankMovementAfterOpening;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
@@ -57,6 +58,7 @@ final class ValidateTransferDisbursement
         private readonly TransferStage $etapa,
         private readonly InstallmentCashBox $cajaDeLaCuota,
         private readonly RecordAuditEvent $auditar,
+        private readonly BankMovementAfterOpening $posteriorALaApertura,
     ) {}
 
     /** @throws ValidationException */
@@ -108,6 +110,8 @@ final class ValidateTransferDisbursement
              */
             $caja = $this->cajaDeLaCuota->for($cuota);
             $moneda = $cuota->currency();
+
+            $this->posteriorALaApertura->assertAllows($movimiento, $caja, $moneda);
 
             $evento = $this->asentar->handle(
                 type: FinancialEventType::BankDisbursement,

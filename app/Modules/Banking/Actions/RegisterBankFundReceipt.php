@@ -11,6 +11,7 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Support\BankMovementAfterOpening;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -52,6 +53,7 @@ final class RegisterBankFundReceipt
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
         private readonly RecordAuditEvent $auditar,
+        private readonly BankMovementAfterOpening $posteriorALaApertura,
     ) {}
 
     /**
@@ -118,6 +120,8 @@ final class RegisterBankFundReceipt
             $moneda = Currency::from((string) BankAccount::query()
                 ->whereKey($transaction->bank_account_id)
                 ->value('currency'));
+
+            $this->posteriorALaApertura->assertAllows($transaction, $cashBoxId, $moneda);
 
             $evento = $this->asentar->handle(
                 type: FinancialEventType::FundsReceived,

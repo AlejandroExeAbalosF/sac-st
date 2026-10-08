@@ -13,6 +13,7 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Support\BankMovementAfterOpening;
 use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
@@ -47,6 +48,7 @@ final class ConfirmCashDepositCredit
         private readonly AllocatableAmount $disponible,
         private readonly RecordAuditEvent $auditar,
         private readonly CashTransferContents $contenido,
+        private readonly BankMovementAfterOpening $posteriorALaApertura,
     ) {}
 
     /** @throws ValidationException */
@@ -74,6 +76,8 @@ final class ConfirmCashDepositCredit
             $moneda = Currency::from((string) BankAccount::query()
                 ->whereKey($transfer->bank_account_id)
                 ->value('currency'));
+
+            $this->posteriorALaApertura->assertAllows($transaction, $transfer->cash_box_id, $moneda);
 
             /*
              * Las dos patas llevan la caja. El dinero en la cuenta del
