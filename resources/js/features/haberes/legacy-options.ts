@@ -23,7 +23,7 @@ export type EntradaHistorica = {
     puedeReservar: boolean;
     /** Lo que queda del sistema anterior sin reservar; `null` si no se sabe. */
     saldoAnterior: string | null;
-    /** La fecha de apertura de la caja de Haberes; `null` sin apertura. */
+    /** La apertura de la caja de Haberes en la moneda del haber; `null` sin apertura. */
     apertura: string | null;
 };
 
@@ -52,7 +52,7 @@ export function opcionesHistoricas(
 
     if (entrada.apertura === null) {
         const motivo =
-            'La caja de Haberes todavía no tiene apertura: sin ella no se puede saber qué es del sistema anterior.';
+            'La caja de Haberes todavía no tiene apertura en la moneda de este haber: sin ella no se puede saber qué es del sistema anterior.';
 
         return { pagada: no(motivo), pendiente: no(motivo) };
     }

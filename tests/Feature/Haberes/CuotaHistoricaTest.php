@@ -85,7 +85,7 @@ class CuotaHistoricaTest extends TestCase
 
         $this->actingAs($this->operador('administrativo'))
             ->post($this->url($cuota), $this->pagoEnPapel())
-            ->assertSessionHasErrors(['installment' => 'La caja de Haberes todavía no tiene apertura: sin ella no se puede saber si un papel es anterior al sistema.']);
+            ->assertSessionHasErrors(['installment' => 'La caja de Haberes todavía no tiene apertura en pesos: sin ella no se puede saber si un papel es anterior al sistema.']);
 
         $this->assertSame(InstallmentWorkflowStatus::Active, $cuota->refresh()->workflow_status);
     }
@@ -111,12 +111,18 @@ class CuotaHistoricaTest extends TestCase
         $this->insertarPapel($cuota, LegacyDocumentKind::IncomeReceipt, '1', '2026-06-02');
     }
 
-    /** Una apertura nueva no puede volver posterior un papel ya cargado. */
-    public function test_la_base_rechaza_una_apertura_igual_o_anterior_a_un_papel_cargado(): void
+    /**
+     * Una apertura rehecha no puede volver posterior un papel ya cargado.
+     *
+     * Cada moneda se abre una vez y sus papeles exigen esa apertura, así
+     * que el caso aparece solo si una apertura se borra desde la base para
+     * rehacerla: la nueva tiene que seguir siendo posterior a los papeles.
+     */
+    public function test_la_base_rechaza_rehacer_la_apertura_antes_de_un_papel_cargado(): void
     {
         $this->abrirLibros();
-        $cuota = $this->cuota('124/2024', '85000.00');
-        $this->registrar($cuota);
+        $this->registrar($this->cuota('124/2024', '85000.00'));
+        $this->borrarLaAperturaDesdeLaBase('ARS');
 
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('la apertura tiene que ser posterior');
@@ -124,29 +130,66 @@ class CuotaHistoricaTest extends TestCase
         // La guarda mira la apertura, no su asiento: vale también sin saldo.
         DB::table('cash_book_openings')->insert([
             'cash_box_id' => $this->caja(),
-            'currency' => 'USD',
+            'currency' => 'ARS',
             'opened_on' => '2025-03-20',
             'declared_total' => '0.00',
         ]);
     }
 
-    /** Lo mismo, dicho al lado del campo: abrir los dólares con una fecha vieja. */
-    public function test_abrir_otra_moneda_antes_de_un_papel_cargado_lo_dice_con_claridad(): void
+    /** Lo mismo, dicho al lado del campo de la fecha. */
+    public function test_rehacer_la_apertura_antes_de_un_papel_cargado_lo_dice_con_claridad(): void
     {
         $this->abrirLibros();
         $this->registrar($this->cuota('127/2024', '85000.00'));
+        $this->borrarLaAperturaDesdeLaBase('ARS');
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('Hay papeles del sistema anterior cargados con fecha hasta el 20/03/2025: la apertura tiene que ser posterior.');
+        $this->expectExceptionMessage('Hay papeles del sistema anterior en pesos cargados con fecha hasta el 20/03/2025: la apertura tiene que ser posterior.');
 
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
             balances: [],
             date: CarbonImmutable::parse('2025-03-20'),
             actorId: $this->quienAbre(),
+            declaredEmpty: true,
+        );
+    }
+
+    /**
+     * Cada moneda corta en su propia apertura.
+     *
+     * Los dólares se abren cuando llegan dólares: hasta entonces se llevan
+     * a mano, y un recibo en dólares de esos días es del sistema anterior
+     * aunque los pesos ya estén en el sistema.
+     */
+    public function test_los_papeles_en_dolares_cortan_en_la_apertura_de_los_dolares(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuota('128/2024', '850.00');
+        $cuota->haber->forceFill(['currency' => 'USD'])->save();
+
+        $papelDeJulio = [...$this->pagoEnPapel(), 'incomeDate' => '2026-07-10', 'paidOn' => '2026-07-20'];
+
+        // Con los pesos abiertos y los dólares no, no hay corte para los dólares.
+        $this->actingAs($this->operador('administrativo'))
+            ->post($this->url($cuota), $papelDeJulio)
+            ->assertSessionHasErrors(['installment' => 'La caja de Haberes todavía no tiene apertura en dólares: sin ella no se puede saber si un papel es anterior al sistema.']);
+
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [],
+            date: CarbonImmutable::parse('2026-09-01'),
+            actorId: $this->quienAbre(),
             currency: Currency::Usd,
             declaredEmpty: true,
         );
+
+        // Julio es posterior a la apertura de pesos y anterior a la de dólares: se carga.
+        $this->actingAs($this->operador('administrativo'))
+            ->post($this->url($cuota), $papelDeJulio)
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(InstallmentWorkflowStatus::LegacySettled, $cuota->refresh()->workflow_status);
     }
 
     /**
@@ -172,7 +215,7 @@ class CuotaHistoricaTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(InstallmentWorkflowStatus::LegacySettled, $cuota->refresh()->workflow_status);
-        $this->assertSame('2026-06-01', DB::scalar('SELECT haberes_opening_date()'));
+        $this->assertSame('2026-06-01', DB::scalar("SELECT haberes_opening_date('ARS')"));
 
         // Y en la base, el papel del día de la apertura sigue afuera.
         $this->expectException(QueryException::class);
@@ -567,6 +610,20 @@ class CuotaHistoricaTest extends TestCase
         ]);
 
         return [$primera, $segunda];
+    }
+
+    /**
+     * Lo que haría quien rehace una apertura con el usuario dueño: la app
+     * no puede, porque la tabla es append-only.
+     */
+    private function borrarLaAperturaDesdeLaBase(string $moneda): void
+    {
+        // La apertura ya estaba confirmada: sus guardas diferidas se cumplen antes.
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        DB::statement('SET CONSTRAINTS ALL DEFERRED');
+        DB::statement('ALTER TABLE cash_book_openings DISABLE TRIGGER cash_book_openings_append_only');
+        DB::table('cash_book_openings')->where('currency', $moneda)->delete();
+        DB::statement('ALTER TABLE cash_book_openings ENABLE TRIGGER cash_book_openings_append_only');
     }
 
     private function caja(): int

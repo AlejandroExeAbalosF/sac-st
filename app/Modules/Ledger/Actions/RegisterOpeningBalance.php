@@ -147,7 +147,7 @@ final class RegisterOpeningBalance
             CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
 
             $this->assertNotOpenedYet($cashBoxId, $currency);
-            $this->reglaDeFecha->assertAllows($cashBoxId, $date);
+            $this->reglaDeFecha->assertAllows($cashBoxId, $currency, $date);
 
             /*
              * Primero el hecho, después sus asientos: la base controla al

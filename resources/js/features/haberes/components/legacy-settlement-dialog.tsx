@@ -185,9 +185,10 @@ export default function LegacySettlementDialog({
 
                 {corteHistorico === null ? (
                     <p className="rounded-lg border border-warning-strong/30 bg-warning-soft p-3 text-sm text-warning-strong">
-                        La caja de Haberes todavía no tiene apertura. Sin ella
-                        no se puede saber si un papel es anterior al sistema:
-                        primero hay que abrir los libros.
+                        La caja de Haberes todavía no tiene apertura en la
+                        moneda de este haber. Sin ella no se puede saber si un
+                        papel es anterior al sistema: primero hay que abrir esos
+                        libros.
                     </p>
                 ) : (
                     <form

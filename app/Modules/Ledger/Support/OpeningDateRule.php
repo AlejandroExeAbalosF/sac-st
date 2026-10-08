@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Ledger\Support;
 
+use App\Modules\Ledger\Enums\Currency;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
@@ -23,5 +24,5 @@ use Illuminate\Validation\ValidationException;
 interface OpeningDateRule
 {
     /** @throws ValidationException si la fecha no sirve para abrir ese libro */
-    public function assertAllows(int $cashBoxId, CarbonInterface $openedOn): void;
+    public function assertAllows(int $cashBoxId, Currency $currency, CarbonInterface $openedOn): void;
 }

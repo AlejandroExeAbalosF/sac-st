@@ -67,7 +67,9 @@ detallado— suman ese total, y la base lo controla. No se edita ni se rehace.
 **La fecha es el primer día que opera el libro, no la víspera.** Lo declarado es
 el cierre manual del día anterior. Los papeles hasta ese cierre son anteriores a
 la apertura y se cargan como cuota histórica, que no mueve plata; desde la fecha
-de la apertura todo va por el circuito. Un día anterior a la apertura se puede
+de la apertura todo va por el circuito. **Cada moneda corta en su propia
+apertura**: los papeles de un haber en dólares se comparan contra la apertura de
+los dólares, aunque los pesos se hayan abierto antes. Un día anterior a la apertura se puede
 mirar en la Caja del día, pero sin flujo: un aviso lo explica y lleva al día de la
 apertura.
 

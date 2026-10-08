@@ -94,11 +94,14 @@ final class RecordLegacySettlement
                 $ingresoVigente = $this->movimientos->currentLegacyDocument($cuota->id, LegacyDocumentKind::IncomeReceipt);
                 $papeles = $this->papersToStore($ingresoVigente, $income, $order, $expense);
 
-                $apertura = $this->corte->date();
+                $apertura = $this->corte->date($cuota->currency());
 
                 if ($apertura === null) {
                     throw ValidationException::withMessages([
-                        'installment' => 'La caja de Haberes todavía no tiene apertura: sin ella no se puede saber si un papel es anterior al sistema.',
+                        'installment' => sprintf(
+                            'La caja de Haberes todavía no tiene apertura en %s: sin ella no se puede saber si un papel es anterior al sistema.',
+                            mb_strtolower($cuota->currency()->label()),
+                        ),
                     ]);
                 }
 

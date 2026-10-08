@@ -43,6 +43,7 @@ use App\Modules\Haberes\Support\LegacyInstallments;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Haberes\Support\ReceiptFormData;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\AuditEvent;
@@ -760,7 +761,8 @@ final class HaberController extends Controller
             'canValidateDisbursement' => request()->user()?->can('egresos.validar') ?? false,
             // Lo del sistema anterior: los papeles de cada cuota, si se pagó antes de la apertura.
             'historicos' => app(LegacyInstallments::class)->forMany($cuotaIds),
-            'corteHistorico' => app(LegacyCutoff::class)->date()?->toDateString(),
+            // El de la moneda del haber: cada caja corta en su propia apertura.
+            'corteHistorico' => app(LegacyCutoff::class)->date(Currency::from($haber->currency))?->toDateString(),
             'canRecordLegacy' => $puedeRegistrarHistorico,
             'canVoidLegacy' => request()->user()?->can('expedientes.anular') ?? false,
             /*

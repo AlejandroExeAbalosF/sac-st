@@ -396,11 +396,14 @@ final class FundInstallmentFromLegacy
             ]);
         }
 
-        $apertura = $this->corte->date();
+        $apertura = $this->corte->date($cuota->currency());
 
         if ($apertura === null) {
             throw ValidationException::withMessages([
-                'installment' => 'La caja de Haberes todavía no tiene apertura: sin ella no hay plata del sistema anterior que reservar.',
+                'installment' => sprintf(
+                    'La caja de Haberes todavía no tiene apertura en %s: sin ella no hay plata del sistema anterior que reservar.',
+                    mb_strtolower($cuota->currency()->label()),
+                ),
             ]);
         }
 
