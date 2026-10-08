@@ -25,7 +25,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CollectsInstallments;
@@ -121,17 +120,44 @@ class CuotaHistoricaTest extends TestCase
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('la apertura tiene que ser posterior');
 
-        DB::table('financial_events')->insert([
-            'public_id' => (string) Str::ulid(),
+        // La guarda mira la apertura, no su asiento: vale también sin saldo.
+        DB::table('cash_book_openings')->insert([
             'cash_box_id' => $this->caja(),
-            'event_type' => 'opening_balance',
-            'event_date' => '2025-03-20',
-            'status' => 'posted',
-            'posted_at' => now(),
-            'idempotency_key' => 'test-apertura-anterior',
-            'created_at' => now(),
-            'updated_at' => now(),
+            'currency' => 'USD',
+            'opened_on' => '2025-03-20',
+            'declared_total' => '0.00',
         ]);
+    }
+
+    /**
+     * Una apertura sin saldo también marca el corte.
+     *
+     * Abrir declarando que no había nada no deja asiento, y el corte lo
+     * buscaba ahí: la carga histórica respondía que la caja no tenía
+     * apertura aunque la tuviera.
+     */
+    public function test_una_apertura_sin_saldo_tambien_marca_el_corte(): void
+    {
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [],
+            date: CarbonImmutable::parse('2026-06-01'),
+            declaredEmpty: true,
+        );
+        $cuota = $this->cuota('125/2024', '85000.00');
+
+        $this->actingAs($this->operador('administrativo'))
+            ->post($this->url($cuota), $this->pagoEnPapel())
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(InstallmentWorkflowStatus::LegacySettled, $cuota->refresh()->workflow_status);
+        $this->assertSame('2026-06-01', DB::scalar('SELECT haberes_opening_date()'));
+
+        // Y en la base, el papel del día de la apertura sigue afuera.
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('no es anterior a la apertura de la caja');
+
+        $this->insertarPapel($this->cuota('126/2024', '85000.00'), LegacyDocumentKind::IncomeReceipt, '9', '2026-06-01');
     }
 
     /* ── El mismo papel dos veces ────────────────────────────────────── */
