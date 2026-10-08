@@ -50,23 +50,12 @@ final class ExportCashSheet
         /*
          * ─── La planilla vale para el cierre que la produjo ──────────────
          *
-         * El puntero lo pone cada cierre en nulo y lo completa la primera
-         * exportación. Un período que se reabrió y se volvió a cerrar tiene
-         * otro snapshot y por lo tanto otra planilla: devolver la del cierre
-         * anterior entregaría números que ya no son los del libro.
-         *
-         * La vieja **no se borra**. Pudo imprimirse y firmarse, y es la
-         * evidencia de qué se cerró la primera vez; lo que corresponde es
-         * que convivan las dos, no que una tape a la otra.
+         * Si el cierre ya tiene planilla, se devuelve esa: el archivista lo
+         * decide con la caja bloqueada y comprobando que el cierre no cambió
+         * de versión. Un período reabierto y vuelto a cerrar tiene otro
+         * detalle congelado y por lo tanto otra planilla; la anterior **no
+         * se borra**, porque pudo imprimirse y firmarse.
          */
-        if ($closing->sheet_attachment_id !== null) {
-            $existente = Attachment::query()->find($closing->sheet_attachment_id);
-
-            if ($existente !== null) {
-                return $existente;
-            }
-        }
-
         return $this->archivist->archive($closing, $actorId);
     }
 }

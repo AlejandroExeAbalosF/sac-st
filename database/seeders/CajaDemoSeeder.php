@@ -166,6 +166,7 @@ final class CajaDemoSeeder extends Seeder
     private function vaciar(): void
     {
         $tablas = [
+            'period_closing_evidence',
             'cash_count_lines',
             'cash_counts',
             'period_closings',
@@ -224,10 +225,8 @@ final class CajaDemoSeeder extends Seeder
     /**
      * Dos usuarios, y no es decoración.
      *
-     * `ReviewCashCount` rechaza que revise quien contó: un arqueo que se
-     * aprueba solo no controla nada. Con un único usuario el seeder no
-     * podría producir un arqueo revisado, que es justamente el estado que
-     * hace falta para cerrar el día.
+     * El escenario muestra una revisión independiente. La autorrevisión
+     * también se admite, pero queda identificada como sin segunda firma.
      */
     private function usuarios(): void
     {

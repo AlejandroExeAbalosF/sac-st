@@ -10,6 +10,7 @@ use App\Modules\Ledger\Excel\CashSheetWorkbook;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\CashBox;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -66,9 +67,15 @@ final class RegenerateCashSheet
         }
 
         return DB::transaction(function () use ($closing, $actorId, $motivo): Attachment {
+            CashBox::query()->lockForUpdate()->findOrFail($closing->cash_box_id);
+            $current = PeriodClosing::query()->lockForUpdate()->findOrFail($closing->id);
+            if ($current->status !== PeriodClosingStatus::Closed || $current->evidence_version !== $closing->evidence_version) {
+                throw ValidationException::withMessages(['status' => 'El cierre cambió. Actualizá la pantalla antes de regenerar.']);
+            }
+            $closing = $current;
             $anterior = $closing->sheet_attachment_id;
 
-            $adjunto = $this->archivist->archive($closing, $actorId);
+            $adjunto = $this->archivist->archive($closing, $actorId, regenerate: true);
 
             $this->recordAuditEvent->handle(
                 action: 'planilla.regenerada',

@@ -265,7 +265,7 @@ de arqueo antes de imputar diferencias originadas únicamente por esa separació
 
 > Mientras no se lo recuente, el arrastre es la parte que el arqueo **no
 > verifica**. Si de ese fajo faltara plata, el total daría igual y nadie lo
-> vería. Por eso revisa otra persona, y por eso existe **Recontar**.
+> vería. Por eso se recomienda la revisión independiente y existe **Recontar**.
 
 **El arqueo cuenta solo efectivo.** Los cheques en cartera no se cuentan por
 cantidad: cada uno es único —número, banco, fecha, beneficiario— y va listado
@@ -276,9 +276,11 @@ traslado se cancela.
 
 ### Revisión
 
-`draft → reviewed`. **La hace alguien distinto de quien contó**, impuesto por el
-Action (`caja.revisar-arqueo`: contador o administrador). Un arqueo que se aprueba
-solo no controla nada.
+`draft → reviewed`. Requiere `caja.revisar-arqueo` (contador o administrador).
+Se recomienda que revise otra persona, pero el sistema admite la autorrevisión
+cuando la dotación no permite una segunda firma. Las pantallas la identifican
+como **«sin segunda firma»** y la auditoría registra esa condición. Revisado no
+significa necesariamente verificado por una persona independiente.
 
 Un borrador se reemplaza contando de nuevo; uno revisado abre el **turno
 siguiente** del mismo día.
@@ -295,13 +297,20 @@ final válido; lo único que no se puede es cerrar el día con una diferencia
 colgando. El `difference_amount` del arqueo **no se borra**: queda como registro
 de lo que se encontró, y lo que cambia es el libro.
 
+**Solo se imputa el último turno del día y con el mismo saldo del libro que se
+contó.** Un turno posterior, incluso en borrador, invalida la imputación del
+anterior. Si el saldo cambió, hay que contar y revisar de nuevo. El Action y la
+base comprueban estas condiciones bajo el bloqueo de caja; no alcanza con que
+el arqueo todavía figure «revisado».
+
 Antes de imputar conviene descartar la causa: un sobrante casi siempre es un
 recibo sin cargar, y esa plata es de alguien.
 
 ### Cierre · `/caja/cierres`
 
-`ClosePeriod` congela un snapshot del período —apertura, recibido, pagado,
-depositado, saldo final— y emite la planilla. Diario o mensual
+`ClosePeriod` congela los totales del período —apertura, recibido, pagado,
+depositado, saldo final— y su detalle documental en la misma transacción. La
+planilla se genera al pedirla. Diario o mensual
 (`cierres.cerrar`).
 
 Para cerrar **un día** hacen falta: ningún asiento en borrador, ningún arqueo sin
@@ -338,6 +347,31 @@ abrirla. Por lo mismo, el número de un cheque conserva sus ceros a la izquierda
 tiene la suya se devuelve esa, para que el papel firmado y el archivo del sistema
 sean el mismo objeto. Rehacerla es de administrador
 (`cierres.regenerar-planilla`), exige motivo y crea una versión nueva.
+
+#### Evidencia y versiones del cierre
+
+Cada cierre efectivo guarda una fila inmutable en `period_closing_evidence`:
+recibos, inventario de cheques, arqueo y denominaciones, rótulos y totales. La
+versión de estos datos es independiente de la versión del dibujo de Excel.
+Reabrir y volver a cerrar crea otra versión; las anteriores no se modifican.
+El libro mensual conserva las referencias a las versiones diarias incluidas.
+Exportar o regenerar lee esta evidencia, aunque después se depositen cheques,
+se anulen recibos o cambien los nombres de la caja y de la cuenta bancaria.
+
+Al cerrar tarde, la custodia se determina a la fecha del período, considerando
+recepciones, depósitos, entregas y reversiones. No se copia el estado actual del
+cheque. Un cheque que financia varias cuotas se cuenta físicamente una sola vez.
+La moneda del cierre filtra los recibos y las cuentas y figura en el título,
+el nombre del archivo y los importes (`$` o `US$`).
+
+**Cierres anteriores a esta versión:** la migración no inventa un detalle
+histórico. Los Excel archivados se siguen descargando sin alterarlos. Si falta
+la evidencia congelada, la primera generación y la regeneración se rechazan
+con una explicación. Para obtener una versión nueva hay que reabrir, verificar
+y volver a cerrar el período; si pertenece a un mes cerrado, se reabre primero
+el mes. Para un mensual nuevo, sus cierres diarios también deben tener evidencia.
+Una nueva versión verificada no sustituye ni certifica retrospectivamente el
+contenido de un archivo firmado anterior.
 
 ### Calendario · `/caja/calendario`
 
@@ -403,6 +437,21 @@ La fecha del banco no se pierde: queda en el movimiento del extracto, en la
 recepción (`received_date`) y en el egreso (`payment_date`), y es la que se usa
 para conciliar y vincular cuotas con depósitos. En la planilla, cada hecho sale
 el día en que el área tomó conocimiento.
+
+**El corte de apertura sigue rigiendo para el movimiento bancario original.**
+Un crédito o débito anterior a la apertura de su caja y moneda no puede
+registrarse como ingreso, pago ni acreditación nuevos, aunque se cargue hoy.
+Lo comprueban el Action y la base al vincular el movimiento. El día mismo de
+la apertura sí pertenece al circuito nuevo. Esto no cambia el registro tardío
+de movimientos posteriores a la apertura, aunque su día operativo esté cerrado.
+
+Una fecha antigua no demuestra por sí sola que el movimiento haya sido
+incluido correctamente en el saldo inicial. Se debe verificar esa inclusión;
+si corresponde apartarlo de la conciliación corriente, se documenta el motivo
+en el extracto mediante la acción existente de ignorar. Los fondos históricos
+pendientes se reservan desde su cuota; los pagos ya realizados se documentan
+como cuotas históricas pagadas. Una omisión en la apertura requiere revisión y
+corrección justificada, no un ingreso o egreso nuevo que duplique el dinero.
 
 Dos excepciones, porque ahí la fecha la pone quien opera: el cobro por
 mostrador —recibir e imputar son un solo acto, con la fecha del cobro— y el
@@ -494,3 +543,11 @@ Anotado en `../../Relevamiento/Correcciones-al-DER-pendientes.md` §23:
   verificación: alguien los tuvo en la mano. Acá la lista se genera de la base,
   así que no dice nada del cajón. Si el área quiere ese control, es una tilde
   por cheque en el arqueo —y eso sí necesita relevamiento—.
+
+## Consulta operativa pendiente: recaudación y fajo
+
+Confirmar con el área si los billetes de la recaudación se mantienen separados
+del fajo y si los egresos respetan el origen atribuido. Acordar también la
+periodicidad del recuento completo. Mientras esa práctica no esté confirmada,
+una diferencia entre ambos montones no debe interpretarse por sí sola como
+faltante físico: el total del cajón y su reparto contable son controles distintos.

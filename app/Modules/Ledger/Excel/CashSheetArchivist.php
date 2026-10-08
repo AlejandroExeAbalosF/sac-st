@@ -11,7 +11,10 @@ use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\CashBox;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -23,30 +26,44 @@ use RuntimeException;
  * solo evitaría que se separen el día que alguien toque el nombre del
  * archivo o las hojas que entran.
  *
- * Cada llamada produce **un adjunto nuevo**. No hay forma de que sea de
- * otra manera: `attachments` tiene un trigger que rechaza toda edición
- * —«un adjunto no se edita: cada versión es un archivo nuevo»— y eso es lo
- * que protege al Excel que ya se imprimió y se firmó.
+ * Exportar reutiliza el adjunto vigente; regenerar crea uno nuevo.
+ * Ambas operaciones bloquean la caja y comprueban la versión del cierre
+ * antes de elegir o escribir el archivo. Los adjuntos anteriores se conservan.
  */
 final class CashSheetArchivist
 {
     public const DOCUMENT_TYPE = 'planilla_de_caja';
 
     public function __construct(
-        private readonly CashSheetBuilder $builder,
+        private readonly CashSheetEvidence $evidence,
         private readonly CashSheetWorkbook $workbook,
         private readonly StoreAttachment $storeAttachment,
     ) {}
 
     /** Dibuja, guarda y deja el cierre apuntando a la planilla nueva. */
-    public function archive(PeriodClosing $closing, ?int $actorId): Attachment
+    public function archive(PeriodClosing $closing, ?int $actorId, bool $regenerate = false): Attachment
+    {
+        return DB::transaction(function () use ($closing, $actorId, $regenerate): Attachment {
+            CashBox::query()->lockForUpdate()->findOrFail($closing->cash_box_id);
+            $current = PeriodClosing::query()->lockForUpdate()->findOrFail($closing->id);
+            if ($current->status !== PeriodClosingStatus::Closed || $current->evidence_version !== $closing->evidence_version) {
+                throw ValidationException::withMessages(['status' => 'El cierre cambió mientras se preparaba la planilla. Actualizá la pantalla.']);
+            }
+            if (! $regenerate && $current->sheet_attachment_id !== null) {
+                return Attachment::query()->findOrFail($current->sheet_attachment_id);
+            }
+            $attachment = $this->write($current, $actorId);
+            $closing->refresh();
+
+            return $attachment;
+        });
+    }
+
+    private function write(PeriodClosing $closing, ?int $actorId): Attachment
     {
         $closing->loadMissing('cashBox');
 
-        $planillas = array_map(
-            fn (PeriodClosing $cierre) => $this->builder->build($cierre),
-            $this->sheetsFor($closing),
-        );
+        $planillas = $this->evidence->workbook($closing);
 
         $nombre = $this->filename($closing);
         $temporal = $this->temporaryPath();
@@ -98,37 +115,6 @@ final class CashSheetArchivist
         }
     }
 
-    /**
-     * Qué hojas entran en el libro.
-     *
-     * Un cierre diario es una planilla. Uno mensual son todas las del mes
-     * más la suya, en orden — y solo las **cerradas**: un día sin cerrar no
-     * tiene snapshot, y meterlo obligaría a recalcularlo, que es
-     * lo que este circuito no hace.
-     *
-     * @return list<PeriodClosing>
-     */
-    private function sheetsFor(PeriodClosing $closing): array
-    {
-        if ($closing->period_type !== PeriodType::Monthly) {
-            return [$closing];
-        }
-
-        $diarios = PeriodClosing::query()
-            ->with('cashBox')
-            ->where('cash_box_id', $closing->cash_box_id)
-            ->where('currency', $closing->currency)
-            ->where('period_type', PeriodType::Daily)
-            ->where('status', PeriodClosingStatus::Closed)
-            ->whereDate('period_from', '>=', $closing->period_from)
-            ->whereDate('period_to', '<=', $closing->period_to)
-            ->orderBy('period_from')
-            ->get()
-            ->all();
-
-        return [...$diarios, $closing];
-    }
-
     private function filename(PeriodClosing $closing): string
     {
         $caja = mb_strtoupper($closing->cashBox->name);
@@ -137,7 +123,7 @@ final class CashSheetArchivist
             ? mb_strtoupper($closing->period_from->translatedFormat('F Y'))
             : $closing->period_from->format('d-m-Y');
 
-        return sprintf('%s %s.xlsx', $caja, $periodo);
+        return sprintf('%s %s %s.xlsx', $caja, $periodo, $closing->currency->value);
     }
 
     private function temporaryPath(): string

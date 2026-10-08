@@ -59,6 +59,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $reopen_reason
  * @property string|null $notes
  * @property int|null $sheet_attachment_id
+ * @property int $evidence_version
  */
 final class PeriodClosing extends Model
 {
@@ -89,6 +90,7 @@ final class PeriodClosing extends Model
         'reopen_reason',
         'notes',
         'sheet_attachment_id',
+        'evidence_version',
     ];
 
     /**
@@ -168,6 +170,7 @@ final class PeriodClosing extends Model
     {
         return [
             'currency' => Currency::class,
+            'evidence_version' => 'integer',
             'period_type' => PeriodType::class,
             'status' => PeriodClosingStatus::class,
             'period_from' => 'immutable_date',

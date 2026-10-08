@@ -11,6 +11,8 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
 use App\Modules\Ledger\Enums\PeriodType;
+use App\Modules\Ledger\Excel\CashSheetBuilder;
+use App\Modules\Ledger\Excel\CashSheetEvidence;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\FinancialEvent;
@@ -80,6 +82,8 @@ final class ClosePeriod
     public function __construct(
         private readonly CashBalance $cashBalance,
         private readonly RecordAuditEvent $recordAuditEvent,
+        private readonly CashSheetBuilder $planilla,
+        private readonly CashSheetEvidence $evidencia,
     ) {}
 
     /** @throws ValidationException */
@@ -139,6 +143,9 @@ final class ClosePeriod
                 $cashBoxId, $currency, $type, $desde, $hasta, $apertura,
                 $efectivo, $cheques, $banco, $actorId, $notes
             ): PeriodClosing {
+                // Cabecera y evidencia se escriben juntas. El llamador puede
+                // haber activado restricciones inmediatas para otras tablas.
+                DB::statement('SET CONSTRAINTS period_closing_has_evidence DEFERRED');
                 $cierre = PeriodClosing::query()->updateOrCreate(
                     [
                         'cash_box_id' => $cashBoxId,
@@ -182,6 +189,13 @@ final class ClosePeriod
                          * corresponden a un snapshot que ya no rige.
                          */
                         'sheet_attachment_id' => null,
+                        'evidence_version' => 1 + (int) DB::table('period_closing_evidence')
+                            ->join('period_closings', 'period_closings.id', '=', 'period_closing_evidence.period_closing_id')
+                            ->where('period_closings.cash_box_id', $cashBoxId)
+                            ->where('period_closings.currency', $currency->value)
+                            ->where('period_closings.period_type', $type->value)
+                            ->whereDate('period_closings.period_from', $desde)
+                            ->max('period_closing_evidence.version'),
                     ],
                 );
 
@@ -200,6 +214,9 @@ final class ClosePeriod
                     ->whereBetween('counted_on', [$desde, $hasta])
                     ->whereIn('status', [CashCountStatus::Reviewed, CashCountStatus::Adjusted])
                     ->update(['status' => CashCountStatus::Closed]);
+
+                $this->evidencia->capture($this->planilla->captureCurrent($cierre));
+                DB::statement('SET CONSTRAINTS period_closing_has_evidence IMMEDIATE');
 
                 $this->recordAuditEvent->handle(
                     action: 'periodo.cerrado',

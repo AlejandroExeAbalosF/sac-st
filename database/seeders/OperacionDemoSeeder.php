@@ -262,6 +262,7 @@ class OperacionDemoSeeder extends Seeder
          * antes que las cuotas—.
          */
         $tablas = [
+            'period_closing_evidence',
             'cash_count_lines',
             'cash_counts',
             'period_closings',

@@ -65,8 +65,10 @@ final class CashSheetWorkbook
      *
      * `7`: el reverso separa la recaudación del día del saldo anterior
      * recontado, también en el cuadro de billetes.
+     *
+     * `8`: moneda explícita en título e importes; detalle congelado al cerrar.
      */
-    public const VERSION = '7';
+    public const VERSION = '8';
 
     private const AZUL = 'FF1F3864';
 
@@ -81,7 +83,7 @@ final class CashSheetWorkbook
 
     private const GRIS = 'FFF2F2F2';
 
-    private const FORMATO_IMPORTE = '"$" #,##0.00';
+    private string $amountFormat = '"$" #,##0.00';
 
     /**
      * Escribe el libro en disco y devuelve la ruta.
@@ -118,6 +120,7 @@ final class CashSheetWorkbook
         );
 
         foreach ($sheets as $planilla) {
+            $this->amountFormat = '"'.$planilla->closing->currency->symbol().'" #,##0.00';
             $this->anverso($libro, $planilla);
 
             if ($planilla->hasReverse()) {
@@ -221,14 +224,6 @@ final class CashSheetWorkbook
             $fila++;
             $primeraDelCuadro = $fila;
 
-            /*
-             * El papel del área dice «PESOS» en la tercera columna. Con un
-             * arqueo en dólares ese rótulo sería falso, así que lo pone la
-             * moneda del arqueo. **El resto de la planilla sigue siendo la
-             * de pesos** --el título, el pie, el recibo que la acompaña--:
-             * cómo es la rendición de dólares es una pregunta abierta con
-             * el área (corrección 23), no una decisión de diseño.
-             */
             $hoja->fromArray(
                 ['CANTIDAD', 'BILLETES', mb_strtoupper($arqueo->currency->label())],
                 null,
@@ -284,7 +279,7 @@ final class CashSheetWorkbook
                     'n',
                 );
                 $hoja->getStyle("B{$fila}:C{$fila}")
-                    ->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+                    ->getNumberFormat()->setFormatCode($this->amountFormat);
             }
 
             /*
@@ -345,7 +340,7 @@ final class CashSheetWorkbook
              * queda fuera del recuadro para poder leerla sin buscarla.
              */
             $hoja->setCellValueExplicit('D'.$fila, $total, 'n');
-            $hoja->getStyle('D'.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+            $hoja->getStyle('D'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
             $hoja->getStyle('D'.$fila)->getFont()->setBold(true);
             $hoja->getStyle('D'.$fila)->getBorders()->getAllBorders()
                 ->setBorderStyle(Border::BORDER_THIN);
@@ -404,7 +399,7 @@ final class CashSheetWorkbook
                     $cheque['beneficiary'], $cheque['number'], $cheque['bank'], $cheque['date'],
                 ], null, 'A'.$fila);
                 $hoja->setCellValueExplicit('H'.$fila, $cheque['amount'], 'n');
-                $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+                $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
 
                 $total = bcadd($total, $cheque['amount'], 2);
             }
@@ -413,7 +408,7 @@ final class CashSheetWorkbook
             $hoja->setCellValue('A'.$fila, 'TOTAL');
             $hoja->setCellValueExplicit('H'.$fila, $total, 'n');
             $hoja->getStyle("A{$fila}:H{$fila}")->getFont()->setBold(true);
-            $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+            $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
         }
 
         $hoja->getColumnDimension('A')->setWidth(30);
@@ -452,7 +447,7 @@ final class CashSheetWorkbook
                 }
 
                 $hoja->setCellValueExplicit($columna.$fila, $row[$clave], 'n');
-                $hoja->getStyle($columna.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+                $hoja->getStyle($columna.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
             }
 
             $fila++;
@@ -472,7 +467,7 @@ final class CashSheetWorkbook
 
         foreach (['B', 'C', 'D'] as $indice => $columna) {
             $hoja->setCellValueExplicit($columna.$fila, $amounts[$indice], 'n');
-            $hoja->getStyle($columna.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+            $hoja->getStyle($columna.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
         }
 
         $estilo = $hoja->getStyle("A{$fila}:D{$fila}");
@@ -493,7 +488,7 @@ final class CashSheetWorkbook
         // de la cantidad de billetes no tiene nada que decir en un total.
         $hoja->mergeCells("A{$fila}:B{$fila}");
         $hoja->setCellValueExplicit('C'.$fila, $amount, 'n');
-        $hoja->getStyle('C'.$fila)->getNumberFormat()->setFormatCode(self::FORMATO_IMPORTE);
+        $hoja->getStyle('C'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
 
         $estilo = $hoja->getStyle("A{$fila}:C{$fila}");
         $estilo->getFont()->setBold(true);
