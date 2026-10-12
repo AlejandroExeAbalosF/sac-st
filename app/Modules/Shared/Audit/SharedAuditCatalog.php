@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Audit;
 
 use App\Modules\Shared\Audit\References\PersonReference;
+use App\Modules\Shared\Audit\Subjects\DocumentSeriesSubject;
 use App\Modules\Shared\Audit\Subjects\PersonBankAccountSubject;
 use App\Modules\Shared\Audit\Subjects\PersonSubject;
 use App\Modules\Shared\Audit\Subjects\RoleSubject;
@@ -23,6 +24,7 @@ final class SharedAuditCatalog implements AuditCatalogContributor
         $catalog->registerCategory('Configuración', 70);
 
         $catalog->registerActions(
+            new AuditActionDefinition('numeracion.configurada', 'Se configuró la numeración de comprobantes', 'Configuración', AuditSeverity::Critical, metadata: ['motivo' => 'Motivo', 'serie_anterior' => 'Serie anterior']),
             new AuditActionDefinition('persona.corregida', 'Se corrigió la ficha de la persona', 'Personas'),
             new AuditActionDefinition(
                 'persona.datos-completados',
@@ -62,6 +64,7 @@ final class SharedAuditCatalog implements AuditCatalogContributor
             ),
         );
 
+        $catalog->registerSubject(new DocumentSeriesSubject);
         $catalog->registerSubject(new UserSubject);
         $catalog->registerSubject(new RoleSubject);
         $catalog->registerSubject(new PersonSubject);

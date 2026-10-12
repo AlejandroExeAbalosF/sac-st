@@ -148,7 +148,7 @@ final class IssueIncomeReceipt
                     $installment, $medio, $recibiDe, $talonarioNumber,
                     $issueDate, $firmante, $actorId, $printsTalonarioNumber,
                 ),
-                'document_series_id' => DocumentSeries::query()->where('code', $serie)->value('id'),
+                'document_series_id' => $numero['series_id'],
                 'number' => $numero['number'],
                 'formatted_number' => $numero['formatted'],
                 'replaces_receipt_id' => $anulado?->id,
@@ -228,7 +228,7 @@ final class IssueIncomeReceipt
             $recibo->amount = $this->financiacion->remaining($installment);
         }
 
-        $serie = DocumentSeries::query()->where('code', ReceiptType::Income->seriesCode())->first();
+        $serie = DocumentSeries::activeForCode(ReceiptType::Income->seriesCode());
 
         /*
          * El número que le tocaría, como anticipo y no como promesa:

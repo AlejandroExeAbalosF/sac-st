@@ -6,6 +6,7 @@ namespace App\Modules\Shared\Actions;
 
 use App\Modules\Shared\Models\DocumentSeries;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -34,7 +35,7 @@ use RuntimeException;
 final class TakeNextDocumentNumber
 {
     /**
-     * @return array{number: int, formatted: string}
+     * @return array{number: int, formatted: string, series_id: int}
      */
     public function handle(string $seriesCode): array
     {
@@ -45,14 +46,18 @@ final class TakeNextDocumentNumber
             );
         }
 
+        // Configurar y emitir comparten este bloqueo antes de elegir la versión vigente.
+        DB::select('SELECT pg_advisory_xact_lock(76104, 1)');
+
         /** @var DocumentSeries|null $series */
         $series = DocumentSeries::query()
             ->where('code', $seriesCode)
+            ->where('is_active', true)
             ->lockForUpdate()
             ->first();
 
         if ($series === null) {
-            throw new RuntimeException("No existe la serie de numeración «{$seriesCode}».");
+            throw new RuntimeException("La serie de numeración «{$seriesCode}» no existe o está inactiva.");
         }
 
         if (! $series->is_active) {
@@ -60,10 +65,14 @@ final class TakeNextDocumentNumber
         }
 
         $number = $series->next_number;
+        if ($number > 999999999999) {
+            throw ValidationException::withMessages(['numbering' => 'La numeración alcanzó su límite. Configurá una nueva serie.']);
+        }
 
         $series->forceFill(['next_number' => $number + 1])->save();
 
         return [
+            'series_id' => $series->id,
             'number' => $number,
             'formatted' => $series->formatNumber($number),
         ];

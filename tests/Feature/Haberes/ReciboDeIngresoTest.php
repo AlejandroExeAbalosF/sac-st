@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Haberes;
 
+use App\Models\User;
 use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
@@ -13,9 +14,12 @@ use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
+use App\Modules\Shared\Actions\ConfigureDocumentNumbering;
+use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
@@ -24,6 +28,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -279,6 +284,117 @@ class ReciboDeIngresoTest extends TestCase
             ->all();
 
         $this->assertSame(['CHEQUES_IN_CUSTODY', 'UNASSIGNED_FUNDS'], $cuentas);
+    }
+
+    public function test_cambiar_el_formato_conserva_el_recibo_y_emite_con_la_nueva_version(): void
+    {
+        $old = app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada());
+        $actor = User::factory()->create();
+        $series = DocumentSeries::activeForCode('0010');
+        $new = app(ConfigureDocumentNumbering::class)->handle(
+            DocumentType::ReceiptIncome,
+            ['prefix' => '100', 'prefixDigits' => 4, 'numberDigits' => 5, 'separator' => '-',
+                'nextNumber' => 50, 'reason' => 'Nueva serie del área.', 'token' => $series->configurationToken()], $actor->id,
+        );
+        $this->assertNotSame($series->id, $new->id);
+        $this->assertFalse($series->refresh()->is_active);
+        $this->assertSame('0010/00000001', $old->refresh()->formatted_number);
+        $receipt = app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada());
+        $this->assertSame('0100-00050', $receipt->formatted_number);
+        $this->assertSame($new->id, $receipt->document_series_id);
+        $this->assertSame($series->id, $old->document_series_id);
+    }
+
+    public function test_cambiar_de_serie_no_permite_repetir_el_numero_de_talonario(): void
+    {
+        app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada(), talonarioNumber: '72190');
+        $actor = User::factory()->create();
+        $series = DocumentSeries::activeForCode('0010');
+        app(ConfigureDocumentNumbering::class)->handle(
+            DocumentType::ReceiptIncome,
+            ['prefix' => '0100', 'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '/',
+                'nextNumber' => 2, 'reason' => 'Cambio de prefijo.', 'token' => $series->configurationToken()], $actor->id,
+        );
+        $this->expectException(QueryException::class);
+        app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada(), talonarioNumber: '72190');
+    }
+
+    /** @return iterable<string, array{bool, bool, string}> */
+    public static function vueltasAlFormatoOriginal(): iterable
+    {
+        foreach ([false, true] as $emitirIntermedio) {
+            foreach ([false, true] as $repetirNumero) {
+                foreach (['prefijo', 'separador'] as $cambio) {
+                    yield $cambio.'-'.(int) $emitirIntermedio.'-'.(int) $repetirNumero => [$emitirIntermedio, $repetirNumero, $cambio];
+                }
+            }
+        }
+    }
+
+    #[DataProvider('vueltasAlFormatoOriginal')]
+    public function test_volver_al_formato_original_respeta_la_historia_sin_error_de_unicidad(bool $emitirIntermedio, bool $repetirNumero, string $cambio): void
+    {
+        $original = app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada());
+        $actor = User::factory()->create();
+        $configure = app(ConfigureDocumentNumbering::class);
+        $intermedia = $configure->handle(DocumentType::ReceiptIncome, [
+            'prefix' => $cambio === 'prefijo' ? '0100' : '0010',
+            'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '-',
+            'nextNumber' => 10, 'reason' => 'Cambio intermedio para verificar el regreso.',
+            'token' => DocumentSeries::activeForCode('0010')->configurationToken(),
+        ], $actor->id);
+        $reciboIntermedio = $emitirIntermedio
+            ? app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada())
+            : null;
+        // Si solo cambió el separador, el prefijo también consumió el número 10.
+        $siguiente = $cambio === 'separador' && $emitirIntermedio ? 11 : 2;
+        $datos = [
+            'prefix' => '0010', 'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '/',
+            'nextNumber' => $repetirNumero ? 1 : $siguiente, 'reason' => 'Regreso al formato original.',
+            'token' => DocumentSeries::activeForCode('0010')->configurationToken(),
+        ];
+
+        if ($repetirNumero) {
+            try {
+                $configure->handle(DocumentType::ReceiptIncome, $datos, $actor->id);
+                $this->fail('Se permitió reutilizar un número del formato original.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('nextNumber', $exception->errors());
+            }
+            $this->assertSame($intermedia->id, DocumentSeries::activeForCode('0010')->id);
+        } else {
+            $regreso = $configure->handle(DocumentType::ReceiptIncome, $datos, $actor->id);
+            $nuevo = app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada());
+            $this->assertSame('0010/'.str_pad((string) $siguiente, 8, '0', STR_PAD_LEFT), $nuevo->formatted_number);
+            $this->assertSame($regreso->id, $nuevo->document_series_id);
+            $this->assertNotSame($original->document_series_id, $regreso->id);
+            $this->assertSame(! $emitirIntermedio, $intermedia->id === $regreso->id);
+        }
+        $this->assertSame('0010/00000001', $original->refresh()->formatted_number);
+        if ($reciboIntermedio !== null) {
+            $this->assertSame(($cambio === 'prefijo' ? '0100' : '0010').'-00000010', $reciboIntermedio->refresh()->formatted_number);
+        }
+        $this->assertSame(1, DocumentSeries::query()->where('code', '0010')->where('is_active', true)->count());
+    }
+
+    public function test_la_base_impide_reescribir_el_formato_de_una_serie_utilizada(): void
+    {
+        $receipt = app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada());
+        $this->expectException(QueryException::class);
+        DB::table('document_series')->where('id', $receipt->document_series_id)->update(['number_padding' => 5]);
+    }
+
+    public function test_no_se_puede_reutilizar_un_numero_emitido_con_el_mismo_prefijo(): void
+    {
+        app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada());
+        $series = DocumentSeries::activeForCode('0010');
+        $actor = User::factory()->create();
+        $this->expectException(ValidationException::class);
+        app(ConfigureDocumentNumbering::class)->handle(
+            DocumentType::ReceiptIncome,
+            ['prefix' => '0010', 'prefixDigits' => 4, 'numberDigits' => 5, 'separator' => '-',
+                'nextNumber' => 1, 'reason' => 'Intento de reinicio.', 'token' => $series->configurationToken()], $actor->id,
+        );
     }
 
     /*

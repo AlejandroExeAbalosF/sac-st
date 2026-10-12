@@ -109,7 +109,7 @@ final class IssueExpenseReceipt
                     $actorId,
                     $printsTalonarioNumber,
                 ),
-                'document_series_id' => DocumentSeries::query()->where('code', $serie)->value('id'),
+                'document_series_id' => $numero['series_id'],
                 'number' => $numero['number'],
                 'formatted_number' => $numero['formatted'],
                 'replaces_receipt_id' => $anulado?->id,
@@ -193,7 +193,7 @@ final class IssueExpenseReceipt
             $printsTalonarioNumber,
         ));
 
-        $serie = DocumentSeries::query()->where('code', ReceiptType::Expense->seriesCode())->first();
+        $serie = DocumentSeries::activeForCode(ReceiptType::Expense->seriesCode());
 
         /*
          * El número que le tocaría, como anticipo y no como promesa: entre

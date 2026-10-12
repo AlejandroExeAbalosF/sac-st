@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Shared\Http\Controllers\AccessAuditController;
 use App\Modules\Shared\Http\Controllers\AttachmentController;
+use App\Modules\Shared\Http\Controllers\DocumentNumberingController;
 use App\Modules\Shared\Http\Controllers\OperationAuditController;
 use App\Modules\Shared\Http\Controllers\PersonController;
 use App\Modules\Shared\Http\Controllers\RoleController;
@@ -57,6 +58,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
      * vive en `mi-cuenta.php` y no lleva permiso.
      */
     Route::prefix('configuracion')->name('configuracion.')->group(function (): void {
+        Route::middleware('can:numeracion.gestionar')->group(function (): void {
+            Route::get('numeracion', [DocumentNumberingController::class, 'index'])->name('numeracion.index');
+            Route::put('numeracion/{type}', [DocumentNumberingController::class, 'update'])->name('numeracion.update');
+        });
         Route::middleware('can:usuarios.ver')->group(function (): void {
             Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');
         });

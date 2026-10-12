@@ -96,6 +96,7 @@ class HandleInertiaRequests extends Middleware
                 'can' => $user === null ? [] : [
                     'usuarios.ver' => $user->can('usuarios.ver'),
                     'roles.gestionar' => $user->can('roles.gestionar'),
+                    'numeracion.gestionar' => $user->can('numeracion.gestionar'),
                     'auditoria.accesos.ver' => $user->can('auditoria.accesos.ver'),
                     'auditoria.operaciones.ver' => $user->can('auditoria.operaciones.ver'),
                     /*

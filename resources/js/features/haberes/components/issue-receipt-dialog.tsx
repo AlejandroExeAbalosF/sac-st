@@ -111,7 +111,8 @@ export default function IssueReceiptDialog({
     const { errors } = usePage().props as unknown as {
         errors?: Record<string, string>;
     };
-    const erroresDelServidor = errors?.installmentId ?? errors?.personId;
+    const erroresDelServidor =
+        errors?.installmentId ?? errors?.personId ?? errors?.numbering;
 
     /*
      * La vista previa se recarga sola cuando cambia algo que sale

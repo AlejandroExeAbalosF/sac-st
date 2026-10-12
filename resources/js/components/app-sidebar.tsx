@@ -36,6 +36,7 @@ import { index as arqueos } from '@/routes/caja/arqueos';
 import { index as cierres } from '@/routes/caja/cierres';
 import { index as accesos } from '@/routes/configuracion/accesos';
 import { index as auditoria } from '@/routes/configuracion/auditoria';
+import { index as numeracion } from '@/routes/configuracion/numeracion';
 import { index as roles } from '@/routes/configuracion/roles';
 import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
@@ -149,6 +150,12 @@ const navGroups: NavGroup[] = [
                         href: usuarios(),
                         icon: Users,
                         permission: 'usuarios.ver',
+                    },
+                    {
+                        title: 'Numeración de comprobantes',
+                        href: numeracion(),
+                        icon: ScrollText,
+                        permission: 'numeracion.gestionar',
                     },
                     {
                         title: 'Roles',

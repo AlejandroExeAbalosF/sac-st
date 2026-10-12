@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * Una serie de numeración.
  *
  * @property int $id
+ * @property string|null $display_prefix
  * @property string $code
  * @property DocumentType $document_type
  * @property string $label
@@ -31,6 +32,7 @@ final class DocumentSeries extends Model
 
     protected $fillable = [
         'code',
+        'display_prefix',
         'document_type',
         'label',
         'cash_box_id',
@@ -57,11 +59,25 @@ final class DocumentSeries extends Model
         return str_replace(
             ['{code}', '{number}'],
             [
-                str_pad($this->code, $this->code_padding, '0', STR_PAD_LEFT),
+                str_pad($this->display_prefix ?? $this->code, $this->code_padding, '0', STR_PAD_LEFT),
                 str_pad((string) $number, $this->number_padding, '0', STR_PAD_LEFT),
             ],
             $this->format_pattern,
         );
+    }
+
+    /** Una identificación interna puede tener varias versiones; solo una emite. */
+    public static function activeForCode(string $code): ?self
+    {
+        return self::query()->where('code', $code)->where('is_active', true)->first();
+    }
+
+    /** Detecta cambios desde que el administrador abrió el formulario. */
+    public function configurationToken(): string
+    {
+        return hash('sha256', json_encode($this->only([
+            'id', 'display_prefix', 'code_padding', 'number_padding', 'format_pattern', 'next_number', 'is_active',
+        ]), JSON_THROW_ON_ERROR));
     }
 
     /** @return array<string, string> */

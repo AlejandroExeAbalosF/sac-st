@@ -274,6 +274,11 @@ Breadcrumbs::for('configuracion.usuarios.index', fn (): array => [
     Crumb::make('Usuarios'),
 ]);
 
+Breadcrumbs::for('configuracion.numeracion.index', fn (): array => [
+    Crumb::make('Configuración'),
+    Crumb::make('Numeración de comprobantes'),
+]);
+
 Breadcrumbs::for('configuracion.roles.index', fn (): array => [
     Crumb::make('Configuración'),
     Crumb::make('Roles'),

@@ -107,7 +107,7 @@ final class IssuePaymentOrder
 
             $orden = PaymentOrder::query()->create([
                 ...$this->componer($cuotaBloqueada, $data, $estado, $cuenta, $firmante),
-                'document_series_id' => DocumentSeries::query()->where('code', $serie)->value('id'),
+                'document_series_id' => $numero['series_id'],
                 'number' => $numero['number'],
                 'formatted_number' => $numero['formatted'],
                 'status' => PaymentOrderStatus::Draft,
@@ -160,9 +160,7 @@ final class IssuePaymentOrder
         $orden = new PaymentOrder($this->componer($installment, $data, $estado, $cuenta, $firmante));
         $orden->status = PaymentOrderStatus::Draft;
 
-        $serie = DocumentSeries::query()
-            ->where('code', DocumentType::PaymentOrder->seriesCode())
-            ->first();
+        $serie = DocumentSeries::activeForCode(DocumentType::PaymentOrder->seriesCode());
 
         /*
          * El número que le tocaría, como anticipo y no como promesa: entre

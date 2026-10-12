@@ -647,7 +647,9 @@ export default function OrdenCreate({
                             </Button>
                         </Seccion>
 
-                        <InputError message={errors?.installmentId} />
+                        <InputError
+                            message={errors?.installmentId ?? errors?.numbering}
+                        />
 
                         {datos.isDirty && (
                             <p

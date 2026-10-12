@@ -48,6 +48,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'usuarios.desactivar' => ['administrador'],
         'usuarios.restablecer-password' => ['administrador'],
         'roles.gestionar' => ['administrador'],
+        'numeracion.gestionar' => ['administrador'],
 
         // Auditoría — Fase 2
         'auditoria.accesos.ver' => ['administrador', 'contador'],

@@ -61,13 +61,7 @@ class DocumentSeriesSeeder extends Seeder
             $existente = DocumentSeries::query()->where('code', $serie['code'])->first();
 
             if ($existente !== null) {
-                // Solo lo descriptivo. El correlativo es del sistema.
-                $existente->forceFill([
-                    'label' => $serie['label'],
-                    'document_type' => $serie['document_type'],
-                    'origin' => $serie['origin'],
-                ])->save();
-
+                // Nunca restaurar el formato ni reactivar una versión histórica.
                 continue;
             }
 

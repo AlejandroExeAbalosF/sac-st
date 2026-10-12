@@ -102,7 +102,7 @@ export default function PayBeneficiaryDialog({
     const { errors } = usePage().props as unknown as {
         errors?: Record<string, string>;
     };
-    const erroresDelServidor = errors?.installmentId;
+    const erroresDelServidor = errors?.installmentId ?? errors?.numbering;
 
     /*
      * La vista previa se recarga sola cuando cambia algo que sale
