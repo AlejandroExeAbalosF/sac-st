@@ -20,7 +20,7 @@ final class RestoreDefaultRolePermissions extends Command
 {
     protected $signature = 'roles:restaurar-predeterminados {--force : No preguntar}';
 
-    protected $description = 'Devuelve los permisos de cada rol a la matriz declarada en RolesAndPermissionsSeeder';
+    protected $description = 'Devuelve los permisos de cada rol a la matriz de fábrica declarada en el catálogo de permisos';
 
     public function handle(RolesAndPermissionsSeeder $seeder): int
     {

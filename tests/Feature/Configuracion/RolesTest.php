@@ -6,11 +6,13 @@ namespace Tests\Feature\Configuracion;
 
 use App\Models\User;
 use App\Modules\Shared\Models\AuditEvent;
+use App\Modules\Shared\Permissions\PermissionCatalog;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
+use RuntimeException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -64,6 +66,205 @@ class RolesTest extends TestCase
                 'permissions' => [],
             ])
             ->assertSessionHasErrors('permissions');
+    }
+
+    /**
+     * La pantalla traba al super-admin igual que al administrador, pero el
+     * servidor solo protegía al segundo: un PUT directo le cambiaba la
+     * matriz y dejaba un evento crítico por un cambio sin ningún efecto.
+     */
+    public function test_el_rol_super_admin_tampoco_se_edita(): void
+    {
+        $superAdmin = Role::findByName('super-admin', 'web');
+        $antes = $superAdmin->permissions()->orderBy('name')->pluck('name')->all();
+
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.roles.index'))
+            ->put(route('configuracion.roles.update', $superAdmin), [
+                'permissions' => [],
+            ])
+            ->assertSessionHasErrors([
+                'permissions' => 'El rol super-admin recibe todos los permisos por diseño y no se edita.',
+            ]);
+
+        $this->assertSame($antes, $superAdmin->fresh()->permissions()->orderBy('name')->pluck('name')->all());
+        $this->assertFalse(
+            AuditEvent::query()->where('action', 'rol.permisos_actualizados')->exists()
+        );
+    }
+
+    public function test_la_pantalla_explica_cada_permiso_y_ordena_por_circuito(): void
+    {
+        $this
+            ->actingAs($this->administrador())
+            ->get(route('configuracion.roles.index'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+                ->component('configuracion/roles')
+                ->where('permissionGroups.0.key', 'expedientes')
+                ->where('permissionGroups.0.label', 'Expedientes')
+                ->where('permissionGroups.0.permissions.0.name', 'expedientes.ver')
+                ->where('permissionGroups.0.permissions.0.label', 'Ver expedientes')
+                ->where('permissionGroups.0.permissions.0.sensitive', false)
+                ->has('permissionGroups.0.permissions.0.description')
+                ->where('roles.0.name', 'administrador')
+                ->where('roles.0.editable', false)
+                ->where('roles.0.lockedReason', fn (string $motivo): bool => str_contains($motivo, 'administrador'))
+                ->where('roles.1.name', 'contador')
+                ->where('roles.1.lockedReason', null)
+                ->where('roles.4.name', 'super-admin')
+                ->where('roles.4.lockedReason', fn (string $motivo): bool => str_contains($motivo, 'super-admin'))
+            );
+    }
+
+    public function test_cada_permiso_de_la_pantalla_tiene_rotulo_y_descripcion(): void
+    {
+        $this
+            ->actingAs($this->administrador())
+            ->get(route('configuracion.roles.index'))
+            ->assertInertia(function (AssertableInertia $page): void {
+                $permisos = collect($page->toArray()['props']['permissionGroups'])->flatMap(
+                    fn (array $grupo): array => $grupo['permissions'],
+                );
+
+                $this->assertSame(
+                    Permission::query()->where('name', 'not like', 'dev.%')->count(),
+                    $permisos->count(),
+                    'La pantalla tiene que ofrecer todos los permisos sembrados que se pueden otorgar.',
+                );
+
+                foreach ($permisos as $permiso) {
+                    $this->assertNotSame('', trim($permiso['label']), $permiso['name']);
+                    $this->assertNotSame('', trim($permiso['description']), $permiso['name']);
+                }
+
+                $this->assertFalse($permisos->firstWhere('name', 'roles.gestionar')['delegable']);
+                $this->assertTrue($permisos->firstWhere('name', 'caja.ver')['delegable']);
+                $this->assertFalse($permisos->firstWhere('name', 'usuarios.crear')['delegable']);
+                // Ver la lista de usuarios es solo lectura: sí se delega.
+                $this->assertTrue($permisos->firstWhere('name', 'usuarios.ver')['delegable']);
+            });
+    }
+
+    public function test_el_super_admin_entra_a_la_pantalla_de_roles(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('super-admin');
+
+        $this->actingAs($superAdmin)
+            ->get(route('configuracion.roles.index'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
+                ->component('configuracion/roles')
+                ->where('auth.can', fn ($can): bool => collect($can)->get('roles.gestionar') === true));
+    }
+
+    /**
+     * Quien edita la matriz puede editar la de su propio rol: con
+     * `roles.gestionar` un contador se daría cualquier otro permiso.
+     */
+    /**
+     * Con `usuarios.crear` un contador daba de alta una cuenta con rol
+     * administrador y entraba con la clave temporal.
+     */
+    public function test_la_administracion_de_usuarios_no_se_delega(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.roles.index'))
+            ->put(route('configuracion.roles.update', $contador), [
+                'permissions' => ['usuarios.ver', 'usuarios.crear', 'usuarios.restablecer-password'],
+            ])
+            ->assertSessionHasErrors([
+                'permissions' => 'Estos permisos no se delegan: los tiene solo el administrador (usuarios.crear, usuarios.restablecer-password).',
+            ]);
+
+        $this->assertFalse($contador->fresh()->hasPermissionTo('usuarios.crear'));
+    }
+
+    public function test_ver_usuarios_si_se_delega(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.roles.index'))
+            ->put(route('configuracion.roles.update', $contador), [
+                'permissions' => ['usuarios.ver'],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($contador->fresh()->hasPermissionTo('usuarios.ver'));
+    }
+
+    public function test_roles_gestionar_no_se_delega(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.roles.index'))
+            ->put(route('configuracion.roles.update', $contador), [
+                'permissions' => ['caja.ver', 'roles.gestionar'],
+            ])
+            ->assertSessionHasErrors([
+                'permissions' => 'Estos permisos no se delegan: los tiene solo el administrador (roles.gestionar).',
+            ]);
+
+        $this->assertFalse($contador->fresh()->hasPermissionTo('roles.gestionar'));
+    }
+
+    /**
+     * Y la base lo impide para cada permiso que el catálogo declara no
+     * delegable: el trigger tiene la lista escrita en SQL, y esto es lo
+     * que avisa si el catálogo suma uno que el trigger no cubre.
+     */
+    public function test_la_base_rechaza_los_permisos_no_delegables_para_un_rol_de_la_matriz(): void
+    {
+        $noDelegables = app(PermissionCatalog::class)->nonDelegable();
+        $this->assertNotEmpty($noDelegables);
+
+        $contador = Role::findByName('contador', 'web');
+
+        foreach ($noDelegables as $nombre) {
+            $rechazado = false;
+
+            try {
+                // La transacción anidada abre un savepoint: el error no
+                // aborta la transacción del test.
+                DB::transaction(fn () => DB::table('role_has_permissions')->insert([
+                    'permission_id' => Permission::findByName($nombre, 'web')->id,
+                    'role_id' => $contador->id,
+                ]));
+            } catch (QueryException $e) {
+                $rechazado = str_contains($e->getMessage(), 'no se delega');
+            }
+
+            $this->assertTrue($rechazado, "La base dejó otorgarle «{$nombre}» al contador.");
+        }
+    }
+
+    /**
+     * Si un rol de la matriz ya lo tenía, la migración no se lo quita en
+     * silencio: frena y pide sacarlo desde la pantalla, que lo audita.
+     */
+    public function test_la_migracion_frena_si_un_rol_de_la_matriz_ya_lo_tiene(): void
+    {
+        DB::statement('DROP TRIGGER role_has_permissions_guard_non_delegable ON role_has_permissions');
+        DB::table('role_has_permissions')->insert([
+            'permission_id' => Permission::findByName('roles.gestionar', 'web')->id,
+            'role_id' => Role::findByName('contador', 'web')->id,
+        ]);
+
+        $migracion = require database_path('migrations/2026_10_12_010000_guard_non_delegable_permissions.php');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('contador (roles.gestionar)');
+
+        $migracion->up();
     }
 
     public function test_no_se_puede_otorgar_un_permiso_inexistente(): void

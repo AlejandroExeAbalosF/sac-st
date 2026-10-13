@@ -13,9 +13,9 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 /**
  * Un rol con los permisos que tiene puestos hoy.
  *
- * `editable` en `false` es el administrador: la pantalla lo muestra igual,
- * porque ocultarlo haría pensar que no existe, pero con sus controles
- * trabados y la leyenda de por qué.
+ * `editable` en `false` es el administrador o el super-admin: la pantalla
+ * los muestra igual, porque ocultarlos haría pensar que no existen, pero con
+ * sus controles trabados y `lockedReason` diciendo por qué.
  */
 #[TypeScript]
 final class RoleData extends Data
@@ -29,6 +29,7 @@ final class RoleData extends Data
         public string $description,
         public array $permissions,
         public bool $editable,
+        public ?string $lockedReason,
         public int $usersCount,
     ) {}
 
@@ -47,6 +48,7 @@ final class RoleData extends Data
                     ->all()
             ),
             editable: $systemRole?->permissionsAreEditable() ?? true,
+            lockedReason: $systemRole?->lockedReason(),
             usersCount: $usersCount,
         );
     }

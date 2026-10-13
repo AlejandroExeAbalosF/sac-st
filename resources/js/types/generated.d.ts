@@ -926,10 +926,17 @@ declare namespace App {
                     symbols: boolean;
                     uncompromised: boolean;
                 };
+                export type PermissionData = {
+                    name: string;
+                    label: string;
+                    description: string;
+                    sensitive: boolean;
+                    delegable: boolean;
+                };
                 export type PermissionGroupData = {
                     key: string;
                     label: string;
-                    permissions: string[];
+                    permissions: App.Modules.Shared.Data.PermissionData[];
                 };
                 export type QueueSampleData = {
                     label: string;
@@ -950,6 +957,7 @@ declare namespace App {
                     description: string;
                     permissions: string[];
                     editable: boolean;
+                    lockedReason: string | null;
                     usersCount: number;
                 };
                 export type UserListItemData = {

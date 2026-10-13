@@ -8,16 +8,22 @@ use App\Listeners\ConfirmPasswordOnLogin;
 use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
+use App\Modules\Banking\Permissions\BankingPermissionCatalog;
 use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
+use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
 use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
 use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
+use App\Modules\Ledger\Permissions\LedgerPermissionCatalog;
 use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
 use App\Modules\Shared\Audit\SharedAuditCatalog;
 use App\Modules\Shared\Enums\SystemRole;
+use App\Modules\Shared\Permissions\PermissionCatalog;
+use App\Modules\Shared\Permissions\PermissionCatalogContributor;
+use App\Modules\Shared\Permissions\SharedPermissionCatalog;
 use App\Support\Navigation\Breadcrumbs;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
@@ -42,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->registerAuditCatalog();
+        $this->registerPermissionCatalog();
 
         /*
          * Banking avisa cuando un traslado se cancela o se acredita, y quien
@@ -80,6 +87,34 @@ class AppServiceProvider extends ServiceProvider
                 HaberesAuditCatalog::class,
             ] as $contributor) {
                 /** @var AuditCatalogContributor $aporte */
+                $aporte = $this->app->make($contributor);
+                $aporte->register($catalog);
+            }
+
+            return $catalog;
+        });
+    }
+
+    /**
+     * El catálogo de permisos, armado con lo que declara cada módulo.
+     *
+     * Mismo criterio que el de auditoría: Shared define el catálogo y cada
+     * módulo aporta sus permisos, de abajo hacia arriba de la dependencia.
+     * Lo leen el seeder —que siembra exactamente esto— y la pantalla de
+     * roles, que muestra qué hace cada permiso.
+     */
+    protected function registerPermissionCatalog(): void
+    {
+        $this->app->singleton(PermissionCatalog::class, function (): PermissionCatalog {
+            $catalog = new PermissionCatalog;
+
+            foreach ([
+                SharedPermissionCatalog::class,
+                LedgerPermissionCatalog::class,
+                BankingPermissionCatalog::class,
+                HaberesPermissionCatalog::class,
+            ] as $contributor) {
+                /** @var PermissionCatalogContributor $aporte */
                 $aporte = $this->app->make($contributor);
                 $aporte->register($catalog);
             }

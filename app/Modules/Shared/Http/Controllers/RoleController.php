@@ -10,6 +10,7 @@ use App\Modules\Shared\Data\PermissionGroupData;
 use App\Modules\Shared\Data\RoleData;
 use App\Modules\Shared\Enums\SystemRole;
 use App\Modules\Shared\Http\Requests\UpdateRolePermissionsRequest;
+use App\Modules\Shared\Permissions\PermissionCatalog;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,37 +21,29 @@ use Spatie\Permission\Models\Role;
 /**
  * La matriz de rol × permiso.
  *
- * El catálogo de permisos lo sigue definiendo `RolesAndPermissionsSeeder`:
+ * Qué permisos existen y qué hace cada uno lo declara `PermissionCatalog`:
  * un permiso existe porque hay una ruta que lo exige. Lo que se edita acá
  * es **quién lo tiene**, que es una decisión del área y no del código.
  */
 final class RoleController extends Controller
 {
-    public function index(): Response
+    public function index(PermissionCatalog $catalog): Response
     {
         $roles = Role::query()
             ->with('permissions')
             ->withCount('users')
-            ->orderBy('name')
-            ->get();
+            ->get()
+            ->sortBy(fn (Role $role): int => SystemRole::tryFrom($role->name)?->displayOrder() ?? PHP_INT_MAX);
 
-        $permissions = array_values(
-            Permission::query()
-                // Las de desarrollo no se otorgan desde acá: mostrarlas
-                // como casillas sería ofrecer algo que se va a rechazar.
-                ->where('name', 'not like', SystemRole::DEVELOPER_ABILITY_PREFIX.'%')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (Permission $permission): string => $permission->name)
-                ->all()
-        );
+        /** @var list<string> $seeded */
+        $seeded = Permission::query()->pluck('name')->all();
 
         return Inertia::render('configuracion/roles', [
             'roles' => $roles
                 ->map(fn (Role $role): RoleData => RoleData::fromModel($role, $role->users_count))
                 ->values()
                 ->all(),
-            'permissionGroups' => PermissionGroupData::group($permissions),
+            'permissionGroups' => PermissionGroupData::fromCatalog($catalog, $seeded),
         ]);
     }
 

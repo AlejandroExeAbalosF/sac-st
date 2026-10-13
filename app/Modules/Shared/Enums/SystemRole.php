@@ -81,9 +81,43 @@ enum SystemRole: string
      * suyo por `Gate::before`, así que desmarcarles un permiso no les
      * quitaría nada y la pantalla estaría mintiendo.
      */
+    /**
+     * El orden en que se listan: de más a menos atribuciones, y al final el
+     * de desarrollo, que no es del área.
+     */
+    public function displayOrder(): int
+    {
+        return match ($this) {
+            self::Administrador => 1,
+            self::Contador => 2,
+            self::Administrativo => 3,
+            self::Consulta => 4,
+            self::SuperAdmin => 5,
+        };
+    }
+
     public function permissionsAreEditable(): bool
     {
-        return $this !== self::Administrador && $this !== self::SuperAdmin;
+        return $this->lockedReason() === null;
+    }
+
+    /**
+     * Por qué la matriz de este rol no se edita, dicho para quien la mira.
+     *
+     * Es la misma regla que aplica `UpdateRolePermissions`: la pantalla y el
+     * servidor leen este texto, así que no pueden contar cosas distintas.
+     */
+    public function lockedReason(): ?string
+    {
+        return match ($this) {
+            self::Administrador => 'El administrador no pasa por esta matriz: el sistema le concede todo antes '
+                .'de consultarla, incluidos los permisos que agreguen las fases futuras. Desmarcarle un '
+                .'casillero daría la impresión de haberlo restringido sin haberlo hecho.',
+            self::SuperAdmin => 'El super-admin no pasa por esta matriz: el sistema le concede todo antes de '
+                .'consultarla, incluidas las capacidades de desarrollo que ni el administrador tiene. No es '
+                .'un rol operativo y sus permisos no se restringen desde acá.',
+            default => null,
+        };
     }
 
     /**

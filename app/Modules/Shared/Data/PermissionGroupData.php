@@ -4,25 +4,26 @@ declare(strict_types=1);
 
 namespace App\Modules\Shared\Data;
 
-use Illuminate\Support\Str;
+use App\Modules\Shared\Permissions\PermissionCatalog;
+use App\Modules\Shared\Permissions\PermissionDefinition;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
- * Los permisos agrupados por el módulo al que pertenecen.
+ * Los permisos agrupados por concepto del área, en el orden del circuito.
  *
- * El agrupador es el prefijo del nombre —`caja.`, `recibos.`, `expedientes.`—
- * y no un catálogo de etiquetas escrito a mano: sesenta permisos con su
- * traducción al castellano serían sesenta oportunidades de que la pantalla
- * diga una cosa y el `can:` de la ruta haga otra. El nombre técnico es el
- * mismo que se lee en `routes/modules/*.php`, y esa correspondencia literal
- * es lo que hace revisable la matriz.
+ * El rótulo y la explicación de cada permiso salen de `PermissionCatalog`,
+ * el mismo lugar del que el seeder saca qué permisos existen: la pantalla
+ * no puede describir algo que no se sembró ni dejar sin describir algo que
+ * sí. El nombre técnico viaja igual, porque es el que se lee en
+ * `routes/modules/*.php` y esa correspondencia literal es lo que hace
+ * revisable la matriz.
  */
 #[TypeScript]
 final class PermissionGroupData extends Data
 {
     /**
-     * @param  list<string>  $permissions
+     * @param  list<PermissionData>  $permissions
      */
     public function __construct(
         public string $key,
@@ -31,27 +32,33 @@ final class PermissionGroupData extends Data
     ) {}
 
     /**
-     * @param  list<string>  $permissionNames
+     * Los grupos que se pueden otorgar desde la pantalla.
+     *
+     * Solo entran los permisos que ya están en la tabla: si el catálogo
+     * declara uno nuevo y todavía no se corrió el seeder, ofrecerlo como
+     * casilla sería ofrecer algo que la validación va a rechazar.
+     *
+     * @param  list<string>  $seeded
      * @return list<self>
      */
-    public static function group(array $permissionNames): array
+    public static function fromCatalog(PermissionCatalog $catalog, array $seeded): array
     {
-        $grouped = [];
+        $groups = [];
 
-        foreach ($permissionNames as $permission) {
-            $key = Str::before($permission, '.');
-            $grouped[$key][] = $permission;
+        foreach ($catalog->grouped() as $group) {
+            $permissions = array_values(array_map(
+                PermissionData::fromDefinition(...),
+                array_filter(
+                    $group['permissions'],
+                    fn (PermissionDefinition $definition): bool => in_array($definition->name, $seeded, true),
+                ),
+            ));
+
+            if ($permissions !== []) {
+                $groups[] = new self($group['key'], $group['label'], $permissions);
+            }
         }
 
-        ksort($grouped);
-
-        return array_map(
-            fn (string $key): self => new self(
-                key: $key,
-                label: Str::of($key)->replace(['-', '_'], ' ')->ucfirst()->value(),
-                permissions: $grouped[$key],
-            ),
-            array_keys($grouped),
-        );
+        return $groups;
     }
 }
