@@ -25,8 +25,11 @@
              `app/Modules` de una vez para verificar las fronteras entre
              módulos, y eso crece con el sistema: al entrar Banking, los
              128 MB por defecto de PHP dejaron de alcanzar. No es una fuga:
-             es el costo de que las fronteras se verifiquen de verdad. -->
-        <ini name="memory_limit" value="512M"/>
+             es el costo de que las fronteras se verifiquen de verdad.
+             Corren al final, en el mismo proceso que toda la suite, y en
+             octubre de 2026 el pico llegó a 520 MB: se subió a 1 GB, el
+             mismo margen que tiene phpstan. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_TIMEZONE" value="UTC" force="true"/>
         <env name="DB_TIMEZONE" value="UTC" force="true"/>
