@@ -483,7 +483,7 @@ function SinCandidatos({
 
 function ComprobanteAdjunto({ ticket }: { ticket: Ticket }) {
     return (
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="lg:sticky lg:top-22 lg:self-start">
             <div className="rounded-lg border p-2">
                 {ticket.attachmentId ? (
                     <a

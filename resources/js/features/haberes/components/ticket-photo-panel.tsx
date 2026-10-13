@@ -77,7 +77,7 @@ export default function TicketPhotoPanel({
     const esPdf = foto?.type === 'application/pdf';
 
     return (
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="lg:sticky lg:top-22 lg:self-start">
             <div
                 onDragOver={(e) => {
                     e.preventDefault();

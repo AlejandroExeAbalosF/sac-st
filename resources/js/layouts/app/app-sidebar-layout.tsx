@@ -19,8 +19,15 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                  * dejaría de pegarse a la ventana. Envolviendo solo a la
                  * página, las tablas anchas siguen sin desbordar y el
                  * encabezado sigue arriba.
+                 *
+                 * Y es `clip`, no `hidden`, por la misma razón un nivel más
+                 * abajo: `hidden` convertía a este div en el contenedor de
+                 * scroll de todo lo `sticky` de las páginas —el panel de la
+                 * foto del ticket, la barra de guardado de Roles— y como el
+                 * div nunca se desplaza, nada se quedaba pegado. `clip`
+                 * recorta igual sin crear un contenedor de scroll.
                  */}
-                <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+                <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
                     {children}
                 </div>
 
