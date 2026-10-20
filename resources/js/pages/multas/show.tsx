@@ -305,7 +305,9 @@ export default function MultaShow({
                             </Button>
                         )}
                     </Encabezado>
-                    <div className="overflow-x-auto [contain:inline-size]">
+                    {/* `relative`: el rótulo `sr-only` del encabezado es absoluto y, sin un
+                        contenedor posicionado, escapa del recorte y ensancha la página. */}
+                    <div className="relative overflow-x-auto [contain:inline-size]">
                         <table className="w-full border-collapse text-left text-sm">
                             <thead>
                                 <tr className="border-b bg-muted text-xs tracking-wide text-field-label uppercase">
