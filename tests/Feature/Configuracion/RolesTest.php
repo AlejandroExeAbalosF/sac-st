@@ -308,6 +308,29 @@ class RolesTest extends TestCase
         );
     }
 
+    /**
+     * Un permiso que nace con el despliegue llega con su asignación de
+     * fábrica aunque el rol ya esté configurado; uno que el área le quitó al
+     * rol, y que ya existía, sigue quitado.
+     */
+    public function test_un_permiso_nuevo_llega_a_los_roles_ya_configurados(): void
+    {
+        $contador = Role::findByName('contador', 'web');
+        $contador->syncPermissions(['caja.ver']);
+        Permission::findByName('multas.ajustar', 'web')->delete();
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $permisos = $contador->fresh()->permissions()->pluck('name');
+
+        $this->assertTrue($permisos->contains('multas.ajustar'));
+        $this->assertTrue($permisos->contains('caja.ver'));
+        // `multas.ver` ya existía y el área no se lo había dado: no se toca.
+        $this->assertFalse($permisos->contains('multas.ver'));
+        // Ni lo que la matriz de fábrica no le da a ese rol.
+        $this->assertFalse(Role::findByName('consulta', 'web')->permissions()->pluck('name')->contains('multas.ajustar'));
+    }
+
     public function test_sembrar_agrega_los_permisos_nuevos_al_catalogo(): void
     {
         // Un permiso que quedó de una versión anterior del mapa desaparece;

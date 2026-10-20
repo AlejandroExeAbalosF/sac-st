@@ -36,6 +36,9 @@ use Spatie\Permission\PermissionRegistrar;
  *    acá había un `syncPermissions` incondicional, y con la pantalla de
  *    roles en el sistema eso significaba que el próximo `db:seed` borraba
  *    en silencio lo que el área había configurado.
+ * 3. *Un permiso nuevo llega con su asignación de fábrica*, también a los
+ *    roles ya configurados: es el único momento en que darlo no pisa
+ *    ninguna decisión del área. Un permiso que ya existía no se toca.
  *
  * Para volver a la matriz de fábrica —a propósito, no de rebote— está
  * `php artisan roles:restaurar-predeterminados`.
@@ -51,6 +54,13 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach (SystemRole::cases() as $role) {
             Role::findOrCreate($role->value, 'web');
         }
+
+        // Los que no existían antes de esta corrida: nadie pudo haberlos
+        // configurado todavía (ver más abajo).
+        $nuevos = array_values(array_diff(
+            $this->catalog->names(),
+            Permission::query()->where('guard_name', 'web')->pluck('name')->all(),
+        ));
 
         foreach ($this->catalog->names() as $permission) {
             Permission::findOrCreate($permission, 'web');
@@ -77,6 +87,15 @@ class RolesAndPermissionsSeeder extends Seeder
             // permisos fue configurado por alguien —acá la primera vez, o
             // desde la pantalla después— y esa decisión no se pisa.
             if ($model->permissions()->exists()) {
+                /*
+                 * Salvo para los permisos que nacen en esta corrida: llegan
+                 * con su asignación de fábrica. Nadie pudo quitárselos a un
+                 * rol porque no existían, así que darlos no pisa ninguna
+                 * decisión; no darlos dejaba cada módulo nuevo invisible
+                 * hasta que alguien los asignara a mano desde Roles.
+                 */
+                $model->givePermissionTo(array_values(array_intersect($nuevos, $this->catalog->defaultsFor($role))));
+
                 continue;
             }
 
