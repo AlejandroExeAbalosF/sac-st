@@ -1,0 +1,85 @@
+import { useForm } from '@inertiajs/react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import FormDialog, {
+    FieldError,
+} from '@/features/multas/components/form-dialog';
+
+/**
+ * Completar o corregir la fecha de un movimiento de la obligación o de un
+ * pago anterior: la de un importado que llegó sin ella, cuando aparece el
+ * papel. El importe y lo que el registro aporta al saldo no cambian.
+ *
+ * Llenar una fecha desconocida o precisar el día dentro del mismo mes es
+ * completar. Moverla o dejarla menos precisa es corregir, y pide motivo.
+ */
+export default function ReviseDateDialog({
+    title,
+    url,
+    value,
+    onClose,
+}: {
+    title: string;
+    url: string;
+    /** «2026-05-07», «2026-05» o vacío. */
+    value: string;
+    onClose: () => void;
+}) {
+    const { data, setData, post, processing, errors } = useForm({
+        date: value,
+        reason: '',
+        // Lo que mostraba el formulario al abrirse: no se pisa lo ajeno.
+        expected: { date: value },
+    });
+
+    return (
+        <FormDialog
+            title={title}
+            description="Solo la fecha: el importe y el efecto sobre el saldo no cambian."
+            onClose={onClose}
+            onSubmit={() =>
+                post(url, { preserveScroll: true, onSuccess: onClose })
+            }
+            processing={processing}
+            submitLabel="Guardar"
+        >
+            <div>
+                <Label htmlFor="revision-fecha">
+                    Fecha
+                    <span className="ml-1 font-normal text-muted-foreground">
+                        (día, solo el mes, o vacía)
+                    </span>
+                </Label>
+                <Input
+                    id="revision-fecha"
+                    className="mt-1 max-w-48"
+                    value={data.date}
+                    onChange={(e) => setData('date', e.target.value)}
+                    placeholder="2026-05-07 o 2026-05"
+                    aria-invalid={Boolean(errors.date)}
+                />
+                <FieldError message={errors.date} />
+            </div>
+
+            <div>
+                <Label htmlFor="revision-fecha-motivo">
+                    Motivo
+                    <span className="ml-1 font-normal text-muted-foreground">
+                        (si corregís una fecha ya cargada)
+                    </span>
+                </Label>
+                <Textarea
+                    id="revision-fecha-motivo"
+                    className="mt-1"
+                    rows={2}
+                    maxLength={500}
+                    value={data.reason}
+                    onChange={(e) => setData('reason', e.target.value)}
+                    aria-invalid={Boolean(errors.reason)}
+                />
+                <FieldError message={errors.reason} />
+            </div>
+        </FormDialog>
+    );
+}

@@ -7,6 +7,7 @@ import {
     Contact,
     FileSpreadsheet,
     FileText,
+    Gavel,
     History,
     Landmark,
     LayoutGrid,
@@ -40,6 +41,7 @@ import { index as numeracion } from '@/routes/configuracion/numeracion';
 import { index as roles } from '@/routes/configuracion/roles';
 import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
+import { index as multas } from '@/routes/multas';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
@@ -57,6 +59,17 @@ const navGroups: NavGroup[] = [
         items: [
             { title: 'Inicio', href: inicio(), icon: LayoutGrid },
             { title: 'Haberes', href: haberes(), icon: FileText },
+            /*
+             * Multas es hermana de Haberes: otra caja, el mismo recorrido.
+             * Lleva permiso porque se puede quitar desde Roles; el de
+             * consulta lo tiene por omisión.
+             */
+            {
+                title: 'Multas',
+                href: multas(),
+                icon: Gavel,
+                permission: 'multas.ver',
+            },
             /*
              * «Recepciones» no está en el menú — desvío 49.
              *

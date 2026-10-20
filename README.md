@@ -27,14 +27,14 @@ Reemplaza un circuito que hoy vive en planillas de cálculo y formularios en pap
 
 ## Estado
 
-El área maneja **tres cajas**. La primera está implementada; las otras dos ya
-existen en el modelo de datos, pero todavía no tienen circuito.
+El área maneja **tres cajas**. La primera está implementada, la de Multas está en
+construcción y la de Aranceles existe en el modelo de datos sin circuito.
 
-| Caja                        | Estado          | Movimientos      |
-| --------------------------- | --------------- | ---------------- |
-| **Haberes en consignación** | ✅ Implementada | ingreso y egreso |
-| **Aranceles**               | ⏳ Pendiente    | -                |
-| **Multas**                  | ⏳ Pendiente    | -                |
+| Caja                        | Estado             | Movimientos      |
+| --------------------------- | ------------------ | ---------------- |
+| **Haberes en consignación** | ✅ Implementada    | ingreso y egreso |
+| **Aranceles**               | ⏳ Pendiente       | -                |
+| **Multas**                  | 🚧 En construcción | solo ingreso     |
 
 La caja es una clasificación
 contable, no una cuenta física. Por eso el motor contable se construyó sin saber
@@ -44,10 +44,12 @@ Las tres están sembradas desde ahora, aunque solo Haberes tenga circuito: la ca
 a la que van a pertenecer sus eventos ya existe, así que construirlas no va a
 exigir tocar el motor.
 
-De Aranceles y Multas **no hay nada operativo todavía, tampoco el ingreso**. Lo
-único definido es la regla que las gobierna: no admitirán egresos, porque recaudan
+De Multas ya está la cuenta corriente —expedientes, documentos, multas, su
+obligación y los pagos anteriores al sistema— y todavía no los cobros: ver
+[docs/multas.md](docs/multas.md). De Aranceles **no hay nada operativo todavía**.
+Las dos comparten la regla que las gobierna: no admitirán egresos, porque recaudan
 para el Estado y lo que entra no vuelve a salir por esa caja, se rinde. El circuito
-entero está por hacerse y su relevamiento, pendiente.
+de Aranceles está por hacerse y su relevamiento, pendiente.
 
 ## Arquitectura
 

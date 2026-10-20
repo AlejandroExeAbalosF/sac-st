@@ -11,7 +11,9 @@ declare(strict_types=1);
 | ni ascendente:
 |
 |     Haberes ──→ Banking ──→ Ledger ──→ Shared
+|     Multas  ──┘
 |
+| Haberes y Multas son hermanos: comparten el motor, no se conocen.
 | Shared no conoce a nadie. Ledger, que es el motor contable de doble
 | partida, no puede saber que existen expedientes ni cuotas: eso es lo que
 | permite que Aranceles y Multas lo reutilicen sin arrastrar el modelo
@@ -40,6 +42,18 @@ arch('Banking no conoce el dominio de Haberes')
     ->expect('App\Modules\Banking')
     ->not->toUse('App\Modules\Haberes');
 
+arch('Multas y Haberes no se conocen entre sí')
+    ->expect('App\Modules\Multas')
+    ->not->toUse('App\Modules\Haberes');
+
+arch('Haberes no conoce el dominio de Multas')
+    ->expect('App\Modules\Haberes')
+    ->not->toUse('App\Modules\Multas');
+
+arch('Shared, Ledger y Banking no conocen el dominio de Multas')
+    ->expect(['App\Modules\Shared', 'App\Modules\Ledger', 'App\Modules\Banking'])
+    ->not->toUse('App\Modules\Multas');
+
 arch('Support es infraestructura sin dominio')
     ->expect('App\Support')
     ->not->toUse('App\Modules');
@@ -65,6 +79,18 @@ arch('los Actions exponen una sola operación')
 arch('los Enums del dominio están respaldados por string')
     ->expect('App\Modules\Haberes\Enums')
     ->toBeStringBackedEnums();
+
+arch('los Enums de Multas están respaldados por string')
+    ->expect('App\Modules\Multas\Enums')
+    ->toBeStringBackedEnums();
+
+arch('los modelos de Multas son modelos de Eloquent')
+    ->expect('App\Modules\Multas\Models')
+    ->toExtend('Illuminate\Database\Eloquent\Model');
+
+arch('los Actions de Multas exponen una sola operación')
+    ->expect('App\Modules\Multas\Actions')
+    ->toHaveMethod('handle');
 
 arch('los Enums de Banking están respaldados por string')
     ->expect('App\Modules\Banking\Enums')

@@ -861,6 +861,122 @@ declare namespace App {
                 export type ResidualStatus = 'open' | 'acknowledged_excess';
             }
         }
+        namespace Multas {
+            namespace Data {
+                export type FineBalanceData = {
+                    obligation: string;
+                    paid: string;
+                    historicalPaid: string;
+                    debt: string;
+                    excess: string;
+                    status: App.Modules.Multas.Enums.FineDebtStatus;
+                };
+                export type FineCaseData = {
+                    id: number;
+                    label: string;
+                    originalText: string;
+                    number: number | null;
+                    year: number | null;
+                    suffix: string | null;
+                    provenance: App.Modules.Multas.Enums.FineProvenance;
+                    notes: string | null;
+                    documents: App.Modules.Multas.Data.FineDocumentData[];
+                    similar: {
+                        id: number;
+                        label: string;
+                    }[];
+                };
+                export type FineDebtEntryData = {
+                    id: number;
+                    kind: App.Modules.Multas.Enums.FineDebtEntryKind;
+                    amount: string;
+                    effectiveOn: string;
+                    effectivePrecision: App.Modules.Multas.Enums.DatePrecision;
+                    documentLabel: string | null;
+                    reason: string | null;
+                    reversalOfId: number | null;
+                    reversedById: number | null;
+                    createdByName: string | null;
+                    createdAt: string | null;
+                };
+                export type FineDetailData = {
+                    id: number;
+                    caseId: number;
+                    caseLabel: string;
+                    caseOriginalText: string;
+                    caption: string;
+                    captionOriginal: string;
+                    personId: number | null;
+                    personName: string | null;
+                    personDocument: string | null;
+                    personType: string | null;
+                    registeredOn: string;
+                    registeredPrecision: App.Modules.Multas.Enums.DatePrecision;
+                    provenance: App.Modules.Multas.Enums.FineProvenance;
+                    documents: App.Modules.Multas.Data.FineDocumentData[];
+                    debtEntries: App.Modules.Multas.Data.FineDebtEntryData[];
+                    historicalMovements: App.Modules.Multas.Data.FineHistoricalMovementData[];
+                    balance: App.Modules.Multas.Data.FineBalanceData;
+                    createdByName: string | null;
+                    createdAt: string | null;
+                };
+                export type FineDocumentData = {
+                    id: number;
+                    kind: App.Modules.Multas.Enums.FineDocumentKind;
+                    actType: App.Modules.Multas.Enums.FineActType | null;
+                    number: number | null;
+                    year: number | null;
+                    originalText: string;
+                    label: string;
+                    issuedOn: string;
+                    issuedPrecision: App.Modules.Multas.Enums.DatePrecision;
+                    provenance: App.Modules.Multas.Enums.FineProvenance;
+                    roles: App.Modules.Multas.Enums.FineDocumentRole[];
+                };
+                export type FineHistoricalMovementData = {
+                    id: number;
+                    kind: App.Modules.Multas.Enums.HistoricalMovementKind;
+                    amount: string;
+                    occurredOn: string;
+                    occurredPrecision: App.Modules.Multas.Enums.DatePrecision;
+                    evidence: string;
+                    status: App.Modules.Multas.Enums.HistoricalMovementStatus;
+                    reviewNote: string | null;
+                    reviewedByName: string | null;
+                    reviewedAt: string | null;
+                    createdByName: string | null;
+                    createdAt: string | null;
+                };
+                export type FineListItemData = {
+                    id: number;
+                    caseId: number;
+                    caseLabel: string;
+                    caption: string;
+                    personName: string | null;
+                    registeredOn: string;
+                    registeredPrecision: App.Modules.Multas.Enums.DatePrecision;
+                    originDocuments: string[];
+                    balance: App.Modules.Multas.Data.FineBalanceData;
+                    provenance: App.Modules.Multas.Enums.FineProvenance;
+                };
+            }
+            namespace Enums {
+                export type DatePrecision = 'day' | 'month' | 'unknown';
+                export type FineActType = 'LAB' | 'HYS';
+                export type FineDebtEntryKind =
+                    'constitution' | 'increase' | 'reduction' | 'reversal';
+                export type FineDebtStatus =
+                    'pending' | 'partial' | 'cancelled' | 'without_effect';
+                export type FineDocumentKind = 'resolution' | 'act' | 'other';
+                export type FineDocumentRole =
+                    'origin' | 'modification' | 'ratification' | 'support';
+                export type FineProvenance = 'manual' | 'import';
+                export type FineRevisionKind = 'completion' | 'correction';
+                export type HistoricalMovementKind = 'payment' | 'refund';
+                export type HistoricalMovementStatus =
+                    'pending_review' | 'validated' | 'rejected';
+            }
+        }
         namespace Shared {
             namespace Data {
                 export type AccessEventData = {

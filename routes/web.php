@@ -34,8 +34,9 @@ Route::middleware(['auth'])->group(function () {
 require __DIR__.'/mi-cuenta.php';
 
 // Un archivo por módulo, en el mismo orden de dependencia que el código:
-// Shared → Ledger → Banking → Haberes.
+// Shared → Ledger → Banking → Haberes y Multas.
 require __DIR__.'/modules/shared.php';
 require __DIR__.'/modules/ledger.php';
 require __DIR__.'/modules/banking.php';
 require __DIR__.'/modules/haberes.php';
+require __DIR__.'/modules/multas.php';

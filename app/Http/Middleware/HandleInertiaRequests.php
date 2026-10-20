@@ -106,6 +106,11 @@ class HandleInertiaRequests extends Middleware
                      * igual y la puerta terminaría en un 403.
                      */
                     'egresos.registrar' => $user->can('egresos.registrar'),
+                    /*
+                     * Multas lo ven todos los roles del área, pero el permiso
+                     * se puede quitar desde Roles: la barra pregunta igual.
+                     */
+                    'multas.ver' => $user->can('multas.ver'),
                 ],
             ],
             'flash' => [

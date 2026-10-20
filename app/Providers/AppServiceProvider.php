@@ -17,6 +17,8 @@ use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
 use App\Modules\Ledger\Permissions\LedgerPermissionCatalog;
 use App\Modules\Ledger\Support\OpeningDateRule;
+use App\Modules\Multas\Audit\MultasAuditCatalog;
+use App\Modules\Multas\Permissions\MultasPermissionCatalog;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
 use App\Modules\Shared\Audit\SharedAuditCatalog;
@@ -85,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
                 LedgerAuditCatalog::class,
                 BankingAuditCatalog::class,
                 HaberesAuditCatalog::class,
+                MultasAuditCatalog::class,
             ] as $contributor) {
                 /** @var AuditCatalogContributor $aporte */
                 $aporte = $this->app->make($contributor);
@@ -113,6 +116,7 @@ class AppServiceProvider extends ServiceProvider
                 LedgerPermissionCatalog::class,
                 BankingPermissionCatalog::class,
                 HaberesPermissionCatalog::class,
+                MultasPermissionCatalog::class,
             ] as $contributor) {
                 /** @var PermissionCatalogContributor $aporte */
                 $aporte = $this->app->make($contributor);

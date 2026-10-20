@@ -8,6 +8,8 @@ use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineCase;
 use App\Support\Navigation\Breadcrumbs;
 use App\Support\Navigation\Crumb;
 
@@ -293,3 +295,33 @@ Breadcrumbs::for('configuracion.auditoria.index', fn (): array => [
     Crumb::make('Configuración'),
     Crumb::make('Auditoría'),
 ]);
+
+// ── Multas ───────────────────────────────────────────────────────────────
+
+Breadcrumbs::for('multas.index', fn (): array => [
+    Crumb::make('Multas'),
+]);
+
+Breadcrumbs::for('multas.create', fn (): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Nueva multa'),
+]);
+
+Breadcrumbs::for('multas.expedientes.show', fn (FineCase $fineCase): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Expte. '.$fineCase->label()),
+]);
+
+/*
+ * La multa cuelga de su expediente: es el «volver» natural, y es donde están
+ * las otras multas del mismo trámite.
+ */
+Breadcrumbs::for('multas.show', function (Fine $fine): array {
+    $fine->loadMissing('fineCase');
+
+    return [
+        Crumb::make('Multas', route('multas.index')),
+        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fine_case_id)),
+        Crumb::make($fine->caption),
+    ];
+});
