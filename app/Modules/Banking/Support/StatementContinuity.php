@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Banking\Support;
 
+use App\Modules\Banking\Enums\ImportStatus;
+use App\Modules\Banking\Enums\ParseStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Models\BankStatementRow;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 
 /**
  * Comprueba que el extracto encadene con lo que ya se importó.
@@ -32,6 +35,16 @@ use App\Support\Money\Decimal;
  * si el archivo comparte aunque sea un movimiento con lo ya importado, la
  * continuidad queda probada por construcción y no hay nada que verificar.
  * Solo hace falta mirar cuando el archivo no toca nada de lo que ya está.
+ *
+ * **Lo conocido se lee de las filas de cada archivo, no de los
+ * movimientos.** MacroOnline exporta lo más nuevo arriba, también dentro
+ * de un día, y los movimientos entran a la base en el orden del archivo:
+ * dentro del último día, el `id` más alto es el movimiento más viejo y su
+ * saldo no es el de cierre. Las filas conservan su posición en el archivo,
+ * y con ella el orden cronológico real —el de
+ * `ParsedStatement::chronologicalRows`—. Entre archivos del mismo día manda
+ * el orden que demuestran sus movimientos compartidos (`BankDayOrder`), no
+ * cuál se importó último; si no lo demuestran, no se afirma ningún salto.
  */
 final class StatementContinuity
 {
@@ -73,13 +86,12 @@ final class StatementContinuity
             return null;
         }
 
-        $anterior = BankTransaction::query()
-            ->where('bank_account_id', $account->id)
-            ->where('transaction_date', '<', $primera->transactionDate)
-            ->whereNotNull('balance_after')
-            ->orderByDesc('transaction_date')
-            ->orderByDesc('id')
-            ->first();
+        $dia = self::knownDay($account, '<', $primera->transactionDate);
+
+        // El último movimiento de ese día en el orden del banco. Si los
+        // extractos no lo demuestran, no se afirma un salto.
+        $orden = $dia === null ? null : (new BankDayOrder)->of($account->id, $dia);
+        $anterior = $orden === null || $orden === [] ? null : $orden[count($orden) - 1];
 
         if ($anterior === null || $anterior->balance_after === null) {
             return null;
@@ -90,7 +102,7 @@ final class StatementContinuity
         }
 
         return self::describe(
-            desde: $anterior->transaction_date?->format('d/m/Y') ?? 'la importación anterior',
+            desde: self::formatDate((string) $dia),
             hasta: self::formatDate($primera->transactionDate),
             conocido: $anterior->balance_after,
             esperado: $apertura,
@@ -116,13 +128,12 @@ final class StatementContinuity
             return null;
         }
 
-        $siguiente = BankTransaction::query()
-            ->where('bank_account_id', $account->id)
-            ->where('transaction_date', '>', $ultima->transactionDate)
-            ->whereNotNull('balance_after')
-            ->orderBy('transaction_date')
-            ->orderBy('id')
-            ->first();
+        $dia = self::knownDay($account, '>', $ultima->transactionDate);
+
+        // El primer movimiento de ese día en el orden del banco. Si los
+        // extractos no lo demuestran, no se afirma un salto.
+        $orden = $dia === null ? null : (new BankDayOrder)->of($account->id, $dia);
+        $siguiente = $orden === null || $orden === [] ? null : $orden[0];
 
         if ($siguiente === null || $siguiente->balance_after === null) {
             return null;
@@ -131,7 +142,7 @@ final class StatementContinuity
         // El saldo que había antes de ese movimiento: su saldo posterior
         // menos lo que el movimiento cambió.
         $movimiento = $siguiente->direction === TransactionDirection::Debit
-            ? '-'.$siguiente->amount
+            ? Decimal::sub('0', $siguiente->amount)
             : $siguiente->amount;
 
         $previoDelSiguiente = Decimal::sub($siguiente->balance_after, $movimiento);
@@ -142,10 +153,33 @@ final class StatementContinuity
 
         return self::describe(
             desde: self::formatDate($ultima->transactionDate),
-            hasta: $siguiente->transaction_date?->format('d/m/Y') ?? 'la importación siguiente',
+            hasta: self::formatDate((string) $dia),
             conocido: $cierre,
             esperado: $previoDelSiguiente,
         );
+    }
+
+    /**
+     * El día conocido más cercano antes o después de una fecha: el último
+     * anterior (`<`) o el primero posterior (`>`) que traen los extractos ya
+     * importados de la cuenta.
+     */
+    /** @param  '<'|'>'  $sentido */
+    private static function knownDay(BankAccount $account, string $sentido, string $fecha): ?string
+    {
+        $filas = BankStatementRow::query()
+            ->join('bank_statement_imports', 'bank_statement_imports.id', '=', 'bank_statement_rows.bank_statement_import_id')
+            ->where('bank_statement_imports.bank_account_id', $account->id)
+            ->where('bank_statement_imports.status', ImportStatus::Completed->value)
+            ->where('bank_statement_rows.parse_status', '<>', ParseStatus::Rejected->value)
+            ->whereNotNull('bank_statement_rows.bank_transaction_id')
+            ->where('bank_statement_rows.parsed_transaction_date', $sentido, $fecha);
+
+        $dia = $sentido === '<'
+            ? $filas->max('bank_statement_rows.parsed_transaction_date')
+            : $filas->min('bank_statement_rows.parsed_transaction_date');
+
+        return $dia === null ? null : CarbonImmutable::parse((string) $dia)->toDateString();
     }
 
     /**
