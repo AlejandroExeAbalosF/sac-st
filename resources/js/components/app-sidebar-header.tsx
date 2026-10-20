@@ -18,7 +18,14 @@ export function AppSidebarHeader() {
      */
     return (
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b border-border/70 bg-card px-6 shadow-raised transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4">
-            <div className="flex min-w-0 items-center gap-2">
+            {/*
+             * `flex-1` y `contain: inline-size`: el camino ocupa lo que queda y
+             * no aporta su ancho al mínimo de la pantalla. Sin esto, un último
+             * eslabón largo —una carátula, un beneficiario— se recortaba a la
+             * vista pero empujaba igual el ancho de toda la columna, y la
+             * página se desplazaba de costado.
+             */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 [contain:inline-size]">
                 <SidebarTrigger className="-ml-1 shrink-0" />
                 <Breadcrumbs />
             </div>
