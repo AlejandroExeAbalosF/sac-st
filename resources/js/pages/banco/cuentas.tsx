@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Landmark, Pencil, Plus } from 'lucide-react';
+import { Landmark, Pencil, Plus, Scissors } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
@@ -23,14 +23,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    CutoffDialog,
+    CutoffSummary,
+} from '@/features/banking/components/account-cutoff';
 import { cbu as formatCbu, dateTime, money } from '@/lib/format';
 import { store, update } from '@/routes/banco/cuentas';
 
 type Cuenta = App.Modules.Banking.Data.BankAccountData;
 
+type Corte = App.Modules.Banking.Data.BankAccountCutoffData;
+
 type Props = {
     accounts: Cuenta[];
+    /** Las cuentas compartidas con su saldo declarado al corte. */
+    cutoffs: Corte[];
     canManage: boolean;
+    canDeclareCutoff: boolean;
 };
 
 type FormValues = {
@@ -62,8 +71,24 @@ const VACIO: FormValues = {
  * pantalla insiste con ese dato en lugar de tratarlo como opcional de
  * relleno.
  */
-export default function BancoCuentas({ accounts, canManage }: Props) {
+export default function BancoCuentas({
+    accounts,
+    cutoffs,
+    canManage,
+    canDeclareCutoff,
+}: Props) {
     const [abierto, setAbierto] = useState(false);
+    const [cortando, setCortando] = useState<Cuenta | null>(null);
+
+    /*
+     * El corte se ofrece en una cuenta activa que todavía no lo tiene. Si
+     * su saldo ya lo declaró la apertura de una caja —como la de Haberes—,
+     * el servidor lo rechaza con el motivo.
+     */
+    const puedeCortar = (cuenta: Cuenta) =>
+        canDeclareCutoff &&
+        cuenta.isActive &&
+        !cutoffs.some((corte) => corte.bankAccountId === cuenta.id);
     const [editando, setEditando] = useState<Cuenta | null>(null);
 
     const form = useForm<FormValues>(VACIO);
@@ -149,6 +174,11 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                                     cuenta={cuenta}
                                     canManage={canManage}
                                     onEdit={() => abrir(cuenta)}
+                                    onCutoff={
+                                        puedeCortar(cuenta)
+                                            ? () => setCortando(cuenta)
+                                            : undefined
+                                    }
                                 />
                             ))}
                         </div>
@@ -221,7 +251,19 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                                             <td className="p-3 text-right tabular-nums">
                                                 {cuenta.importCount}
                                             </td>
-                                            <td className="p-3 text-right">
+                                            <td className="p-3 text-right whitespace-nowrap">
+                                                {puedeCortar(cuenta) && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setCortando(cuenta)
+                                                        }
+                                                    >
+                                                        <Scissors className="size-4" />
+                                                        Declarar corte
+                                                    </Button>
+                                                )}
                                                 {canManage && (
                                                     <Button
                                                         variant="ghost"
@@ -242,7 +284,40 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                         </div>
                     </>
                 )}
+
+                {cutoffs.length > 0 && (
+                    <section className="space-y-3">
+                        <div>
+                            <h2 className="text-sm font-semibold">
+                                Cuentas compartidas
+                            </h2>
+                            <p className="text-sm text-muted-foreground">
+                                Su saldo se declaró una vez, para la cuenta, sin
+                                repartir entre las cajas que la usan.
+                            </p>
+                        </div>
+                        <div className="grid gap-3 lg:grid-cols-2">
+                            {cutoffs.map((corte) => (
+                                <CutoffSummary
+                                    key={corte.bankAccountId}
+                                    corte={corte}
+                                    cuenta={accounts.find(
+                                        (cuenta) =>
+                                            cuenta.id === corte.bankAccountId,
+                                    )}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                )}
             </div>
+
+            {cortando && (
+                <CutoffDialog
+                    cuenta={cortando}
+                    onClose={() => setCortando(null)}
+                />
+            )}
 
             <Dialog open={abierto} onOpenChange={setAbierto}>
                 <DialogContent className="sm:max-w-lg">
@@ -382,10 +457,12 @@ function CuentaMovil({
     cuenta,
     canManage,
     onEdit,
+    onCutoff,
 }: {
     cuenta: Cuenta;
     canManage: boolean;
     onEdit: () => void;
+    onCutoff?: () => void;
 }) {
     return (
         <article className="rounded-lg border bg-card p-4 shadow-xs">
@@ -426,6 +503,17 @@ function CuentaMovil({
                     valor={cuenta.importCount.toString()}
                 />
             </dl>
+
+            {onCutoff && (
+                <Button
+                    variant="outline"
+                    className="mt-4 min-h-11 w-full"
+                    onClick={onCutoff}
+                >
+                    <Scissors className="size-4" aria-hidden="true" />
+                    Declarar corte
+                </Button>
+            )}
 
             {canManage && (
                 <Button

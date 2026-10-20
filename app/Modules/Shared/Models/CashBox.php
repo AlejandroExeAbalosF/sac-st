@@ -26,6 +26,9 @@ final class CashBox extends Model
     /** El circuito que construye esta etapa. */
     public const string HABERES = 'haberes';
 
+    /** Opera con una cuenta bancaria compartida con Aranceles. */
+    public const string MULTAS = 'multas';
+
     protected $fillable = [
         'code',
         'name',

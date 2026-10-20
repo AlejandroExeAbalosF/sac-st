@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Models;
 
 use App\Models\User;
+use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $occurred_on
  * @property DatePrecision $occurred_precision
  * @property string $evidence_text
+ * @property int|null $bank_transaction_id El crédito del banco que lo respalda, anterior a la apertura de la caja.
  * @property HistoricalMovementStatus $status
  * @property int|null $reviewed_by
  * @property Carbon|null $reviewed_at
@@ -35,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property-read User|null $creator
  * @property-read User|null $reviewer
+ * @property-read BankTransaction|null $bankTransaction
  */
 final class FineHistoricalMovement extends Model
 {
@@ -49,6 +52,7 @@ final class FineHistoricalMovement extends Model
         'occurred_on',
         'occurred_precision',
         'evidence_text',
+        'bank_transaction_id',
         'status',
         'reviewed_by',
         'reviewed_at',
@@ -79,6 +83,14 @@ final class FineHistoricalMovement extends Model
     public function fine(): BelongsTo
     {
         return $this->belongsTo(Fine::class);
+    }
+
+    /**
+     * @return BelongsTo<BankTransaction, $this>
+     */
+    public function bankTransaction(): BelongsTo
+    {
+        return $this->belongsTo(BankTransaction::class);
     }
 
     /**

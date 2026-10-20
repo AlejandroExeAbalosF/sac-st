@@ -54,7 +54,7 @@ final class FineDetailData extends Data
     /**
      * Espera cargados `fineCase`, `person`, `documents`, `balance`, `creator`,
      * `debtEntries.{document,reversedBy,creator}` e
-     * `historicalMovements.{creator,reviewer}`.
+     * `historicalMovements.{creator,reviewer,bankTransaction}`.
      *
      * @param  list<FineAttachmentData>  $adjuntos  los de la multa
      * @param  array<int, list<FineAttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior

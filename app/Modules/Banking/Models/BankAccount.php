@@ -6,6 +6,7 @@ namespace App\Modules\Banking\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Cuenta bancaria del organismo.
@@ -44,6 +45,17 @@ final class BankAccount extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(BankTransaction::class);
+    }
+
+    /**
+     * El corte, si la cuenta lo tiene: la usan varias cajas y su saldo se
+     * declaró una vez, sin repartir.
+     *
+     * @return HasOne<BankAccountOpening, $this>
+     */
+    public function opening(): HasOne
+    {
+        return $this->hasOne(BankAccountOpening::class);
     }
 
     /** @return array<string, string> */

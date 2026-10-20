@@ -145,3 +145,56 @@ es la parte del excedente hecha de plata que está en el libro.
   `ExporteConcurrenteDeMultasTest`.
 - Los importes van como texto formateado (`Decimal::format`), nunca como número de
   Excel.
+
+<a id="caja-y-banco"></a>
+
+## Caja y cuenta compartida
+
+- El corte de una cuenta es uno, append-only (`bank_account_openings`, UNIQUE por
+  cuenta, `forbid_mutation()`). **Base.**
+- No hay corte sobre una cuenta cuyo saldo ya declaró la apertura de una caja
+  (pata `BANK_ACCOUNT` de un asiento de apertura), ni sobre una con créditos
+  imputados hasta esa fecha, ni que caiga en la vida de un libro que opera con
+  ella. **Base:** `bank_account_openings_guard`, con el candado de la cuenta.
+- Una apertura no declara saldo bancario sobre una cuenta con corte. **Base:**
+  `journal_lines_opening_without_shared_bank`.
+- El libro dice con qué cuenta opera, de su misma moneda. **Base:** FK compuesta
+  `cash_book_openings (bank_account_id, currency) → bank_accounts (id, currency)`.
+- Un libro que opera con una cuenta con corte abre después del corte. **Base:**
+  `cash_book_openings_after_bank_cutoff`.
+- Un movimiento hasta el corte de su cuenta no se imputa en ningún libro, además
+  de la regla de la apertura de cada caja. **Base:** `bank_allocation_after_opening`.
+- La caja de Multas abre en pesos, sin saldo bancario y con su cuenta. **Solo
+  Action** (`OpenFineCashBook`): es política de la caja.
+- El saldo declarado coincide con el del extracto al cierre de ese día **solo si
+  un mismo archivo lo demuestra**: uno con filas antes y después del corte, leído
+  en su orden cronológico (fecha y, dentro del día, de abajo hacia arriba). Un
+  extracto que arranca después no dice nada del corte. **Solo Action**; sin ese
+  archivo, la pantalla muestra la verificación pendiente y se completa cuando
+  llega.
+- La conciliación compara el último saldo informado con lo movido **hasta ese
+  mismo movimiento**, incluido el orden dentro del día; lo posterior se cuenta
+  aparte como no contrastable. **Solo pantalla.**
+- El orden de un día sale de los extractos (`BankDayOrder`): cada archivo ordena
+  sus filas y los movimientos que dos archivos comparten unen esos órdenes. Si no
+  queda un único orden posible, el día es indeterminado y de él no se afirma ni
+  un saldo final ni un salto. Cuál archivo se importó último no ordena nada. Lo
+  usan el último saldo, la conciliación y el aviso de continuidad entre extractos.
+- La cola de créditos sin clasificar excluye los que respaldan un pago anterior
+  vigente. **Solo pantalla.**
+
+<a id="credito-viejo"></a>
+
+## Crédito viejo como pago anterior
+
+- `fine_historical_movements.bank_transaction_id`: un crédito de la cuenta de
+  Multas, anterior a la apertura de su caja (que tiene que existir), sin
+  imputaciones; el pago es por su importe exacto y con su fecha. **Base:**
+  `fine_historical_bank_credit`.
+- Un crédito respalda un solo pago vigente. **Base:** UNIQUE parcial
+  `WHERE status <> 'rejected'`.
+- Un crédito vinculado no se imputa en un libro. **Base:**
+  `bank_allocation_not_fine_history`.
+- Su fecha no se revisa. **Base** (misma función, al actualizar) y **Action**.
+- Revertir el extracto de un crédito vinculado se rechaza con mensaje. **Base:**
+  la FK; **Action:** `RollbackBankStatementImport` traduce el 23503.

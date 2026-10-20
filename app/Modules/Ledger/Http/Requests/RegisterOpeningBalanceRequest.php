@@ -18,8 +18,12 @@ use Illuminate\Validation\Rule;
  * el Action: si viajara desde el navegador sería un número que puede no
  * coincidir con la suma de sus partes, y el asiento quedaría sin balancear
  * por un dato que el sistema ya tiene.
+ *
+ * No es `final`: la apertura de cada caja la extiende con su política
+ * —Multas abre solo efectivo y cheques, con su cuenta—, y la lectura de
+ * los importes es la misma para todas.
  */
-final class RegisterOpeningBalanceRequest extends FormRequest
+class RegisterOpeningBalanceRequest extends FormRequest
 {
     /**
      * El importe se normaliza antes de validarse.

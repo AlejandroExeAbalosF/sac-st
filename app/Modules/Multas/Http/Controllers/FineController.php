@@ -19,6 +19,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\FineAttachments;
+use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
@@ -128,7 +129,7 @@ final class FineController extends Controller
         return to_route('multas.show', $multa);
     }
 
-    public function show(Request $request, Fine $fine, FineAttachments $adjuntos): Response
+    public function show(Request $request, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos): Response
     {
         $fine->load([
             'fineCase',
@@ -142,6 +143,7 @@ final class FineController extends Controller
             'debtEntries.creator:id,name',
             'historicalMovements.creator:id,name',
             'historicalMovements.reviewer:id,name',
+            'historicalMovements.bankTransaction',
         ]);
 
         $usuario = $request->user();
@@ -158,10 +160,17 @@ final class FineController extends Controller
                 ->values(),
             // La resolución y las actas son del expediente; la multa las muestra igual.
             'adjuntosDelExpediente' => $adjuntos->for(AttachmentSubject::FineCase, [$fine->fine_case_id])[$fine->fine_case_id] ?? [],
+            /*
+             * Los créditos viejos de la cuenta de Multas, para respaldar un
+             * pago anterior. Se piden con una recarga parcial al buscar.
+             */
+            'creditosDelBanco' => Inertia::optional(fn (): array => $creditos->search($request->string('credito')->toString())),
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
+                // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.
+                'linkBankCredit' => $creditos->book() !== null,
             ],
         ]);
     }

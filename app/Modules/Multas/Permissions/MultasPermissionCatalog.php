@@ -46,6 +46,16 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Como la apertura de Haberes: define todos los saldos posteriores
+            // de la caja y no se rehace. Se adelanta de la Etapa 6 (§8).
+            new PermissionDefinition(
+                'multas.caja.abrir',
+                'Abrir la caja de Multas',
+                'Declarar, una sola vez, el efectivo y los cheques que hay en la caja de Multas el día que empieza a operar, y la cuenta bancaria con la que opera.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
         );
     }
 }

@@ -35,10 +35,12 @@ final class FineHistoricalMovementData extends Data
         public ?string $createdAt,
         /** @var list<FineAttachmentData> */
         public array $attachments,
+        /** El crédito del banco que lo respalda, si viene de uno. */
+        public ?FineBankCreditData $bankCredit,
     ) {}
 
     /**
-     * Espera cargados `creator` y `reviewer`.
+     * Espera cargados `creator`, `reviewer` y `bankTransaction`.
      *
      * @param  list<FineAttachmentData>  $adjuntos
      */
@@ -61,6 +63,7 @@ final class FineHistoricalMovementData extends Data
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $antecedente->created_at?->toIso8601String(),
             attachments: $adjuntos,
+            bankCredit: $antecedente->bankTransaction === null ? null : FineBankCreditData::fromModel($antecedente->bankTransaction),
         );
     }
 }

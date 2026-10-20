@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Multas\Actions\RecordFineBankCreditPayment;
 use App\Modules\Multas\Actions\RecordFineHistoricalMovement;
 use App\Modules\Multas\Actions\ReviewFineHistoricalMovement;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
@@ -12,12 +13,14 @@ use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Http\Requests\ReviewHistoricalMovementRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
+use App\Modules\Multas\Http\Requests\StoreFineBankCreditPaymentRequest;
 use App\Modules\Multas\Http\Requests\StoreHistoricalMovementRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Support\PartialDate;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Los pagos y devoluciones anteriores al sistema.
@@ -36,6 +39,27 @@ final class FineHistoricalMovementController extends Controller
         );
 
         Toast::success('Antecedente registrado.', 'Cuenta en el saldo cuando alguien con permiso de ajustar lo valide.');
+
+        return to_route('multas.show', $fine);
+    }
+
+    /**
+     * Un crédito viejo de la cuenta de Multas, identificado como pago de
+     * esta multa. Importe y fecha salen del crédito.
+     */
+    public function storeFromBankCredit(
+        StoreFineBankCreditPaymentRequest $request,
+        Fine $fine,
+        RecordFineBankCreditPayment $registrar,
+    ): RedirectResponse {
+        $registrar->handle(
+            $fine,
+            (int) $request->validated('bankTransactionId'),
+            (string) $request->validated('evidence'),
+            $request->user()?->id,
+        );
+
+        Toast::success('Pago anterior registrado con su crédito del banco.', 'Cuenta en el saldo cuando alguien con permiso de ajustar lo valide.');
 
         return to_route('multas.show', $fine);
     }
@@ -63,6 +87,13 @@ final class FineHistoricalMovementController extends Controller
         FineHistoricalMovement $movement,
         ReviseFineIdentifiers $revisar,
     ): RedirectResponse {
+        // La base lo impide igual (`fine_historical_bank_credit`).
+        if ($movement->bank_transaction_id !== null) {
+            throw ValidationException::withMessages([
+                'date' => 'La fecha de un pago respaldado por un crédito del banco es la del banco: no se revisa.',
+            ]);
+        }
+
         $fecha = PartialDate::parse($request->validated('date')) ?? PartialDate::unknown();
         $fechaVista = PartialDate::parse($request->validated('expected.date')) ?? PartialDate::unknown();
 

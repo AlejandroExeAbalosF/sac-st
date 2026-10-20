@@ -33,6 +33,9 @@ enum AttachmentSubject: string
     /** Un papel del sistema anterior: recibo u Orden de Pago de talonario. */
     case LegacyDocument = 'legacy_document';
 
+    /** El comprobante del saldo de una cuenta bancaria al corte. */
+    case BankAccountOpening = 'bank_account_opening';
+
     /** Un papel del expediente de Multas: la resolución, el acta. */
     case FineCase = 'fine_case';
 
@@ -55,6 +58,7 @@ enum AttachmentSubject: string
             self::DepositTicket => 'Ticket de depósito',
             self::PeriodClosing => 'Planilla de caja',
             self::LegacyDocument => 'Papel del sistema anterior',
+            self::BankAccountOpening => 'Corte de una cuenta bancaria',
             self::FineCase => 'Expediente de multa',
             self::Fine => 'Multa',
             self::FineHistoricalMovement => 'Pago anterior de una multa',

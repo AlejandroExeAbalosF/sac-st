@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Banking\Support;
 
+use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
@@ -24,6 +25,25 @@ final class BankMovementAfterOpening
 {
     public function assertAllows(BankTransaction $transaction, int $cashBoxId, Currency $currency): void
     {
+        /*
+         * En una cuenta compartida, el corte es de la cuenta: lo de hasta
+         * ese día está en el saldo que se declaró sin repartir, sea cual
+         * sea la caja que hoy quiera imputarlo.
+         */
+        $corte = BankAccountOpening::query()->where('bank_account_id', $transaction->bank_account_id)->first();
+
+        if ($corte !== null && $transaction->transaction_date !== null
+            && $transaction->transaction_date->toDateString() <= $corte->cutoff_on->toDateString()) {
+            throw ValidationException::withMessages([
+                'bankTransactionId' => sprintf(
+                    'El movimiento bancario es del %s y la cuenta tiene su saldo declarado al %s: ya está dentro de ese saldo, '
+                    .'que no se reparte entre cajas, y no se registra como un ingreso o egreso nuevo.',
+                    $transaction->transaction_date->format('d/m/Y'),
+                    $corte->cutoff_on->format('d/m/Y'),
+                ),
+            ]);
+        }
+
         $opening = CashBookOpening::for($cashBoxId, $currency);
 
         if ($opening !== null && $transaction->transaction_date !== null

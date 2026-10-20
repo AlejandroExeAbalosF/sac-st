@@ -445,6 +445,13 @@ Lo comprueban el Action y la base al vincular el movimiento. El día mismo de
 la apertura sí pertenece al circuito nuevo. Esto no cambia el registro tardío
 de movimientos posteriores a la apertura, aunque su día operativo esté cerrado.
 
+**Una cuenta compartida tiene además su propio corte.** Si una cuenta la usan
+varias cajas —la de Multas, mañana Aranceles—, su saldo se declara una vez, para
+la cuenta, en Banco › Cuentas (`bank_account_openings`). Un movimiento hasta ese
+día tampoco entra como dinero nuevo, sea cual sea la caja. La cuenta de Haberes
+no tiene corte —su saldo lo declaró la apertura de la caja, como «depósitos
+directos»— y no se le puede declarar uno, así que para Haberes nada cambia.
+
 Una fecha antigua no demuestra por sí sola que el movimiento haya sido
 incluido correctamente en el saldo inicial. Se debe verificar esa inclusión;
 si corresponde apartarlo de la conciliación corriente, se documenta el motivo
@@ -485,6 +492,8 @@ legible; el trigger impide el desastre.
   dólares se abren por separado.
 - La apertura es **una por caja y moneda**, append-only, y lo que declara coincide
   con sus asientos; es el primer hecho de su libro (`cash_book_openings_consistent`).
+- La apertura dice con qué cuenta opera el libro (`bank_account_id`, de su misma
+  moneda por FK compuesta). La de Haberes se completó desde su pata bancaria.
 - Cada asiento **balancea por moneda**.
 - Un período cerrado **no admite movimientos** con fecha adentro…
 - …ni un movimiento anterior que **desactualice un cierre posterior**: la apertura

@@ -7,14 +7,12 @@ namespace App\Modules\Ledger\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Enums\Currency;
-use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RegisterOpeningBalanceRequest;
 use App\Modules\Ledger\Models\CashCountLine;
-use App\Modules\Ledger\Models\JournalLine;
+use App\Modules\Ledger\Support\OpeningLines;
 use App\Modules\Shared\Models\CashBox;
-use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,6 +35,7 @@ final class OpeningBalanceController extends Controller
 
     public function __construct(
         private readonly RegisterOpeningBalance $abrir,
+        private readonly OpeningLines $lineas,
     ) {}
 
     public function index(Request $request): Response
@@ -84,7 +83,7 @@ final class OpeningBalanceController extends Controller
                 'postedAt' => $apertura->created_at->toIso8601String(),
                 'description' => $apertura->notes,
                 'isEmpty' => $apertura->isEmpty(),
-                'lines' => $this->linesOf((int) $caja->id, $moneda),
+                'lines' => $this->lineas->of((int) $caja->id, $moneda),
             ],
         ]);
     }
@@ -143,43 +142,6 @@ final class OpeningBalanceController extends Controller
         }
 
         return $lista;
-    }
-
-    /**
-     * Lo que la apertura declaró, por cuenta.
-     *
-     * Suma todos los asientos de apertura del libro: el principal y el de
-     * cada cheque detallado. Mirar solo el principal dejaba afuera la
-     * cartera cuando se detallaba, y no mostraba nada cuando solo había
-     * cheques.
-     *
-     * @return list<array{account: string, label: string, amount: numeric-string}>
-     */
-    private function linesOf(int $cashBoxId, Currency $moneda): array
-    {
-        $porCuenta = [];
-
-        $filas = JournalLine::query()
-            ->join('financial_events', 'financial_events.id', '=', 'journal_lines.financial_event_id')
-            ->where('financial_events.event_type', FinancialEventType::OpeningBalance->value)
-            ->where('financial_events.cash_box_id', $cashBoxId)
-            ->where('journal_lines.currency', $moneda->value)
-            ->where('journal_lines.debit', '>', 0)
-            ->orderBy('journal_lines.id')
-            ->get(['journal_lines.account_code', 'journal_lines.debit']);
-
-        foreach ($filas as $linea) {
-            // El modelo ya lo devuelve como enum: `account_code` está casteado.
-            $cuenta = $linea->account_code;
-
-            $porCuenta[$cuenta->value] = [
-                'account' => $cuenta->value,
-                'label' => $cuenta->label(),
-                'amount' => Decimal::add($porCuenta[$cuenta->value]['amount'] ?? '0.00', $linea->debit),
-            ];
-        }
-
-        return array_values($porCuenta);
     }
 
     /**

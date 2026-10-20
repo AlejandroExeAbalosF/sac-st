@@ -17,6 +17,7 @@ import {
     Settings,
     ShieldCheck,
     Users,
+    Wallet,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -42,6 +43,7 @@ import { index as roles } from '@/routes/configuracion/roles';
 import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
 import { index as multas } from '@/routes/multas';
+import { index as cajaDeMultas } from '@/routes/multas/caja';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
@@ -66,9 +68,22 @@ const navGroups: NavGroup[] = [
              */
             {
                 title: 'Multas',
-                href: multas(),
                 icon: Gavel,
                 permission: 'multas.ver',
+                children: [
+                    {
+                        title: 'Cuenta corriente',
+                        href: multas(),
+                        icon: Gavel,
+                        permission: 'multas.ver',
+                    },
+                    {
+                        title: 'Caja de Multas',
+                        href: cajaDeMultas(),
+                        icon: Wallet,
+                        permission: 'multas.ver',
+                    },
+                ],
             },
             /*
              * «Recepciones» no está en el menú — desvío 49.

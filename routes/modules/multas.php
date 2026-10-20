@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Multas\Http\Controllers\FineAttachmentController;
 use App\Modules\Multas\Http\Controllers\FineCaseController;
+use App\Modules\Multas\Http\Controllers\FineCashController;
 use App\Modules\Multas\Http\Controllers\FineController;
 use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
@@ -29,6 +30,9 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 
         Route::post('{fine}/documentos', [FineDocumentController::class, 'store'])->whereNumber('fine')->name('documentos.store');
         Route::post('{fine}/antecedentes', [FineHistoricalMovementController::class, 'store'])->whereNumber('fine')->name('antecedentes.store');
+        Route::post('{fine}/antecedentes/credito', [FineHistoricalMovementController::class, 'storeFromBankCredit'])
+            ->whereNumber('fine')
+            ->name('antecedentes.credito.store');
 
         Route::post('expedientes/{fineCase}/documentos', [FineCaseController::class, 'storeDocument'])
             ->whereNumber('fineCase')
@@ -74,8 +78,18 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
             ->name('antecedentes.review');
     });
 
+    /*
+     * La apertura de la caja: una sola vez, como la de Haberes. El saldo
+     * de la cuenta bancaria no va acá: es compartido y se declara en
+     * Banco › Cuentas.
+     */
+    Route::middleware('can:multas.caja.abrir')->group(function (): void {
+        Route::post('caja/apertura', [FineCashController::class, 'store'])->name('caja.apertura.store');
+    });
+
     Route::middleware('can:multas.ver')->group(function (): void {
         Route::get('/', [FineController::class, 'index'])->name('index');
+        Route::get('caja', [FineCashController::class, 'index'])->name('caja.index');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->whereNumber('fineCase')->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');

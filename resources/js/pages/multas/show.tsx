@@ -38,12 +38,20 @@ type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Movimiento = App.Modules.Multas.Data.FineDebtEntryData;
 type Antecedente = App.Modules.Multas.Data.FineHistoricalMovementData;
 type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
+type Credito = App.Modules.Multas.Data.FineBankCreditData;
 
 type Props = {
     multa: Multa;
     documentosDelExpediente: Documento[];
     adjuntosDelExpediente: Adjunto[];
-    can: { register: boolean; adjust: boolean; viewAttachments: boolean };
+    /** Llegan solo al buscar un crédito, con una recarga parcial. */
+    creditosDelBanco?: Credito[];
+    can: {
+        register: boolean;
+        adjust: boolean;
+        viewAttachments: boolean;
+        linkBankCredit: boolean;
+    };
 };
 
 type Dialogo =
@@ -73,6 +81,7 @@ export default function MultaShow({
     multa,
     documentosDelExpediente,
     adjuntosDelExpediente,
+    creditosDelBanco,
     can,
 }: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -505,6 +514,14 @@ export default function MultaShow({
                                         </span>
                                         <span className="text-xs text-muted-foreground">
                                             {antecedente.evidence}
+                                            {antecedente.bankCredit && (
+                                                <>
+                                                    {' · '}crédito del banco
+                                                    {antecedente.bankCredit
+                                                        .operationId &&
+                                                        ` · Op. ${antecedente.bankCredit.operationId}`}
+                                                </>
+                                            )}
                                         </span>
                                         <span className="ml-auto flex items-center gap-2">
                                             <StatusBadge
@@ -525,22 +542,23 @@ export default function MultaShow({
                                                     Comprobante
                                                 </Button>
                                             )}
-                                            {puedeRevisarFecha(
-                                                antecedente.occurredPrecision,
-                                            ) && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() =>
-                                                        setDialogo({
-                                                            tipo: 'fecha-antecedente',
-                                                            antecedente,
-                                                        })
-                                                    }
-                                                >
-                                                    Fecha
-                                                </Button>
-                                            )}
+                                            {antecedente.bankCredit === null &&
+                                                puedeRevisarFecha(
+                                                    antecedente.occurredPrecision,
+                                                ) && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'fecha-antecedente',
+                                                                antecedente,
+                                                            })
+                                                        }
+                                                    >
+                                                        Fecha
+                                                    </Button>
+                                                )}
                                             {can.adjust &&
                                                 antecedente.status ===
                                                     'pending_review' && (
@@ -645,7 +663,12 @@ export default function MultaShow({
                 />
             )}
             {dialogo?.tipo === 'antecedente' && (
-                <HistoricalMovementDialog fineId={multa.id} onClose={cerrar} />
+                <HistoricalMovementDialog
+                    fineId={multa.id}
+                    onClose={cerrar}
+                    allowBankCredit={can.linkBankCredit}
+                    creditos={creditosDelBanco}
+                />
             )}
             {dialogo?.tipo === 'revisar' && (
                 <ReviewHistoricalDialog

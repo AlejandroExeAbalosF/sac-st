@@ -2,6 +2,23 @@ declare namespace App {
     namespace Modules {
         namespace Banking {
             namespace Data {
+                export type BankAccountCutoffData = {
+                    bankAccountId: number;
+                    cutoffOn: string;
+                    statementBalance: string;
+                    notes: string | null;
+                    declaredByName: string | null;
+                    declaredAt: string;
+                    attachmentId: number | null;
+                    statementAtCutoff: string | null;
+                    reconciliation: {
+                        expected: string;
+                        latest: string;
+                        latestDate: string;
+                        difference: string;
+                        unverifiedCount: number;
+                    } | null;
+                };
                 export type BankAccountData = {
                     id: number;
                     label: string;
@@ -879,6 +896,26 @@ declare namespace App {
                     excess: string;
                     status: App.Modules.Multas.Enums.FineDebtStatus;
                 };
+                export type FineBankCreditData = {
+                    id: number;
+                    date: string;
+                    amount: string;
+                    description: string | null;
+                    counterparty: string | null;
+                    operationId: string | null;
+                    ignored: boolean;
+                };
+                export type FineBankPanelData = {
+                    bankAccountId: number;
+                    bankAccountLabel: string;
+                    cutoffOn: string | null;
+                    cutoffBalance: string | null;
+                    latestStatementBalance: string | null;
+                    latestStatementDate: string | null;
+                    bookBalance: string;
+                    unclassifiedCount: number;
+                    unclassifiedAmount: string;
+                };
                 export type FineCaseData = {
                     id: number;
                     label: string;
@@ -956,6 +993,7 @@ declare namespace App {
                     createdByName: string | null;
                     createdAt: string | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    bankCredit: App.Modules.Multas.Data.FineBankCreditData | null;
                 };
                 export type FineListItemData = {
                     id: number;
@@ -1129,6 +1167,7 @@ declare namespace App {
                     | 'deposit_ticket'
                     | 'period_closing'
                     | 'legacy_document'
+                    | 'bank_account_opening'
                     | 'fine_case'
                     | 'fine'
                     | 'fine_historical_movement';

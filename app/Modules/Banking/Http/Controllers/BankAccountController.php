@@ -5,20 +5,33 @@ declare(strict_types=1);
 namespace App\Modules\Banking\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Banking\Actions\DeclareBankAccountCutoff;
+use App\Modules\Banking\Data\BankAccountCutoffData;
 use App\Modules\Banking\Data\BankAccountData;
 use App\Modules\Banking\Enums\ImportStatus;
+use App\Modules\Banking\Http\Requests\DeclareBankAccountCutoffRequest;
 use App\Modules\Banking\Http\Requests\SaveBankAccountRequest;
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankStatementImport;
+use App\Modules\Banking\Support\AccountCutoffBalance;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\Attachment;
+use App\Support\Ui\Toast;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Inertia\Inertia;
 use Inertia\Response;
 
 final class BankAccountController extends Controller
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly RecordAuditEvent $auditar,
+        private readonly AccountCutoffBalance $saldos,
+    ) {}
 
     public function index(): Response
     {
@@ -39,8 +52,59 @@ final class BankAccountController extends Controller
 
         return Inertia::render('banco/cuentas', [
             'accounts' => $accounts,
+            'cutoffs' => $this->cutoffs(),
             'canManage' => request()->user()?->can('banco.cuentas.gestionar') ?? false,
+            'canDeclareCutoff' => request()->user()?->can('banco.cuentas.declarar-corte') ?? false,
         ]);
+    }
+
+    /**
+     * El saldo de una cuenta compartida al corte, una sola vez.
+     */
+    public function declareCutoff(
+        DeclareBankAccountCutoffRequest $request,
+        BankAccount $account,
+        DeclareBankAccountCutoff $declarar,
+    ): RedirectResponse {
+        $comprobante = $request->file('evidence');
+
+        $declarar->handle(
+            $account,
+            CarbonImmutable::parse((string) $request->validated('cutoffOn')),
+            (string) $request->validated('statementBalance'),
+            $request->validated('notes'),
+            $comprobante instanceof UploadedFile ? $comprobante : null,
+            (int) $request->user()?->id,
+        );
+
+        Toast::success("Corte de «{$account->label}» declarado.");
+
+        return to_route('banco.cuentas.index');
+    }
+
+    /**
+     * Los cortes declarados, con su comprobante y su conciliación.
+     *
+     * @return list<BankAccountCutoffData>
+     */
+    private function cutoffs(): array
+    {
+        $cortes = BankAccountOpening::query()->with('declarer:id,name')->orderBy('id')->get();
+
+        $adjuntos = Attachment::query()
+            ->where('subject_type', AttachmentSubject::BankAccountOpening)
+            ->whereIn('subject_id', $cortes->modelKeys())
+            ->pluck('id', 'subject_id');
+
+        return array_values($cortes
+            ->map(fn (BankAccountOpening $corte): BankAccountCutoffData => BankAccountCutoffData::fromModel(
+                $corte,
+                isset($adjuntos[$corte->id]) ? (int) $adjuntos[$corte->id] : null,
+                // Se recalcula al mirar: un extracto importado después completa la verificación.
+                $this->saldos->atEndOf($corte->bank_account_id, $corte->cutoff_on),
+                $this->saldos->reconcile($corte),
+            ))
+            ->all());
     }
 
     public function store(SaveBankAccountRequest $request): RedirectResponse

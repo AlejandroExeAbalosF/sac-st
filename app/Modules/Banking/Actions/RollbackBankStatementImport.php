@@ -12,6 +12,7 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -145,7 +146,25 @@ final class RollbackBankStatementImport
              * —antes le alcanzaba con un `SET LOCAL` que cualquier rol
              * puede fijar—; `assertUntouched` da el mensaje legible antes.
              */
-            DB::select('SELECT discard_statement_transaction(?)', [$transaction->id]);
+            try {
+                DB::select('SELECT discard_statement_transaction(?)', [$transaction->id]);
+            } catch (QueryException $e) {
+                /*
+                 * Otro registro lo cita —un pago anterior de una multa, por
+                 * ejemplo— y la clave foránea lo protege. Banking no sabe
+                 * quién: lo dice en general, con la salida.
+                 */
+                if ($e->getCode() !== '23503') {
+                    throw $e;
+                }
+
+                throw new RuntimeException(sprintf(
+                    'No se puede revertir: el movimiento del %s por %s respalda otro registro del sistema, '
+                    .'como un pago anterior de una multa. Hay que deshacer ese vínculo antes.',
+                    $transaction->transaction_date?->format('d/m/Y') ?? 'sin fecha',
+                    $transaction->amount,
+                ), previous: $e);
+            }
         }
     }
 

@@ -3,9 +3,10 @@
 Qué hace hoy la Caja de Multas. Describe lo implementado; las reglas con su
 garantía en la base están en [reglas de Multas](multas-reglas.md).
 
-**Estado: en construcción.** Está la cuenta corriente: expedientes, documentos,
-multas, su obligación y los pagos anteriores al sistema. Todavía **no hay cobros**:
-ni caja, ni recibos, ni banco. Esas partes llegan en etapas siguientes.
+**Estado: en construcción.** Está la cuenta corriente —expedientes, documentos,
+multas, su obligación y los pagos anteriores al sistema— y la apertura de la caja
+con su cuenta bancaria compartida. Todavía **no hay cobros** ni recibos: llegan en
+la etapa siguiente.
 
 ---
 
@@ -45,6 +46,7 @@ conoce. El test de fronteras lo exige.
 | Ficha de la multa | `/multas/{id}` | `multas.ver` |
 | Expediente | `/multas/expedientes/{id}` | `multas.ver` |
 | Exportar la cuenta corriente | `/multas/exportar` | `multas.ver` |
+| Caja de Multas | `/multas/caja` | `multas.ver`; abrirla, `multas.caja.abrir` |
 
 ### Cuenta corriente · `/multas`
 
@@ -89,7 +91,8 @@ saldo y estado. Abajo:
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos**: los de la multa y, debajo, los del expediente.
-- **Pagos anteriores al sistema**, con su respaldo, su revisión y su comprobante.
+- **Pagos anteriores al sistema**, con su respaldo, su revisión, su comprobante y,
+  si vino del banco, el crédito que lo respalda.
 
 ### Expediente · `/multas/expedientes/{id}`
 
@@ -148,12 +151,53 @@ Un pago que se hizo antes de este sistema —el que figura en una columna mensua
 Excel, un recibo de papel— se registra con su importe, su fecha (puede ser solo el
 mes) y el respaldo que lo prueba.
 
+Si el pago fue una transferencia que el extracto ya trae —un crédito de la cuenta
+de Multas **anterior a la apertura de la caja**—, se registra eligiendo ese crédito:
+el importe y la fecha son los del banco, por el crédito entero (un pago no se
+reparte), y el mismo crédito no respalda otro pago ni se cobra después. Si se
+descarta, el crédito queda libre para el pago correcto.
+
 No es plata que entra hoy: ya se rindió. Por eso **no genera asientos**. Queda
 pendiente de revisión y cuenta en el saldo recién cuando alguien con permiso de
 ajustar lo **valida**. Descartarlo pide el motivo. Se revisa una sola vez.
 
 Una **devolución** anterior se valida solo si hay pagos anteriores validados que
 la cubran; si no, queda pendiente hasta validar el pago que devuelve.
+
+---
+
+<a id="caja"></a>
+
+## Caja y cuenta bancaria
+
+La cuenta bancaria de Multas es **compartida con Aranceles**, y su saldo no se
+puede repartir entre las dos (M08, M12). Por eso hay dos aperturas distintas:
+
+- **El corte de la cuenta** (Banco › Cuentas, permiso `banco.cuentas.declarar-corte`):
+  el saldo que informa el banco al cierre de un día, una sola vez y sin repartir,
+  con su comprobante. Si un extracto importado atraviesa ese día —tiene filas
+  antes y después—, el saldo tiene que ser el suyo; si no, se acepta y la pantalla
+  dice que la verificación queda pendiente hasta que llegue ese archivo. Lo que el
+  extracto trae hasta ese día queda adentro y **no entra a ningún libro como
+  cobro**. La pantalla muestra si el saldo al corte más lo movido hasta el último
+  saldo informado cierra contra ese saldo, y cuántos movimientos posteriores
+  todavía no se pueden contrastar.
+- **La apertura de la caja** (`/multas/caja`, permiso `multas.caja.abrir`): como la
+  de Haberes —fecha, efectivo contado por billete, cheques detallados, total
+  calculado—, pero **sin saldo bancario** y diciendo con qué cuenta opera. Abre
+  después del corte de esa cuenta; la pantalla sugiere el día siguiente.
+
+Abierta la caja, la pantalla muestra la cuenta en **dos números que no se suman
+nunca**: el saldo según el banco —la cuenta entera, compartida— y los cobros de
+Multas en el banco —lo que el libro de Multas tiene ahí, en cero hasta que existan
+los cobros—. Debajo, los créditos posteriores al corte que todavía nadie
+identificó: es la cola de «pendiente de clasificación de caja». Un crédito que ya
+respalda un pago anterior vigente sale de la cola; si ese pago se descarta,
+vuelve.
+
+La importación de extractos no cambia: es por cuenta, con su control de
+continuidad, vista previa y movimientos repetidos, y no depende de la caja. Un
+mismo crédito no lo pueden consumir dos cajas por encima de su importe.
 
 ---
 
@@ -189,6 +233,8 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ver` | Consultar la cuenta corriente | administrador, contador, administrativo, consulta |
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
+| `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
+| `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a
 los roles ya configurados (`RolesAndPermissionsSeeder`); uno que ya existía no se

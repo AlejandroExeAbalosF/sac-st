@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonInterface $opened_on El primer día del libro; lo declarado es el cierre del día anterior.
  * @property numeric-string $declared_total Cero: no había nada al abrir.
  * @property int|null $opened_by
+ * @property int|null $bank_account_id La cuenta con la que opera el libro, de su misma moneda.
  * @property string|null $notes
  * @property CarbonInterface $created_at
  */
@@ -44,6 +45,7 @@ final class CashBookOpening extends Model
         'opened_on',
         'declared_total',
         'opened_by',
+        'bank_account_id',
         'notes',
     ];
 

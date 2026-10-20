@@ -302,6 +302,11 @@ Breadcrumbs::for('multas.index', fn (): array => [
     Crumb::make('Multas'),
 ]);
 
+Breadcrumbs::for('multas.caja.index', fn (): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Caja'),
+]);
+
 Breadcrumbs::for('multas.create', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
     Crumb::make('Nueva multa'),

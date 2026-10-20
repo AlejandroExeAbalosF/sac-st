@@ -36,6 +36,16 @@ final class BankingPermissionCatalog implements PermissionCatalogContributor
                 'banco',
                 ['administrador', 'contador'],
             ),
+            // Como la apertura de una caja: define qué créditos ya no entran
+            // a ningún libro, y no se corrige.
+            new PermissionDefinition(
+                'banco.cuentas.declarar-corte',
+                'Declarar el corte de una cuenta compartida',
+                'Cargar, una sola vez, el saldo que informa el banco para una cuenta que usan varias cajas, sin repartirlo entre ellas.',
+                'banco',
+                ['administrador'],
+                sensitive: true,
+            ),
             new PermissionDefinition(
                 'banco.extractos.ver',
                 'Ver extractos y movimientos',
