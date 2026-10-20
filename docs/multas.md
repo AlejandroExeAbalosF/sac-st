@@ -44,6 +44,7 @@ conoce. El test de fronteras lo exige.
 | Nueva multa | `/multas/nueva` | `multas.registrar` |
 | Ficha de la multa | `/multas/{id}` | `multas.ver` |
 | Expediente | `/multas/expedientes/{id}` | `multas.ver` |
+| Exportar la cuenta corriente | `/multas/exportar` | `multas.ver` |
 
 ### Cuenta corriente · `/multas`
 
@@ -52,6 +53,14 @@ encuentra «169607/2024-0»), de resolución, de acta, o la carátula. Filtra po
 deuda (con o sin) y por año de registro. Cada fila dice el importe vigente, el
 saldo y la situación: pendiente, con pagos parciales, cancelada o sin efecto, y si
 tiene excedente.
+
+**Exportar a Excel** baja lo que está filtrado, entero y sin paginar: una fila por
+multa con expediente, carátula, persona, documentos de origen, fecha de registro,
+importe vigente, pagado en el sistema, pagado antes del sistema, saldo, excedente,
+estado y procedencia. Los importes van escritos («1.400.000,00»), como en pantalla,
+no como número de Excel. Todo el archivo sale de una misma foto de los datos: lo
+que otro carga o corrige mientras se baja —una fecha, una carátula, un ajuste— no
+repite ni saltea filas ni mezcla momentos, y quien corrige no espera.
 
 ### Nueva multa · `/multas/nueva`
 
@@ -79,11 +88,38 @@ saldo y estado. Abajo:
   ratificación o respaldo. Vincular una ratificación no mueve la obligación.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
-- **Pagos anteriores al sistema**, con su respaldo y su revisión.
+- **Archivos**: los de la multa y, debajo, los del expediente.
+- **Pagos anteriores al sistema**, con su respaldo, su revisión y su comprobante.
 
 ### Expediente · `/multas/expedientes/{id}`
 
-Sus documentos —se pueden cargar antes que la multa— y las multas que originó.
+Sus documentos —se pueden cargar antes que la multa—, sus archivos y las multas que
+originó.
+
+---
+
+<a id="adjuntos"></a>
+
+## Archivos
+
+La foto o el PDF de un papel se adjunta a quien es dueño de ese papel:
+
+- **Expediente**: la resolución, las actas, cualquier papel del expediente. Lo
+  muestran todas sus multas.
+- **Multa**: lo que respalda esa multa en particular.
+- **Pago anterior**: su comprobante —recibo, boleta, planilla—, que ayuda a
+  validarlo.
+
+No se pide adjuntar nada para cargar: se completa cuando aparece el papel. Se
+adjunta con el permiso de cargar (`multas.registrar`) y se abre con el de ver
+adjuntos (`adjuntos.ver`); sin él se lista el nombre, sin enlace.
+
+Entra por el mismo camino que el resto de los adjuntos del sistema: disco privado,
+validado por su contenido (JPG, PNG, WEBP o PDF, hasta 10 MB), las fotos
+normalizadas a WEBP y la huella del archivo guardado. Un archivo no se edita ni se
+borra: si se subió el equivocado, se sube el correcto con una descripción que lo
+diga. Cada uno queda en la auditoría; el comprobante de un pago anterior, sobre su
+multa.
 
 ---
 
@@ -151,7 +187,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | Permiso | Para qué | Roles por omisión |
 | --- | --- | --- |
 | `multas.ver` | Consultar la cuenta corriente | administrador, contador, administrativo, consulta |
-| `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores | administrador, administrativo |
+| `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a

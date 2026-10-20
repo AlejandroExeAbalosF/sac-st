@@ -14,7 +14,9 @@ use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\NewDocument;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Support\Ui\Toast;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -28,7 +30,7 @@ use Inertia\Response;
  */
 final class FineCaseController extends Controller
 {
-    public function show(Request $request, FineCase $fineCase): Response
+    public function show(Request $request, FineCase $fineCase, FineAttachments $adjuntos): Response
     {
         $fineCase->load('documents');
 
@@ -43,9 +45,12 @@ final class FineCaseController extends Controller
         return Inertia::render('multas/expediente', [
             'expediente' => FineCaseData::fromModel($fineCase),
             'multas' => $multas->map(fn (Fine $multa): FineListItemData => FineListItemData::fromModel($multa))->values(),
+            // Las fotos de la resolución y de las actas: el expediente es dueño de esos papeles.
+            'adjuntos' => $adjuntos->for(AttachmentSubject::FineCase, [$fineCase->id])[$fineCase->id] ?? [],
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
+                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }

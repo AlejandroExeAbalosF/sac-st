@@ -3,6 +3,7 @@ import { Archive, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -25,7 +26,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { businessToday, date } from '@/lib/format';
 import { legacySettlement as registrarPagoAnterior } from '@/routes/haberes/installments';
-import PaperPhotoDropzone from './paper-photo-dropzone';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;

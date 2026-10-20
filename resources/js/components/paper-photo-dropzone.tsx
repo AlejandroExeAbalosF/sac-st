@@ -7,10 +7,11 @@ import { cn } from '@/lib/utils';
 const ACEPTA = 'image/jpeg,image/png,image/webp,application/pdf';
 
 /**
- * La foto de un papel del sistema anterior: se arrastra o se elige.
+ * La foto de un papel: se arrastra o se elige.
  *
- * Es la versión compacta del panel de comprobantes —entra en un diálogo,
- * al lado del número y la fecha del papel—: una zona punteada que acepta
+ * La usan el papel del sistema anterior en Haberes y los adjuntos de
+ * Multas. Es la versión compacta del panel de comprobantes —entra en un
+ * diálogo, al lado de los datos del papel—: una zona punteada que acepta
  * el archivo soltado encima, y que también se abre con un clic o con el
  * teclado. Elegida la foto, muestra cuál es —una miniatura, o el ícono si
  * es un PDF— para que el operador vea que subió la correcta antes de
@@ -24,11 +25,15 @@ export default function PaperPhotoDropzone({
     foto,
     onElegir,
     error,
+    label = 'Foto',
+    optional = true,
 }: {
     id: string;
     foto: File | null;
     onElegir: (archivo: File | null) => void;
     error?: string;
+    label?: string;
+    optional?: boolean;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [encima, setEncima] = useState(false);
@@ -60,10 +65,12 @@ export default function PaperPhotoDropzone({
                 htmlFor={id}
                 className="text-sm leading-none font-medium select-none"
             >
-                Foto
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    opcional
-                </span>
+                {label}
+                {optional && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        opcional
+                    </span>
+                )}
             </label>
 
             <div

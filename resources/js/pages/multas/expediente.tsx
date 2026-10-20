@@ -1,10 +1,20 @@
 import { Head, Link } from '@inertiajs/react';
-import { FilePlus2, Pencil, Plus, TriangleAlert } from 'lucide-react';
+import {
+    FilePlus2,
+    Paperclip,
+    Pencil,
+    Plus,
+    TriangleAlert,
+} from 'lucide-react';
 import { useState } from 'react';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    AttachFileDialog,
+    AttachmentList,
+} from '@/features/multas/components/attachments';
 import {
     AddDocumentDialog,
     ReviseCaseDialog,
@@ -17,20 +27,24 @@ import {
 } from '@/features/multas/labels';
 import { create, show } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
+import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Multa = App.Modules.Multas.Data.FineListItemData;
+type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
 
 type Props = {
     expediente: Expediente;
     multas: Multa[];
-    can: { register: boolean; adjust: boolean };
+    adjuntos: Adjunto[];
+    can: { register: boolean; adjust: boolean; viewAttachments: boolean };
 };
 
 type Dialogo =
     | { tipo: 'documento' }
     | { tipo: 'expediente' }
+    | { tipo: 'adjuntar' }
     | { tipo: 'corregir-documento'; documento: Documento };
 
 /**
@@ -39,7 +53,12 @@ type Dialogo =
  * Un expediente puede tener varias multas —dos sancionados por la misma
  * acta— y sus documentos se cargan una vez y se comparten.
  */
-export default function ExpedienteDeMultas({ expediente, multas, can }: Props) {
+export default function ExpedienteDeMultas({
+    expediente,
+    multas,
+    adjuntos,
+    can,
+}: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
     const cerrar = () => setDialogo(null);
 
@@ -195,6 +214,35 @@ export default function ExpedienteDeMultas({ expediente, multas, can }: Props) {
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
+                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
+                        <h2 className="text-sm font-semibold">Archivos</h2>
+                        {can.register && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
+                            >
+                                <Paperclip aria-hidden="true" />
+                                Adjuntar archivo
+                            </Button>
+                        )}
+                    </div>
+                    <div className="px-5 py-3">
+                        {adjuntos.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Sin archivos. Se agregan cuando aparece el
+                                papel: no hace falta para cargar.
+                            </p>
+                        ) : (
+                            <AttachmentList
+                                adjuntos={adjuntos}
+                                canView={can.viewAttachments}
+                            />
+                        )}
+                    </div>
+                </section>
+
+                <section className="rounded-lg border bg-card shadow-raised">
                     <h2 className="border-b px-5 py-3 text-sm font-semibold">
                         Multas
                     </h2>
@@ -244,6 +292,14 @@ export default function ExpedienteDeMultas({ expediente, multas, can }: Props) {
 
             {dialogo?.tipo === 'documento' && (
                 <AddDocumentDialog caseId={expediente.id} onClose={cerrar} />
+            )}
+            {dialogo?.tipo === 'adjuntar' && (
+                <AttachFileDialog
+                    url={attachToCase(expediente.id).url}
+                    title="Adjuntar un archivo al expediente"
+                    description="La foto o el PDF de la resolución, de un acta o de otro papel del expediente. Lo ven todas sus multas."
+                    onClose={cerrar}
+                />
             )}
             {dialogo?.tipo === 'expediente' && (
                 <ReviseCaseDialog expediente={expediente} onClose={cerrar} />

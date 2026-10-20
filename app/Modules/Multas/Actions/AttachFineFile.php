@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Multas\Actions;
+
+use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\Attachment;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Throwable;
+
+/**
+ * Adjunta un archivo a un expediente, a una multa o a un pago anterior.
+ *
+ * La foto de la resolución o del acta va en el expediente, que es dueño de
+ * esos papeles; lo que respalda una multa en particular, en la multa; el
+ * comprobante de un pago anterior, en el antecedente. No se pide adjuntar
+ * nada para cargar (M11): se completa cuando aparece el papel.
+ *
+ * El archivo entra por `StoreAttachment`, como todos: disco privado,
+ * validado por contenido, fotos normalizadas y huella del archivo guardado.
+ * Un adjunto no se edita ni se borra.
+ */
+final class AttachFineFile
+{
+    public function __construct(
+        private readonly StoreAttachment $adjuntos,
+        private readonly RecordAuditEvent $auditar,
+    ) {}
+
+    public function handle(
+        FineCase|Fine|FineHistoricalMovement $sujeto,
+        UploadedFile $archivo,
+        ?string $title,
+        ?int $actorId,
+    ): Attachment {
+        $titulo = trim((string) $title) === '' ? null : trim((string) $title);
+        $adjunto = null;
+
+        try {
+            return DB::transaction(function () use ($sujeto, $archivo, $titulo, $actorId, &$adjunto): Attachment {
+                $adjunto = $this->adjuntos->handle(
+                    file: $archivo,
+                    subject: match (true) {
+                        $sujeto instanceof FineCase => AttachmentSubject::FineCase,
+                        $sujeto instanceof Fine => AttachmentSubject::Fine,
+                        default => AttachmentSubject::FineHistoricalMovement,
+                    },
+                    subjectId: (int) $sujeto->getKey(),
+                    documentType: match (true) {
+                        $sujeto instanceof FineCase => 'fine_case_paper',
+                        $sujeto instanceof Fine => 'fine_support',
+                        default => 'fine_historical_evidence',
+                    },
+                    userId: $actorId,
+                    title: $titulo,
+                );
+
+                // El pago anterior se audita sobre su multa: es donde se lee.
+                $this->auditar->handle(
+                    match (true) {
+                        $sujeto instanceof FineCase => 'expediente-multa.adjunto-agregado',
+                        $sujeto instanceof Fine => 'multa.adjunto-agregado',
+                        default => 'multa.respaldo-de-antecedente-agregado',
+                    },
+                    $sujeto instanceof FineHistoricalMovement ? Fine::query()->findOrFail($sujeto->fine_id) : $sujeto,
+                    metadata: [
+                        'titulo' => $adjunto->title,
+                        'archivo' => $adjunto->original_filename,
+                    ],
+                    actorId: $actorId,
+                );
+
+                return $adjunto;
+            });
+        } catch (Throwable $exception) {
+            // La fila volvió atrás: el archivo ya escrito quedaría huérfano.
+            if ($adjunto instanceof Attachment) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            throw $exception;
+        }
+    }
+}

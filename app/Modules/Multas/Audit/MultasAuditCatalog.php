@@ -124,6 +124,24 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['amount' => 'Importe', 'respaldo' => 'Respaldo'],
             ),
             new AuditActionDefinition(
+                'expediente-multa.adjunto-agregado',
+                'Se adjuntó un archivo al expediente de multa',
+                'Multas',
+                metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
+            ),
+            new AuditActionDefinition(
+                'multa.adjunto-agregado',
+                'Se adjuntó un archivo a la multa',
+                'Multas',
+                metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
+            ),
+            new AuditActionDefinition(
+                'multa.respaldo-de-antecedente-agregado',
+                'Se adjuntó el comprobante de un pago anterior al sistema',
+                'Multas',
+                metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.antecedente-descartado',
                 'Se descartó un pago anterior al sistema',
                 'Multas',

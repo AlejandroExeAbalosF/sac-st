@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Multas\Http\Controllers\FineAttachmentController;
 use App\Modules\Multas\Http\Controllers\FineCaseController;
 use App\Modules\Multas\Http\Controllers\FineController;
 use App\Modules\Multas\Http\Controllers\FineDebtController;
@@ -32,6 +33,15 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('expedientes/{fineCase}/documentos', [FineCaseController::class, 'storeDocument'])
             ->whereNumber('fineCase')
             ->name('expedientes.documentos.store');
+
+        // Adjuntar es parte de cargar: el papel aparece después (M11).
+        Route::post('expedientes/{fineCase}/adjuntos', [FineAttachmentController::class, 'storeForCase'])
+            ->whereNumber('fineCase')
+            ->name('expedientes.adjuntos.store');
+        Route::post('{fine}/adjuntos', [FineAttachmentController::class, 'storeForFine'])->whereNumber('fine')->name('adjuntos.store');
+        Route::post('antecedentes/{movement}/adjuntos', [FineAttachmentController::class, 'storeForMovement'])
+            ->whereNumber('movement')
+            ->name('antecedentes.adjuntos.store');
     });
 
     /*
@@ -66,6 +76,7 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 
     Route::middleware('can:multas.ver')->group(function (): void {
         Route::get('/', [FineController::class, 'index'])->name('index');
+        Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->whereNumber('fineCase')->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');
     });

@@ -40,16 +40,17 @@ final class ScannedDocument
     }
 
     /**
+     * @param  string  $noun  cómo llama la pantalla a lo que se sube, con su artículo
      * @return array<string, string>
      */
-    public static function messages(string $attribute): array
+    public static function messages(string $attribute, string $noun = 'El comprobante'): array
     {
-        $formato = 'El comprobante puede ser una foto JPG, PNG o WEBP, o un PDF.';
+        $formato = "{$noun} puede ser una foto JPG, PNG o WEBP, o un PDF.";
 
         return [
             "{$attribute}.mimes" => $formato,
             "{$attribute}.extensions" => $formato,
-            "{$attribute}.max" => 'El comprobante no puede superar los 10 MB.',
+            "{$attribute}.max" => "{$noun} no puede superar los 10 MB.",
         ];
     }
 

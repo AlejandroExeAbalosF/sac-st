@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { FilePlus2, History, Pencil, Scale } from 'lucide-react';
+import { FilePlus2, History, Paperclip, Pencil, Scale } from 'lucide-react';
 import { useState } from 'react';
 import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
@@ -7,6 +7,10 @@ import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AdjustDebtDialog from '@/features/multas/components/adjust-debt-dialog';
+import {
+    AttachFileDialog,
+    AttachmentList,
+} from '@/features/multas/components/attachments';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
@@ -22,7 +26,9 @@ import {
     partialDate,
 } from '@/features/multas/labels';
 import { dateTime, isNonZero, sumAmounts } from '@/lib/format';
+import { store as attachToFine } from '@/routes/multas/adjuntos';
 import { reverse } from '@/routes/multas/ajustes';
+import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
 import { store as reviseMovementDate } from '@/routes/multas/antecedentes/revisiones';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
@@ -31,11 +37,13 @@ type Multa = App.Modules.Multas.Data.FineDetailData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Movimiento = App.Modules.Multas.Data.FineDebtEntryData;
 type Antecedente = App.Modules.Multas.Data.FineHistoricalMovementData;
+type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
 
 type Props = {
     multa: Multa;
     documentosDelExpediente: Documento[];
-    can: { register: boolean; adjust: boolean };
+    adjuntosDelExpediente: Adjunto[];
+    can: { register: boolean; adjust: boolean; viewAttachments: boolean };
 };
 
 type Dialogo =
@@ -49,6 +57,8 @@ type Dialogo =
           resultado: 'validated' | 'rejected';
       }
     | { tipo: 'corregir' }
+    | { tipo: 'adjuntar' }
+    | { tipo: 'adjuntar-antecedente'; antecedente: Antecedente }
     | { tipo: 'fecha-movimiento'; movimiento: Movimiento }
     | { tipo: 'fecha-antecedente'; antecedente: Antecedente };
 
@@ -62,6 +72,7 @@ type Dialogo =
 export default function MultaShow({
     multa,
     documentosDelExpediente,
+    adjuntosDelExpediente,
     can,
 }: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -235,6 +246,50 @@ export default function MultaShow({
                             </li>
                         ))}
                     </ul>
+                </section>
+
+                <section className="rounded-lg border bg-card shadow-raised">
+                    <Encabezado titulo="Archivos">
+                        {can.register && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
+                            >
+                                <Paperclip aria-hidden="true" />
+                                Adjuntar archivo
+                            </Button>
+                        )}
+                    </Encabezado>
+                    <div className="grid gap-4 px-5 py-3">
+                        {multa.attachments.length === 0 &&
+                        adjuntosDelExpediente.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Sin archivos. Las fotos de la resolución y de
+                                las actas van en el expediente.
+                            </p>
+                        ) : (
+                            <>
+                                {multa.attachments.length > 0 && (
+                                    <AttachmentList
+                                        adjuntos={multa.attachments}
+                                        canView={can.viewAttachments}
+                                    />
+                                )}
+                                {adjuntosDelExpediente.length > 0 && (
+                                    <div className="grid gap-1.5">
+                                        <p className="text-xs tracking-wide text-field-label uppercase">
+                                            Del expediente
+                                        </p>
+                                        <AttachmentList
+                                            adjuntos={adjuntosDelExpediente}
+                                            canView={can.viewAttachments}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
@@ -454,6 +509,20 @@ export default function MultaShow({
                                                 label={estadoAntecedente.label}
                                                 tone={estadoAntecedente.tone}
                                             />
+                                            {can.register && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        setDialogo({
+                                                            tipo: 'adjuntar-antecedente',
+                                                            antecedente,
+                                                        })
+                                                    }
+                                                >
+                                                    Comprobante
+                                                </Button>
+                                            )}
                                             {puedeRevisarFecha(
                                                 antecedente.occurredPrecision,
                                             ) && (
@@ -505,6 +574,18 @@ export default function MultaShow({
                                                     </>
                                                 )}
                                         </span>
+                                        {antecedente.attachments.length > 0 && (
+                                            <div className="w-full">
+                                                <AttachmentList
+                                                    adjuntos={
+                                                        antecedente.attachments
+                                                    }
+                                                    canView={
+                                                        can.viewAttachments
+                                                    }
+                                                />
+                                            </div>
+                                        )}
                                         {antecedente.reviewNote && (
                                             <p className="w-full text-xs text-muted-foreground">
                                                 {antecedente.reviewedByName ??
@@ -568,6 +649,22 @@ export default function MultaShow({
                 <ReviewHistoricalDialog
                     antecedente={dialogo.antecedente}
                     resultado={dialogo.resultado}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'adjuntar' && (
+                <AttachFileDialog
+                    url={attachToFine(multa.id).url}
+                    title="Adjuntar un archivo a la multa"
+                    description="Lo que respalda esta multa en particular. La foto de la resolución o del acta va en el expediente, que es dueño de esos papeles."
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'adjuntar-antecedente' && (
+                <AttachFileDialog
+                    url={attachToMovement(dialogo.antecedente.id).url}
+                    title="Comprobante del pago anterior"
+                    description="El recibo, la boleta o la planilla que muestra que el pago se hizo. Ayuda a validarlo."
                     onClose={cerrar}
                 />
             )}

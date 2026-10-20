@@ -33,12 +33,16 @@ final class FineHistoricalMovementData extends Data
         public ?string $reviewedAt,
         public ?string $createdByName,
         public ?string $createdAt,
+        /** @var list<FineAttachmentData> */
+        public array $attachments,
     ) {}
 
     /**
      * Espera cargados `creator` y `reviewer`.
+     *
+     * @param  list<FineAttachmentData>  $adjuntos
      */
-    public static function fromModel(FineHistoricalMovement $antecedente): self
+    public static function fromModel(FineHistoricalMovement $antecedente, array $adjuntos): self
     {
         $autor = $antecedente->creator;
         $revisor = $antecedente->reviewer;
@@ -56,6 +60,7 @@ final class FineHistoricalMovementData extends Data
             reviewedAt: $antecedente->reviewed_at?->toIso8601String(),
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $antecedente->created_at?->toIso8601String(),
+            attachments: $adjuntos,
         );
     }
 }

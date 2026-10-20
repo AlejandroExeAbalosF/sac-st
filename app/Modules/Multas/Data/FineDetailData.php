@@ -47,14 +47,19 @@ final class FineDetailData extends Data
         public FineBalanceData $balance,
         public ?string $createdByName,
         public ?string $createdAt,
+        /** @var list<FineAttachmentData> */
+        public array $attachments,
     ) {}
 
     /**
      * Espera cargados `fineCase`, `person`, `documents`, `balance`, `creator`,
      * `debtEntries.{document,reversedBy,creator}` e
      * `historicalMovements.{creator,reviewer}`.
+     *
+     * @param  list<FineAttachmentData>  $adjuntos  los de la multa
+     * @param  array<int, list<FineAttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior
      */
-    public static function fromModel(Fine $multa): self
+    public static function fromModel(Fine $multa, array $adjuntos, array $adjuntosDeAntecedentes): self
     {
         $autor = $multa->creator;
 
@@ -93,11 +98,15 @@ final class FineDetailData extends Data
                 ->all()),
             historicalMovements: array_values($multa->historicalMovements
                 ->sortBy('id')
-                ->map(fn (FineHistoricalMovement $antecedente): FineHistoricalMovementData => FineHistoricalMovementData::fromModel($antecedente))
+                ->map(fn (FineHistoricalMovement $antecedente): FineHistoricalMovementData => FineHistoricalMovementData::fromModel(
+                    $antecedente,
+                    $adjuntosDeAntecedentes[$antecedente->id] ?? [],
+                ))
                 ->all()),
             balance: FineBalanceData::fromModel($multa->balance),
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $multa->created_at?->toIso8601String(),
+            attachments: $adjuntos,
         );
     }
 

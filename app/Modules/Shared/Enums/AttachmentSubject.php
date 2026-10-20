@@ -33,6 +33,15 @@ enum AttachmentSubject: string
     /** Un papel del sistema anterior: recibo u Orden de Pago de talonario. */
     case LegacyDocument = 'legacy_document';
 
+    /** Un papel del expediente de Multas: la resolución, el acta. */
+    case FineCase = 'fine_case';
+
+    /** Lo que respalda una multa en particular. */
+    case Fine = 'fine';
+
+    /** El comprobante de un pago anterior al sistema. */
+    case FineHistoricalMovement = 'fine_historical_movement';
+
     public function label(): string
     {
         return match ($this) {
@@ -46,6 +55,9 @@ enum AttachmentSubject: string
             self::DepositTicket => 'Ticket de depósito',
             self::PeriodClosing => 'Planilla de caja',
             self::LegacyDocument => 'Papel del sistema anterior',
+            self::FineCase => 'Expediente de multa',
+            self::Fine => 'Multa',
+            self::FineHistoricalMovement => 'Pago anterior de una multa',
         };
     }
 }

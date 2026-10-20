@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Search } from 'lucide-react';
+import { FileSpreadsheet, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -17,12 +17,21 @@ import {
 } from '@/components/ui/select';
 import { DEBT_STATUS, partialDate } from '@/features/multas/labels';
 import { isNonZero } from '@/lib/format';
-import { create, index, show } from '@/routes/multas';
+import { create, exportar, index, show } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
 
 type Multa = App.Modules.Multas.Data.FineListItemData;
 
 type Filtros = { q: string; estado: string; anio: number | null };
+
+/** Solo viaja lo que filtra: la dirección queda limpia. */
+function consulta(filtros: Filtros): Record<string, string | number> {
+    return {
+        ...(filtros.q !== '' ? { q: filtros.q } : {}),
+        ...(filtros.estado !== '' ? { estado: filtros.estado } : {}),
+        ...(filtros.anio !== null ? { anio: filtros.anio } : {}),
+    };
+}
 
 type Props = {
     multas: Multa[];
@@ -49,18 +58,10 @@ export default function MultasIndex({
     const consultar = (cambios: Partial<Filtros>) => {
         const siguiente = { ...filters, q: termino, ...cambios };
 
-        router.get(
-            index().url,
-            {
-                // Solo viaja lo que filtra: la dirección queda limpia.
-                ...(siguiente.q !== '' ? { q: siguiente.q } : {}),
-                ...(siguiente.estado !== ''
-                    ? { estado: siguiente.estado }
-                    : {}),
-                ...(siguiente.anio !== null ? { anio: siguiente.anio } : {}),
-            },
-            { preserveState: true, replace: true },
-        );
+        router.get(index().url, consulta(siguiente), {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const buscar = (e: React.FormEvent) => {
@@ -78,17 +79,34 @@ export default function MultasIndex({
                     eyebrow="Operación · Caja Multas"
                     description="Las multas laborales y de higiene y seguridad, con lo que se debe de cada una."
                     actions={
-                        canRegister && (
-                            <Button asChild>
-                                <Link href={create()}>
-                                    <Plus
+                        <>
+                            {/* Lo que se ve filtrado, entero y sin paginar. */}
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={
+                                        exportar({ query: consulta(filters) })
+                                            .url
+                                    }
+                                >
+                                    <FileSpreadsheet
                                         className="size-4"
                                         aria-hidden="true"
                                     />
-                                    Nueva multa
-                                </Link>
+                                    Exportar a Excel
+                                </a>
                             </Button>
-                        )
+                            {canRegister && (
+                                <Button asChild>
+                                    <Link href={create()}>
+                                        <Plus
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
+                                        Nueva multa
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
                     }
                 />
 

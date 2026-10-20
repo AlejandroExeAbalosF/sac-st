@@ -863,6 +863,14 @@ declare namespace App {
         }
         namespace Multas {
             namespace Data {
+                export type FineAttachmentData = {
+                    id: number;
+                    title: string;
+                    originalFilename: string;
+                    viewable: boolean;
+                    createdByName: string | null;
+                    createdAt: string;
+                };
                 export type FineBalanceData = {
                     obligation: string;
                     paid: string;
@@ -919,6 +927,7 @@ declare namespace App {
                     balance: App.Modules.Multas.Data.FineBalanceData;
                     createdByName: string | null;
                     createdAt: string | null;
+                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
                 };
                 export type FineDocumentData = {
                     id: number;
@@ -946,6 +955,7 @@ declare namespace App {
                     reviewedAt: string | null;
                     createdByName: string | null;
                     createdAt: string | null;
+                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
                 };
                 export type FineListItemData = {
                     id: number;
@@ -1118,7 +1128,10 @@ declare namespace App {
                     | 'cash_transfer'
                     | 'deposit_ticket'
                     | 'period_closing'
-                    | 'legacy_document';
+                    | 'legacy_document'
+                    | 'fine_case'
+                    | 'fine'
+                    | 'fine_historical_movement';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

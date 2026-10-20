@@ -42,4 +42,18 @@ final class FineIndexRequest extends FormRequest
             'page' => 'página',
         ];
     }
+
+    /**
+     * Lo mismo para la pantalla y para el exporte.
+     *
+     * @return array{q: string, estado: string, anio: int|null}
+     */
+    public function filters(): array
+    {
+        return [
+            'q' => trim((string) $this->validated('q')),
+            'estado' => (string) $this->validated('estado'),
+            'anio' => $this->validated('anio') === null ? null : (int) $this->validated('anio'),
+        ];
+    }
 }

@@ -18,9 +18,16 @@ use App\Modules\Multas\Http\Requests\StoreFineRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineCaseNumber;
+use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Support\BusinessDate;
+use App\Support\Excel\SpreadsheetWriter;
+use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
+use Generator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +35,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * La cuenta corriente de multas: el listado, el alta y la ficha.
@@ -39,30 +47,11 @@ final class FineController extends Controller
 {
     private const POR_PAGINA = 25;
 
-    public function index(FineIndexRequest $request): Response
+    public function index(FineIndexRequest $request, FineListQuery $listado): Response
     {
-        $filtros = [
-            'q' => trim((string) $request->validated('q')),
-            'estado' => (string) $request->validated('estado'),
-            'anio' => $request->validated('anio') === null ? null : (int) $request->validated('anio'),
-        ];
+        $filtros = $request->filters();
 
-        $paginador = Fine::query()
-            ->select('fines.*')
-            ->join('fine_balances', 'fine_balances.fine_id', '=', 'fines.id')
-            ->with([
-                'fineCase:id,original_text,number,year,suffix',
-                'person:id,name',
-                'documents',
-                'balance',
-            ])
-            ->buscar($filtros['q'])
-            ->when($filtros['estado'] === 'con-deuda', fn ($query) => $query->where('fine_balances.debt', '>', 0))
-            ->when($filtros['estado'] === 'sin-deuda', fn ($query) => $query->where('fine_balances.debt', '=', 0))
-            ->when($filtros['anio'] !== null, fn ($query) => $query->whereYear('fines.registered_on', $filtros['anio']))
-            // Lo último que se registró, primero; los históricos sin fecha, al final.
-            ->orderByRaw('fines.registered_on DESC NULLS LAST')
-            ->orderByDesc('fines.id')
+        $paginador = $listado->query($filtros)
             ->paginate(self::POR_PAGINA)
             ->withQueryString();
 
@@ -75,6 +64,34 @@ final class FineController extends Controller
             // La forma que espera `PaginationFooter`.
             'pagination' => Arr::only($paginador->toArray(), ['current_page', 'last_page', 'from', 'to', 'total', 'links']),
         ]);
+    }
+
+    /**
+     * El listado con los mismos filtros, en una planilla: una fila por multa.
+     *
+     * Los importes van escritos, como en pantalla: pasarlos a número de
+     * Excel sería meterles un `float`.
+     */
+    public function export(FineIndexRequest $request, FineListQuery $listado): StreamedResponse
+    {
+        return SpreadsheetWriter::download(
+            sprintf('multas-%s.xlsx', BusinessDate::today()->format('Y-m-d')),
+            [
+                'Expediente',
+                'Carátula',
+                'Persona',
+                'Documentos de origen',
+                'Fecha de registro',
+                'Importe vigente',
+                'Pagado en el sistema',
+                'Pagado antes del sistema',
+                'Saldo',
+                'Excedente',
+                'Estado',
+                'Procedencia',
+            ],
+            $this->filasDelExporte($listado, $request->filters()),
+        );
     }
 
     /**
@@ -111,7 +128,7 @@ final class FineController extends Controller
         return to_route('multas.show', $multa);
     }
 
-    public function show(Request $request, Fine $fine): Response
+    public function show(Request $request, Fine $fine, FineAttachments $adjuntos): Response
     {
         $fine->load([
             'fineCase',
@@ -130,14 +147,21 @@ final class FineController extends Controller
         $usuario = $request->user();
 
         return Inertia::render('multas/show', [
-            'multa' => FineDetailData::fromModel($fine),
+            'multa' => FineDetailData::fromModel(
+                $fine,
+                $adjuntos->for(AttachmentSubject::Fine, [$fine->id])[$fine->id] ?? [],
+                $adjuntos->for(AttachmentSubject::FineHistoricalMovement, array_values($fine->historicalMovements->modelKeys())),
+            ),
             'documentosDelExpediente' => $fine->fineCase->documents
                 ->sortBy('id')
                 ->map(fn (FineDocument $documento): FineDocumentData => FineDocumentData::fromModel($documento))
                 ->values(),
+            // La resolución y las actas son del expediente; la multa las muestra igual.
+            'adjuntosDelExpediente' => $adjuntos->for(AttachmentSubject::FineCase, [$fine->fine_case_id])[$fine->fine_case_id] ?? [],
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
+                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }
@@ -172,6 +196,35 @@ final class FineController extends Controller
         Toast::success($revision === null ? 'No había nada que cambiar.' : 'Datos de la multa actualizados.');
 
         return to_route('multas.show', $fine);
+    }
+
+    /**
+     * @param  array{q: string, estado: string, anio: int|null}  $filtros
+     * @return Generator<int, list<string>>
+     */
+    private function filasDelExporte(FineListQuery $listado, array $filtros): Generator
+    {
+        foreach ($listado->chunks($filtros) as $bloque) {
+            foreach ($bloque as $multa) {
+                $fila = FineListItemData::fromModel($multa);
+                $saldo = $fila->balance;
+
+                yield [
+                    $fila->caseLabel,
+                    $fila->caption,
+                    $fila->personName ?? '',
+                    implode(' · ', $fila->originDocuments),
+                    PartialDate::fromStored($multa->registered_on?->toDateString(), $multa->registered_precision)->toDisplay(),
+                    Decimal::format($saldo->obligation),
+                    Decimal::format($saldo->paid),
+                    Decimal::format($saldo->historicalPaid),
+                    Decimal::format($saldo->debt),
+                    Decimal::format($saldo->excess),
+                    $saldo->status->label(),
+                    $fila->provenance->label(),
+                ];
+            }
+        }
     }
 
     /**

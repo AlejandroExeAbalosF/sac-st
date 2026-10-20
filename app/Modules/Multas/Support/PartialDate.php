@@ -65,6 +65,16 @@ final readonly class PartialDate
         };
     }
 
+    /** Como se lee en una planilla: «14/07/2025», «07/2025» o «Sin fecha». */
+    public function toDisplay(): string
+    {
+        return match ($this->precision) {
+            DatePrecision::Day => CarbonImmutable::parse((string) $this->date)->format('d/m/Y'),
+            DatePrecision::Month => CarbonImmutable::parse((string) $this->date)->format('m/Y'),
+            DatePrecision::Unknown => 'Sin fecha',
+        };
+    }
+
     public function isAfter(CarbonImmutable $day): bool
     {
         return $this->date !== null && CarbonImmutable::parse($this->date)->greaterThan($day);

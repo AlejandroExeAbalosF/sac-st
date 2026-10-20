@@ -112,3 +112,36 @@ es la parte del excedente hecha de plata que está en el libro.
   pendiente hasta que se valide el pago que devuelve. **Base:**
   `fine_historical_refund_covered`, con bloqueo de la multa.
 - No se borran. **Base.**
+
+<a id="adjuntos"></a>
+
+## Archivos
+
+- Un archivo de Multas es un `attachments` con sujeto `fine_case`, `fine` o
+  `fine_historical_movement`. **Base:** `attachments_subject_type_check`.
+- No se edita ni se borra. **Base:** `attachments_immutable`; solo el archivo de un
+  extracto importado se borra, al revertir la importación.
+- Que el sujeto exista: `subject_id` es polimórfico y no tiene FK, como en el resto
+  de los adjuntos. **Solo Action** (`AttachFineFile` recibe el modelo ya resuelto
+  por la ruta).
+- Tipo y tamaño por contenido, no por nombre (`ScannedDocument`); las fotos se
+  normalizan a WEBP. **Solo Action/Request.**
+- Si la fila vuelve atrás, el archivo ya escrito en el disco se borra. **Solo
+  Action.**
+
+<a id="exporte"></a>
+
+## Exporte
+
+- Mismos filtros y mismo orden que la pantalla (`FineListQuery`). El orden usa
+  `COALESCE(registered_on, '-infinity')` para que el cursor del exporte compare
+  lo mismo que ordena; equivale a `NULLS LAST`.
+- Recorre por cursor dentro de una sola transacción `REPEATABLE READ, READ ONLY`
+  que abarca todos los bloques y sus relaciones: el conjunto, el orden, los saldos
+  y los filtros son los del momento de la primera lectura. El cursor usa la fecha
+  de registro, que es corregible; sin la foto única, una multa corregida durante la
+  descarga salía dos veces o ninguna. Leer no bloquea a quien corrige. **Base**
+  (aislamiento de PostgreSQL); regresión con dos conexiones en
+  `ExporteConcurrenteDeMultasTest`.
+- Los importes van como texto formateado (`Decimal::format`), nunca como número de
+  Excel.
