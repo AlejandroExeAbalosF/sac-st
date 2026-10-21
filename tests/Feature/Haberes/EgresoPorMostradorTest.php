@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\HaberManagementLabel;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Modules\Shared\Actions\TakeNextDocumentNumber;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
@@ -323,6 +324,28 @@ class EgresoPorMostradorTest extends TestCase
     }
 
     /** La fecha de la entrega no puede ser futura. */
+    /** Una hoja del talonario de egresos ya usada vuelve al formulario, y la entrega no ocurre. */
+    public function test_una_hoja_repetida_del_talonario_vuelve_al_formulario(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $numero = DB::transaction(fn (): array => app(TakeNextDocumentNumber::class)->handle('0020'));
+        $usada = $this->reciboDeIngreso($cuota)->replicate()->forceFill([
+            'receipt_type' => ReceiptType::Expense,
+            'document_series_id' => $numero['series_id'],
+            'number' => $numero['number'],
+            'formatted_number' => $numero['formatted'],
+            'talonario_number' => '55001',
+            'beneficiary_installment_id' => null,
+        ]);
+        $usada->save();
+
+        $this->entregar($cuota, ['talonarioNumber' => '55001'])
+            ->assertSessionHasErrors(['talonarioNumber' => 'La hoja 55001 del talonario ya se usó en el recibo 0020/00000001. Revisá el número: cada hoja se carga una sola vez, aunque su recibo se haya anulado.']);
+
+        $this->assertSame(1, $this->recibosDeEgreso()->count());
+        $this->assertSame(0, Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->count());
+    }
+
     public function test_la_fecha_de_la_entrega_no_puede_ser_futura(): void
     {
         $this->entregar($this->cuotaCobrada(), ['paymentDate' => BusinessDate::today()->addDay()->toDateString()])

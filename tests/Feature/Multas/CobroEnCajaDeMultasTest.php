@@ -183,7 +183,7 @@ class CobroEnCajaDeMultasTest extends TestCase
             ->post(route('multas.cobros.store', $multa), [...$this->cobro('100.00'), 'talonarioNumber' => '18470'])
             ->assertSessionHasNoErrors();
         $this->post(route('multas.cobros.store', $multa), [...$this->cobro('200.00'), 'talonarioNumber' => '18470'])
-            ->assertSessionHasErrors(['talonarioNumber' => 'La hoja 18470 del talonario de Multas ya se usó en el recibo 0210/00000001. Revisá el número: cada hoja se carga una sola vez, aunque se haya anulado.']);
+            ->assertSessionHasErrors(['talonarioNumber' => 'La hoja 18470 del talonario ya se usó en el recibo 0210/00000001. Revisá el número: cada hoja se carga una sola vez, aunque su recibo se haya anulado.']);
 
         expect(FinePayment::query()->count())->toBe(1)
             ->and(DB::table('receipts')->count())->toBe(1);

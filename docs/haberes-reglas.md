@@ -116,6 +116,14 @@ por qué el recibo no congela la cuota; no autoriza editar un recibo emitido.
 Una cuota financiada con plata del sistema anterior no lleva recibo del sistema:
 su recibo es el de papel ([fondos anteriores](#fondos-anteriores)).
 
+Una hoja del talonario se carga una sola vez por caja y tipo de recibo, aunque su
+recibo se haya anulado. Lo impone la base (`receipts_talonario_number_unique`); la
+emisión de ingreso y la de egreso lo comprueban antes de guardar y responden en el
+campo «N.º de talonario» con el recibo que ya la usó, también cuando dos emisiones
+simultáneas chocan en la base (`TalonarioSequence::assertFree` y `translate`). El
+número del sistema no se consume y, si la emisión cobraba o entregaba, tampoco queda
+el movimiento de dinero.
+
 Evidencia: [cobro y emisión](../app/Modules/Haberes/Actions/CollectAndIssueReceipt.php),
 [emisión](../app/Modules/Haberes/Actions/IssueIncomeReceipt.php),
 [recepción desde ticket](../app/Modules/Haberes/Actions/ReceiveAndAllocateTicket.php),

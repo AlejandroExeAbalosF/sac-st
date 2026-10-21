@@ -17,7 +17,7 @@ use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
-use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
@@ -43,6 +43,7 @@ final class CollectFinePayment
         private readonly RegisterCashFundReceipt $recibir,
         private readonly ApplyFinePayment $aplicar,
         private readonly RecordAuditEvent $auditar,
+        private readonly TalonarioSequence $talonarios,
     ) {}
 
     /**
@@ -81,11 +82,7 @@ final class CollectFinePayment
             }
 
             // Dos cobros a la vez con el mismo papel: la base frenó al segundo.
-            if (str_contains($e->getMessage(), 'receipts_talonario_number_unique') && $talonario !== null) {
-                throw ValidationException::withMessages(['talonarioNumber' => $this->talonarioUsado($talonario)]);
-            }
-
-            throw $e;
+            throw $this->talonarios->translate($e, ReceiptType::Income, $this->cajaDeMultas(), $talonario) ?? $e;
         }
     }
 
@@ -134,9 +131,7 @@ final class CollectFinePayment
              * Una hoja del talonario se usa una vez, aunque el recibo se haya
              * anulado. La base lo impide; esto lo dice en el campo.
              */
-            if ($talonario !== null && $this->talonarioTomado($caja, $talonario)) {
-                throw ValidationException::withMessages(['talonarioNumber' => $this->talonarioUsado($talonario)]);
-            }
+            $this->talonarios->assertFree(ReceiptType::Income, $caja, $talonario);
 
             if (Decimal::equals($saldo, '0')) {
                 throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay nada que cobrar.']);
@@ -198,26 +193,9 @@ final class CollectFinePayment
         });
     }
 
-    private function talonarioTomado(int $caja, string $talonario): bool
+    private function cajaDeMultas(): int
     {
-        return Receipt::query()
-            ->where('cash_box_id', $caja)
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('talonario_number', $talonario)
-            ->exists();
-    }
-
-    private function talonarioUsado(string $talonario): string
-    {
-        $recibo = Receipt::query()
-            ->where('cash_box_id', CashBox::query()->where('code', CashBox::MULTAS)->value('id'))
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('talonario_number', $talonario)
-            ->value('formatted_number');
-
-        return "La hoja {$talonario} del talonario de Multas ya se usó"
-            .($recibo === null ? '.' : " en el recibo {$recibo}.")
-            .' Revisá el número: cada hoja se carga una sola vez, aunque se haya anulado.';
+        return (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id');
     }
 
     /**

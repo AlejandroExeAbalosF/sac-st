@@ -18,9 +18,11 @@ use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -49,6 +51,7 @@ final class IssueIncomeReceipt
         private readonly TakeNextDocumentNumber $numerar,
         private readonly InstallmentFunding $financiacion,
         private readonly RecordAuditEvent $auditar,
+        private readonly TalonarioSequence $talonario,
     ) {}
 
     /**
@@ -116,6 +119,31 @@ final class IssueIncomeReceipt
          */
         $firmante = $signedById === null ? null : User::query()->find($signedById);
 
+        try {
+            return $this->emitir(
+                $installment, $medio, $recibiDe, $actorId,
+                $talonarioNumber, $issueDate, $firmante, $printsTalonarioNumber,
+            );
+        } catch (UniqueConstraintViolationException $e) {
+            // Otro operador cargó la misma hoja en el mismo instante.
+            throw $this->talonario->translate($e, ReceiptType::Income, $this->cajaDeLaSerie(), $talonarioNumber) ?? $e;
+        }
+    }
+
+    /**
+     * @throws ValidationException
+     * @throws UniqueConstraintViolationException dos emisiones simultáneas con la misma hoja del talonario
+     */
+    private function emitir(
+        BeneficiaryInstallment $installment,
+        PaymentMedium $medio,
+        int $recibiDe,
+        ?int $actorId,
+        ?string $talonarioNumber,
+        ?CarbonInterface $issueDate,
+        ?User $firmante,
+        bool $printsTalonarioNumber,
+    ): Receipt {
         return DB::transaction(function () use (
             $installment, $medio, $recibiDe, $actorId,
             $talonarioNumber, $issueDate, $firmante, $printsTalonarioNumber
@@ -127,6 +155,9 @@ final class IssueIncomeReceipt
              */
             $serie = ReceiptType::Income->seriesCode();
             $numero = $this->numerar->handle($serie);
+
+            // Una hoja del talonario se carga una sola vez, aunque se haya anulado.
+            $this->talonario->assertFree(ReceiptType::Income, $this->cajaDeLaSerie(), $talonarioNumber);
 
             /*
              * A quién reemplaza, si hubo un intento anulado antes.
@@ -379,5 +410,11 @@ final class IssueIncomeReceipt
                 'installmentId' => "La cuota ya tiene su recibo de ingreso de papel n.º {$papel->talonarioNumber()}: no lleva uno del sistema.",
             ]);
         }
+    }
+
+    /** La caja del recibo: la de su serie, que la base copia al guardarlo. */
+    private function cajaDeLaSerie(): int
+    {
+        return (int) DocumentSeries::activeForCode(ReceiptType::Income->seriesCode())?->cash_box_id;
     }
 }

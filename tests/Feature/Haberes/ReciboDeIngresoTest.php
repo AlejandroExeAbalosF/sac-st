@@ -184,9 +184,52 @@ class ReciboDeIngresoTest extends TestCase
 
         $otra = $this->otraCuotaFinanciada();
 
-        $this->expectException(QueryException::class);
+        // Lo dice en el campo, con el recibo que ya la usó: no es una caída del sistema.
+        try {
+            app(IssueIncomeReceipt::class)->handle($otra, talonarioNumber: '00071514');
+            $this->fail('Se emitió con una hoja del talonario ya usada.');
+        } catch (ValidationException $e) {
+            $this->assertSame(
+                "La hoja 00071514 del talonario ya se usó en el recibo {$recibo->formatted_number}. "
+                .'Revisá el número: cada hoja se carga una sola vez, aunque su recibo se haya anulado.',
+                $e->errors()['talonarioNumber'][0],
+            );
+        }
 
-        app(IssueIncomeReceipt::class)->handle($otra, talonarioNumber: '00071514');
+        // Y el número del sistema no se consumió: volvió con la transacción.
+        $this->assertSame(2, DocumentSeries::activeForCode('0010')->next_number);
+    }
+
+    /** La base la impide aunque nadie pase por el Action. */
+    public function test_la_base_rechaza_una_hoja_del_talonario_repetida(): void
+    {
+        $recibo = app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada(), talonarioNumber: '00071514');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('receipts_talonario_number_unique');
+
+        DB::table('receipts')->insert([
+            ...$this->filaCruda($recibo),
+            'beneficiary_installment_id' => null,
+            'number' => $recibo->number + 1,
+            'formatted_number' => '0010/00000999',
+        ]);
+    }
+
+    /** Desde la pantalla, la hoja repetida vuelve al formulario en su campo. */
+    public function test_la_pantalla_muestra_la_hoja_repetida_en_su_campo(): void
+    {
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.receipt', $this->cuotaFinanciada()), [
+                'talonarioNumber' => '72190', 'idempotencyKey' => 'primera-hoja',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->post(route('haberes.installments.receipt', $this->otraCuotaFinanciada()), [
+            'talonarioNumber' => '72190', 'idempotencyKey' => 'misma-hoja',
+        ])->assertSessionHasErrors('talonarioNumber');
+
+        $this->assertSame(1, Receipt::query()->where('talonario_number', '72190')->count());
     }
 
     /** Un recibo documenta todas las asignaciones que completaron la cuota. */
@@ -314,7 +357,8 @@ class ReciboDeIngresoTest extends TestCase
             ['prefix' => '0100', 'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '/',
                 'nextNumber' => 2, 'reason' => 'Cambio de prefijo.', 'token' => $series->configurationToken()], $actor->id,
         );
-        $this->expectException(QueryException::class);
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('La hoja 72190 del talonario ya se usó en el recibo 0010/00000001.');
         app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada(), talonarioNumber: '72190');
     }
 

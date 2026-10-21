@@ -17,8 +17,10 @@ use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -56,6 +58,7 @@ final class IssueExpenseReceipt
         private readonly TakeNextDocumentNumber $numerar,
         private readonly InstallmentFunding $financiacion,
         private readonly RecordAuditEvent $auditar,
+        private readonly TalonarioSequence $talonario,
     ) {}
 
     /**
@@ -78,6 +81,26 @@ final class IssueExpenseReceipt
 
         $this->assertIssuable($installment, $disbursement);
 
+        try {
+            return $this->emitir($installment, $disbursement, $actorId, $talonarioNumber, $issueDate, $printsTalonarioNumber);
+        } catch (UniqueConstraintViolationException $e) {
+            // Otro operador cargó la misma hoja en el mismo instante.
+            throw $this->talonario->translate($e, ReceiptType::Expense, $this->cajaDeLaSerie(), $talonarioNumber) ?? $e;
+        }
+    }
+
+    /**
+     * @throws ValidationException
+     * @throws UniqueConstraintViolationException dos emisiones simultáneas con la misma hoja del talonario
+     */
+    private function emitir(
+        BeneficiaryInstallment $installment,
+        Disbursement $disbursement,
+        ?int $actorId,
+        ?string $talonarioNumber,
+        ?CarbonInterface $issueDate,
+        bool $printsTalonarioNumber,
+    ): Receipt {
         return DB::transaction(function () use (
             $installment, $disbursement, $actorId, $talonarioNumber,
             $issueDate, $printsTalonarioNumber
@@ -89,6 +112,9 @@ final class IssueExpenseReceipt
              */
             $serie = ReceiptType::Expense->seriesCode();
             $numero = $this->numerar->handle($serie);
+
+            // Una hoja del talonario se carga una sola vez, aunque se haya anulado.
+            $this->talonario->assertFree(ReceiptType::Expense, $this->cajaDeLaSerie(), $talonarioNumber);
 
             /*
              * A quién reemplaza, si hubo un intento anulado antes.
@@ -332,5 +358,11 @@ final class IssueExpenseReceipt
                     .'Para emitir otro hay que anular ese primero.',
             ]);
         }
+    }
+
+    /** La caja del recibo: la de su serie, que la base copia al guardarlo. */
+    private function cajaDeLaSerie(): int
+    {
+        return (int) DocumentSeries::activeForCode(ReceiptType::Expense->seriesCode())?->cash_box_id;
     }
 }
