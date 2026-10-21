@@ -247,7 +247,10 @@ no de Multas: Haberes deposita por cuota y no cambia.
   cheque, sin asignación a cuota. **Base:** `transfer_follows_box_policy`,
   diferido, sobre el traslado y sus ítems; **Action:** `DepositWholeReceiptToBank`.
 - Un traslado vigente (no cancelado) por cobro. **Base:**
-  `transfer_follows_box_policy`; **Action:** mensaje en el campo.
+  `transfer_follows_box_policy`, que toma la recepción (`FOR NO KEY UPDATE`) antes
+  de contar: dos escritores a la vez se serializan y el segundo se rechaza
+  (`2026_10_23_005000`); **Action:** bloquea la recepción y da el mensaje en el
+  campo.
 - La cuenta es la del libro de la caja (`cash_book_openings.bank_account_id`), no
   cualquiera de la misma moneda. **Base:** `transfer_follows_box_policy`;
   **Action:** la toma del libro, no la recibe.

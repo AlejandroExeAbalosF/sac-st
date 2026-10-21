@@ -6,8 +6,10 @@ use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\RawCashDeposit;
 
 // Proceso independiente para concurrencia real sobre un traslado; recibe credenciales solo por stdin.
 $input = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
@@ -29,14 +31,25 @@ DB::statement("SET statement_timeout = '20s'");
 echo json_encode(['ready' => DB::scalar('SELECT pg_backend_pid()')]).PHP_EOL;
 flush();
 try {
-    $traslado = CashToBankTransfer::query()->findOrFail($input['transfer']);
-    if ($input['mode'] === 'cancel') {
-        app(CancelCashToBankTransfer::class)->handle($traslado, 'Cancelado por el worker', 'worker-cancel-'.$input['tag'], $input['actor']);
+    if ($input['mode'] === 'raw-deposit') {
+        // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.
+        DB::transaction(function () use ($input): void {
+            RawCashDeposit::write($input['receipt'], $input['amount'], $input['account'], $input['box'], $input['actor']);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        });
+        $result = ['status' => 'done'];
     } else {
-        $credito = BankTransaction::query()->findOrFail($input['transaction']);
-        app(ConfirmCashDepositCredit::class)->handle($traslado, $credito, 'worker-confirm-'.$input['tag'], $input['actor']);
+        $traslado = CashToBankTransfer::query()->findOrFail($input['transfer']);
+        if ($input['mode'] === 'cancel') {
+            app(CancelCashToBankTransfer::class)->handle($traslado, 'Cancelado por el worker', 'worker-cancel-'.$input['tag'], $input['actor']);
+        } else {
+            $credito = BankTransaction::query()->findOrFail($input['transaction']);
+            app(ConfirmCashDepositCredit::class)->handle($traslado, $credito, 'worker-confirm-'.$input['tag'], $input['actor']);
+        }
+        $result = ['status' => 'done', 'transfer' => CashToBankTransfer::query()->findOrFail($input['transfer'])->status->value];
     }
-    $result = ['status' => 'done', 'transfer' => CashToBankTransfer::query()->findOrFail($input['transfer'])->status->value];
+} catch (QueryException $exception) {
+    $result = ['status' => 'database', 'message' => $exception->getMessage()];
 } catch (ValidationException $exception) {
     $result = ['status' => 'validation', 'errors' => $exception->errors()];
 } catch (Throwable $exception) {
