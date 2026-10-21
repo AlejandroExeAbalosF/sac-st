@@ -26,11 +26,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $document_series_id
+ * @property int $cash_box_id
  * @property int $number
  * @property string $formatted_number
  * @property string|null $talonario_number
  * @property ReceiptType $receipt_type
- * @property int $person_id
+ * @property int|null $person_id
  * @property int|null $beneficiary_installment_id
  * @property string|null $concept_snapshot
  * @property string $medium_snapshot
@@ -58,6 +59,7 @@ final class Receipt extends Model
 {
     protected $fillable = [
         'document_series_id',
+        'cash_box_id',
         'number',
         'formatted_number',
         'talonario_number',
@@ -94,7 +96,11 @@ final class Receipt extends Model
         return $this->belongsTo(DocumentSeries::class, 'document_series_id');
     }
 
-    /** «Recibí de» en el ingreso; el beneficiario en el egreso. */
+    /**
+     * «Recibí de» en el ingreso; el beneficiario en el egreso. Nulo solo en
+     * una caja que no lo exige: el recibo dice entonces a quién se extendió
+     * en `counterparty_name_snapshot`.
+     */
     /** @return BelongsTo<Person, $this> */
     public function person(): BelongsTo
     {

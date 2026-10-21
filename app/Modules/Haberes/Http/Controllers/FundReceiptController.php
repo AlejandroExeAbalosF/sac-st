@@ -20,6 +20,7 @@ use App\Modules\Haberes\Http\Requests\ReverseFundReceiptRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\ReceiptOrigin;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
@@ -48,6 +49,7 @@ final class FundReceiptController extends Controller
     public function __construct(
         private readonly InstallmentFunding $financiacion,
         private readonly ReceiptOrigin $origen,
+        private readonly HaberesCashBox $haberes,
     ) {}
 
     public function index(Request $request): Response
@@ -64,6 +66,8 @@ final class FundReceiptController extends Controller
              * mira en «Saldo del sistema anterior».
              */
             ->where('origin', FundReceiptOrigin::Received->value)
+            // Lo cobrado por otra caja no espera dueño acá.
+            ->tap(fn ($query) => $this->haberes->scope($query))
             /*
              * «Pendientes» es la cola de trabajo del área: lo que entró y
              * todavía no tiene dueño.
@@ -156,6 +160,8 @@ final class FundReceiptController extends Controller
 
     public function show(Request $request, FundReceipt $receipt): Response
     {
+        abort_unless($this->haberes->owns($receipt->cash_box_id), 404);
+
         $receipt->load(['depositor', 'cashBox', 'receivedBy', 'financialEvent']);
 
         $origen = $this->origen->for($receipt);
@@ -186,6 +192,8 @@ final class FundReceiptController extends Controller
         FundReceipt $receipt,
         AllocateFundsToInstallment $asignar,
     ): RedirectResponse {
+        abort_unless($this->haberes->owns($receipt->cash_box_id), 404);
+
         $cuota = BeneficiaryInstallment::query()->findOrFail((int) $request->validated('installmentId'));
 
         $asignar->handle(
@@ -220,6 +228,8 @@ final class FundReceiptController extends Controller
         FundReceipt $receipt,
         ReverseFundReceipt $revertir,
     ): RedirectResponse {
+        abort_unless($this->haberes->owns($receipt->cash_box_id), 404);
+
         $revertir->handle(
             receipt: $receipt,
             reason: (string) $request->validated('reason'),

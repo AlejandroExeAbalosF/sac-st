@@ -6,7 +6,6 @@ namespace App\Modules\Shared\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Shared\Actions\ConfigureDocumentNumbering;
-use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Models\DocumentSeries;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,9 +18,9 @@ final class DocumentNumberingController extends Controller
     public function index(): Response
     {
         return Inertia::render('configuracion/numeracion', [
-            'series' => DocumentSeries::query()->where('origin', 'system')->orderBy('document_type')->orderByDesc('id')->get()
+            'series' => DocumentSeries::query()->where('origin', 'system')->orderBy('code')->orderByDesc('id')->get()
                 ->map(fn (DocumentSeries $series): array => [
-                    'id' => $series->id, 'type' => $series->document_type->value, 'label' => $series->document_type->label(),
+                    'id' => $series->id, 'code' => $series->code, 'label' => $series->label,
                     'active' => $series->is_active, 'prefix' => $series->display_prefix ?? $series->code,
                     'prefixDigits' => $series->code_padding, 'numberDigits' => $series->number_padding,
                     'separator' => str_contains($series->format_pattern, '/') ? '/' : '-',
@@ -35,9 +34,9 @@ final class DocumentNumberingController extends Controller
         ]);
     }
 
-    public function update(Request $request, DocumentType $type, ConfigureDocumentNumbering $configure): RedirectResponse
+    public function update(Request $request, string $code, ConfigureDocumentNumbering $configure): RedirectResponse
     {
-        $configure->handle($type, $request->all(), (int) $request->user()?->id);
+        $configure->handle($code, $request->all(), (int) $request->user()?->id);
 
         return back()->with('success', 'Numeración actualizada. Los comprobantes anteriores conservan su número.');
     }

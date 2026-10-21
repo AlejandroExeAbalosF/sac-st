@@ -60,7 +60,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::prefix('configuracion')->name('configuracion.')->group(function (): void {
         Route::middleware('can:numeracion.gestionar')->group(function (): void {
             Route::get('numeracion', [DocumentNumberingController::class, 'index'])->name('numeracion.index');
-            Route::put('numeracion/{type}', [DocumentNumberingController::class, 'update'])->name('numeracion.update');
+            Route::put('numeracion/{code}', [DocumentNumberingController::class, 'update'])
+                ->where('code', '[0-9]{4}')->name('numeracion.update');
         });
         Route::middleware('can:usuarios.ver')->group(function (): void {
             Route::get('usuarios', [UserController::class, 'index'])->name('usuarios.index');

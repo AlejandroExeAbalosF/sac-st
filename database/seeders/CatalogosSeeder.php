@@ -37,10 +37,11 @@ final class CatalogosSeeder extends Seeder
     public function run(): void
     {
         $this->call(RolesAndPermissionsSeeder::class);
-        // Sin series no se puede emitir ningún comprobante.
-        $this->call(DocumentSeriesSeeder::class);
-        // Y sin cajas no hay a qué imputar un evento financiero.
+        // Sin cajas no hay a qué imputar un evento financiero.
         $this->call(CashBoxSeeder::class);
+        // Y sin series no se puede emitir ningún comprobante. Van después
+        // porque cada serie pertenece a una caja.
+        $this->call(DocumentSeriesSeeder::class);
         // Las etiquetas son las opciones que ofrece el formulario de la
         // cuota: sin ellas el selector sale vacío.
         $this->call(HaberManagementLabelSeeder::class);

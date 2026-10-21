@@ -38,11 +38,11 @@ class NumeracionTest extends TestCase
         $this->withoutVite();
         $user = $this->admin();
         $this->actingAs($user)->get('/configuracion/numeracion')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->component('configuracion/numeracion')->has('series', 3));
-        $this->put('/configuracion/numeracion/receipt_income', $this->input())->assertSessionHasNoErrors()->assertRedirect();
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('configuracion/numeracion')->has('series', 4));
+        $this->put('/configuracion/numeracion/0010', $this->input())->assertSessionHasNoErrors()->assertRedirect();
         $number = DB::transaction(fn () => app(TakeNextDocumentNumber::class)->handle('0010'));
         $this->assertSame('00125-000123', $number['formatted']);
-        $this->assertSame(3, DocumentSeries::query()->count());
+        $this->assertSame(4, DocumentSeries::query()->count());
         $this->assertDatabaseHas('audit_events', ['action' => 'numeracion.configurada', 'user_id' => $user->id]);
     }
 
@@ -50,19 +50,19 @@ class NumeracionTest extends TestCase
     {
         $this->actingAs(User::factory()->create()->assignRole('consulta'));
         $this->get('/configuracion/numeracion')->assertForbidden();
-        $this->put('/configuracion/numeracion/receipt_income', $this->input())->assertForbidden();
+        $this->put('/configuracion/numeracion/0010', $this->input())->assertForbidden();
     }
 
     public function test_no_admite_prefijo_de_otro_tipo(): void
     {
-        $this->actingAs($this->admin())->put('/configuracion/numeracion/receipt_income', [
+        $this->actingAs($this->admin())->put('/configuracion/numeracion/0010', [
             ...$this->input(), 'prefix' => '0020', 'prefixDigits' => 4,
         ])->assertSessionHasErrors('prefix');
     }
 
     public function test_valida_campos_y_exige_motivo(): void
     {
-        $this->actingAs($this->admin())->put('/configuracion/numeracion/receipt_income', [
+        $this->actingAs($this->admin())->put('/configuracion/numeracion/0010', [
             ...$this->input(), 'prefix' => '../', 'prefixDigits' => 0, 'numberDigits' => 13,
             'nextNumber' => 0, 'separator' => '<', 'reason' => '',
         ])->assertSessionHasErrors(['prefix', 'prefixDigits', 'numberDigits', 'nextNumber', 'separator', 'reason']);
@@ -70,7 +70,7 @@ class NumeracionTest extends TestCase
 
     public function test_no_trunca_el_prefijo(): void
     {
-        $this->actingAs($this->admin())->put('/configuracion/numeracion/receipt_income', [
+        $this->actingAs($this->admin())->put('/configuracion/numeracion/0010', [
             ...$this->input(), 'prefixDigits' => 2,
         ])->assertSessionHasErrors('prefixDigits');
     }
@@ -79,16 +79,16 @@ class NumeracionTest extends TestCase
     {
         $input = $this->input();
         DB::transaction(fn () => app(TakeNextDocumentNumber::class)->handle('0010'));
-        $this->actingAs($this->admin())->put('/configuracion/numeracion/receipt_income', $input)->assertSessionHasErrors('token');
+        $this->actingAs($this->admin())->put('/configuracion/numeracion/0010', $input)->assertSessionHasErrors('token');
     }
 
     public function test_otro_cambio_invalida_un_formulario_abierto(): void
     {
         $input = $this->input();
         $actor = $this->admin();
-        app(ConfigureDocumentNumbering::class)->handle(DocumentType::ReceiptIncome, $input, $actor->id);
+        app(ConfigureDocumentNumbering::class)->handle('0010', $input, $actor->id);
         $this->expectException(ValidationException::class);
-        app(ConfigureDocumentNumbering::class)->handle(DocumentType::ReceiptIncome, $input, $actor->id);
+        app(ConfigureDocumentNumbering::class)->handle('0010', $input, $actor->id);
     }
 
     public function test_cada_tipo_tiene_su_configuracion_independiente(): void
@@ -96,7 +96,7 @@ class NumeracionTest extends TestCase
         $actor = $this->admin();
         foreach (DocumentType::cases() as $index => $type) {
             $series = DocumentSeries::activeForCode($type->seriesCode());
-            app(ConfigureDocumentNumbering::class)->handle($type, [
+            app(ConfigureDocumentNumbering::class)->handle($type->seriesCode(), [
                 ...$this->input(), 'prefix' => (string) (100 + $index), 'token' => $series->configurationToken(),
             ], $actor->id);
             $number = DB::transaction(fn () => app(TakeNextDocumentNumber::class)->handle($type->seriesCode()));
@@ -106,7 +106,7 @@ class NumeracionTest extends TestCase
 
     public function test_resembrar_no_restaura_la_configuracion_de_fabrica(): void
     {
-        app(ConfigureDocumentNumbering::class)->handle(DocumentType::ReceiptIncome, $this->input(), $this->admin()->id);
+        app(ConfigureDocumentNumbering::class)->handle('0010', $this->input(), $this->admin()->id);
         $this->seed(DocumentSeriesSeeder::class);
         $this->assertSame('00125-000123', DB::transaction(fn () => app(TakeNextDocumentNumber::class)->handle('0010'))['formatted']);
     }

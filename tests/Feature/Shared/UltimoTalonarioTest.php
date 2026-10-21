@@ -41,7 +41,7 @@ class UltimoTalonarioTest extends TestCase
 
     public function test_sin_comprobantes_no_hay_ultimo(): void
     {
-        $this->assertNull(app(TalonarioSequence::class)->lastUsed(ReceiptType::Income));
+        $this->assertNull(app(TalonarioSequence::class)->lastUsed(ReceiptType::Income, $this->haberes()));
     }
 
     public function test_devuelve_el_ultimo_cargado_en_la_serie(): void
@@ -51,7 +51,7 @@ class UltimoTalonarioTest extends TestCase
 
         $this->assertSame(
             '00071514',
-            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income),
+            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income, $this->haberes()),
         );
     }
 
@@ -70,7 +70,7 @@ class UltimoTalonarioTest extends TestCase
 
         $this->assertSame(
             '72192',
-            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income),
+            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income, $this->haberes()),
         );
     }
 
@@ -82,7 +82,7 @@ class UltimoTalonarioTest extends TestCase
 
         $this->assertSame(
             '72192',
-            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income),
+            app(TalonarioSequence::class)->lastUsed(ReceiptType::Income, $this->haberes()),
         );
     }
 
@@ -91,10 +91,15 @@ class UltimoTalonarioTest extends TestCase
     {
         $this->emitir('72192');
 
-        $ultimos = app(TalonarioSequence::class)->all();
+        $ultimos = app(TalonarioSequence::class)->all($this->haberes());
 
         $this->assertSame('72192', $ultimos[ReceiptType::Income->value]);
         $this->assertNull($ultimos[ReceiptType::Expense->value]);
+    }
+
+    private function haberes(): int
+    {
+        return (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
     }
 
     private function emitir(?string $talonario): void

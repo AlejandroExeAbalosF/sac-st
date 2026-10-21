@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Shared\Actions;
 
-use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Models\DocumentSeries;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -15,8 +14,13 @@ final class ConfigureDocumentNumbering
 {
     public function __construct(private readonly RecordAuditEvent $audit) {}
 
-    /** @param array<string, mixed> $input */
-    public function handle(DocumentType $type, array $input, int $actorId): DocumentSeries
+    /**
+     * La serie se identifica por su código, que dice la caja y el tipo:
+     * todas sus versiones lo comparten y solo una está vigente.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    public function handle(string $seriesCode, array $input, int $actorId): DocumentSeries
     {
         $data = Validator::make($input, [
             'prefix' => ['required', 'string', 'regex:/^[0-9]{1,12}$/D'],
@@ -28,9 +32,9 @@ final class ConfigureDocumentNumbering
             'token' => ['required', 'string', 'size:64'],
         ])->validate();
 
-        return DB::transaction(function () use ($type, $data, $actorId): DocumentSeries {
+        return DB::transaction(function () use ($seriesCode, $data, $actorId): DocumentSeries {
             DB::select('SELECT pg_advisory_xact_lock(76104, 1)');
-            $series = DocumentSeries::query()->where('code', $type->seriesCode())
+            $series = DocumentSeries::query()->where('code', $seriesCode)
                 ->where('is_active', true)->lockForUpdate()->firstOrFail();
             if (! hash_equals($series->configurationToken(), $data['token'])) {
                 throw ValidationException::withMessages(['token' => 'Se emitió un comprobante o cambió la configuración. Recargá la página antes de guardar.']);
@@ -39,12 +43,13 @@ final class ConfigureDocumentNumbering
                 throw ValidationException::withMessages(['prefixDigits' => 'La cantidad de dígitos debe alcanzar para el prefijo.']);
             }
             $prefix = str_pad($data['prefix'], (int) $data['prefixDigits'], '0', STR_PAD_LEFT);
-            // Se reserva el prefijo aun en versiones históricas: nunca identifica otro tipo.
+            // Se reserva el prefijo aun en versiones históricas: nunca identifica otro
+            // tipo ni otra caja, porque el número formateado es único en todo el sistema.
             $samePrefix = DocumentSeries::query()->get()->filter(
                 fn (DocumentSeries $other): bool => str_pad($other->display_prefix ?? $other->code, $other->code_padding, '0', STR_PAD_LEFT) === $prefix,
             );
-            if ($samePrefix->contains(fn (DocumentSeries $other): bool => $other->document_type !== $type)) {
-                throw ValidationException::withMessages(['prefix' => 'Ese prefijo pertenece a otro tipo de comprobante, incluso si su serie ya es histórica.']);
+            if ($samePrefix->contains(fn (DocumentSeries $other): bool => $other->code !== $series->code)) {
+                throw ValidationException::withMessages(['prefix' => 'Ese prefijo pertenece a otro tipo de comprobante o a otra caja, incluso si su serie ya es histórica.']);
             }
             $ids = $samePrefix->pluck('id')->all();
             $last = max(

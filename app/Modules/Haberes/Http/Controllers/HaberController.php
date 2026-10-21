@@ -34,6 +34,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\HaberManagementLabel;
 use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\DisbursementEligibility;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\InstallmentBatch;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\InstallmentStages;
@@ -316,7 +317,11 @@ final class HaberController extends Controller
         Receipt $receipt,
         ReceiptPdfFactory $plantillas,
         ReceiptFormData $formulario,
+        HaberesCashBox $haberes,
     ): SymfonyResponse {
+        // Los recibos de otra caja tienen su propio formulario y su visor.
+        abort_unless($haberes->owns($receipt->cash_box_id), 404);
+
         $pdf = $plantillas->for($receipt);
 
         $documento = $pdf->render(
@@ -344,7 +349,11 @@ final class HaberController extends Controller
         Receipt $receipt,
         ReceiptPdfFactory $plantillas,
         ReceiptFormData $formulario,
+        HaberesCashBox $haberes,
     ): SymfonyResponse {
+        // Los recibos de otra caja tienen su propio formulario y su visor.
+        abort_unless($haberes->owns($receipt->cash_box_id), 404);
+
         return response($plantillas->for($receipt)->preview(
             $receipt,
             conFondo: ! $request->boolean('talonario'),
@@ -737,7 +746,7 @@ final class HaberController extends Controller
              * que se tipea no sigue al anterior, que es como se caza un
              * `72912` escrito donde iba `72192`. El aviso no bloquea nada.
              */
-            'ultimoTalonario' => app(TalonarioSequence::class)->all(),
+            'ultimoTalonario' => app(TalonarioSequence::class)->all(app(HaberesCashBox::class)->id()),
             'canCancel' => request()->user()?->can('expedientes.anular') ?? false,
             /*
              * Órdenes de Pago: qué le corresponde a cada cuota, y los

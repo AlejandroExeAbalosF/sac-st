@@ -57,7 +57,7 @@ class NumeracionExtremosTest extends TestCase
     {
         $series = DocumentSeries::activeForCode($type->seriesCode());
 
-        return app(ConfigureDocumentNumbering::class)->handle($type, [
+        return app(ConfigureDocumentNumbering::class)->handle($type->seriesCode(), [
             'prefix' => $series->display_prefix ?? $series->code, 'prefixDigits' => $series->code_padding,
             'numberDigits' => $series->number_padding, 'separator' => str_contains($series->format_pattern, '/') ? '/' : '-',
             'nextNumber' => $series->next_number, 'reason' => 'Validación de casos extremos.', 'token' => $series->configurationToken(),

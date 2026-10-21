@@ -9,6 +9,7 @@ use App\Modules\Haberes\Data\InstallmentReceiptData;
 use App\Modules\Haberes\Data\ReceiptPanelData;
 use App\Modules\Haberes\Data\ReceiptSubjectData;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Shared\Models\Receipt;
 use Illuminate\Http\JsonResponse;
 
@@ -32,8 +33,11 @@ use Illuminate\Http\JsonResponse;
  */
 final class ReceiptPanelController extends Controller
 {
-    public function __invoke(Receipt $receipt): JsonResponse
+    public function __invoke(Receipt $receipt, HaberesCashBox $haberes): JsonResponse
     {
+        // Los recibos de otra caja tienen su propio visor.
+        abort_unless($haberes->owns($receipt->cash_box_id), 404);
+
         return response()->json(
             ReceiptPanelData::fromModel(
                 $receipt->loadMissing(InstallmentReceiptData::RELATIONS),

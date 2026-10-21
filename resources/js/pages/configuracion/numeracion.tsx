@@ -17,7 +17,7 @@ import { update } from '@/routes/configuracion/numeracion';
 
 type Series = {
     id: number;
-    type: string;
+    code: string;
     label: string;
     active: boolean;
     prefix: string;
@@ -52,7 +52,7 @@ export default function Numeracion({ series }: { series: Series[] }) {
                             key={s.token}
                             series={s}
                             history={series.filter(
-                                (h) => h.type === s.type && !h.active,
+                                (h) => h.code === s.code && !h.active,
                             )}
                         />
                     ))}
@@ -145,7 +145,7 @@ function SeriesForm({
                 className="space-y-4"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    form.put(update(series.type).url, { preserveScroll: true });
+                    form.put(update(series.code).url, { preserveScroll: true });
                 }}
             >
                 <FormError message={errors.token} />

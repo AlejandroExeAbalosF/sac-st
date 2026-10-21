@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $display_prefix
  * @property string $code
  * @property DocumentType $document_type
+ * @property int $cash_box_id
  * @property string $label
  * @property SeriesOrigin $origin
  * @property string $format_pattern

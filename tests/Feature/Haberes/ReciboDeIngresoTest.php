@@ -15,7 +15,6 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Shared\Actions\ConfigureDocumentNumbering;
-use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\CashBox;
@@ -292,7 +291,7 @@ class ReciboDeIngresoTest extends TestCase
         $actor = User::factory()->create();
         $series = DocumentSeries::activeForCode('0010');
         $new = app(ConfigureDocumentNumbering::class)->handle(
-            DocumentType::ReceiptIncome,
+            '0010',
             ['prefix' => '100', 'prefixDigits' => 4, 'numberDigits' => 5, 'separator' => '-',
                 'nextNumber' => 50, 'reason' => 'Nueva serie del área.', 'token' => $series->configurationToken()], $actor->id,
         );
@@ -311,7 +310,7 @@ class ReciboDeIngresoTest extends TestCase
         $actor = User::factory()->create();
         $series = DocumentSeries::activeForCode('0010');
         app(ConfigureDocumentNumbering::class)->handle(
-            DocumentType::ReceiptIncome,
+            '0010',
             ['prefix' => '0100', 'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '/',
                 'nextNumber' => 2, 'reason' => 'Cambio de prefijo.', 'token' => $series->configurationToken()], $actor->id,
         );
@@ -337,7 +336,7 @@ class ReciboDeIngresoTest extends TestCase
         $original = app(IssueIncomeReceipt::class)->handle($this->cuotaFinanciada());
         $actor = User::factory()->create();
         $configure = app(ConfigureDocumentNumbering::class);
-        $intermedia = $configure->handle(DocumentType::ReceiptIncome, [
+        $intermedia = $configure->handle('0010', [
             'prefix' => $cambio === 'prefijo' ? '0100' : '0010',
             'prefixDigits' => 4, 'numberDigits' => 8, 'separator' => '-',
             'nextNumber' => 10, 'reason' => 'Cambio intermedio para verificar el regreso.',
@@ -356,14 +355,14 @@ class ReciboDeIngresoTest extends TestCase
 
         if ($repetirNumero) {
             try {
-                $configure->handle(DocumentType::ReceiptIncome, $datos, $actor->id);
+                $configure->handle('0010', $datos, $actor->id);
                 $this->fail('Se permitió reutilizar un número del formato original.');
             } catch (ValidationException $exception) {
                 $this->assertArrayHasKey('nextNumber', $exception->errors());
             }
             $this->assertSame($intermedia->id, DocumentSeries::activeForCode('0010')->id);
         } else {
-            $regreso = $configure->handle(DocumentType::ReceiptIncome, $datos, $actor->id);
+            $regreso = $configure->handle('0010', $datos, $actor->id);
             $nuevo = app(IssueIncomeReceipt::class)->handle($this->otraCuotaFinanciada());
             $this->assertSame('0010/'.str_pad((string) $siguiente, 8, '0', STR_PAD_LEFT), $nuevo->formatted_number);
             $this->assertSame($regreso->id, $nuevo->document_series_id);
@@ -391,7 +390,7 @@ class ReciboDeIngresoTest extends TestCase
         $actor = User::factory()->create();
         $this->expectException(ValidationException::class);
         app(ConfigureDocumentNumbering::class)->handle(
-            DocumentType::ReceiptIncome,
+            '0010',
             ['prefix' => '0010', 'prefixDigits' => 4, 'numberDigits' => 5, 'separator' => '-',
                 'nextNumber' => 1, 'reason' => 'Intento de reinicio.', 'token' => $series->configurationToken()], $actor->id,
         );

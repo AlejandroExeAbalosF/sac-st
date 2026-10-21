@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\DocumentSeries;
 use Illuminate\Database\Seeder;
 
@@ -21,7 +22,7 @@ use Illuminate\Database\Seeder;
 class DocumentSeriesSeeder extends Seeder
 {
     /**
-     * @var list<array{code: string, document_type: string, origin: string, label: string}>
+     * @var list<array{code: string, cash_box: string, document_type: string, origin: string, label: string}>
      */
     private const SERIES = [
         /*
@@ -37,21 +38,35 @@ class DocumentSeriesSeeder extends Seeder
          */
         [
             'code' => '0010',
+            'cash_box' => CashBox::HABERES,
             'document_type' => 'receipt_income',
             'origin' => 'system',
             'label' => 'Recibo de ingreso — Haberes',
         ],
         [
             'code' => '0020',
+            'cash_box' => CashBox::HABERES,
             'document_type' => 'receipt_expense',
             'origin' => 'system',
             'label' => 'Recibo de egreso — Haberes',
         ],
         [
             'code' => '0030',
+            'cash_box' => CashBox::HABERES,
             'document_type' => 'payment_order',
             'origin' => 'system',
             'label' => 'Orden de Pago — Haberes',
+        ],
+        /*
+         * Multas numera aparte: su talonario de papel es otro y su recibo
+         * no puede confundirse con uno de Haberes. Solo emite ingresos.
+         */
+        [
+            'code' => '0210',
+            'cash_box' => CashBox::MULTAS,
+            'document_type' => 'receipt_income',
+            'origin' => 'system',
+            'label' => 'Recibo de ingreso — Multas',
         ],
     ];
 
@@ -65,8 +80,12 @@ class DocumentSeriesSeeder extends Seeder
                 continue;
             }
 
+            ['cash_box' => $caja] = $serie;
+            unset($serie['cash_box']);
+
             DocumentSeries::query()->create([
                 ...$serie,
+                'cash_box_id' => CashBox::query()->where('code', $caja)->valueOrFail('id'),
                 'format_pattern' => '{code}/{number}',
                 'code_padding' => 4,
                 'number_padding' => 8,

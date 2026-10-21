@@ -76,7 +76,7 @@ class NumeracionConcurrenteTest extends TestCase
         ];
         DB::beginTransaction();
         if (str_starts_with($race, 'configure-')) {
-            $configured = app(ConfigureDocumentNumbering::class)->handle($type, $settings, $this->fixture->actorId);
+            $configured = app(ConfigureDocumentNumbering::class)->handle($type->seriesCode(), $settings, $this->fixture->actorId);
         } else {
             $issued = $this->fixture->emit($type, $first);
         }

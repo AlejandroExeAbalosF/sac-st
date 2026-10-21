@@ -31,7 +31,7 @@ flush();
 try {
     $type = DocumentType::from($input['type']);
     if ($input['mode'] === 'configure') {
-        $series = app(ConfigureDocumentNumbering::class)->handle($type, $input['settings'], $input['actor']);
+        $series = app(ConfigureDocumentNumbering::class)->handle($type->seriesCode(), $input['settings'], $input['actor']);
         $result = ['status' => 'configured', 'series' => $series->id];
     } else {
         $fixture = new NumberingFixture($input['actor']);

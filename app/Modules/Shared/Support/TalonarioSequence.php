@@ -8,7 +8,7 @@ use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
 
 /**
- * El último número de talonario que se cargó en cada serie.
+ * El último número de talonario que se cargó en cada serie de una caja.
  *
  * **No es una secuencia que el sistema controle.** El número sale de un
  * lote de papel impreso afuera: el sistema no lo genera, no lo exige —es
@@ -31,11 +31,15 @@ final class TalonarioSequence
      * número de un talonario de cinco cifras quedaría siendo el `9`. Y
      * tampoco como entero, porque el número del papel puede traer ceros a la
      * izquierda —`00071514`— que forman parte de cómo el área lo escribe.
+     *
+     * Cada caja tiene su propio talonario de papel: el de Multas no le dice
+     * nada al operador de Haberes.
      */
-    public function lastUsed(ReceiptType $type): ?string
+    public function lastUsed(ReceiptType $type, int $cashBoxId): ?string
     {
         return Receipt::query()
-            ->whereHas('series', fn ($query) => $query->where('code', $type->seriesCode()))
+            ->where('cash_box_id', $cashBoxId)
+            ->where('receipt_type', $type)
             ->whereNotNull('talonario_number')
             ->orderByRaw('length(talonario_number) DESC, talonario_number DESC')
             ->value('talonario_number');
@@ -46,12 +50,12 @@ final class TalonarioSequence
      *
      * @return array<string, string|null>
      */
-    public function all(): array
+    public function all(int $cashBoxId): array
     {
         $ultimos = [];
 
         foreach (ReceiptType::cases() as $tipo) {
-            $ultimos[$tipo->value] = $this->lastUsed($tipo);
+            $ultimos[$tipo->value] = $this->lastUsed($tipo, $cashBoxId);
         }
 
         return $ultimos;

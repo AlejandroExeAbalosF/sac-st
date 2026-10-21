@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $name
  * @property bool $allows_income
  * @property bool $allows_expense
+ * @property bool $requires_receipt_person
  * @property bool $is_active
  */
 final class CashBox extends Model
@@ -34,6 +35,7 @@ final class CashBox extends Model
         'name',
         'allows_income',
         'allows_expense',
+        'requires_receipt_person',
         'is_active',
     ];
 
@@ -52,6 +54,7 @@ final class CashBox extends Model
         return [
             'allows_income' => 'boolean',
             'allows_expense' => 'boolean',
+            'requires_receipt_person' => 'boolean',
             'is_active' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
