@@ -268,7 +268,8 @@ cada cobro de caja dónde está la plata.
 - **Acreditar** (`multas.verificar-pagos`): se busca el crédito del extracto, como
   en Haberes, y se confirma. Tiene que ser un **crédito entero y sin otro uso**: el
   remanente de un crédito mayor no es este depósito. Acreditado, la plata está en
-  el banco y el crédito ya no queda libre para otro pago.
+  el banco y el crédito ya no queda libre para otro pago. Si el servidor rechaza
+  el crédito elegido, el diálogo dice por qué y deja la lista para elegir otro.
 - **Cancelar** (`multas.verificar-pagos`): un depósito que no ocurrió o se cargó
   mal, con su motivo, mientras no se acreditó. El cobro vuelve a la caja y se
   puede depositar de nuevo; el cancelado queda a la vista con su motivo.

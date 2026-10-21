@@ -1,6 +1,7 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { Landmark, ListFilter, SearchX } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -46,6 +47,12 @@ type Candidato = {
  *
  * Lo usa cada caja con sus rutas: la búsqueda y la confirmación las decide
  * el servidor, con la política de la caja.
+ *
+ * El servidor puede rechazar el crédito elegido —otro importe, un uso
+ * previo, otro operador que lo tomó mientras el diálogo estaba abierto— y
+ * el motivo se muestra acá, con la lista intacta para elegir otro. Viaja en
+ * un error bag propio del traslado: el rechazo de uno no aparece en el
+ * diálogo de otro.
  */
 export default function CreditMatchDialog({
     traslado,
@@ -64,6 +71,21 @@ export default function CreditMatchDialog({
     const [todos, setTodos] = useState(false);
     const [elegido, setElegido] = useState<number | null>(null);
     const [enviando, setEnviando] = useState(false);
+    // Se oculta al elegir otro crédito, hasta el próximo intento.
+    const [rechazoVisto, setRechazoVisto] = useState(false);
+
+    const bolsa = `acreditacion-${traslado.id}`;
+    const { errors } = usePage().props as unknown as {
+        errors?: Record<string, Record<string, string> | undefined>;
+    };
+    const rechazo = rechazoVisto
+        ? undefined
+        : (errors?.[bolsa]?.bankTransactionId ?? errors?.[bolsa]?.transferId);
+
+    const elegir = (id: number | null) => {
+        setElegido(id);
+        setRechazoVisto(true);
+    };
 
     /*
      * Se monta al abrirse, asi que el estado nace limpio y el efecto solo
@@ -107,6 +129,7 @@ export default function CreditMatchDialog({
         }
 
         setEnviando(true);
+        setRechazoVisto(false);
 
         router.post(
             confirmUrl,
@@ -116,6 +139,9 @@ export default function CreditMatchDialog({
             },
             {
                 preserveScroll: true,
+                // Ante un rechazo el diálogo sigue abierto, con su lista.
+                preserveState: true,
+                errorBag: bolsa,
                 onFinish: () => setEnviando(false),
                 onSuccess: () => onCerrar(),
             },
@@ -172,7 +198,7 @@ export default function CreditMatchDialog({
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                        setElegido(null);
+                                        elegir(null);
                                         setTodos(true);
                                     }}
                                 >
@@ -187,7 +213,7 @@ export default function CreditMatchDialog({
                         <button
                             key={c.id}
                             type="button"
-                            onClick={() => setElegido(c.id)}
+                            onClick={() => elegir(c.id)}
                             className={cn(
                                 'w-full rounded-lg border p-3 text-left transition-colors',
                                 elegido === c.id
@@ -219,7 +245,7 @@ export default function CreditMatchDialog({
                         <button
                             type="button"
                             onClick={() => {
-                                setElegido(null);
+                                elegir(null);
                                 setTodos(true);
                             }}
                             className="w-full pt-1 text-left text-xs text-muted-foreground underline-offset-2 hover:underline"
@@ -236,6 +262,8 @@ export default function CreditMatchDialog({
                         </p>
                     )}
                 </div>
+
+                <InputError message={rechazo} />
 
                 <DialogFooter className="gap-2">
                     <Button variant="outline" onClick={onCerrar}>
