@@ -54,12 +54,21 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 'multas',
                 ['administrador', 'administrativo'],
             ),
+            // Llevar al banco lo cobrado: cambia de lugar, no de dueño. Lo hace
+            // quien atiende la caja, como en Haberes (`caja.trasladar`).
+            new PermissionDefinition(
+                'multas.depositar',
+                'Depositar cobros de multas',
+                'Llevar al banco un cobro de la caja de Multas, entero y en su propio depósito, con el ticket del cajero.',
+                'multas',
+                ['administrador', 'administrativo'],
+            ),
             // Verificar es afirmar que un crédito del banco es el pago de una
             // multa: lo hace quien concilia, no quien atiende el mostrador.
             new PermissionDefinition(
                 'multas.verificar-pagos',
                 'Verificar pagos de multas por el banco',
-                'Informar pagos por transferencia, depósito directo o cheque electrónico, verificarlos contra un crédito del extracto y descartar los que no corresponden.',
+                'Informar pagos por transferencia, depósito directo o cheque electrónico, verificarlos contra un crédito del extracto y descartar los que no corresponden. Confirmar o cancelar los depósitos de la caja.',
                 'multas',
                 ['administrador', 'contador'],
                 sensitive: true,

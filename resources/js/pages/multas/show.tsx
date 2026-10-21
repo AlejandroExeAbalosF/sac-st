@@ -25,6 +25,7 @@ import {
 import BankPaymentDialog from '@/features/multas/components/bank-payment-dialog';
 import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
+import CollectionDeposit from '@/features/multas/components/collection-deposit';
 import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
@@ -85,6 +86,8 @@ type Props = {
         adjust: boolean;
         viewAttachments: boolean;
         linkBankCredit: boolean;
+        deposit: boolean;
+        confirmDeposit: boolean;
     };
 };
 
@@ -724,6 +727,23 @@ export default function MultaShow({
                                             <p className="w-full text-xs text-muted-foreground">
                                                 Descartado: {pago.discardReason}
                                             </p>
+                                        )}
+                                        {pago.deposit && (
+                                            <div className="w-full">
+                                                <CollectionDeposit
+                                                    paymentId={pago.id}
+                                                    amount={pago.amount}
+                                                    deposito={pago.deposit}
+                                                    desde="multa"
+                                                    canDeposit={can.deposit}
+                                                    canConfirm={
+                                                        can.confirmDeposit
+                                                    }
+                                                    canViewAttachments={
+                                                        can.viewAttachments
+                                                    }
+                                                />
+                                            </div>
                                         )}
                                         {pago.attachments.length > 0 && (
                                             <div className="w-full">

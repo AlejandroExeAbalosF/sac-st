@@ -13,6 +13,7 @@ type PaymentMedium = App.Modules.Multas.Enums.FinePaymentMedium;
 type PaymentStatus = App.Modules.Multas.Enums.FinePaymentStatus;
 type Timeliness = App.Modules.Multas.Enums.FineTimeliness;
 type AppealKind = App.Modules.Multas.Enums.AppealKind;
+type CollectionPlace = App.Modules.Multas.Enums.FineCollectionPlace;
 
 /*
  * Los rótulos de los enums de Multas, en un solo lugar.
@@ -101,6 +102,16 @@ export const TIMELINESS: Record<
     on_time: { label: 'En término', tone: 'done' },
     late: { label: 'Fuera de término', tone: 'action' },
     undetermined: { label: 'Término a revisar', tone: 'blocked' },
+};
+
+/** Dónde está la plata de un cobro de la caja (M06). */
+export const COLLECTION_PLACE: Record<
+    CollectionPlace,
+    { label: string; tone: StatusTone }
+> = {
+    in_custody: { label: 'En la caja', tone: 'action' },
+    in_transit: { label: 'Depositado, sin acreditar', tone: 'progress' },
+    in_bank: { label: 'Acreditado en el banco', tone: 'done' },
 };
 
 const MESES = [

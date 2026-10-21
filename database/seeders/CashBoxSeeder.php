@@ -24,7 +24,7 @@ use Illuminate\Database\Seeder;
 class CashBoxSeeder extends Seeder
 {
     /**
-     * @var list<array{code: string, name: string, allows_income: bool, allows_expense: bool, requires_receipt_person: bool}>
+     * @var list<array{code: string, name: string, allows_income: bool, allows_expense: bool, requires_receipt_person: bool, deposits_whole_receipts: bool}>
      */
     private const CAJAS = [
         [
@@ -33,6 +33,8 @@ class CashBoxSeeder extends Seeder
             'allows_income' => true,
             'allows_expense' => true,
             'requires_receipt_person' => true,
+            // Deposita por cuota: un cheque puede viajar repartido entre varias.
+            'deposits_whole_receipts' => false,
         ],
         [
             // Recauda para el Estado: lo que entra no vuelve a salir por
@@ -42,6 +44,8 @@ class CashBoxSeeder extends Seeder
             'allows_income' => true,
             'allows_expense' => false,
             'requires_receipt_person' => true,
+            // Sin circuito todavía: la política la decide el área cuando se construya.
+            'deposits_whole_receipts' => false,
         ],
         [
             'code' => 'multas',
@@ -51,6 +55,8 @@ class CashBoxSeeder extends Seeder
             // El recibo se extiende a la carátula del expediente, que no
             // siempre es una persona del maestro (DER físico de Multas §5).
             'requires_receipt_person' => false,
+            // Cada cobro va al banco entero y solo (M06).
+            'deposits_whole_receipts' => true,
         ],
     ];
 
@@ -65,6 +71,7 @@ class CashBoxSeeder extends Seeder
                     'allows_income' => $caja['allows_income'],
                     'allows_expense' => $caja['allows_expense'],
                     'requires_receipt_person' => $caja['requires_receipt_person'],
+                    'deposits_whole_receipts' => $caja['deposits_whole_receipts'],
                 ])->save();
 
                 continue;

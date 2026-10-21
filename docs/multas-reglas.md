@@ -235,6 +235,37 @@ es la parte del excedente hecha de plata que está en el libro.
 - Cobrar exige la caja abierta en la moneda de la multa y saldo pendiente; un cobro
   de un día anterior exige el número de talonario. **Solo Action.**
 
+<a id="deposito"></a>
+
+## Depósito al banco
+
+La política es de la caja (`cash_boxes.deposits_whole_receipts`, Multas en `true`),
+no de Multas: Haberes deposita por cuota y no cambia.
+
+- Un traslado lleva **un cobro entero**: un ítem, por el importe de la recepción,
+  de la misma caja, recibida por el circuito (`origin = received`), efectivo o
+  cheque, sin asignación a cuota. **Base:** `transfer_follows_box_policy`,
+  diferido, sobre el traslado y sus ítems; **Action:** `DepositWholeReceiptToBank`.
+- Un traslado vigente (no cancelado) por cobro. **Base:**
+  `transfer_follows_box_policy`; **Action:** mensaje en el campo.
+- La cuenta es la del libro de la caja (`cash_book_openings.bank_account_id`), no
+  cualquiera de la misma moneda. **Base:** `transfer_follows_box_policy`;
+  **Action:** la toma del libro, no la recibe.
+- El depósito no es anterior al cobro ni futuro. **Solo Action** y Form Request.
+- La foto del ticket es obligatoria. **Solo Form Request** (`ScannedDocument`).
+- La acreditación es un **crédito entero y sin otro uso**. **Base:**
+  `cash_deposit_credit_whole` sobre `bank_transaction_allocations`; **Action:**
+  `ConfirmCashDepositCredit` con la política, y los candidatos no ofrecen otro.
+- El traslado solo avanza desde `deposited`, a acreditado o a cancelado. **Base:**
+  `cash_to_bank_transfers_append_only` (para todas las cajas); **Action:**
+  `CancelCashToBankTransfer` rechaza lo acreditado.
+- Acreditar y cancelar a la vez dejan un solo resultado: los dos bloquean el
+  traslado. Probado con dos procesos (`DepositoConcurrenteDeMultasTest`).
+- Un traslado de otra caja no existe para las pantallas de una caja: 404 en Multas
+  y en Haberes. **Solo controlador.**
+- El estado del cheque sigue al traslado (`cheque_follows_transfer`); lo mueve
+  Banking (`TransferredCheques`), sin saber de quién era.
+
 <a id="excedente"></a>
 
 ## Excedente asentado

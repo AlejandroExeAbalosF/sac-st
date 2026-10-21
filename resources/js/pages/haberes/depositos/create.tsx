@@ -15,7 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import TicketPhotoPanel, {
     useTicketPhoto,
-} from '@/features/haberes/components/ticket-photo-panel';
+} from '@/features/banking/components/ticket-photo-panel';
 import { businessToday, money } from '@/lib/format';
 import { show as haberShow } from '@/routes/haberes/haber';
 import { ticket as registrar } from '@/routes/haberes/installments';

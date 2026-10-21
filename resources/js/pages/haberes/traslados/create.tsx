@@ -4,7 +4,6 @@ import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -13,10 +12,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import DepositTicketFields from '@/features/banking/components/deposit-ticket-fields';
 import TicketPhotoPanel, {
     useTicketPhoto,
-} from '@/features/haberes/components/ticket-photo-panel';
-import { businessToday, isNonZero, money } from '@/lib/format';
+} from '@/features/banking/components/ticket-photo-panel';
+import { isNonZero, money } from '@/lib/format';
 import { transfer as trasladar } from '@/routes/haberes/installments';
 
 type Props = {
@@ -108,8 +108,6 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
         event.preventDefault();
         form.post(trasladar(cuota.id).url, { forceFormData: true });
     };
-
-    const hoy = businessToday();
 
     return (
         <>
@@ -229,112 +227,13 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                             )}
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label htmlFor="depositDate">
-                                    Fecha del depósito
-                                </Label>
-                                <Input
-                                    id="depositDate"
-                                    type="date"
-                                    max={hoy}
-                                    value={form.data.depositDate}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'depositDate',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <InputError message={form.errors.depositDate} />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="depositTime">
-                                    Hora
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                        opcional
-                                    </span>
-                                </Label>
-                                <Input
-                                    id="depositTime"
-                                    type="time"
-                                    value={form.data.depositTime}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'depositTime',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <InputError message={form.errors.depositTime} />
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label htmlFor="operationNumber">
-                                    N.º de operación
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                        opcional
-                                    </span>
-                                </Label>
-                                <Input
-                                    id="operationNumber"
-                                    value={form.data.operationNumber}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'operationNumber',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="995979830"
-                                    className="font-mono tabular-nums"
-                                />
-                                <InputError
-                                    message={form.errors.operationNumber}
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="terminal">
-                                    Terminal
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                        opcional
-                                    </span>
-                                </Label>
-                                <Input
-                                    id="terminal"
-                                    value={form.data.terminal}
-                                    onChange={(e) =>
-                                        form.setData('terminal', e.target.value)
-                                    }
-                                />
-                                <InputError message={form.errors.terminal} />
-                            </div>
-                        </div>
-
-                        <p className="text-xs text-muted-foreground">
-                            Se guardan como evidencia de lo que dice el papel.
-                            La acreditación se busca por fecha e importe.
-                        </p>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="notes">
-                                Observaciones
-                                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                                    opcional
-                                </span>
-                            </Label>
-                            <Input
-                                id="notes"
-                                value={form.data.notes}
-                                onChange={(e) =>
-                                    form.setData('notes', e.target.value)
-                                }
-                            />
-                            <InputError message={form.errors.notes} />
-                        </div>
+                        <DepositTicketFields
+                            data={form.data}
+                            setData={(campo, valor) =>
+                                form.setData(campo, valor)
+                            }
+                            errors={form.errors}
+                        />
 
                         <InputError message={errors?.installmentId} />
 

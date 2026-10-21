@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
  * PostgreSQL.
  *
  * Ledger pregunta sin nombrar a nadie, y el módulo dueño lo implementa y
- * se registra en `AppServiceProvider`, como `CashTransferContents`.
+ * se registra en `AppServiceProvider`.
  */
 interface OpeningDateRule
 {

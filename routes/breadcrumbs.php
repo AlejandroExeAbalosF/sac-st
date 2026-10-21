@@ -10,6 +10,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Models\FinePayment;
 use App\Support\Navigation\Breadcrumbs;
 use App\Support\Navigation\Crumb;
 
@@ -333,5 +334,18 @@ Breadcrumbs::for('multas.show', function (Fine $fine): array {
         Crumb::make('Multas', route('multas.index')),
         Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fine_case_id)),
         Crumb::make($fine->caption),
+    ];
+});
+
+// El depósito de un cobro cuelga de su multa: es de ahí que sale la plata.
+Breadcrumbs::for('multas.pagos.deposito.create', function (FinePayment $payment): array {
+    $payment->loadMissing('fine.fineCase');
+    $fine = $payment->fine;
+
+    return [
+        Crumb::make('Multas', route('multas.index')),
+        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fine_case_id)),
+        Crumb::make($fine->caption, route('multas.show', $fine)),
+        Crumb::make('Depósito en el banco'),
     ];
 });

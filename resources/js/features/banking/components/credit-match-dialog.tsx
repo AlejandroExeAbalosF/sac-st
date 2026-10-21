@@ -13,12 +13,9 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import {
-    candidates as candidatos,
-    confirm as acreditar,
-} from '@/routes/traslados';
 
-type Traslado = App.Modules.Haberes.Data.InstallmentTransferData;
+/** Lo que el diálogo necesita del traslado, sea de la caja que sea. */
+type Traslado = { id: number; amount: string; depositDate: string };
 
 type Respuesta = {
     candidates: Candidato[];
@@ -46,13 +43,20 @@ type Candidato = {
  * Vincularlo tiene un segundo efecto que no se ve: ese movimiento queda
  * sin saldo libre, y deja de poder registrarse además como dinero que
  * entró. Sin eso, el mismo depósito se contaría dos veces.
+ *
+ * Lo usa cada caja con sus rutas: la búsqueda y la confirmación las decide
+ * el servidor, con la política de la caja.
  */
 export default function CreditMatchDialog({
     traslado,
+    candidatesUrl,
+    confirmUrl,
     abierto,
     onCerrar,
 }: {
     traslado: Traslado;
+    candidatesUrl: string;
+    confirmUrl: string;
     abierto: boolean;
     onCerrar: () => void;
 }) {
@@ -68,7 +72,7 @@ export default function CreditMatchDialog({
      */
     useEffect(() => {
         let vigente = true;
-        const url = candidatos(traslado.id).url + (todos ? '?todos=1' : '');
+        const url = candidatesUrl + (todos ? '?todos=1' : '');
 
         fetch(url, { headers: { Accept: 'application/json' } })
             .then((r) => r.json())
@@ -86,7 +90,7 @@ export default function CreditMatchDialog({
         return () => {
             vigente = false;
         };
-    }, [traslado.id, todos]);
+    }, [candidatesUrl, todos]);
 
     /*
      * Cargando es que lo que tenemos no corresponde al modo pedido. Se
@@ -105,7 +109,7 @@ export default function CreditMatchDialog({
         setEnviando(true);
 
         router.post(
-            acreditar(traslado.id).url,
+            confirmUrl,
             {
                 bankTransactionId: elegido,
                 idempotencyKey: `acreditacion:${traslado.id}:${elegido}`,

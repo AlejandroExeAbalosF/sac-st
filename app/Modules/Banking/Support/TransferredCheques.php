@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Haberes\Support;
+namespace App\Modules\Banking\Support;
 
 use App\Modules\Banking\Models\CashToBankTransfer;
-use App\Modules\Banking\Support\CashTransferContents;
-use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Banking\Models\CashToBankTransferItem;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
@@ -24,11 +23,13 @@ use App\Modules\Ledger\Models\FundReceipt;
  * - al cancelarse el traslado, vuelve a `in_custody`;
  * - al acreditarlo el extracto, `cleared`.
  *
- * El rechazo de un cheque depositado (`rejected`) no tiene circuito todavía.
- * La base controla que el estado coincida con el del traslado
+ * Vive en Banking, junto al traslado, porque no necesita saber de quién era
+ * el cheque: le alcanzan los ítems. Antes era un contrato que implementaba
+ * Haberes, y un traslado de otra caja dependía de que Haberes se acordara de
+ * él. La base controla igual que el estado coincida con el del traslado
  * (`cheque_follows_transfer`).
  */
-final class TransferredCheques implements CashTransferContents
+final class TransferredCheques
 {
     public function deposited(CashToBankTransfer $transfer): void
     {

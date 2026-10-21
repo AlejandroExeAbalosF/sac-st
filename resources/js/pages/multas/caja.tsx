@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
+import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -29,12 +30,16 @@ import type {
     AperturaExistente,
     Cheque,
 } from '@/features/caja/components/opening-parts';
+import CollectionDeposit from '@/features/multas/components/collection-deposit';
+import { PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { businessToday, date, isNonZero } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
+import { show as verMulta } from '@/routes/multas';
 import { store } from '@/routes/multas/caja/apertura';
 
 type CuentaBancaria = { id: number; label: string; cutoffOn: string | null };
 type Banco = App.Modules.Multas.Data.FineBankPanelData;
+type Cobro = App.Modules.Multas.Data.FinePendingPaymentData;
 
 type Props = {
     opening: AperturaExistente | null;
@@ -42,6 +47,11 @@ type Props = {
     bankAccounts: CuentaBancaria[];
     suggestedDenominations: number[];
     canOpen: boolean;
+    paraDepositar: Cobro[];
+    enTransito: Cobro[];
+    canDeposit: boolean;
+    canConfirmDeposit: boolean;
+    canViewAttachments: boolean;
 };
 
 const EFECTIVO = 'CASH_ON_HAND';
@@ -70,7 +80,14 @@ export default function CajaDeMultas({
     bankAccounts,
     suggestedDenominations,
     canOpen,
+    paraDepositar,
+    enTransito,
+    canDeposit,
+    canConfirmDeposit,
+    canViewAttachments,
 }: Props) {
+    const permisos = { canDeposit, canConfirmDeposit, canViewAttachments };
+
     return (
         <>
             <Head title="Caja de Multas" />
@@ -86,6 +103,18 @@ export default function CajaDeMultas({
                     <>
                         <AperturaHecha existing={opening} />
                         {bank && <PanelBancario banco={bank} />}
+                        <Cobros
+                            titulo="Cobros por depositar"
+                            vacio="No hay cobros en la caja esperando el depósito."
+                            cobros={paraDepositar}
+                            {...permisos}
+                        />
+                        <Cobros
+                            titulo="Depositado, sin acreditar"
+                            vacio="No hay depósitos esperando al extracto."
+                            cobros={enTransito}
+                            {...permisos}
+                        />
                     </>
                 ) : canOpen ? (
                     <FormularioDeApertura
@@ -445,8 +474,9 @@ function PanelBancario({ banco }: { banco: Banco }) {
                         <Money value={banco.bookBalance} />
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        Lo que el libro de Multas tiene en la cuenta. Los cobros
-                        llegan en la próxima etapa.
+                        Lo que el libro de Multas tiene en la cuenta: los
+                        depósitos de la caja ya acreditados y los pagos por el
+                        banco ya verificados.
                     </p>
                     {isNonZero(banco.unclassifiedAmount) && (
                         <p className="mt-2 text-xs text-warning-strong">
@@ -461,6 +491,90 @@ function PanelBancario({ banco }: { banco: Banco }) {
                     )}
                 </div>
             </div>
+        </section>
+    );
+}
+
+/**
+ * Los cobros de la caja en un mismo lugar —por depositar, o depositados
+ * esperando al extracto—, del más viejo al más nuevo. Cada uno va al banco
+ * entero y en su propio depósito (M06).
+ */
+function Cobros({
+    titulo,
+    vacio,
+    cobros,
+    canDeposit,
+    canConfirmDeposit,
+    canViewAttachments,
+}: {
+    titulo: string;
+    vacio: string;
+    cobros: Cobro[];
+    canDeposit: boolean;
+    canConfirmDeposit: boolean;
+    canViewAttachments: boolean;
+}) {
+    return (
+        <section className="rounded-lg border bg-card shadow-raised">
+            <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
+                <h2 className="text-sm font-semibold">{titulo}</h2>
+                <StatusBadge
+                    label={String(cobros.length)}
+                    tone={cobros.length > 0 ? 'action' : 'neutral'}
+                />
+            </div>
+            {cobros.length === 0 ? (
+                <p className="px-5 py-4 text-sm text-muted-foreground">
+                    {vacio}
+                </p>
+            ) : (
+                <ul className="divide-y">
+                    {cobros.map((fila) => (
+                        <li
+                            key={fila.payment.id}
+                            className="grid gap-2 px-5 py-3 text-sm"
+                        >
+                            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                                <Link
+                                    href={verMulta(fila.fineId)}
+                                    className="font-medium hover:underline"
+                                >
+                                    {fila.fineCaption}
+                                </Link>
+                                <span className="font-mono text-xs text-muted-foreground">
+                                    Expte. {fila.caseLabel}
+                                </span>
+                                <span>
+                                    {PAYMENT_MEDIUM[fila.payment.medium]}
+                                    {fila.payment.chequeNumber &&
+                                        ` n.º ${fila.payment.chequeNumber}`}{' '}
+                                    · <Money value={fila.payment.amount} />
+                                </span>
+                                <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
+                                    Recibo{' '}
+                                    {fila.payment.talonarioNumber ??
+                                        fila.payment.receiptNumber ??
+                                        '—'}
+                                    {fila.payment.receiptDate &&
+                                        ` del ${date(fila.payment.receiptDate)}`}
+                                </span>
+                            </div>
+                            {fila.payment.deposit && (
+                                <CollectionDeposit
+                                    paymentId={fila.payment.id}
+                                    amount={fila.payment.amount}
+                                    deposito={fila.payment.deposit}
+                                    desde="caja"
+                                    canDeposit={canDeposit}
+                                    canConfirm={canConfirmDeposit}
+                                    canViewAttachments={canViewAttachments}
+                                />
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
         </section>
     );
 }

@@ -4,9 +4,10 @@ Qué hace hoy la Caja de Multas. Describe lo implementado; las reglas con su
 garantía en la base están en [reglas de Multas](multas-reglas.md).
 
 **Estado: en construcción.** Está la cuenta corriente —expedientes, documentos,
-multas, su obligación y los pagos anteriores al sistema— y la apertura de la caja
-con su cuenta bancaria compartida. Todavía **no hay cobros** ni recibos: llegan en
-la etapa siguiente.
+multas, su obligación y los pagos anteriores al sistema—, la apertura de la caja
+con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
+banco, el recurso del 20 % y el depósito al banco de lo cobrado. Faltan el cheque
+rechazado y su reemplazo, y la caja del día con su arqueo y cierre.
 
 ---
 
@@ -199,8 +200,8 @@ puede repartir entre las dos (M08, M12). Por eso hay dos aperturas distintas:
 
 Abierta la caja, la pantalla muestra la cuenta en **dos números que no se suman
 nunca**: el saldo según el banco —la cuenta entera, compartida— y los cobros de
-Multas en el banco —lo que el libro de Multas tiene ahí, en cero hasta que existan
-los cobros—. Debajo, los créditos posteriores al corte que todavía nadie
+Multas en el banco —lo que el libro de Multas tiene ahí: los depósitos de la caja
+ya acreditados y los pagos por banco ya verificados—. Debajo, los créditos posteriores al corte que todavía nadie
 identificó: es la cola de «pendiente de clasificación de caja». Un crédito que ya
 respalda un pago anterior vigente sale de la cola; si ese pago se descarta,
 vuelve.
@@ -247,6 +248,32 @@ cambiar cuánto de lo ya cobrado es excedente: el sistema lo reclasifica en el m
 acto, sin mover dinero.
 
 Anular un pago o cambiar su medio (P13) no está habilitado.
+
+<a id="deposito"></a>
+
+## Depósito al banco
+
+Lo cobrado en la caja va al banco **entero y solo**: cada cobro en su propio
+depósito, por su importe completo —el excedente incluido—, sin fraccionarlo ni
+juntarlo con otros (M06). La caja de Multas lista abajo de la cuenta los **cobros
+por depositar** y lo **depositado, sin acreditar**; la ficha de la multa dice en
+cada cobro de caja dónde está la plata.
+
+- **Depositar** (permiso `multas.depositar`): una pantalla para transcribir el
+  ticket del cajero —fecha, hora, operación, terminal— con la **foto obligatoria**
+  al lado, como en Haberes. El importe no se escribe: es el cobro entero. La
+  cuenta no se elige: es la del libro de la caja. La fecha no puede ser futura ni
+  anterior al cobro. El cheque sale de custodia; el efectivo, de la caja; los dos
+  quedan en tránsito.
+- **Acreditar** (`multas.verificar-pagos`): se busca el crédito del extracto, como
+  en Haberes, y se confirma. Tiene que ser un **crédito entero y sin otro uso**: el
+  remanente de un crédito mayor no es este depósito. Acreditado, la plata está en
+  el banco y el crédito ya no queda libre para otro pago.
+- **Cancelar** (`multas.verificar-pagos`): un depósito que no ocurrió o se cargó
+  mal, con su motivo, mientras no se acreditó. El cobro vuelve a la caja y se
+  puede depositar de nuevo; el cancelado queda a la vista con su motivo.
+
+Depositar no es cobrar otra vez: la deuda no se mueve y el recibo no cambia.
 
 <a id="banco"></a>
 
@@ -336,7 +363,8 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
-| `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar | administrador, contador |
+| `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
+| `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar; acreditar o cancelar un depósito de la caja | administrador, contador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 

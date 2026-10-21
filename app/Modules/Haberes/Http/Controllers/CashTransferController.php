@@ -7,14 +7,13 @@ namespace App\Modules\Haberes\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
-use App\Modules\Banking\Actions\FindCashDepositCandidates;
-use App\Modules\Banking\Actions\ListCreditsForTransfer;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
-use App\Modules\Banking\Support\CashDepositCandidate;
+use App\Modules\Banking\Support\CashDepositCreditOptions;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentDeposit;
 use App\Support\BusinessDate;
@@ -153,86 +152,11 @@ final class CashTransferController extends Controller
     public function candidates(
         Request $request,
         CashToBankTransfer $transfer,
-        FindCashDepositCandidates $buscar,
-        ListCreditsForTransfer $listar,
+        CashDepositCreditOptions $opciones,
     ): JsonResponse {
-        /*
-         * `?todos=1` cambia el filtro duro por el listado completo. No es
-         * un modo de depuracion: «no hay candidatos» casi nunca significa
-         * que el credito no exista, y sin esta salida la pantalla queda
-         * sin nada que ofrecer justo cuando mas hace falta.
-         */
-        if ($request->boolean('todos')) {
-            return response()->json([
-                'candidates' => array_map(
-                    fn (BankTransaction $m): array => $this->describirCredito($m, $transfer),
-                    $listar->handle($transfer),
-                ),
-                'todos' => true,
-                'periodImported' => $listar->periodIsImported($transfer),
-            ]);
-        }
+        $this->assertDeHaberes($transfer);
 
-        return response()->json([
-            'candidates' => array_map(
-                fn (CashDepositCandidate $c): array => [
-                    'id' => $c->transaction->id,
-                    'date' => $c->transaction->transaction_date?->format('Y-m-d'),
-                    'amount' => $c->transaction->amount,
-                    'description' => $c->transaction->description,
-                    'operationId' => $c->transaction->operation_id,
-                    'signals' => $c->signals,
-                ],
-                $buscar->handle($transfer),
-            ),
-            'todos' => false,
-            'periodImported' => $listar->periodIsImported($transfer),
-        ]);
-    }
-
-    /**
-     * Un credito del listado ancho, con su distancia a la vista.
-     *
-     * En que difiere es lo unico que el operador necesita para decidir, y
-     * decirlo es lo que distingue esta lista de un volcado de la tabla.
-     *
-     * @return array<string, mixed>
-     */
-    private function describirCredito(BankTransaction $movimiento, CashToBankTransfer $transfer): array
-    {
-        $diferencia = Decimal::sub(
-            Decimal::abs($movimiento->amount),
-            $transfer->amount,
-        );
-
-        $dias = $movimiento->transaction_date === null
-            ? null
-            : (int) $transfer->deposit_date->diffInDays($movimiento->transaction_date, false);
-
-        $signals = [
-            'importe' => Decimal::equals($diferencia, '0')
-                ? 'exacto'
-                : 'difiere en $ '.Decimal::format(Decimal::abs($diferencia)),
-        ];
-
-        if ($dias !== null) {
-            $signals['fecha'] = match (true) {
-                $dias === 0 => 'el mismo día del depósito',
-                $dias === 1 => 'el día siguiente',
-                $dias > 1 => "{$dias} días después",
-                $dias === -1 => 'un día antes del depósito',
-                default => abs($dias).' días antes del depósito',
-            };
-        }
-
-        return [
-            'id' => $movimiento->id,
-            'date' => $movimiento->transaction_date?->format('Y-m-d'),
-            'amount' => $movimiento->amount,
-            'description' => $movimiento->description,
-            'operationId' => $movimiento->operation_id,
-            'signals' => $signals,
-        ];
+        return response()->json($opciones->for($transfer, $request->boolean('todos')));
     }
 
     /**
@@ -246,6 +170,8 @@ final class CashTransferController extends Controller
         CashToBankTransfer $transfer,
         CancelCashToBankTransfer $cancelar,
     ): RedirectResponse {
+        $this->assertDeHaberes($transfer);
+
         $validado = $request->validate([
             'reason' => ['required', 'string', 'min:5', 'max:500'],
             'idempotencyKey' => ['required', 'string', 'max:120'],
@@ -272,6 +198,8 @@ final class CashTransferController extends Controller
         CashToBankTransfer $transfer,
         ConfirmCashDepositCredit $confirmar,
     ): RedirectResponse {
+        $this->assertDeHaberes($transfer);
+
         $validado = $request->validate([
             'bankTransactionId' => ['required', 'integer', 'exists:bank_transactions,id'],
             'idempotencyKey' => ['required', 'string', 'max:120'],
@@ -290,5 +218,14 @@ final class CashTransferController extends Controller
         Toast::success('El extracto confirmó el depósito.', 'El dinero ya está en el banco.');
 
         return back();
+    }
+
+    /**
+     * Un traslado de otra caja no existe para estas pantallas: lo opera la
+     * suya, con sus permisos. Mismo criterio que recepciones y recibos.
+     */
+    private function assertDeHaberes(CashToBankTransfer $transfer): void
+    {
+        abort_unless(app(HaberesCashBox::class)->owns($transfer->cash_box_id), 404);
     }
 }

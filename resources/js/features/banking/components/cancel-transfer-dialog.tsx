@@ -14,9 +14,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { date, money } from '@/lib/format';
-import { cancel as cancelarTraslado } from '@/routes/traslados';
 
-type Traslado = App.Modules.Haberes.Data.InstallmentTransferData;
+/** Lo que el diálogo necesita del traslado, sea de la caja que sea. */
+type Traslado = { id: number; amount: string; depositDate: string };
 
 /**
  * Deshacer un traslado que no ocurrió.
@@ -28,13 +28,24 @@ type Traslado = App.Modules.Haberes.Data.InstallmentTransferData;
  *
  * **Sólo lo que sigue en tránsito.** Un traslado acreditado está
  * confirmado por el extracto y ese dinero está en la cuenta.
+ *
+ * Lo usa cada caja con su ruta y sus palabras.
  */
 export default function CancelTransferDialog({
     traslado,
+    url,
+    titulo = 'Cancelar el traslado',
+    consecuencia = 'El efectivo vuelve a figurar en la caja.',
+    ejemplo = 'El depósito se cargó sobre la cuota equivocada.',
     abierto,
     onCerrar,
 }: {
     traslado: Traslado;
+    url: string;
+    titulo?: string;
+    /** Qué pasa con la plata al cancelar. */
+    consecuencia?: string;
+    ejemplo?: string;
     abierto: boolean;
     onCerrar: () => void;
 }) {
@@ -51,7 +62,7 @@ export default function CancelTransferDialog({
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
 
-        form.post(cancelarTraslado(traslado.id).url, {
+        form.post(url, {
             preserveScroll: true,
             onSuccess: () => onCerrar(),
         });
@@ -61,10 +72,10 @@ export default function CancelTransferDialog({
         <Dialog open={abierto} onOpenChange={(v) => !v && onCerrar()}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Cancelar el traslado</DialogTitle>
+                    <DialogTitle>{titulo}</DialogTitle>
                     <DialogDescription>
                         Para cuando el depósito no ocurrió o se cargó
-                        equivocado. El efectivo vuelve a figurar en la caja.
+                        equivocado. {consecuencia}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -97,7 +108,7 @@ export default function CancelTransferDialog({
                             onChange={(e) =>
                                 form.setData('reason', e.target.value)
                             }
-                            placeholder="El depósito se cargó sobre la cuota equivocada."
+                            placeholder={ejemplo}
                         />
                         <InputError message={form.errors.reason} />
                     </div>
@@ -118,7 +129,7 @@ export default function CancelTransferDialog({
                             disabled={form.processing}
                         >
                             <Undo2 className="size-4" />
-                            Cancelar el traslado
+                            {titulo}
                         </Button>
                     </DialogFooter>
                 </form>

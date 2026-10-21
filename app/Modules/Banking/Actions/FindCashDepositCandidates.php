@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Banking\Support\CashDepositCandidate;
+use App\Modules\Banking\Support\WholeReceiptDeposits;
 use App\Support\Money\Decimal;
 
 /**
@@ -35,7 +36,10 @@ final class FindCashDepositCandidates
 
     private const DAYS_BACKWARD = 1;
 
-    public function __construct(private readonly AllocatableAmount $disponible) {}
+    public function __construct(
+        private readonly AllocatableAmount $disponible,
+        private readonly WholeReceiptDeposits $cobrosEnteros,
+    ) {}
 
     /** @return list<CashDepositCandidate> */
     public function handle(CashToBankTransfer $transfer): array
@@ -56,14 +60,19 @@ final class FindCashDepositCandidates
             ->orderBy('transaction_date')
             ->get();
 
+        $entero = $this->cobrosEnteros->appliesTo($transfer->cash_box_id);
+
         $candidatos = $movimientos
             /*
              * Lo que ya está imputado no se ofrece. Un crédito consumido
              * por una recepción de fondos no puede ser además la
              * acreditación de un traslado: sería la misma plata contada
-             * dos veces.
+             * dos veces. Y una caja que deposita cobros enteros solo
+             * reconoce un crédito sin ningún uso.
              */
-            ->filter(fn (BankTransaction $m): bool => ! Decimal::equals($this->disponible->for($m), '0'))
+            ->filter(fn (BankTransaction $m): bool => $entero
+                ? Decimal::equals($this->disponible->for($m), Decimal::abs($m->amount))
+                : ! Decimal::equals($this->disponible->for($m), '0'))
             ->map(fn (BankTransaction $m): CashDepositCandidate => $this->describe($transfer, $m))
             ->sortBy(fn (CashDepositCandidate $c): int => $c->rank())
             ->values()

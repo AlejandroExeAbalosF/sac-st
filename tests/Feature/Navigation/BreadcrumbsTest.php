@@ -78,6 +78,7 @@ const RUTAS_SIN_PANTALLA = [
     'people.index',
     'people.resolve',
     'traslados.candidates',
+    'multas.traslados.candidates',
     'haberes.installments.history',
     'expedientes.history',
     'haberes.haber.history',

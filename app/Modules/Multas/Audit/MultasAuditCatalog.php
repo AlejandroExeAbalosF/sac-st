@@ -185,6 +185,25 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 'Multas',
                 metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'judicial' => 'Orden de pago judicial'],
             ),
+            new AuditActionDefinition(
+                'multa.cobro-depositado',
+                'Se depositó en el banco un cobro de la multa',
+                'Multas',
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'fecha' => 'Fecha del depósito', 'traslado' => 'Traslado'],
+            ),
+            new AuditActionDefinition(
+                'multa.deposito-acreditado',
+                'Se acreditó en el extracto el depósito de un cobro de la multa',
+                'Multas',
+                metadata: ['amount' => 'Importe', 'traslado' => 'Traslado', 'credito' => 'Crédito del banco'],
+            ),
+            new AuditActionDefinition(
+                'multa.deposito-cancelado',
+                'Se canceló el depósito de un cobro de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['amount' => 'Importe', 'traslado' => 'Traslado', 'motivo' => 'Motivo'],
+            ),
         );
 
         $catalog->registerSubject(new FineCaseSubject);

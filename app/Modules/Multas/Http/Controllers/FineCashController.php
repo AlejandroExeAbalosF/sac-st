@@ -18,7 +18,11 @@ use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\OpeningLines;
 use App\Modules\Multas\Actions\OpenFineCashBook;
 use App\Modules\Multas\Data\FineBankPanelData;
+use App\Modules\Multas\Data\FinePendingPaymentData;
+use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Http\Requests\OpenFineCashBookRequest;
+use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -30,18 +34,20 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * La caja de Multas: su apertura y la cuenta con la que opera.
+ * La caja de Multas: su apertura, la cuenta con la que opera y lo cobrado
+ * camino al banco.
  *
  * Antes de abrir, el formulario; después, lo declarado y la cuenta en dos
  * números separados —el saldo del banco, compartido con Aranceles, y lo
- * cobrado por Multas— que no se suman nunca. Arqueos y cierres llegan en
- * la Etapa 6.
+ * cobrado por Multas— que no se suman nunca, y los cobros por depositar y
+ * en tránsito. Arqueos y cierres llegan en la Etapa 6.
  */
 final class FineCashController extends Controller
 {
     public function __construct(
         private readonly OpeningLines $lineas,
         private readonly AccountCutoffBalance $saldos,
+        private readonly FineDeposits $depositos,
     ) {}
 
     public function index(Request $request): Response
@@ -61,6 +67,15 @@ final class FineCashController extends Controller
             'bankAccounts' => $apertura === null ? $this->bankAccounts() : [],
             'suggestedDenominations' => CashCountLine::suggestedDenominations(Currency::Ars),
             'canOpen' => $request->user()?->can('multas.caja.abrir') ?? false,
+            /*
+             * Lo cobrado que sigue en la caja y lo depositado que espera al
+             * extracto (M06). Cada cobro va entero y solo, a la cuenta del libro.
+             */
+            'paraDepositar' => $apertura === null ? [] : $this->cobros(FineCollectionPlace::InCustody),
+            'enTransito' => $apertura === null ? [] : $this->cobros(FineCollectionPlace::InTransit),
+            'canDeposit' => ($request->user()?->can('multas.depositar') ?? false) && $apertura?->bank_account_id !== null,
+            'canConfirmDeposit' => $request->user()?->can('multas.verificar-pagos') ?? false,
+            'canViewAttachments' => $request->user()?->can('adjuntos.ver') ?? false,
         ]);
     }
 
@@ -156,6 +171,26 @@ final class FineCashController extends Controller
             unclassifiedCount: (int) ($pendientes?->getAttribute('cantidad') ?? 0),
             unclassifiedAmount: Decimal::scale((string) ($pendientes?->getAttribute('total') ?? '0')),
         );
+    }
+
+    /**
+     * Los cobros de la caja en ese lugar, del más viejo al más nuevo: es lo
+     * que lleva más tiempo esperando.
+     *
+     * @return list<FinePendingPaymentData>
+     */
+    private function cobros(FineCollectionPlace $lugar): array
+    {
+        $pagos = $this->depositos->counterPayments($lugar)
+            ->with(['fine.fineCase', 'application.fundReceipt', 'paymentReceipt.receipt', 'creator:id,name'])
+            ->orderBy('id')
+            ->get();
+
+        $depositos = $this->depositos->forPayments($pagos);
+
+        return array_values($pagos
+            ->map(fn (FinePayment $pago): FinePendingPaymentData => FinePendingPaymentData::fromModel($pago, $depositos[$pago->id] ?? null))
+            ->all());
     }
 
     private function cashBox(): CashBox

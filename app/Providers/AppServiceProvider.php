@@ -9,11 +9,9 @@ use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
-use App\Modules\Banking\Support\CashTransferContents;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
 use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
 use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
-use App\Modules\Haberes\Support\TransferredCheques;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
 use App\Modules\Ledger\Permissions\LedgerPermissionCatalog;
 use App\Modules\Ledger\Support\OpeningDateRule;
@@ -51,14 +49,6 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerAuditCatalog();
         $this->registerPermissionCatalog();
-
-        /*
-         * Banking avisa cuando un traslado se cancela o se acredita, y quien
-         * sabe qué cheques viajaron —Haberes, dueño de los ítems— actualiza
-         * su estado. Va acá por la misma razón que el catálogo: Banking no
-         * puede nombrar a Haberes.
-         */
-        $this->app->bind(CashTransferContents::class, TransferredCheques::class);
 
         /*
          * La apertura es de Ledger y los papeles del sistema anterior, de

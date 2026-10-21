@@ -26,6 +26,8 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
+import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { preview } from '@/routes/adjuntos';
@@ -34,8 +36,11 @@ import { voidPaper as anularPapel } from '@/routes/haberes/installments/legacy-f
 import { create as nuevoTicket } from '@/routes/haberes/installments/ticket';
 import { create as nuevoTraslado } from '@/routes/haberes/installments/transfer';
 import { show as verRecepcion } from '@/routes/recepciones';
-import CancelTransferDialog from './cancel-transfer-dialog';
-import CreditMatchDialog from './credit-match-dialog';
+import {
+    cancel as cancelarTraslado,
+    candidates as candidatosDelTraslado,
+    confirm as acreditarTraslado,
+} from '@/routes/traslados';
 import DepositTicketDialog from './deposit-ticket-dialog';
 import IssueReceiptDialog from './issue-receipt-dialog';
 import type { Firmante } from './issue-receipt-dialog';
@@ -1059,6 +1064,7 @@ function TrasladoAlBanco({
             {cancelando && (
                 <CancelTransferDialog
                     traslado={traslado}
+                    url={cancelarTraslado(traslado.id).url}
                     abierto
                     onCerrar={() => setCancelando(false)}
                 />
@@ -1067,6 +1073,8 @@ function TrasladoAlBanco({
             {buscando && (
                 <CreditMatchDialog
                     traslado={traslado}
+                    candidatesUrl={candidatosDelTraslado(traslado.id).url}
+                    confirmUrl={acreditarTraslado(traslado.id).url}
                     abierto
                     onCerrar={() => setBuscando(false)}
                 />

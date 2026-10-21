@@ -920,6 +920,11 @@ declare namespace App {
                     unclassifiedCount: number;
                     unclassifiedAmount: string;
                 };
+                export type FineCancelledDepositData = {
+                    transferId: number;
+                    depositDate: string;
+                    reason: string | null;
+                };
                 export type FineCaseData = {
                     id: number;
                     label: string;
@@ -947,6 +952,15 @@ declare namespace App {
                     reversedById: number | null;
                     createdByName: string | null;
                     createdAt: string | null;
+                };
+                export type FineDepositData = {
+                    place: App.Modules.Multas.Enums.FineCollectionPlace;
+                    transferId: number | null;
+                    depositDate: string | null;
+                    operationNumber: string | null;
+                    creditedOn: string | null;
+                    ticket: App.Modules.Multas.Data.FineAttachmentData | null;
+                    cancelled: App.Modules.Multas.Data.FineCancelledDepositData[];
                 };
                 export type FineDetailData = {
                     id: number;
@@ -1042,6 +1056,7 @@ declare namespace App {
                     discardReason: string | null;
                     replacesPaymentId: number | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    deposit: App.Modules.Multas.Data.FineDepositData | null;
                 };
                 export type FinePendingPaymentData = {
                     fineId: number;
@@ -1054,6 +1069,8 @@ declare namespace App {
                 export type AppealKind = 'hierarchical' | 'appeal';
                 export type DatePrecision = 'day' | 'month' | 'unknown';
                 export type FineActType = 'LAB' | 'HYS';
+                export type FineCollectionPlace =
+                    'in_custody' | 'in_transit' | 'in_bank';
                 export type FineDebtEntryKind =
                     'constitution' | 'increase' | 'reduction' | 'reversal';
                 export type FineDebtStatus =

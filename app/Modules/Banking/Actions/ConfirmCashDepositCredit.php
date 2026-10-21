@@ -14,7 +14,8 @@ use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Banking\Support\BankMovementAfterOpening;
-use App\Modules\Banking\Support\CashTransferContents;
+use App\Modules\Banking\Support\TransferredCheques;
+use App\Modules\Banking\Support\WholeReceiptDeposits;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -47,8 +48,9 @@ final class ConfirmCashDepositCredit
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
         private readonly RecordAuditEvent $auditar,
-        private readonly CashTransferContents $contenido,
+        private readonly TransferredCheques $contenido,
         private readonly BankMovementAfterOpening $posteriorALaApertura,
+        private readonly WholeReceiptDeposits $cobrosEnteros,
     ) {}
 
     /** @throws ValidationException */
@@ -59,7 +61,8 @@ final class ConfirmCashDepositCredit
         ?int $actorId = null,
     ): CashToBankTransfer {
         return DB::transaction(function () use ($transfer, $transaction, $idempotencyKey, $actorId): CashToBankTransfer {
-            $transfer->refresh();
+            // Bloqueado: confirmar y cancelar a la vez dejan un solo resultado.
+            $transfer = CashToBankTransfer::query()->lockForUpdate()->findOrFail($transfer->id);
 
             /*
              * Un segundo envío del mismo formulario. Se resuelve antes que
@@ -167,9 +170,23 @@ final class ConfirmCashDepositCredit
          * movimientos aparte—, así que se exige exacto en vez de admitir
          * una imputación parcial que dejaría el traslado a medio cerrar.
          */
-        if (! Decimal::equals($this->disponible->forUpdate($transaction), $transfer->amount)) {
+        $libre = $this->disponible->forUpdate($transaction);
+
+        if (! Decimal::equals($libre, $transfer->amount)) {
             throw ValidationException::withMessages([
                 'bankTransactionId' => 'Ese movimiento no tiene libre el importe exacto del depósito.',
+            ]);
+        }
+
+        /*
+         * Una caja que deposita cada cobro entero se acredita con un crédito
+         * entero: el remanente de un crédito mayor es otra plata, y aceptarlo
+         * cerraría el tránsito con un movimiento que no es este depósito.
+         */
+        if ($this->cobrosEnteros->appliesTo($transfer->cash_box_id)
+            && ! Decimal::equals(Decimal::abs($transaction->amount), $libre)) {
+            throw ValidationException::withMessages([
+                'bankTransactionId' => 'Este depósito se acredita con un crédito entero y sin otro uso: ese movimiento ya tiene una parte imputada.',
             ]);
         }
 

@@ -27,6 +27,7 @@ use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseNumber;
+use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -137,7 +138,7 @@ final class FineController extends Controller
         return to_route('multas.show', $multa);
     }
 
-    public function show(Request $request, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos): Response
+    public function show(Request $request, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos): Response
     {
         $fine->load([
             'fineCase',
@@ -169,6 +170,7 @@ final class FineController extends Controller
                 $adjuntos->for(AttachmentSubject::Fine, [$fine->id])[$fine->id] ?? [],
                 $adjuntos->for(AttachmentSubject::FineHistoricalMovement, array_values($fine->historicalMovements->modelKeys())),
                 $adjuntos->for(AttachmentSubject::FinePayment, array_values($fine->payments->modelKeys())),
+                $depositos->forPayments($fine->payments),
             ),
             'documentosDelExpediente' => $fine->fineCase->documents
                 ->sortBy('id')
@@ -217,6 +219,9 @@ final class FineController extends Controller
                 'reportBank' => $cobra || $verifica,
                 // Verificar contra el extracto exige la caja abierta con su cuenta.
                 'verifyBank' => $verifica && $cajaAbierta && $creditos->book() !== null,
+                // Depositar lo cobrado y confirmar su acreditación, con la cuenta del libro.
+                'deposit' => ($usuario?->can('multas.depositar') ?? false) && $creditos->book() !== null,
+                'confirmDeposit' => $verifica,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.

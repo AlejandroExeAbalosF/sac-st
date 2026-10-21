@@ -160,12 +160,13 @@ cheque depositado (`rejected`) no tiene circuito todavía.
 | El traslado sale de una sola caja, a una cuenta en la moneda del haber | `DepositCashToBank` | `journal_lines_bank_currency` (moneda) |
 | La acreditación deja el dinero en el banco de la caja del traslado | `ConfirmCashDepositCredit` | — |
 
-Banking no conoce los ítems del traslado: avisa por el contrato
-`CashTransferContents`, que Haberes implementa y `AppServiceProvider` registra.
+El ítem del traslado y el estado de sus cheques son de Banking
+(`CashToBankTransferItem`, `TransferredCheques`): mover un cheque no exige
+saber de quién era. Haberes extiende el ítem con la asignación a la cuota.
 
 Evidencia: [canal](../app/Modules/Haberes/Support/PaymentOrderSources.php),
 [traslado](../app/Modules/Haberes/Actions/DepositCashToBank.php),
-[cheques del traslado](../app/Modules/Haberes/Support/TransferredCheques.php),
+[cheques del traslado](../app/Modules/Banking/Support/TransferredCheques.php),
 [elegibilidad de egreso](../app/Modules/Haberes/Support/DisbursementEligibility.php),
 [pruebas de traslado](../tests/Feature/Haberes/TrasladoDeEfectivoTest.php) y
 [cheques en el traslado](../tests/Feature/Haberes/ChequeEnElTrasladoTest.php).

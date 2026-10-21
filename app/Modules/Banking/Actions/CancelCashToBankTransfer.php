@@ -6,7 +6,7 @@ namespace App\Modules\Banking\Actions;
 
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\CashToBankTransfer;
-use App\Modules\Banking\Support\CashTransferContents;
+use App\Modules\Banking\Support\TransferredCheques;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Support\InverseEntry;
@@ -43,7 +43,7 @@ final class CancelCashToBankTransfer
         private readonly PostJournalEntry $asentar,
         private readonly RecordAuditEvent $auditar,
         private readonly InverseEntry $inverso,
-        private readonly CashTransferContents $contenido,
+        private readonly TransferredCheques $contenido,
     ) {}
 
     /** @throws ValidationException */

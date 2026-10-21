@@ -9,8 +9,8 @@ use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
- * Un pago que espera a alguien: informado sin verificar, o recurso en
- * revisión. Lleva la multa para poder ir a ella.
+ * Un pago que espera a alguien —informado sin verificar, cobro por depositar
+ * o depositado sin acreditar—, con su multa para poder ir a ella.
  */
 #[TypeScript]
 final class FinePendingPaymentData extends Data
@@ -23,13 +23,13 @@ final class FinePendingPaymentData extends Data
     ) {}
 
     /** Espera cargados `fine.fineCase` y lo que pide `FinePaymentData`. */
-    public static function fromModel(FinePayment $pago): self
+    public static function fromModel(FinePayment $pago, ?FineDepositData $deposito = null): self
     {
         return new self(
             fineId: $pago->fine_id,
             fineCaption: $pago->fine->caption,
             caseLabel: $pago->fine->fineCase->label(),
-            payment: FinePaymentData::fromModel($pago),
+            payment: FinePaymentData::fromModel($pago, deposito: $deposito),
         );
     }
 }

@@ -66,6 +66,8 @@ final class FinePaymentData extends Data
         public ?int $replacesPaymentId,
         /** @var list<FineAttachmentData> */
         public array $attachments,
+        /** Un cobro de caja: dónde está la plata y su depósito (M06). */
+        public ?FineDepositData $deposit = null,
     ) {}
 
     /**
@@ -73,7 +75,7 @@ final class FinePaymentData extends Data
      *
      * @param  list<FineAttachmentData>  $adjuntos
      */
-    public static function fromModel(FinePayment $pago, array $adjuntos = []): self
+    public static function fromModel(FinePayment $pago, array $adjuntos = [], ?FineDepositData $deposito = null): self
     {
         $aplicacion = $pago->application;
         $recepcion = $aplicacion?->fundReceipt;
@@ -110,6 +112,7 @@ final class FinePaymentData extends Data
             discardReason: $pago->discard_reason,
             replacesPaymentId: $pago->replaces_fine_payment_id,
             attachments: $adjuntos,
+            deposit: $deposito,
         );
     }
 }

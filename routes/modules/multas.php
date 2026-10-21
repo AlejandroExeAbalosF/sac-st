@@ -9,6 +9,7 @@ use App\Modules\Multas\Http\Controllers\FineCaseController;
 use App\Modules\Multas\Http\Controllers\FineCashController;
 use App\Modules\Multas\Http\Controllers\FineController;
 use App\Modules\Multas\Http\Controllers\FineDebtController;
+use App\Modules\Multas\Http\Controllers\FineDepositController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
@@ -109,8 +110,17 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('{fine}/recursos', [FineAppealController::class, 'store'])->whereNumber('fine')->name('recursos.store');
     });
 
+    // Lo cobrado en la caja va al banco entero, cada cobro en su depósito (M06).
+    Route::middleware('can:multas.depositar')->group(function (): void {
+        Route::get('pagos/{payment}/deposito', [FineDepositController::class, 'create'])->whereNumber('payment')->name('pagos.deposito.create');
+        Route::post('pagos/{payment}/deposito', [FineDepositController::class, 'store'])->whereNumber('payment')->name('pagos.deposito.store');
+    });
+
     // Verificar contra el extracto, o descartar, es de quien concilia.
     Route::middleware('can:multas.verificar-pagos')->group(function (): void {
+        Route::get('traslados/{transfer}/candidatos', [FineDepositController::class, 'candidates'])->whereNumber('transfer')->name('traslados.candidates');
+        Route::post('traslados/{transfer}/acreditar', [FineDepositController::class, 'confirm'])->whereNumber('transfer')->name('traslados.confirm');
+        Route::post('traslados/{transfer}/cancelar', [FineDepositController::class, 'cancel'])->whereNumber('transfer')->name('traslados.cancel');
         Route::get('pagos', [FinePaymentQueueController::class, 'index'])->name('pagos.index');
         Route::post('{fine}/pagos-bancarios/verificados', [FineBankPaymentController::class, 'storeVerified'])
             ->whereNumber('fine')

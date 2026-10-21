@@ -9,6 +9,7 @@ use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\WholeReceiptDeposits;
 
 /**
  * Todos los créditos a los que un traslado **podría** corresponder.
@@ -43,6 +44,8 @@ final class ListCreditsForTransfer
      */
     private const LIMITE = 25;
 
+    public function __construct(private readonly WholeReceiptDeposits $cobrosEnteros) {}
+
     /** @return list<BankTransaction> */
     public function handle(CashToBankTransfer $transfer): array
     {
@@ -62,7 +65,10 @@ final class ListCreditsForTransfer
              * ofrecerlo sería prometer algo que va a fallar.
              */
             ->whereRaw(
-                'ABS(amount) > (
+                ($this->cobrosEnteros->appliesTo($transfer->cash_box_id)
+                    // Una caja que deposita cobros enteros solo reconoce un crédito sin ningún uso.
+                    ? '0 = '
+                    : 'ABS(amount) > ').'(
                     SELECT COALESCE(SUM(CASE WHEN reversal_of_id IS NULL THEN amount ELSE -amount END), 0)
                     FROM bank_transaction_allocations
                     WHERE bank_transaction_id = bank_transactions.id
