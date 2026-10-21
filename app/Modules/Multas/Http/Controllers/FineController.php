@@ -160,8 +160,7 @@ final class FineController extends Controller
         $usuario = $request->user();
         $cobra = $usuario?->can('multas.cobrar') ?? false;
         $verifica = $usuario?->can('multas.verificar-pagos') ?? false;
-        $resuelve = $usuario?->can('multas.resolver-recurso') ?? false;
-        $emiteRecibos = $cobra || $verifica || $resuelve;
+        $emiteRecibos = $cobra || $verifica;
         $cajaAbierta = $this->cajaAbierta($fine);
 
         return Inertia::render('multas/show', [
@@ -195,8 +194,8 @@ final class FineController extends Controller
             'recurso' => [
                 'base' => $fine->balance->obligation ?? '0.00',
                 'required' => AppealAmount::required($fine->balance->obligation ?? '0'),
-                // Con otro recurso sin descartar, el nuevo va a revisión (P05).
-                'repeated' => $fine->payments->contains(
+                // Una multa admite un solo recurso: con uno vigente no se ofrece otro.
+                'registered' => $fine->payments->contains(
                     fn (FinePayment $pago): bool => $pago->appeal_kind !== null && $pago->status !== FinePaymentStatus::Discarded,
                 ),
             ],
@@ -218,7 +217,6 @@ final class FineController extends Controller
                 'reportBank' => $cobra || $verifica,
                 // Verificar contra el extracto exige la caja abierta con su cuenta.
                 'verifyBank' => $verifica && $cajaAbierta && $creditos->book() !== null,
-                'resolveAppeal' => $resuelve,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.

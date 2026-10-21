@@ -207,17 +207,17 @@ es la parte del excedente hecha de plata que está en el libro.
   `bank_transfer` / `direct_deposit` / `echeq`; el origen judicial es aparte y solo
   para transferencia o cheque, con su referencia. **Base:** CHECK.
 - Lo cobrado en la caja nace `applied`; lo bancario nace `reported`. Después solo
-  avanza: `reported` → `applied` o `discarded`; `under_review` (recurso) →
-  `applied` (efectivo), `reported` (depósito directo) o `discarded`. Lo aplicado y
-  lo descartado no cambian, y los datos del pago no se editan. **Base:**
+  avanza: `reported` → `applied` o `discarded`. Lo aplicado y lo descartado no
+  cambian, y los datos del pago no se editan: un informado mal cargado se corrige
+  con otro que lo reemplaza ([corrección](#correccion)). **Base:**
   `fine_payments_guard`.
 - La presentación tiene fecha y precisión (`instant` / `day` / `unknown`). Si no es
   el instante de la carga, lleva respaldo. **Base:** CHECK.
-- El recurso del 20 %: base = obligación vigente al registrarlo, congelada;
-  exigido = `trunc(base × 0,20, 0)`; solo efectivo o depósito directo; el importe
-  del pago es el exigido; si el recibo externo dice otro, queda `under_review` y no
-  sale sin resolución. **Base:** CHECK y `fine_payments_guard`. El circuito se
-  habilita en la tanda bancaria.
+- El recurso del 20 %: base = obligación vigente al registrarlo, congelada; el
+  20 % calculado = `trunc(base × 0,20, 0)` queda como referencia; el importe del
+  pago es el del recibo externo; solo efectivo o depósito directo; uno por multa.
+  **Base:** CHECK, índice único parcial y `fine_payments_guard`. Detalle en
+  [recurso](#recurso).
 - `fine_payment_applications`: una por pago y una por recepción. El importe es la
   recepción entera, de la caja de Multas, en la moneda de la multa y por el mismo
   medio; `applied_amount + excess_amount = amount`; el asiento `funds_applied`
@@ -305,21 +305,33 @@ es la parte del excedente hecha de plata que está en el libro.
 
 ## Recurso del 20 %
 
-- Exigido = `trunc(base × 0,20, 0)`, con base = obligación vigente al registrarlo.
-  **Base:** CHECK `fine_payments_appeal_check` y `fine_payments_guard` (base
-  congelada). **Action:** `RegisterFineAppeal` con `AppealAmount`.
+- El importe cobrado es el del recibo externo. El 20 % calculado
+  (`appeal_required_amount = trunc(base × 0,20, 0)`, base = obligación vigente al
+  registrarlo) queda como referencia. **Base:** CHECK `fine_payments_appeal_check` y
+  `fine_payments_guard` (base congelada). **Action:** `RegisterFineAppeal` con
+  `AppealAmount`. Una diferencia no frena el cobro (U, 21/10/2026).
 - Solo efectivo o depósito directo, nunca de origen judicial. **Base:** CHECK.
-- Con diferencia, `under_review`, sin recepción ni recibo; sale solo resuelto, y
-  aplicado siempre por el exigido. **Base:** CHECK `fine_payments_review_check` y
-  `fine_payments_guard` (efectivo → `applied`, depósito → `reported`).
-- Un recurso sobre una multa con otro sin descartar nace `appeal_repeated` y en
-  revisión aunque coincida (P05 provisorio); un intento descartado no cuenta.
-  **Base:** `fine_payments_guard` (la marca es la que corresponde) y CHECK
-  `fine_payments_review_check`. **Action:** `RegisterFineAppeal`.
+- Una multa, un recurso vigente (no descartado). **Base:** índice único parcial
+  `fine_payments_one_appeal_per_fine`; **Action:** mensaje en el campo, también ante
+  dos registros simultáneos.
 - El depósito del recurso conserva su presentación anterior con respaldo; el
   efectivo se presenta en el momento. **Base:** CHECK
   `fine_payments_presentation_check`; **Action:** mensaje en el campo.
-- Resolver aplicando un recurso en efectivo exige saldo pendiente en ese momento.
-  **Solo Action** (`ResolveFineAppeal`).
-- `multas.resolver-recurso` no se delega. **Base:**
-  `role_has_permissions_guard_non_delegable`; **Action:** `UpdateRolePermissions`.
+
+<a id="correccion"></a>
+
+## Corrección de un informado
+
+- Solo un pago `reported` se corrige: se descarta con «Corregido: motivo» y el nuevo
+  apunta a él (`replaces_fine_payment_id`, único). **Base:** `fine_payments_guard`
+  exige que el reemplazado esté descartado, sea de la misma multa y del mismo tipo
+  (recurso o no). **Action:** `ReportFineBankPayment` y `RegisterFineAppeal`.
+- El corregido nace informado y hereda la presentación del original —instante y
+  precisión—, que es lo que decide el término; una corrección que trae otra
+  presentación se rechaza. **Base:** `fine_payments_guard`; **Action:** mensaje en
+  el campo.
+- La corrección de un recurso es otro depósito: no se corrige hacia el efectivo.
+  **Base:** el corregido nace informado; **Action:** mensaje en el campo.
+- Corregir no pide saldo pendiente: no mueve plata, completa los datos de un
+  depósito que ya existe. Si otro pago canceló la multa, lo que sobre se reconoce
+  como excedente al verificarlo. **Solo Action.**

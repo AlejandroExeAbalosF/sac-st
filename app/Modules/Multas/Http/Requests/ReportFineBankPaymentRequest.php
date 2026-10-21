@@ -29,6 +29,8 @@ final class ReportFineBankPaymentRequest extends FormRequest
             'presentationEvidence' => ['nullable', 'string', 'max:300'],
             'declaredPaidOn' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
             'judicialReference' => ['nullable', 'string', 'max:120'],
+            'replacesPaymentId' => ['nullable', 'integer', 'exists:fine_payments,id'],
+            'correctionReason' => ['required_with:replacesPaymentId', 'nullable', 'string', 'min:5', 'max:400'],
             'idempotencyKey' => ['required', 'string', 'max:90'],
         ];
     }
@@ -45,6 +47,7 @@ final class ReportFineBankPaymentRequest extends FormRequest
             'presentationEvidence' => 'respaldo de la presentación',
             'declaredPaidOn' => 'fecha del pago',
             'judicialReference' => 'orden de pago judicial',
+            'correctionReason' => 'motivo de la corrección',
         ];
     }
 }

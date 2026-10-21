@@ -1038,10 +1038,9 @@ declare namespace App {
                     appealBaseAmount: string | null;
                     appealRequiredAmount: string | null;
                     externalReceiptReference: string | null;
-                    externalReceiptAmount: string | null;
-                    appealRepeated: boolean;
-                    reviewReason: string | null;
+                    appealDiffers: boolean;
                     discardReason: string | null;
+                    replacesPaymentId: number | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
                 };
                 export type FinePendingPaymentData = {
@@ -1069,7 +1068,7 @@ declare namespace App {
                     | 'direct_deposit'
                     | 'echeq';
                 export type FinePaymentStatus =
-                    'reported' | 'applied' | 'discarded' | 'under_review';
+                    'reported' | 'applied' | 'discarded';
                 export type FineProvenance = 'manual' | 'import';
                 export type FineRevisionKind = 'completion' | 'correction';
                 export type FineTimeliness =

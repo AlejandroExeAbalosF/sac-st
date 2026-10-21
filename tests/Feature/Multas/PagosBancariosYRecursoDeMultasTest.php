@@ -12,8 +12,10 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Multas\Actions\ApplyFinePayment;
 use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\DiscardFinePayment;
 use App\Modules\Multas\Actions\RegisterFineAppeal;
 use App\Modules\Multas\Actions\ReportFineBankPayment;
+use App\Modules\Multas\Data\FinePaymentData;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
@@ -25,7 +27,6 @@ use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
-use App\Modules\Shared\Permissions\PermissionCatalog;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -196,9 +197,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('multas/pagos')
                 ->has('informados', 1)
-                ->where('informados.0.fineCaption', 'CRISTOMAX S.A.S')
-                ->has('enRevision', 0)
-                ->where('canResolve', false));
+                ->where('informados.0.fineCaption', 'CRISTOMAX S.A.S'));
     }
 
     /** Una presentación de un día anterior lleva su respaldo, y queda con el día. */
@@ -234,9 +233,148 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->and($adjunto->subject_id)->toBe($pago->id);
     }
 
+    // ── Corregir un informado ───────────────────────────────────────────
+
+    /** Un informado mal cargado se corrige: el anterior queda descartado y el nuevo apunta a él. */
+    public function test_a_reported_payment_is_corrected_keeping_its_presentation(): void
+    {
+        $multa = $this->escenario();
+        $ayer = BusinessDate::today()->subDay()->toDateString();
+        $usuario = $this->operador();
+
+        $this->actingAs($usuario)->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('30000.00'), 'presentedOn' => $ayer, 'presentationEvidence' => 'Sello de Mesa de Entradas',
+        ])->assertSessionHasNoErrors();
+        $anterior = FinePayment::query()->sole();
+
+        $this->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('300000.00'), 'replacesPaymentId' => $anterior->id,
+        ])->assertSessionHasErrors('correctionReason');
+
+        $this->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('300000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'Faltaba un cero en el importe',
+        ])->assertSessionHasNoErrors();
+
+        $corregido = FinePayment::query()->latest('id')->firstOrFail();
+
+        expect($anterior->refresh()->status)->toBe(FinePaymentStatus::Discarded)
+            ->and($anterior->discard_reason)->toBe('Corregido: Faltaba un cero en el importe')
+            ->and($corregido->status)->toBe(FinePaymentStatus::Reported)
+            ->and($corregido->amount)->toBe('300000.00')
+            ->and($corregido->replaces_fine_payment_id)->toBe($anterior->id)
+            ->and($corregido->presented_precision->value)->toBe('day')
+            ->and($corregido->presented_at?->toDateString())->toBe($ayer)
+            ->and($corregido->presentation_evidence)->toBe('Sello de Mesa de Entradas');
+    }
+
+    /** Lo aplicado ya tiene recibo: no se corrige así (anular es P13, pendiente). */
+    public function test_an_applied_payment_is_not_corrected(): void
+    {
+        $multa = $this->escenario();
+        $pago = app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '1000.00', (string) Str::uuid(), $this->quienAbre());
+
+        $this->actingAs($this->operador())->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('1000.00'), 'replacesPaymentId' => $pago->id, 'correctionReason' => 'Era una transferencia',
+        ])->assertSessionHasErrors('replacesPaymentId');
+
+        expect($pago->refresh()->status)->toBe(FinePaymentStatus::Applied);
+    }
+
+    /**
+     * La presentación decide el término: una corrección no la cambia, aunque la
+     * petición traiga otra. Informado después del cierre de junio, sigue fuera
+     * de término.
+     */
+    public function test_a_correction_cannot_bring_another_presentation(): void
+    {
+        $multa = $this->escenario(registrada: '2026-06-05');
+        $this->cerrarJunio();
+        $credito = $this->movimiento($this->laCuenta, '2026-06-29', '280000.00');
+        $anterior = $this->informar($multa, '28000.00');
+        $correccion = [
+            ...$this->informe('280000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'Faltaba un cero',
+        ];
+
+        $this->actingAs($this->operador())->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$correccion, 'presentedOn' => '2026-06-29', 'presentationEvidence' => 'Sello de Mesa de Entradas',
+        ])->assertSessionHasErrors('presentedOn');
+        expect($anterior->refresh()->status)->toBe(FinePaymentStatus::Reported);
+
+        $this->post(route('multas.pagos-bancarios.store', $multa), $correccion)->assertSessionHasNoErrors();
+        $corregido = FinePayment::query()->latest('id')->firstOrFail();
+
+        expect($corregido->presented_at?->format('Y-m-d H:i:s.u'))->toBe($anterior->presented_at?->format('Y-m-d H:i:s.u'))
+            ->and($corregido->presented_precision)->toBe($anterior->presented_precision);
+
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.verify', $corregido), ['bankTransactionId' => $credito->id])
+            ->assertSessionHasNoErrors();
+
+        expect($corregido->application()->firstOrFail()->timeliness)->toBe(FineTimeliness::Late);
+    }
+
+    /**
+     * Se informó $ 28.000 por un depósito de $ 280.000 y otro pago canceló la
+     * multa: la corrección no pide saldo, y el depósito entra como excedente al
+     * verificarlo.
+     */
+    public function test_a_reported_payment_is_corrected_after_another_one_settles_the_fine(): void
+    {
+        $multa = $this->escenario();
+        $credito = $this->movimiento($this->laCuenta, '2026-06-10', '280000.00');
+        $anterior = $this->informar($multa, '28000.00');
+        app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '1400000.00', (string) Str::uuid(), $this->quienAbre());
+
+        $this->actingAs($this->operador())->post(route('multas.pagos-bancarios.store', $multa), $this->informe('1000.00'))
+            ->assertSessionHasErrors('amount');
+        $this->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('280000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'El depósito es de 280.000',
+        ])->assertSessionHasNoErrors();
+
+        $corregido = FinePayment::query()->where('replaces_fine_payment_id', $anterior->id)->sole();
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.verify', $corregido), ['bankTransactionId' => $credito->id])
+            ->assertSessionHasNoErrors();
+
+        expect($corregido->application()->firstOrFail()->excess_amount)->toBe('280000.00')
+            ->and($this->saldo($multa, 'operational_excess'))->toBe('280000.00');
+    }
+
+    /** La base: una corrección apunta a un pago descartado de la misma multa y del mismo tipo. */
+    public function test_the_database_keeps_corrections_pointing_to_a_discarded_payment(): void
+    {
+        $multa = $this->escenario();
+        $vigente = $this->informar($multa, '1000.00');
+
+        $this->rechaza('reemplaza a un pago descartado', fn () => DB::table('fine_payments')->insert([
+            ...$this->filaInformada($multa), 'replaces_fine_payment_id' => $vigente->id,
+        ]));
+    }
+
+    /** La base: el corregido nace informado y con la presentación del que reemplaza. */
+    public function test_the_database_keeps_the_presentation_of_a_correction(): void
+    {
+        $multa = $this->escenario();
+        $descartado = app(DiscardFinePayment::class)->handle($this->informar($multa, '1000.00'), 'Cargado de más', $this->quienAbre());
+        $fila = [
+            ...$this->filaInformada($multa),
+            'replaces_fine_payment_id' => $descartado->id,
+            'presented_at' => $descartado->presented_at,
+            'presented_precision' => $descartado->presented_precision->value,
+        ];
+
+        $this->rechaza('conserva la presentación', fn () => DB::table('fine_payments')->insert([
+            ...$fila, 'presented_at' => BusinessDate::startOfDay('2026-06-29'), 'presented_precision' => 'day',
+            'presentation_evidence' => 'Sello de Mesa de Entradas',
+        ]));
+        $this->rechaza('nace informada', fn () => DB::table('fine_payments')->insert([
+            ...$fila, 'medium' => 'cash', 'status' => 'applied',
+        ]));
+    }
+
     // ── Recurso del 20 % ────────────────────────────────────────────────
 
-    /** Pesos enteros a favor del deudor: 100.002,50 × 20 % = 20.000,50 → 20.000,00 (M07). */
+    /** El 20 % calculado, de referencia: pesos enteros a favor del deudor. */
     public function test_the_appeal_amount_drops_the_cents(): void
     {
         expect(AppealAmount::required('100002.50'))->toBe('20000.00')
@@ -245,7 +383,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->and(AppealAmount::required('4.99'))->toBe('0.00');
     }
 
-    public function test_an_appeal_paid_in_cash_with_a_matching_external_receipt_is_collected(): void
+    public function test_an_appeal_in_cash_is_collected_for_its_external_receipt(): void
     {
         $multa = $this->escenario();
 
@@ -258,12 +396,17 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         expect($pago->status)->toBe(FinePaymentStatus::Applied)
             ->and($pago->appeal_kind)->toBe(AppealKind::Hierarchical)
             ->and($pago->appeal_base_amount)->toBe('1400000.00')
+            ->and($pago->appeal_required_amount)->toBe('280000.00')
             ->and($pago->amount)->toBe('280000.00')
             ->and($pago->paymentReceipt()->exists())->toBeTrue()
             ->and($this->saldo($multa, 'debt'))->toBe('1120000.00');
     }
 
-    public function test_an_appeal_whose_external_receipt_differs_waits_for_the_administrator(): void
+    /**
+     * U, 21/10/2026: se cobra lo que dice el recibo externo, aunque difiera del
+     * 20 % calculado; la diferencia queda a la vista.
+     */
+    public function test_an_appeal_that_differs_from_the_twenty_percent_is_collected_as_written(): void
     {
         $multa = $this->escenario();
 
@@ -272,114 +415,101 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $pago = FinePayment::query()->sole();
-        expect($pago->status)->toBe(FinePaymentStatus::UnderReview)
-            ->and(DB::table('fund_receipts')->count())->toBe(0)
-            ->and(DB::table('receipts')->count())->toBe(0)
-            ->and($this->saldo($multa, 'debt'))->toBe('1400000.00');
 
-        // No lo resuelve quien concilia ni quien cobra.
-        foreach (['contador', 'administrativo'] as $rol) {
-            $this->actingAs($this->operador($rol))
-                ->post(route('multas.pagos.resolve', $pago), ['decision' => 'apply', 'reason' => 'El recibo externo redondeó mal'])
-                ->assertForbidden();
-        }
-
-        $this->actingAs($this->operador('administrador'))
-            ->post(route('multas.pagos.resolve', $pago), ['decision' => 'apply', 'reason' => 'El recibo externo redondeó mal'])
-            ->assertSessionHasNoErrors();
-
-        $pago->refresh();
         expect($pago->status)->toBe(FinePaymentStatus::Applied)
-            ->and($pago->amount)->toBe('280000.00')
-            ->and($pago->review_reason)->toBe('El recibo externo redondeó mal')
-            ->and($pago->paymentReceipt()->exists())->toBeTrue()
-            ->and($this->saldo($multa, 'debt'))->toBe('1120000.00');
+            ->and($pago->amount)->toBe('280000.50')
+            ->and($pago->appeal_required_amount)->toBe('280000.00')
+            ->and(FinePaymentData::fromModel($pago->load(['application.fundReceipt', 'paymentReceipt.receipt', 'creator']))->appealDiffers)->toBeTrue()
+            ->and($this->saldo($multa, 'debt'))->toBe('1119999.50');
     }
 
-    public function test_an_appeal_under_review_can_be_discarded(): void
+    /** U, 21/10/2026: una multa admite un solo recurso. */
+    public function test_a_fine_admits_a_single_appeal(): void
     {
         $multa = $this->escenario();
-        $pago = $this->recurrir($multa, FinePaymentMedium::Cash, '1.00');
 
-        $this->actingAs($this->operador('administrador'))
-            ->post(route('multas.pagos.resolve', $pago), ['decision' => 'discard', 'reason' => 'Falta un ajuste de la multa'])
-            ->assertSessionHasNoErrors();
-
-        expect($pago->refresh()->status)->toBe(FinePaymentStatus::Discarded)
-            ->and($pago->discard_reason)->toBe('Falta un ajuste de la multa');
-    }
-
-    /** Por depósito directo, el recurso coincidente queda informado y se aplica al verificar. */
-    public function test_an_appeal_by_direct_deposit_is_applied_when_verified(): void
-    {
-        $multa = $this->escenario();
-        $pago = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '280000.00');
-        $credito = $this->movimiento($this->laCuenta, '2026-06-12', '280000.00');
-
-        expect($pago->status)->toBe(FinePaymentStatus::Reported);
-
-        $this->actingAs($this->operador('contador'))
-            ->post(route('multas.pagos.verify', $pago), ['bankTransactionId' => $credito->id])
-            ->assertSessionHasNoErrors();
-
-        expect($pago->refresh()->status)->toBe(FinePaymentStatus::Applied)
-            ->and($this->saldo($multa, 'debt'))->toBe('1120000.00');
-    }
-
-    /** Revisión 4c, R1 — P05 provisorio: un segundo recurso no se cobra solo. */
-    public function test_a_second_appeal_on_the_same_fine_goes_to_review(): void
-    {
-        $multa = $this->escenario();
-        $usuario = $this->operador();
-
-        $this->actingAs($usuario)->post(route('multas.recursos.store', $multa), $this->recurso('cash', '280000.00'))
+        $this->actingAs($this->operador())
+            ->post(route('multas.recursos.store', $multa), $this->recurso('direct_deposit', '280000.00'))
             ->assertSessionHasNoErrors();
         $this->post(route('multas.recursos.store', $multa), $this->recurso('cash', '280000.00'))
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('kind');
 
-        $segundo = FinePayment::query()->latest('id')->firstOrFail();
-
-        expect($segundo->status)->toBe(FinePaymentStatus::UnderReview)
-            ->and($segundo->appeal_repeated)->toBeTrue()
-            ->and($segundo->paymentReceipt()->exists())->toBeFalse()
-            ->and(DB::table('receipts')->count())->toBe(1)
-            ->and($this->saldo($multa, 'debt'))->toBe('1120000.00');
+        expect(FinePayment::query()->count())->toBe(1);
     }
 
-    /** Un intento descartado no es un recurso anterior. */
-    public function test_a_discarded_attempt_does_not_make_the_next_appeal_repeated(): void
+    /** Un intento descartado no cuenta: después se registra el que corresponde. */
+    public function test_a_discarded_appeal_does_not_count(): void
     {
         $multa = $this->escenario();
-        $intento = $this->recurrir($multa, FinePaymentMedium::Cash, '1.00');
+        $intento = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '28000.00');
 
-        $this->actingAs($this->operador('administrador'))
-            ->post(route('multas.pagos.resolve', $intento), ['decision' => 'discard', 'reason' => 'Faltaba un ajuste'])
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.discard', $intento), ['reason' => 'El recibo externo era de otra multa'])
             ->assertSessionHasNoErrors();
 
-        $nuevo = $this->recurrir($multa, FinePaymentMedium::Cash, '280000.00');
-
-        expect($nuevo->status)->toBe(FinePaymentStatus::Applied)
-            ->and($nuevo->appeal_repeated)->toBeFalse();
+        expect($this->recurrir($multa, FinePaymentMedium::Cash, '280000.00')->status)->toBe(FinePaymentStatus::Applied);
     }
 
-    /** La base: la marca de repetido la decide lo que hay, no quien inserta. */
-    public function test_the_database_marks_a_repeated_appeal_and_keeps_it_in_review(): void
+    /** Un depósito de recurso mal cargado se corrige; sigue habiendo un solo recurso. */
+    public function test_a_reported_appeal_deposit_is_corrected(): void
+    {
+        $multa = $this->escenario();
+        $anterior = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '28000.00');
+
+        $this->actingAs($this->operador())->post(route('multas.recursos.store', $multa), [
+            ...$this->recurso('direct_deposit', '280000.00'),
+            'replacesPaymentId' => $anterior->id, 'correctionReason' => 'El recibo externo dice 280.000',
+        ])->assertSessionHasNoErrors();
+
+        $corregido = FinePayment::query()->latest('id')->firstOrFail();
+
+        expect($anterior->refresh()->status)->toBe(FinePaymentStatus::Discarded)
+            ->and($corregido->amount)->toBe('280000.00')
+            ->and($corregido->replaces_fine_payment_id)->toBe($anterior->id);
+    }
+
+    /**
+     * La corrección de un recurso es otro depósito con la misma presentación:
+     * no se convierte en un cobro en efectivo ni trae otra fecha. Y no pide
+     * saldo: otro pago pudo haber cancelado la multa.
+     */
+    public function test_an_appeal_correction_stays_a_deposit_with_its_presentation(): void
+    {
+        $multa = $this->escenario();
+        $anterior = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '28000.00');
+        app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '1400000.00', (string) Str::uuid(), $this->quienAbre());
+        $correccion = fn (string $medio): array => [
+            ...$this->recurso($medio, '280000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'El recibo externo dice 280.000',
+        ];
+
+        $this->actingAs($this->operador())->post(route('multas.recursos.store', $multa), $correccion('cash'))
+            ->assertSessionHasErrors('medium');
+        $this->post(route('multas.recursos.store', $multa), [
+            ...$correccion('direct_deposit'),
+            'presentedOn' => BusinessDate::today()->subDay()->toDateString(), 'presentationEvidence' => 'Sello de Mesa de Entradas',
+        ])->assertSessionHasErrors('presentedOn');
+        expect($anterior->refresh()->status)->toBe(FinePaymentStatus::Reported);
+
+        $this->post(route('multas.recursos.store', $multa), $correccion('direct_deposit'))->assertSessionHasNoErrors();
+        $corregido = FinePayment::query()->where('replaces_fine_payment_id', $anterior->id)->sole();
+
+        expect($corregido->status)->toBe(FinePaymentStatus::Reported)
+            ->and($corregido->presented_at?->format('Y-m-d H:i:s.u'))->toBe($anterior->presented_at?->format('Y-m-d H:i:s.u'))
+            ->and($this->saldo($multa, 'debt'))->toBe('0.00');
+    }
+
+    /** La base: dos recursos vigentes de la misma multa no entran. */
+    public function test_the_database_keeps_a_single_appeal_per_fine(): void
     {
         $multa = $this->escenario();
         $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '280000.00');
 
-        $this->rechaza('es repetido', fn () => DB::table('fine_payments')->insert(
+        $this->rechaza('fine_payments_one_appeal_per_fine', fn () => DB::table('fine_payments')->insert(
             $this->filaDeRecurso($multa, base: '1400000.00', exigido: '280000.00'),
         ));
-        $this->rechaza('fine_payments_review_check', fn () => DB::table('fine_payments')->insert([
-            ...$this->filaDeRecurso($multa, base: '1400000.00', exigido: '280000.00'), 'appeal_repeated' => true,
-        ]));
     }
 
-    /**
-     * Revisión 4c, R2: el depósito del recurso conserva su presentación. Se
-     * presentó el 29/06, antes del cierre de junio, aunque se cargó después.
-     */
+    /** El depósito del recurso conserva su presentación anterior: se presentó antes del cierre de junio. */
     public function test_an_appeal_deposit_keeps_its_earlier_presentation(): void
     {
         $multa = $this->escenario(registrada: '2026-06-05');
@@ -417,28 +547,6 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->assertSessionHasErrors('presentedOn');
     }
 
-    /** Revisión 4c, R3: resolver no cobra un recurso en efectivo si la multa ya se pagó. */
-    public function test_a_pending_cash_appeal_is_not_collected_once_the_fine_is_paid(): void
-    {
-        $multa = $this->escenario();
-        $pago = $this->recurrir($multa, FinePaymentMedium::Cash, '280000.50');
-        app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '1400000.00', (string) Str::uuid(), $this->quienAbre());
-        $administrador = $this->operador('administrador');
-
-        $this->actingAs($administrador)
-            ->post(route('multas.pagos.resolve', $pago), ['decision' => 'apply', 'reason' => 'El recibo externo redondeó mal'])
-            ->assertSessionHasErrors(['decision' => 'La multa ya no tiene saldo pendiente: no se cobra el recurso. Descartalo con su motivo.']);
-
-        expect($pago->refresh()->status)->toBe(FinePaymentStatus::UnderReview)
-            ->and($this->saldo($multa, 'excess'))->toBe('0.00')
-            ->and(DB::table('fund_receipts')->count())->toBe(1);
-
-        $this->post(route('multas.pagos.resolve', $pago), ['decision' => 'discard', 'reason' => 'La multa se pagó entera'])
-            ->assertSessionHasNoErrors();
-
-        expect($pago->refresh()->status)->toBe(FinePaymentStatus::Discarded);
-    }
-
     public function test_an_appeal_is_paid_only_in_cash_or_by_direct_deposit(): void
     {
         $multa = $this->escenario();
@@ -448,7 +556,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->assertSessionHasErrors('medium');
     }
 
-    /** La base congela la base del 20 % y la cuenta, aunque nadie pase por el Action. */
+    /** La base congela la base del 20 % y la cuenta de referencia, aunque nadie pase por el Action. */
     public function test_the_database_keeps_the_appeal_base_and_its_twenty_percent(): void
     {
         $multa = $this->escenario();
@@ -459,12 +567,6 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $this->rechaza('fine_payments_appeal_check', fn () => DB::table('fine_payments')->insert(
             $this->filaDeRecurso($multa, base: '1400000.00', exigido: '280001.00'),
         ));
-    }
-
-    public function test_the_appeal_permission_cannot_be_delegated(): void
-    {
-        $this->assertContains('multas.resolver-recurso', app(PermissionCatalog::class)->nonDelegable());
-        $this->assertFalse(User::factory()->create()->assignRole('contador')->can('multas.resolver-recurso'));
     }
 
     // ── Escenario ───────────────────────────────────────────────────────
@@ -532,7 +634,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
     {
         return [
             'kind' => 'hierarchical', 'medium' => $medio, 'externalReference' => 'R-2026-0042',
-            'externalAmount' => $externo, 'idempotencyKey' => (string) Str::uuid(),
+            'amount' => $externo, 'idempotencyKey' => (string) Str::uuid(),
         ];
     }
 
@@ -545,8 +647,21 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             'fine_id' => $multa->id, 'medium' => 'direct_deposit', 'status' => 'reported', 'amount' => $exigido,
             'presented_at' => $ahora, 'presented_precision' => 'instant', 'reported_at' => $ahora,
             'payer_name' => 'CRISTOMAX S.A.S', 'appeal_kind' => 'appeal', 'appeal_base_amount' => $base,
-            'appeal_required_amount' => $exigido, 'external_receipt_reference' => 'R-1', 'external_receipt_amount' => $exigido,
+            'appeal_required_amount' => $exigido, 'external_receipt_reference' => 'R-1',
             'idempotency_key' => (string) Str::uuid(), 'created_at' => $ahora, 'updated_at' => $ahora,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function filaInformada(Fine $multa): array
+    {
+        $ahora = CarbonImmutable::now();
+
+        return [
+            'fine_id' => $multa->id, 'medium' => 'bank_transfer', 'status' => 'reported', 'amount' => '1000.00',
+            'presented_at' => $ahora, 'presented_precision' => 'instant', 'reported_at' => $ahora,
+            'payer_name' => 'CRISTOMAX S.A.S', 'idempotency_key' => (string) Str::uuid(),
+            'created_at' => $ahora, 'updated_at' => $ahora,
         ];
     }
 

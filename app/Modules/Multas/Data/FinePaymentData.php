@@ -11,6 +11,7 @@ use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\FinePayment;
+use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -48,19 +49,21 @@ final class FinePaymentData extends Data
         public ?string $createdByName,
         public ?string $createdAt,
         public ?string $declaredPaidOn,
-        /** Recurso del 20 %: tipo, base congelada, exigido y lo que dice el recibo externo. */
+        /**
+         * Recurso del 20 %: tipo, base congelada y el 20 % calculado como
+         * referencia. El importe del pago es el del recibo externo.
+         */
         public ?AppealKind $appealKind,
         /** @var numeric-string|null */
         public ?string $appealBaseAmount,
         /** @var numeric-string|null */
         public ?string $appealRequiredAmount,
         public ?string $externalReceiptReference,
-        /** @var numeric-string|null */
-        public ?string $externalReceiptAmount,
-        /** Otro recurso de la misma multa ya estaba vigente al registrarlo (P05). */
-        public bool $appealRepeated,
-        public ?string $reviewReason,
+        /** El importe del recibo externo no es el 20 % calculado. */
+        public bool $appealDiffers,
         public ?string $discardReason,
+        /** El informado que este corrige. */
+        public ?int $replacesPaymentId,
         /** @var list<FineAttachmentData> */
         public array $attachments,
     ) {}
@@ -103,10 +106,9 @@ final class FinePaymentData extends Data
             appealBaseAmount: $pago->appeal_base_amount,
             appealRequiredAmount: $pago->appeal_required_amount,
             externalReceiptReference: $pago->external_receipt_reference,
-            externalReceiptAmount: $pago->external_receipt_amount,
-            appealRepeated: $pago->appeal_repeated,
-            reviewReason: $pago->review_reason,
+            appealDiffers: $pago->appeal_required_amount !== null && ! Decimal::equals($pago->amount, $pago->appeal_required_amount),
             discardReason: $pago->discard_reason,
+            replacesPaymentId: $pago->replaces_fine_payment_id,
             attachments: $adjuntos,
         );
     }

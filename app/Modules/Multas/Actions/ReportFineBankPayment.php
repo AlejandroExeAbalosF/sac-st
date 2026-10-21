@@ -26,10 +26,16 @@ use Illuminate\Validation\ValidationException;
  * presentó el comprobante, que es lo que decide el término (M08): hoy, en el
  * momento de cargarlo, o un día anterior con su respaldo —el sello de Mesa
  * de Entradas, una nota—.
+ *
+ * Un informado que se cargó mal se corrige antes de verificarlo: el anterior
+ * se descarta con su motivo y el nuevo apunta a él.
  */
 final class ReportFineBankPayment
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly DiscardFinePayment $descartar,
+        private readonly RecordAuditEvent $auditar,
+    ) {}
 
     /**
      * @throws ValidationException
@@ -44,6 +50,8 @@ final class ReportFineBankPayment
         ?string $presentationEvidence = null,
         ?CarbonImmutable $declaredPaidOn = null,
         ?string $judicialReference = null,
+        ?FinePayment $replaces = null,
+        ?string $correctionReason = null,
     ): FinePayment {
         $importe = Decimal::scale($amount);
         $hoy = BusinessDate::today();
@@ -53,8 +61,13 @@ final class ReportFineBankPayment
 
         $this->assertReportable($medio, $importe, $presentado, $hoy, $respaldo, $declaredPaidOn, $judicial);
 
+        if ($replaces !== null && ($presentedOn !== null || $respaldo !== null)) {
+            throw ValidationException::withMessages(['presentedOn' => 'Una corrección conserva la presentación del pago que reemplaza: no se carga otra.']);
+        }
+
         return DB::transaction(function () use (
-            $multa, $medio, $importe, $idempotencyKey, $actorId, $presentado, $hoy, $respaldo, $declaredPaidOn, $judicial
+            $multa, $medio, $importe, $idempotencyKey, $actorId, $presentado, $hoy, $respaldo, $declaredPaidOn, $judicial,
+            $replaces, $correctionReason
         ): FinePayment {
             $yaInformado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
 
@@ -64,12 +77,34 @@ final class ReportFineBankPayment
 
             $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
 
-            if (Decimal::equals((string) FineBalance::query()->whereKey($multa->id)->value('debt'), '0')) {
+            if ($replaces !== null) {
+                if ($replaces->fine_id !== $multa->id || $replaces->appeal_kind !== null) {
+                    throw ValidationException::withMessages(['replacesPaymentId' => 'Se corrige un pago informado de esta misma multa.']);
+                }
+
+                if ($replaces->status !== FinePaymentStatus::Reported) {
+                    throw ValidationException::withMessages(['replacesPaymentId' => 'Ese pago ya no está informado: lo que ya se aplicó tiene recibo y no se corrige así.']);
+                }
+
+                $this->descartar->handle($replaces, 'Corregido: '.trim((string) $correctionReason), $actorId);
+            }
+
+            // Una corrección no pide saldo: no mueve plata, completa los datos de un
+            // depósito que ya existe. Si sobra, el excedente se reconoce al verificarlo.
+            if ($replaces === null && Decimal::equals((string) FineBalance::query()->whereKey($multa->id)->value('debt'), '0')) {
                 throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay pago que informar.']);
             }
 
             $ahora = CarbonImmutable::now();
             $delDia = $presentado->isSameDay($hoy);
+
+            $presentacion = $replaces !== null
+                ? $this->presentacionHeredada($replaces)
+                : [
+                    'presented_at' => $delDia ? $ahora : BusinessDate::startOfDay($presentado->toDateString()),
+                    'presented_precision' => $delDia ? PresentationPrecision::Instant : PresentationPrecision::Day,
+                    'presentation_evidence' => $delDia ? null : $respaldo,
+                ];
 
             $pago = FinePayment::query()->create([
                 'fine_id' => $multa->id,
@@ -78,13 +113,12 @@ final class ReportFineBankPayment
                 'judicial_reference' => $judicial,
                 'status' => FinePaymentStatus::Reported,
                 'amount' => $importe,
-                'presented_at' => $delDia ? $ahora : BusinessDate::startOfDay($presentado->toDateString()),
-                'presented_precision' => $delDia ? PresentationPrecision::Instant : PresentationPrecision::Day,
-                'presentation_evidence' => $delDia ? null : $respaldo,
+                ...$presentacion,
                 'reported_at' => $ahora,
                 'declared_paid_on' => $declaredPaidOn?->toDateString(),
                 'payer_person_id' => $multa->person_id,
                 'payer_name' => $multa->caption,
+                'replaces_fine_payment_id' => $replaces?->id,
                 'idempotency_key' => $idempotencyKey,
                 'created_by' => $actorId,
             ]);
@@ -93,10 +127,28 @@ final class ReportFineBankPayment
                 'medio' => $medio->label(),
                 'amount' => $importe,
                 'judicial' => $judicial,
+                'corrige' => $replaces === null ? null : 'Reemplaza el informado N.º '.$replaces->id,
             ]), actorId: $actorId);
 
             return $pago;
         });
+    }
+
+    /**
+     * La presentación del corregido es la del informado que reemplaza: se
+     * corrigen los datos de la carga, no el día en que se presentó el
+     * comprobante, que es lo que decide el término.
+     *
+     * @return array{presented_at: mixed, presented_precision: mixed, presentation_evidence: string}
+     */
+    private function presentacionHeredada(FinePayment $anterior): array
+    {
+        return [
+            'presented_at' => $anterior->presented_at,
+            'presented_precision' => $anterior->presented_precision,
+            'presentation_evidence' => $anterior->presentation_evidence
+                ?? 'Presentado con el pago informado que este corrige.',
+        ];
     }
 
     /**

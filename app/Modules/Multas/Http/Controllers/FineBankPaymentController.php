@@ -48,9 +48,11 @@ final class FineBankPaymentController extends Controller
             presentationEvidence: $datos['presentationEvidence'] ?? null,
             declaredPaidOn: isset($datos['declaredPaidOn']) ? CarbonImmutable::parse((string) $datos['declaredPaidOn']) : null,
             judicialReference: $datos['judicialReference'] ?? null,
+            replaces: isset($datos['replacesPaymentId']) ? FinePayment::query()->findOrFail((int) $datos['replacesPaymentId']) : null,
+            correctionReason: $datos['correctionReason'] ?? null,
         );
 
-        Toast::success('Pago informado.', 'Queda por verificar contra el extracto: todavía no reduce el saldo.');
+        Toast::success(isset($datos['replacesPaymentId']) ? 'Pago corregido.' : 'Pago informado.', 'Queda por verificar contra el extracto: todavía no reduce el saldo.');
 
         return back();
     }

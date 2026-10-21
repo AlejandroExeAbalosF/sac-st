@@ -26,27 +26,28 @@ use Illuminate\Validation\ValidationException;
 /**
  * El pago del 20 % para recurrir la multa, jerárquico o en apelación (M07).
  *
- * La base es el importe vigente de la multa en este momento, y queda
- * congelada: una resolución posterior no invalida el cálculo. Solo en
- * efectivo, que se cobra en el acto, o por depósito directo, que queda
- * informado hasta verificarlo contra el extracto.
+ * **Se cobra lo que dice el recibo externo** (U, 21/10/2026): la liquidación
+ * del 20 % la hace otra oficina y llega con su propio documento. El sistema
+ * guarda al lado el 20 % que calcula sobre el importe vigente de la multa
+ * —sin centavos, con la base congelada— como referencia; si difieren, el
+ * cobro sigue y la diferencia queda a la vista.
  *
- * El sancionado trae un recibo externo que dice el importe. Si no coincide
- * con el 20 % calculado, el intento queda **en revisión**: no se cobra ni se
- * emite recibo hasta que el administrador lo resuelva. No hay excepción
- * discrecional: lo que se aplica es siempre el 20 % exigido.
+ * **Una multa admite un solo recurso.** Un segundo se rechaza; un intento
+ * descartado no cuenta.
  *
- * También queda en revisión un recurso sobre una multa que ya tiene otro sin
- * descartar (P05, provisorio hasta que el área defina los recursos repetidos).
+ * Solo en efectivo, que se cobra en el acto, o por depósito directo, que
+ * queda informado hasta verificarlo contra el extracto. El depósito puede
+ * haberse presentado antes de cargarlo: como en cualquier pago por banco, la
+ * presentación —con su respaldo— decide el término (M08).
  *
- * El depósito directo puede haberse presentado antes de cargarlo: como en
- * cualquier pago por banco, la presentación —con su respaldo— decide el
- * término (M08). El efectivo se presenta y se cobra en el mostrador, ahora.
+ * Un depósito informado que se cargó mal se corrige: el anterior se descarta
+ * con su motivo y el nuevo apunta a él.
  */
 final class RegisterFineAppeal
 {
     public function __construct(
         private readonly ReceiveFinePaymentAtCounter $recibir,
+        private readonly DiscardFinePayment $descartar,
         private readonly TalonarioSequence $talonarios,
         private readonly RecordAuditEvent $auditar,
     ) {}
@@ -59,7 +60,7 @@ final class RegisterFineAppeal
         AppealKind $tipo,
         FinePaymentMedium $medio,
         string $externalReference,
-        string $externalAmount,
+        string $amount,
         string $idempotencyKey,
         ?int $actorId,
         ?string $talonarioNumber = null,
@@ -67,26 +68,116 @@ final class RegisterFineAppeal
         ?CarbonImmutable $declaredPaidOn = null,
         ?CarbonImmutable $presentedOn = null,
         ?string $presentationEvidence = null,
+        ?FinePayment $replaces = null,
+        ?string $correctionReason = null,
     ): FinePayment {
         $referencia = trim($externalReference);
-        $externo = Decimal::scale($externalAmount);
+        $importe = Decimal::scale($amount);
         $talonario = trim((string) $talonarioNumber) ?: null;
         $hoy = BusinessDate::today();
         $presentado = $presentedOn ?? $hoy;
         $respaldo = trim((string) $presentationEvidence) ?: null;
 
-        $this->assertRegistrable($medio, $referencia, $externo, $declaredPaidOn, $presentado, $hoy, $respaldo);
+        $this->assertRegistrable($medio, $referencia, $importe, $declaredPaidOn, $presentado, $hoy, $respaldo);
+
+        if ($replaces !== null) {
+            $this->assertCorrectable($medio, $presentedOn, $respaldo);
+        }
 
         try {
-            return $this->register(
-                $multa, $tipo, $medio, $referencia, $externo, $idempotencyKey, $actorId, $talonario, $signedById, $declaredPaidOn,
-                $presentado->isSameDay($hoy) ? null : $presentado, $respaldo,
-            );
+            return DB::transaction(function () use (
+                $multa, $tipo, $medio, $referencia, $importe, $idempotencyKey, $actorId, $talonario, $signedById,
+                $declaredPaidOn, $presentado, $hoy, $respaldo, $replaces, $correctionReason
+            ): FinePayment {
+                $yaRegistrado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
+
+                if ($yaRegistrado !== null) {
+                    return $yaRegistrado;
+                }
+
+                $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
+
+                if ($replaces !== null) {
+                    $this->reemplazar($multa, $replaces, $correctionReason, $actorId);
+                }
+
+                $saldo = FineBalance::query()->whereKey($multa->id)->firstOrFail();
+
+                // Una corrección no pide saldo: completa los datos de un depósito que ya existe.
+                if ($replaces === null && Decimal::equals($saldo->debt, '0')) {
+                    throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay recurso que pagar.']);
+                }
+
+                $anterior = FinePayment::query()
+                    ->where('fine_id', $multa->id)
+                    ->whereNotNull('appeal_kind')
+                    ->where('status', '<>', FinePaymentStatus::Discarded)
+                    ->first();
+
+                if ($anterior !== null) {
+                    throw ValidationException::withMessages([
+                        'kind' => 'La multa ya tiene un recurso registrado: una multa admite uno solo. Si aquel se cargó mal, corregilo o descartalo.',
+                    ]);
+                }
+
+                $base = $saldo->obligation;
+                $ahora = CarbonImmutable::now();
+                $delDia = $presentado->isSameDay($hoy);
+
+                $presentacion = $replaces !== null
+                    ? $this->presentacionHeredada($replaces)
+                    : [
+                        'presented_at' => $delDia ? $ahora : BusinessDate::startOfDay($presentado->toDateString()),
+                        'presented_precision' => $delDia ? PresentationPrecision::Instant : PresentationPrecision::Day,
+                        'presentation_evidence' => $delDia ? null : $respaldo,
+                    ];
+
+                $pago = FinePayment::query()->create([
+                    'fine_id' => $multa->id,
+                    'medium' => $medio,
+                    'status' => $medio === FinePaymentMedium::Cash ? FinePaymentStatus::Applied : FinePaymentStatus::Reported,
+                    'amount' => $importe,
+                    ...$presentacion,
+                    'reported_at' => $ahora,
+                    'declared_paid_on' => $declaredPaidOn?->toDateString(),
+                    'payer_person_id' => $multa->person_id,
+                    'payer_name' => $multa->caption,
+                    'appeal_kind' => $tipo,
+                    'appeal_base_amount' => $base,
+                    'appeal_required_amount' => AppealAmount::required($base),
+                    'external_receipt_reference' => $referencia,
+                    'replaces_fine_payment_id' => $replaces?->id,
+                    'idempotency_key' => $idempotencyKey,
+                    'created_by' => $actorId,
+                ]);
+
+                $comprobante = $pago->status === FinePaymentStatus::Applied
+                    ? $this->recibir->handle($pago, $hoy, null, $talonario, $signedById, $actorId)
+                    : null;
+
+                $this->auditar->handle('multa.recurso-registrado', $multa, metadata: array_filter([
+                    'tipo' => $tipo->label(),
+                    'medio' => $medio->label(),
+                    'base' => $base,
+                    'exigido' => $pago->appeal_required_amount,
+                    'externo' => $referencia,
+                    'importe' => $importe,
+                    'recibo' => $comprobante?->receipt()->value('formatted_number'),
+                    'corrige' => $replaces === null ? null : 'Reemplaza el informado N.º '.$replaces->id,
+                ]), actorId: $actorId);
+
+                return $pago;
+            });
         } catch (UniqueConstraintViolationException $e) {
             $yaRegistrado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
 
             if ($yaRegistrado !== null) {
                 return $yaRegistrado;
+            }
+
+            // Dos recursos de la misma multa a la vez: la base frenó al segundo.
+            if (str_contains($e->getMessage(), 'fine_payments_one_appeal_per_fine')) {
+                throw ValidationException::withMessages(['kind' => 'La multa ya tiene un recurso registrado: una multa admite uno solo.']);
             }
 
             throw $this->talonarios->translate(
@@ -96,101 +187,59 @@ final class RegisterFineAppeal
     }
 
     /**
+     * Una corrección: el recurso informado que se cargó mal se descarta con su
+     * motivo, en la misma transacción que registra el corregido.
+     *
      * @throws ValidationException
-     * @throws UniqueConstraintViolationException dos pedidos simultáneos con la misma clave o el mismo talonario
      */
-    private function register(
-        Fine $multa,
-        AppealKind $tipo,
-        FinePaymentMedium $medio,
-        string $referencia,
-        string $externo,
-        string $idempotencyKey,
-        ?int $actorId,
-        ?string $talonario,
-        ?int $signedById,
-        ?CarbonImmutable $declaredPaidOn,
-        ?CarbonImmutable $presentadoAntes,
-        ?string $respaldo,
-    ): FinePayment {
-        return DB::transaction(function () use (
-            $multa, $tipo, $medio, $referencia, $externo, $idempotencyKey, $actorId, $talonario, $signedById, $declaredPaidOn,
-            $presentadoAntes, $respaldo
-        ): FinePayment {
-            $yaRegistrado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
+    private function reemplazar(Fine $multa, FinePayment $anterior, ?string $motivo, ?int $actorId): void
+    {
+        if ($anterior->fine_id !== $multa->id || $anterior->appeal_kind === null) {
+            throw ValidationException::withMessages(['replacesPaymentId' => 'Se corrige un recurso de esta misma multa.']);
+        }
 
-            if ($yaRegistrado !== null) {
-                return $yaRegistrado;
-            }
+        if ($anterior->status !== FinePaymentStatus::Reported) {
+            throw ValidationException::withMessages(['replacesPaymentId' => 'Ese pago ya no está informado: lo que ya se aplicó tiene recibo y no se corrige así.']);
+        }
 
-            $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
-            $saldo = FineBalance::query()->whereKey($multa->id)->firstOrFail();
+        $this->descartar->handle($anterior, 'Corregido: '.trim((string) $motivo), $actorId);
+    }
 
-            if (Decimal::equals($saldo->debt, '0')) {
-                throw ValidationException::withMessages(['externalAmount' => 'La multa no tiene saldo pendiente: no hay recurso que pagar.']);
-            }
+    /**
+     * La presentación del corregido es la del informado que reemplaza: se
+     * corrigen los datos de la carga, no el día en que se presentó el
+     * comprobante, que es lo que decide el término.
+     *
+     * @return array{presented_at: mixed, presented_precision: mixed, presentation_evidence: string}
+     */
+    private function presentacionHeredada(FinePayment $anterior): array
+    {
+        return [
+            'presented_at' => $anterior->presented_at,
+            'presented_precision' => $anterior->presented_precision,
+            'presentation_evidence' => $anterior->presentation_evidence
+                ?? 'Presentado con el pago informado que este corrige.',
+        ];
+    }
 
-            $base = $saldo->obligation;
-            $exigido = AppealAmount::required($base);
-
-            if (Decimal::equals($exigido, '0')) {
-                throw ValidationException::withMessages([
-                    'externalAmount' => 'El 20 % de la multa vigente no llega a un peso: no hay importe que exigir.',
-                ]);
-            }
-
-            $coincide = Decimal::equals($externo, $exigido);
-            // Otro recurso de la multa que no se descartó: este va a revisión (P05).
-            $repetido = FinePayment::query()
-                ->where('fine_id', $multa->id)
-                ->whereNotNull('appeal_kind')
-                ->where('status', '<>', FinePaymentStatus::Discarded)
-                ->exists();
-            $ahora = CarbonImmutable::now();
-
-            $pago = FinePayment::query()->create([
-                'fine_id' => $multa->id,
-                'medium' => $medio,
-                'status' => match (true) {
-                    ! $coincide || $repetido => FinePaymentStatus::UnderReview,
-                    $medio === FinePaymentMedium::Cash => FinePaymentStatus::Applied,
-                    default => FinePaymentStatus::Reported,
-                },
-                'amount' => $exigido,
-                'presented_at' => $presentadoAntes === null ? $ahora : BusinessDate::startOfDay($presentadoAntes->toDateString()),
-                'presented_precision' => $presentadoAntes === null ? PresentationPrecision::Instant : PresentationPrecision::Day,
-                'presentation_evidence' => $presentadoAntes === null ? null : $respaldo,
-                'reported_at' => $ahora,
-                'declared_paid_on' => $declaredPaidOn?->toDateString(),
-                'payer_person_id' => $multa->person_id,
-                'payer_name' => $multa->caption,
-                'appeal_kind' => $tipo,
-                'appeal_base_amount' => $base,
-                'appeal_required_amount' => $exigido,
-                'external_receipt_reference' => $referencia,
-                'external_receipt_amount' => $externo,
-                'appeal_repeated' => $repetido,
-                'idempotency_key' => $idempotencyKey,
-                'created_by' => $actorId,
+    /**
+     * Lo que se corrige es un depósito informado: el corregido también es un
+     * depósito —el efectivo se cobra en la caja, no se corrige hacia ahí— y
+     * conserva la presentación del original.
+     *
+     * @throws ValidationException
+     */
+    private function assertCorrectable(FinePaymentMedium $medio, ?CarbonImmutable $presentedOn, ?string $respaldo): void
+    {
+        if ($medio !== FinePaymentMedium::DirectDeposit) {
+            throw ValidationException::withMessages([
+                'medium' => 'Se corrige un depósito informado: el corregido también es un depósito. Si se pagó en efectivo, descartá el informado y cobralo en la caja.',
             ]);
+        }
 
-            $comprobante = $pago->status === FinePaymentStatus::Applied
-                ? $this->recibir->handle($pago, BusinessDate::today(), null, $talonario, $signedById, $actorId)
-                : null;
-
-            $this->auditar->handle('multa.recurso-registrado', $multa, metadata: array_filter([
-                'tipo' => $tipo->label(),
-                'medio' => $medio->label(),
-                'base' => $base,
-                'exigido' => $exigido,
-                'externo' => $referencia,
-                'importe_externo' => $externo,
-                'repetido' => $repetido ? 'Sí: la multa ya tiene otro recurso' : null,
-                'recibo' => $comprobante?->receipt()->value('formatted_number'),
-            ]), actorId: $actorId);
-
-            return $pago;
-        });
+        if ($presentedOn !== null || $respaldo !== null) {
+            throw ValidationException::withMessages(['presentedOn' => 'Una corrección conserva la presentación del pago que reemplaza: no se carga otra.']);
+        }
     }
 
     /**
@@ -199,7 +248,7 @@ final class RegisterFineAppeal
     private function assertRegistrable(
         FinePaymentMedium $medio,
         string $referencia,
-        string $externo,
+        string $importe,
         ?CarbonImmutable $pagado,
         CarbonImmutable $presentado,
         CarbonImmutable $hoy,
@@ -215,8 +264,8 @@ final class RegisterFineAppeal
             throw ValidationException::withMessages(['externalReference' => 'Anotá el número del recibo externo que trae el sancionado.']);
         }
 
-        if (Decimal::isNegative($externo) || Decimal::equals($externo, '0')) {
-            throw ValidationException::withMessages(['externalAmount' => 'Anotá el importe que dice el recibo externo.']);
+        if (Decimal::isNegative($importe) || Decimal::equals($importe, '0')) {
+            throw ValidationException::withMessages(['amount' => 'Anotá el importe que dice el recibo externo.']);
         }
 
         if ($pagado !== null && ($medio !== FinePaymentMedium::DirectDeposit || $pagado->greaterThan($hoy))) {

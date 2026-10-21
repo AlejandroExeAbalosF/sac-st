@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import CreditPicker from '@/features/multas/components/credit-picker';
 import FormDialog, {
@@ -20,11 +21,12 @@ import ReceiptFields, {
     receiptPayload,
     SIN_FIRMANTE,
 } from '@/features/multas/components/receipt-fields';
-import { businessToday, parseAmount } from '@/lib/format';
+import { businessToday, money, parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/pagos-bancarios';
 import { store as storeVerified } from '@/routes/multas/pagos-bancarios/verificados';
 
 type Credito = App.Modules.Multas.Data.FineBankCreditData;
+type Pago = App.Modules.Multas.Data.FinePaymentData;
 type Medio = 'bank_transfer' | 'direct_deposit' | 'echeq';
 
 const MEDIOS: Record<Medio, string> = {
@@ -47,6 +49,7 @@ export default function BankPaymentDialog({
     creditos,
     firmantes,
     idempotencyKey,
+    corrige,
     onClose,
 }: {
     fineId: number;
@@ -54,22 +57,26 @@ export default function BankPaymentDialog({
     creditos?: Credito[];
     firmantes: Firmante[];
     idempotencyKey: string;
+    /** El pago informado que se corrige, si es una corrección. */
+    corrige?: Pago;
     onClose: () => void;
 }) {
     const [delExtracto, setDelExtracto] = useState(false);
     const hoy = businessToday();
     const { data, setData, post, transform, processing, errors } = useForm({
-        medium: 'bank_transfer' as Medio,
-        amount: '',
+        medium: (corrige?.medium ?? 'bank_transfer') as Medio,
+        amount: corrige ? money(corrige.amount, { symbol: false }) : '',
         presentedOn: hoy,
         presentationEvidence: '',
-        declaredPaidOn: '',
-        judicial: false,
-        judicialReference: '',
+        declaredPaidOn: corrige?.declaredPaidOn ?? '',
+        judicial: Boolean(corrige?.judicialReference),
+        judicialReference: corrige?.judicialReference ?? '',
         bankTransactionId: null as number | null,
         talonarioNumber: '',
         signedById: SIN_FIRMANTE,
+        correctionReason: '',
     });
+    const errores = errors as Record<string, string | undefined>;
     const atrasado = data.presentedOn !== '' && data.presentedOn < hoy;
     const transferencia = data.medium === 'bank_transfer';
 
@@ -104,6 +111,12 @@ export default function BankPaymentDialog({
                 : null,
             declaredPaidOn: datos.declaredPaidOn || null,
             judicialReference: judicial,
+            ...(corrige
+                ? {
+                      replacesPaymentId: corrige.id,
+                      correctionReason: datos.correctionReason.trim(),
+                  }
+                : {}),
             idempotencyKey,
         }));
         post(store(fineId).url, { preserveScroll: true, onSuccess: onClose });
@@ -111,16 +124,24 @@ export default function BankPaymentDialog({
 
     return (
         <FormDialog
-            title="Pago por banco"
+            title={corrige ? 'Corregir el pago informado' : 'Pago por banco'}
             description={
-                delExtracto
-                    ? 'Elegí el crédito del extracto que trajo el pago. Se aplica en el acto, por el importe del crédito, y sale el recibo.'
-                    : 'El pago queda informado hasta verificarlo contra el extracto: todavía no reduce el saldo.'
+                corrige
+                    ? 'El informado se descarta con el motivo y queda este en su lugar, con la misma presentación.'
+                    : delExtracto
+                      ? 'Elegí el crédito del extracto que trajo el pago. Se aplica en el acto, por el importe del crédito, y sale el recibo.'
+                      : 'El pago queda informado hasta verificarlo contra el extracto: todavía no reduce el saldo.'
             }
             onClose={onClose}
             onSubmit={enviar}
             processing={processing}
-            submitLabel={delExtracto ? 'Verificar y emitir recibo' : 'Informar'}
+            submitLabel={
+                corrige
+                    ? 'Corregir'
+                    : delExtracto
+                      ? 'Verificar y emitir recibo'
+                      : 'Informar'
+            }
         >
             {canVerify && (
                 <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
@@ -201,23 +222,25 @@ export default function BankPaymentDialog({
             ) : (
                 <>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label htmlFor="banco-presentado">
-                                Presentado el
-                            </Label>
-                            <Input
-                                id="banco-presentado"
-                                type="date"
-                                className="mt-1"
-                                max={hoy}
-                                value={data.presentedOn}
-                                onChange={(e) =>
-                                    setData('presentedOn', e.target.value)
-                                }
-                                aria-invalid={Boolean(errors.presentedOn)}
-                            />
-                            <FieldError message={errors.presentedOn} />
-                        </div>
+                        {!corrige && (
+                            <div>
+                                <Label htmlFor="banco-presentado">
+                                    Presentado el
+                                </Label>
+                                <Input
+                                    id="banco-presentado"
+                                    type="date"
+                                    className="mt-1"
+                                    max={hoy}
+                                    value={data.presentedOn}
+                                    onChange={(e) =>
+                                        setData('presentedOn', e.target.value)
+                                    }
+                                    aria-invalid={Boolean(errors.presentedOn)}
+                                />
+                                <FieldError message={errors.presentedOn} />
+                            </div>
+                        )}
                         <div>
                             <Label htmlFor="banco-pagado">
                                 Pagado el (según el comprobante)
@@ -295,6 +318,30 @@ export default function BankPaymentDialog({
                             <FieldError message={errors.judicialReference} />
                         </div>
                     )}
+                </div>
+            )}
+            {corrige && (
+                <div>
+                    <Label htmlFor="banco-correccion">Qué se corrige</Label>
+                    <Textarea
+                        id="banco-correccion"
+                        className="mt-1"
+                        rows={2}
+                        maxLength={400}
+                        value={data.correctionReason}
+                        onChange={(e) =>
+                            setData('correctionReason', e.target.value)
+                        }
+                        placeholder="El importe estaba mal tipeado, no era una transferencia…"
+                        aria-invalid={Boolean(errores.correctionReason)}
+                    />
+                    <FieldError
+                        message={
+                            errores.correctionReason ??
+                            errores.replacesPaymentId ??
+                            errores.reason
+                        }
+                    />
                 </div>
             )}
         </FormDialog>

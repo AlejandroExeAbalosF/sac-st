@@ -151,7 +151,7 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 'multa.pago-informado',
                 'Se informó un pago bancario de la multa',
                 'Multas',
-                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'judicial' => 'Orden de pago judicial'],
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'judicial' => 'Orden de pago judicial', 'corrige' => 'Corrección'],
             ),
             new AuditActionDefinition(
                 'multa.pago-verificado',
@@ -171,14 +171,7 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 'multa.recurso-registrado',
                 'Se registró un pago por recurso de la multa',
                 'Multas',
-                metadata: ['tipo' => 'Recurso', 'medio' => 'Medio', 'base' => 'Base', 'exigido' => 'Exigido', 'externo' => 'Recibo externo', 'importe_externo' => 'Importe del recibo externo', 'recibo' => 'Recibo'],
-            ),
-            new AuditActionDefinition(
-                'multa.recurso-resuelto',
-                'Se resolvió la diferencia de un pago por recurso',
-                'Multas',
-                AuditSeverity::Critical,
-                metadata: ['decision' => 'Decisión', 'exigido' => 'Exigido', 'importe_externo' => 'Importe del recibo externo', 'reason' => 'Motivo', 'recibo' => 'Recibo'],
+                metadata: ['tipo' => 'Recurso', 'medio' => 'Medio', 'base' => 'Base', 'exigido' => '20 % calculado', 'externo' => 'Recibo externo', 'importe' => 'Importe del recibo externo', 'recibo' => 'Recibo', 'corrige' => 'Corrección'],
             ),
             new AuditActionDefinition(
                 'multa.comprobante-de-pago-agregado',

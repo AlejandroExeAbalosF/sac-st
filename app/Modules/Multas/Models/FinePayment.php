@@ -19,7 +19,8 @@ use Illuminate\Support\Carbon;
  *
  * Solo el aplicado toca la deuda y lleva recibo. Lo cobrado en la caja nace
  * aplicado; lo que llega por el banco nace informado y se aplica al
- * verificar el crédito (M02). Lo aplicado y lo descartado ya no cambian.
+ * verificar el crédito (M02). Lo aplicado y lo descartado ya no cambian; un
+ * informado mal cargado se corrige con otro que lo reemplaza.
  *
  * @property int $id
  * @property int $fine_id
@@ -39,14 +40,10 @@ use Illuminate\Support\Carbon;
  * @property numeric-string|null $appeal_base_amount
  * @property numeric-string|null $appeal_required_amount
  * @property string|null $external_receipt_reference
- * @property numeric-string|null $external_receipt_amount
- * @property bool $appeal_repeated
- * @property int|null $reviewed_by
- * @property Carbon|null $reviewed_at
- * @property string|null $review_reason
  * @property int|null $discarded_by
  * @property Carbon|null $discarded_at
  * @property string|null $discard_reason
+ * @property int|null $replaces_fine_payment_id El informado que este corrige.
  * @property string $idempotency_key
  * @property int|null $created_by
  * @property Carbon|null $created_at
@@ -77,14 +74,10 @@ final class FinePayment extends Model
         'appeal_base_amount',
         'appeal_required_amount',
         'external_receipt_reference',
-        'external_receipt_amount',
-        'appeal_repeated',
-        'reviewed_by',
-        'reviewed_at',
-        'review_reason',
         'discarded_by',
         'discarded_at',
         'discard_reason',
+        'replaces_fine_payment_id',
         'idempotency_key',
         'created_by',
     ];
@@ -106,9 +99,6 @@ final class FinePayment extends Model
             'appeal_kind' => AppealKind::class,
             'appeal_base_amount' => 'decimal:2',
             'appeal_required_amount' => 'decimal:2',
-            'external_receipt_amount' => 'decimal:2',
-            'appeal_repeated' => 'boolean',
-            'reviewed_at' => 'datetime',
             'discarded_at' => 'datetime',
         ];
     }

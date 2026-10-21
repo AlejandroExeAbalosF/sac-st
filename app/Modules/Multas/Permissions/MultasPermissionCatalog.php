@@ -10,8 +10,8 @@ use App\Modules\Shared\Permissions\PermissionDefinition;
 
 /**
  * Lo que declara Multas: registrar las multas, su obligación y sus
- * antecedentes, abrir la caja, cobrar, verificar los pagos por el banco y
- * resolver la diferencia de un recurso (DER físico §8).
+ * antecedentes, abrir la caja, cobrar y verificar los pagos por el banco
+ * (DER físico §8).
  */
 final class MultasPermissionCatalog implements PermissionCatalogContributor
 {
@@ -63,17 +63,6 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 'multas',
                 ['administrador', 'contador'],
                 sensitive: true,
-            ),
-            // M07: lo resuelven el administrador y el super-admin, y no se
-            // delega a otro rol desde la matriz.
-            new PermissionDefinition(
-                'multas.resolver-recurso',
-                'Resolver la diferencia de un recurso',
-                'Aplicar por el 20 % exigido o descartar un pago por recurso cuyo recibo externo no coincide con el cálculo.',
-                'multas',
-                ['administrador'],
-                sensitive: true,
-                delegable: false,
             ),
             // Como la apertura de Haberes: define todos los saldos posteriores
             // de la caja y no se rehace. Se adelanta de la Etapa 6 (§8).

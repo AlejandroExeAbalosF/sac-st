@@ -86,7 +86,6 @@ export const PAYMENT_STATUS: Record<
     reported: { label: 'Informado', tone: 'action' },
     applied: { label: 'Aplicado', tone: 'done' },
     discarded: { label: 'Descartado', tone: 'neutral' },
-    under_review: { label: 'En revisión', tone: 'blocked' },
 };
 
 export const APPEAL_KIND: Record<AppealKind, string> = {

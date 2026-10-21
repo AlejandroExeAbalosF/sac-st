@@ -93,16 +93,16 @@ saldo y estado. Abajo:
 - **Archivos**: los de la multa y, debajo, los del expediente.
 - **Pagos**: los del sistema, con su medio, su estado, su recibo, si fue el
   cancelatorio, si se presentó en término, su comprobante y, si sobró, cuánto
-  quedó de excedente. Desde acá se cobra en caja, se informa o verifica un pago
-  por banco y se registra o resuelve un recurso.
+  quedó de excedente. Desde acá se cobra en caja, se informa, corrige o verifica
+  un pago por banco y se registra el recurso.
 - **Pagos anteriores al sistema**, con su respaldo, su revisión, su comprobante y,
   si vino del banco, el crédito que lo respalda.
 
 ### Pagos por verificar · `/multas/pagos`
 
 La cola de quien concilia (`multas.verificar-pagos`): los pagos informados por el
-banco que esperan su crédito, del más viejo al más nuevo, y los recursos en
-revisión. Cada fila lleva a la ficha, donde se verifica, se descarta o se resuelve.
+banco que esperan su crédito, del más viejo al más nuevo. Cada fila lleva a la
+ficha, donde se verifica, se corrige o se descarta.
 
 ### Expediente · `/multas/expedientes/{id}`
 
@@ -269,6 +269,13 @@ un cheque electrónico** (M02):
   el extracto» y hacer las dos cosas en un acto, por el importe del crédito. La
   presentación es ese momento: identificar después del cierre del mes de la multa
   es fuera de término (M08).
+- **Corregir** (quien informa): un informado mal cargado —el importe, el medio, la
+  fecha de pago— se reemplaza por otro. El anterior queda descartado con el motivo,
+  y el corregido conserva la misma presentación: la fecha de presentación no se
+  corrige. Se puede corregir aunque otro pago ya haya cancelado la multa; lo que
+  sobre queda como excedente al verificarlo. Un depósito de recurso se corrige
+  como depósito: si se pagó en efectivo, se descarta y se cobra en la caja. Lo ya
+  aplicado tiene recibo y no se corrige así: anular un pago está pendiente (P13).
 - **Descartar** (`multas.verificar-pagos`): un informado que no corresponde, con su
   motivo. Nunca tocó el saldo.
 
@@ -280,23 +287,19 @@ por la caja (P15).
 ## Recurso del 20 %
 
 «Recurso (20 %)» registra el pago para recurrir, jerárquico o en apelación (M07).
-El importe no se escribe: es el 20 % del importe vigente de la multa, con sus
-ajustes y sin descontar pagos, **sin centavos**, y queda con la base congelada.
-Se carga el recibo externo que trae el sancionado y lo que dice.
+**Se cobra el importe del recibo externo** que trae el sancionado: la liquidación
+la hace otra oficina. El sistema muestra al lado el 20 % que calcula sobre el
+importe vigente, con sus ajustes y sin descontar pagos, **sin centavos**, con la
+base congelada; si difieren, se cobra igual y la diferencia queda a la vista en la
+multa y en la auditoría.
 
-- Si coincide: en **efectivo** se cobra en el acto y sale el recibo; por **depósito
-  directo** queda informado y se verifica como cualquier pago por banco. El
-  depósito puede haberse presentado antes de cargarlo: como en todo pago por banco,
-  se indica el día y su respaldo, y eso decide el término.
-- Si la multa ya tiene **otro recurso** sin descartar, el nuevo queda en revisión
-  aunque coincida (P05, provisorio hasta que el área defina los recursos repetidos).
-- Si no coincide: queda **en revisión**, sin cobro ni recibo. Lo resuelve el
-  administrador (`multas.resolver-recurso`, no delegable) después de revisar la
-  multa, sus ajustes y el redondeo: **aplicar** por el 20 % exigido —el recibo
-  externo estaba mal— o **descartar** —el dato propio estaba mal—, para corregirlo y
-  registrar otro intento con la base de ese momento. No hay excepción al 20 %.
-  Aplicar uno en efectivo recibe el dinero en ese momento: si la multa ya se pagó
-  mientras esperaba, no se cobra y queda el descarte.
+- En **efectivo** se cobra en el acto y sale el recibo; por **depósito directo**
+  queda informado y se verifica como cualquier pago por banco. El depósito puede
+  haberse presentado antes de cargarlo: se indica el día y su respaldo, y eso
+  decide el término.
+- **Una multa admite un solo recurso.** Con uno registrado, la ficha no ofrece otro y
+  el sistema lo rechaza. Un intento descartado no cuenta.
+- Un depósito de recurso mal cargado se **corrige** como cualquier informado.
 
 ---
 
@@ -334,7 +337,6 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar | administrador, contador |
-| `multas.resolver-recurso` | Resolver la diferencia de un recurso. **No se delega** desde Roles | administrador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 

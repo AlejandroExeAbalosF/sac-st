@@ -10,8 +10,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * Dónde está un pago.
  *
  * Solo el aplicado toca la deuda y lleva recibo. Uno informado espera que
- * se verifique el crédito; uno en revisión es un recurso cuyo recibo
- * externo no coincide con el 20 % (M07).
+ * se verifique el crédito; uno descartado no correspondía o se corrigió.
  */
 #[TypeScript]
 enum FinePaymentStatus: string
@@ -19,7 +18,6 @@ enum FinePaymentStatus: string
     case Reported = 'reported';
     case Applied = 'applied';
     case Discarded = 'discarded';
-    case UnderReview = 'under_review';
 
     public function label(): string
     {
@@ -27,7 +25,6 @@ enum FinePaymentStatus: string
             self::Reported => 'Informado',
             self::Applied => 'Aplicado',
             self::Discarded => 'Descartado',
-            self::UnderReview => 'En revisión',
         };
     }
 }

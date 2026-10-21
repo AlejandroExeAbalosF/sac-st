@@ -16,8 +16,8 @@ use Illuminate\Validation\ValidationException;
  * duplicado, el banco nunca lo acreditó.
  *
  * Nunca tocó la deuda ni tuvo recibo, así que descartarlo no mueve nada:
- * queda a la vista con quién lo descartó y por qué. Un recurso en revisión
- * no se descarta acá: lo resuelve quien puede resolverlo (M07).
+ * queda a la vista con quién lo descartó y por qué. También lo usa la
+ * corrección de un informado, antes de registrar el corregido.
  */
 final class DiscardFinePayment
 {
@@ -40,9 +40,7 @@ final class DiscardFinePayment
 
             if ($pago->status !== FinePaymentStatus::Reported) {
                 throw ValidationException::withMessages([
-                    'reason' => $pago->status === FinePaymentStatus::UnderReview
-                        ? 'Un recurso en revisión lo resuelve quien puede resolverlo.'
-                        : 'Ese pago ya no está informado: no se descarta.',
+                    'reason' => 'Ese pago ya no está informado: lo que ya se aplicó no se descarta ni se corrige.',
                 ]);
             }
 

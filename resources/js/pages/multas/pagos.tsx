@@ -9,20 +9,16 @@ import { show } from '@/routes/multas';
 type Pendiente = App.Modules.Multas.Data.FinePendingPaymentData;
 
 /**
- * Pagos por verificar: lo informado que espera su crédito del extracto, y
- * los recursos cuya diferencia espera al administrador.
+ * Pagos por verificar: lo informado por el banco que espera su crédito del
+ * extracto, del más viejo al más nuevo.
  *
  * Cada fila lleva a la ficha de la multa, que es donde se verifica, se
- * descarta o se resuelve.
+ * corrige o se descarta.
  */
 export default function PagosPorVerificar({
     informados,
-    enRevision,
-    canResolve,
 }: {
     informados: Pendiente[];
-    enRevision: Pendiente[];
-    canResolve: boolean;
 }) {
     return (
         <>
@@ -35,113 +31,59 @@ export default function PagosPorVerificar({
                     description="Lo informado por el banco todavía no reduce el saldo de la multa: se aplica al verificarlo contra el extracto."
                 />
 
-                <Bloque
-                    titulo="Informados por el banco"
-                    vacio="No hay pagos informados esperando su crédito."
-                    filas={informados}
-                    detalle={(p) => (
-                        <>
-                            Presentado{' '}
-                            {p.payment.presentedPrecision === 'instant'
-                                ? dateTime(p.payment.presentedAt)
-                                : date(p.payment.presentedAt)}
-                            {p.payment.declaredPaidOn &&
-                                ` · pagado el ${date(p.payment.declaredPaidOn)}`}
-                            {p.payment.judicialReference &&
-                                ` · orden judicial ${p.payment.judicialReference}`}
-                        </>
+                <section className="rounded-lg border bg-card shadow-raised">
+                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
+                        <h2 className="text-sm font-semibold">
+                            Informados por el banco
+                        </h2>
+                        <StatusBadge
+                            label={String(informados.length)}
+                            tone={informados.length > 0 ? 'action' : 'neutral'}
+                        />
+                    </div>
+                    {informados.length === 0 ? (
+                        <p className="px-5 py-4 text-sm text-muted-foreground">
+                            No hay pagos informados esperando su crédito.
+                        </p>
+                    ) : (
+                        <ul className="divide-y">
+                            {informados.map((fila) => (
+                                <li
+                                    key={fila.payment.id}
+                                    className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-3 text-sm"
+                                >
+                                    <Link
+                                        href={show(fila.fineId)}
+                                        className="font-medium hover:underline"
+                                    >
+                                        {fila.fineCaption}
+                                    </Link>
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        Expte. {fila.caseLabel}
+                                    </span>
+                                    <span>
+                                        {PAYMENT_MEDIUM[fila.payment.medium]}
+                                        {fila.payment.appealKind &&
+                                            ` · ${APPEAL_KIND[fila.payment.appealKind]}`}{' '}
+                                        · <Money value={fila.payment.amount} />
+                                    </span>
+                                    <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
+                                        Presentado{' '}
+                                        {fila.payment.presentedPrecision ===
+                                        'instant'
+                                            ? dateTime(fila.payment.presentedAt)
+                                            : date(fila.payment.presentedAt)}
+                                        {fila.payment.declaredPaidOn &&
+                                            ` · pagado el ${date(fila.payment.declaredPaidOn)}`}
+                                        {fila.payment.judicialReference &&
+                                            ` · orden judicial ${fila.payment.judicialReference}`}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
                     )}
-                />
-
-                <Bloque
-                    titulo="Recursos en revisión"
-                    vacio="No hay recursos con diferencia."
-                    filas={enRevision}
-                    aviso={
-                        canResolve
-                            ? undefined
-                            : 'Los resuelve el administrador: revisa la multa, sus ajustes y el redondeo.'
-                    }
-                    detalle={(p) => (
-                        <>
-                            {p.payment.appealKind &&
-                                APPEAL_KIND[p.payment.appealKind]}{' '}
-                            · exigido{' '}
-                            <Money
-                                value={p.payment.appealRequiredAmount ?? '0.00'}
-                            />{' '}
-                            · el recibo externo dice{' '}
-                            <Money
-                                value={
-                                    p.payment.externalReceiptAmount ?? '0.00'
-                                }
-                            />
-                        </>
-                    )}
-                />
+                </section>
             </div>
         </>
-    );
-}
-
-function Bloque({
-    titulo,
-    vacio,
-    filas,
-    detalle,
-    aviso,
-}: {
-    titulo: string;
-    vacio: string;
-    filas: Pendiente[];
-    detalle: (fila: Pendiente) => React.ReactNode;
-    aviso?: string;
-}) {
-    return (
-        <section className="rounded-lg border bg-card shadow-raised">
-            <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                <h2 className="text-sm font-semibold">{titulo}</h2>
-                <StatusBadge
-                    label={String(filas.length)}
-                    tone={filas.length > 0 ? 'action' : 'neutral'}
-                />
-            </div>
-            {aviso && filas.length > 0 && (
-                <p className="border-b px-5 py-2 text-xs text-muted-foreground">
-                    {aviso}
-                </p>
-            )}
-            {filas.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-muted-foreground">
-                    {vacio}
-                </p>
-            ) : (
-                <ul className="divide-y">
-                    {filas.map((fila) => (
-                        <li
-                            key={fila.payment.id}
-                            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-3 text-sm"
-                        >
-                            <Link
-                                href={show(fila.fineId)}
-                                className="font-medium hover:underline"
-                            >
-                                {fila.fineCaption}
-                            </Link>
-                            <span className="font-mono text-xs text-muted-foreground">
-                                Expte. {fila.caseLabel}
-                            </span>
-                            <span>
-                                {PAYMENT_MEDIUM[fila.payment.medium]} ·{' '}
-                                <Money value={fila.payment.amount} />
-                            </span>
-                            <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
-                                {detalle(fila)}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </section>
     );
 }

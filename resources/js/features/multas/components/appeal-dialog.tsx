@@ -9,6 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import FormDialog, {
     FieldError,
@@ -28,57 +29,58 @@ import { store } from '@/routes/multas/recursos';
 
 type Kind = App.Modules.Multas.Enums.AppealKind;
 type Medio = 'cash' | 'direct_deposit';
+type Pago = App.Modules.Multas.Data.FinePaymentData;
 
 /**
  * El pago del 20 % para recurrir la multa (M07).
  *
- * El importe no se escribe: es el 20 % del importe vigente, sin centavos, y
- * lo calcula el servidor. Lo que se carga es lo que dice el recibo externo
- * que trae el sancionado. Si coincide, en efectivo se cobra en el acto y por
- * depósito directo queda informado; si no, queda en revisión, sin cobro ni
- * recibo, hasta que el administrador lo resuelva. Lo mismo si la multa ya
- * tiene otro recurso sin descartar (P05, provisorio).
+ * Se cobra lo que dice el recibo externo que trae el sancionado: la
+ * liquidación la hace otra oficina. El sistema muestra el 20 % que calcula
+ * sobre el importe vigente, sin centavos, como referencia; si difieren, se
+ * cobra igual y la diferencia queda a la vista. Una multa admite un solo
+ * recurso.
  *
- * El depósito directo puede haberse presentado antes de cargarlo: la
- * presentación, con su respaldo, decide el término (M08).
+ * En efectivo se cobra en el acto; por depósito directo queda informado, y su
+ * presentación —con respaldo, si fue un día anterior— decide el término (M08).
+ * Un depósito informado que se cargó mal se corrige desde acá.
  */
 export default function AppealDialog({
     fineId,
     base,
     required,
-    repeated,
     allowCash,
     firmantes,
     idempotencyKey,
+    corrige,
     onClose,
 }: {
     fineId: number;
     base: string;
     required: string;
-    /** La multa ya tiene otro recurso sin descartar: este va a revisión. */
-    repeated: boolean;
     /** El efectivo se cobra en la caja: hace falta poder cobrar y la caja abierta. */
     allowCash: boolean;
     firmantes: Firmante[];
     idempotencyKey: string;
+    /** El depósito informado que se corrige, si es una corrección. */
+    corrige?: Pago;
     onClose: () => void;
 }) {
+    const hoy = businessToday();
     const { data, setData, post, transform, processing, errors } = useForm({
-        kind: 'hierarchical' as Kind,
-        medium: (allowCash ? 'cash' : 'direct_deposit') as Medio,
-        externalReference: '',
-        externalAmount: money(required, { symbol: false }),
-        declaredPaidOn: '',
-        presentedOn: businessToday(),
+        kind: (corrige?.appealKind ?? 'hierarchical') as Kind,
+        medium: (corrige || !allowCash ? 'direct_deposit' : 'cash') as Medio,
+        externalReference: corrige?.externalReceiptReference ?? '',
+        amount: money(corrige?.amount ?? required, { symbol: false }),
+        declaredPaidOn: corrige?.declaredPaidOn ?? '',
+        presentedOn: hoy,
         presentationEvidence: '',
         talonarioNumber: '',
         signedById: SIN_FIRMANTE,
+        correctionReason: '',
     });
     const efectivo = data.medium === 'cash';
-    const externo = parseAmount(data.externalAmount);
-    const coincide = externo !== '' && compareAmounts(externo, required) === 0;
-    const enRevision = !coincide || repeated;
-    const hoy = businessToday();
+    const importe = parseAmount(data.amount);
+    const difiere = importe !== '' && compareAmounts(importe, required) !== 0;
     const atrasado =
         !efectivo && data.presentedOn !== '' && data.presentedOn < hoy;
 
@@ -87,7 +89,7 @@ export default function AppealDialog({
             kind: datos.kind,
             medium: datos.medium,
             externalReference: datos.externalReference.trim(),
-            externalAmount: parseAmount(datos.externalAmount),
+            amount: parseAmount(datos.amount),
             declaredPaidOn: efectivo ? null : datos.declaredPaidOn || null,
             presentedOn: atrasado ? datos.presentedOn : null,
             presentationEvidence: atrasado
@@ -96,27 +98,37 @@ export default function AppealDialog({
             ...(efectivo
                 ? receiptPayload(datos.talonarioNumber, datos.signedById)
                 : {}),
+            ...(corrige
+                ? {
+                      replacesPaymentId: corrige.id,
+                      correctionReason: datos.correctionReason.trim(),
+                  }
+                : {}),
             idempotencyKey,
         }));
         post(store(fineId).url, { preserveScroll: true, onSuccess: onClose });
     };
 
+    const errores = errors as Record<string, string | undefined>;
+
     return (
         <FormDialog
-            title="Pago por recurso"
+            title={
+                corrige ? 'Corregir el recurso informado' : 'Pago por recurso'
+            }
             description={
                 <>
-                    El 20 % de {money(base)}, sin centavos:{' '}
-                    <strong>{money(required)}</strong>. Se cobra exactamente
-                    eso.
+                    Se cobra el importe del recibo externo. Como referencia, el
+                    20 % de {money(base)}, sin centavos, es{' '}
+                    <strong>{money(required)}</strong>.
                 </>
             }
             onClose={onClose}
             onSubmit={enviar}
             processing={processing}
             submitLabel={
-                enRevision
-                    ? 'Registrar para revisión'
+                corrige
+                    ? 'Corregir'
                     : efectivo
                       ? 'Cobrar y emitir recibo'
                       : 'Registrar'
@@ -140,12 +152,14 @@ export default function AppealDialog({
                             ))}
                         </SelectContent>
                     </Select>
+                    <FieldError message={errores.kind} />
                 </div>
                 <div>
                     <Label htmlFor="recurso-medio">Medio</Label>
                     <Select
                         value={data.medium}
                         onValueChange={(v) => setData('medium', v as Medio)}
+                        disabled={Boolean(corrige)}
                     >
                         <SelectTrigger id="recurso-medio" className="mt-1">
                             <SelectValue />
@@ -185,32 +199,24 @@ export default function AppealDialog({
                     <div className="mt-1">
                         <AmountInput
                             id="recurso-importe"
-                            value={data.externalAmount}
-                            onChange={(v) => setData('externalAmount', v)}
-                            aria-invalid={Boolean(errors.externalAmount)}
+                            value={data.amount}
+                            onChange={(v) => setData('amount', v)}
+                            aria-invalid={Boolean(errors.amount)}
                         />
                     </div>
-                    <FieldError message={errors.externalAmount} />
+                    <FieldError message={errors.amount} />
                 </div>
             </div>
 
-            {repeated && (
+            {difiere && (
                 <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                    La multa ya tiene otro recurso. Se registra en revisión: no
-                    se cobra ni se emite recibo hasta que el administrador lo
-                    resuelva.
+                    Difiere del 20 % calculado ({money(required)}). Se cobra el
+                    importe del recibo externo, y la diferencia queda a la vista
+                    en la multa.
                 </p>
             )}
 
-            {!coincide && data.externalAmount !== '' && (
-                <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                    No coincide con el 20 % calculado. Se registra en revisión:
-                    no se cobra ni se emite recibo hasta que el administrador
-                    revise la multa, sus ajustes y el redondeo.
-                </p>
-            )}
-
-            {efectivo && !enRevision && (
+            {efectivo && (
                 <ReceiptFields
                     idPrefix="recurso"
                     talonarioNumber={data.talonarioNumber}
@@ -224,25 +230,44 @@ export default function AppealDialog({
 
             {!efectivo && (
                 <div className="grid gap-4 sm:grid-cols-2">
+                    {!corrige && (
+                        <div>
+                            <Label htmlFor="recurso-presentado">
+                                Presentado el
+                            </Label>
+                            <Input
+                                id="recurso-presentado"
+                                type="date"
+                                className="mt-1"
+                                max={hoy}
+                                value={data.presentedOn}
+                                onChange={(e) =>
+                                    setData('presentedOn', e.target.value)
+                                }
+                                aria-invalid={Boolean(errors.presentedOn)}
+                            />
+                            <FieldError message={errors.presentedOn} />
+                        </div>
+                    )}
                     <div>
-                        <Label htmlFor="recurso-presentado">
-                            Presentado el
+                        <Label htmlFor="recurso-pagado">
+                            Depositado el (según el comprobante)
                         </Label>
                         <Input
-                            id="recurso-presentado"
+                            id="recurso-pagado"
                             type="date"
                             className="mt-1"
                             max={hoy}
-                            value={data.presentedOn}
+                            value={data.declaredPaidOn}
                             onChange={(e) =>
-                                setData('presentedOn', e.target.value)
+                                setData('declaredPaidOn', e.target.value)
                             }
-                            aria-invalid={Boolean(errors.presentedOn)}
+                            aria-invalid={Boolean(errors.declaredPaidOn)}
                         />
-                        <FieldError message={errors.presentedOn} />
+                        <FieldError message={errors.declaredPaidOn} />
                     </div>
                     {atrasado && (
-                        <div>
+                        <div className="sm:col-span-2">
                             <Label htmlFor="recurso-respaldo">
                                 Respaldo de la presentación
                             </Label>
@@ -268,23 +293,28 @@ export default function AppealDialog({
                 </div>
             )}
 
-            {!efectivo && (
+            {corrige && (
                 <div>
-                    <Label htmlFor="recurso-pagado">
-                        Depositado el (según el comprobante)
-                    </Label>
-                    <Input
-                        id="recurso-pagado"
-                        type="date"
-                        className="mt-1 max-w-48"
-                        max={hoy}
-                        value={data.declaredPaidOn}
+                    <Label htmlFor="recurso-correccion">Qué se corrige</Label>
+                    <Textarea
+                        id="recurso-correccion"
+                        className="mt-1"
+                        rows={2}
+                        maxLength={400}
+                        value={data.correctionReason}
                         onChange={(e) =>
-                            setData('declaredPaidOn', e.target.value)
+                            setData('correctionReason', e.target.value)
                         }
-                        aria-invalid={Boolean(errors.declaredPaidOn)}
+                        placeholder="El recibo externo decía otro importe, el número estaba mal…"
+                        aria-invalid={Boolean(errores.correctionReason)}
                     />
-                    <FieldError message={errors.declaredPaidOn} />
+                    <FieldError
+                        message={
+                            errores.correctionReason ??
+                            errores.replacesPaymentId ??
+                            errores.reason
+                        }
+                    />
                 </div>
             )}
         </FormDialog>

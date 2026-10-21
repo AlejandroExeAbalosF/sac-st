@@ -119,11 +119,6 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('pagos/{payment}/descarte', [FineBankPaymentController::class, 'discard'])->whereNumber('payment')->name('pagos.discard');
     });
 
-    // M07: la diferencia de un recurso la resuelve solo el administrador.
-    Route::middleware('can:multas.resolver-recurso')->group(function (): void {
-        Route::post('pagos/{payment}/resolucion', [FineAppealController::class, 'resolve'])->whereNumber('payment')->name('pagos.resolve');
-    });
-
     Route::middleware('can:multas.ver')->group(function (): void {
         // El recibo de Multas: el mismo papel en el visor y en la impresora.
         Route::get('recibos/{receipt}/ver', [FinePaymentController::class, 'view'])->whereNumber('receipt')->name('recibos.view');
