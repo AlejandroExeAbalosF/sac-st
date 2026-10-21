@@ -1126,7 +1126,7 @@ function Encabezado({
 }) {
     return (
         <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-            <h2 className="text-sm font-semibold">{titulo}</h2>
+            <h2 className="flex-1 text-sm font-semibold">{titulo}</h2>
             {children}
         </div>
     );
