@@ -119,7 +119,12 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                     description={`El beneficiario no retiró la cuota ${cuota.number}: su efectivo se lleva a la cuenta del organismo.`}
                 />
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+                {/*
+                 * Las dos columnas desde `xl`: con la barra lateral abierta,
+                 * a 1024 px el formulario quedaba en 265 px y el resumen se
+                 * pisaba. Antes se apilan, con la foto debajo.
+                 */}
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
                     <form
                         onSubmit={enviar}
                         className="space-y-5 rounded-lg border bg-card p-5 shadow-raised"

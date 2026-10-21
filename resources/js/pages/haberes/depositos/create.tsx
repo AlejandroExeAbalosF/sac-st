@@ -167,7 +167,12 @@ export default function DepositoCreate({
                     </div>
                 )}
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+                {/*
+                 * Las dos columnas desde `xl`: con la barra lateral abierta,
+                 * a 1024 px el formulario quedaba en 265 px y el resumen se
+                 * pisaba. Antes se apilan, con la foto debajo.
+                 */}
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
                     <form
                         onSubmit={enviar}
                         className="space-y-5 rounded-lg border bg-card p-5 shadow-raised"
@@ -372,7 +377,7 @@ export default function DepositoCreate({
                             <InputError message={form.errors.notes} />
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <Button type="submit" disabled={form.processing}>
                                 Registrar y buscar en el banco
                                 <ArrowRight className="size-4" />
