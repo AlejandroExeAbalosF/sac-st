@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Multas\Http\Controllers\FineAppealController;
 use App\Modules\Multas\Http\Controllers\FineAttachmentController;
+use App\Modules\Multas\Http\Controllers\FineBankPaymentController;
 use App\Modules\Multas\Http\Controllers\FineCaseController;
 use App\Modules\Multas\Http\Controllers\FineCashController;
 use App\Modules\Multas\Http\Controllers\FineController;
@@ -10,6 +12,7 @@ use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
+use App\Modules\Multas\Http\Controllers\FinePaymentQueueController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -93,6 +96,32 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
      */
     Route::middleware('can:multas.cobrar')->group(function (): void {
         Route::post('{fine}/cobros', [FinePaymentController::class, 'store'])->whereNumber('fine')->name('cobros.store');
+    });
+
+    /*
+     * Lo que llega por el banco se informa —desde el mostrador o desde la
+     * conciliación— y el recurso del 20 % se registra según su medio: cada
+     * controlador exige el permiso que corresponde.
+     */
+    Route::middleware('can:multas.ver')->group(function (): void {
+        Route::post('{fine}/pagos-bancarios', [FineBankPaymentController::class, 'store'])->whereNumber('fine')->name('pagos-bancarios.store');
+        Route::post('pagos/{payment}/adjuntos', [FineBankPaymentController::class, 'attach'])->whereNumber('payment')->name('pagos.adjuntos.store');
+        Route::post('{fine}/recursos', [FineAppealController::class, 'store'])->whereNumber('fine')->name('recursos.store');
+    });
+
+    // Verificar contra el extracto, o descartar, es de quien concilia.
+    Route::middleware('can:multas.verificar-pagos')->group(function (): void {
+        Route::get('pagos', [FinePaymentQueueController::class, 'index'])->name('pagos.index');
+        Route::post('{fine}/pagos-bancarios/verificados', [FineBankPaymentController::class, 'storeVerified'])
+            ->whereNumber('fine')
+            ->name('pagos-bancarios.verificados.store');
+        Route::post('pagos/{payment}/verificacion', [FineBankPaymentController::class, 'verify'])->whereNumber('payment')->name('pagos.verify');
+        Route::post('pagos/{payment}/descarte', [FineBankPaymentController::class, 'discard'])->whereNumber('payment')->name('pagos.discard');
+    });
+
+    // M07: la diferencia de un recurso la resuelve solo el administrador.
+    Route::middleware('can:multas.resolver-recurso')->group(function (): void {
+        Route::post('pagos/{payment}/resolucion', [FineAppealController::class, 'resolve'])->whereNumber('payment')->name('pagos.resolve');
     });
 
     Route::middleware('can:multas.ver')->group(function (): void {

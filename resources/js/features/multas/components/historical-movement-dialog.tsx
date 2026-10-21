@@ -1,9 +1,6 @@
-import { router, useForm } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
-import Money from '@/components/money';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,12 +12,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import CreditPicker from '@/features/multas/components/credit-picker';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
 import { HISTORICAL_KIND } from '@/features/multas/labels';
-import { date, parseAmount } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/antecedentes';
 import { store as storeFromCredit } from '@/routes/multas/antecedentes/credito';
 
@@ -178,21 +175,10 @@ function DesdeUnCredito({
     onClose: () => void;
     onManual: () => void;
 }) {
-    const [termino, setTermino] = useState('');
-    const [buscando, setBuscando] = useState(false);
     const { data, setData, post, processing, errors } = useForm<{
         bankTransactionId: number | null;
         evidence: string;
     }>({ bankTransactionId: null, evidence: '' });
-
-    const buscar = () => {
-        setBuscando(true);
-        router.reload({
-            only: ['creditosDelBanco'],
-            data: { credito: termino },
-            onFinish: () => setBuscando(false),
-        });
-    };
 
     return (
         <FormDialog
@@ -210,86 +196,15 @@ function DesdeUnCredito({
         >
             <OrigenDelPago delBanco onChange={onManual} />
 
-            <div>
-                <Label htmlFor="credito-busqueda">Buscar el crédito</Label>
-                <div className="mt-1 flex gap-2">
-                    <Input
-                        id="credito-busqueda"
-                        value={termino}
-                        onChange={(e) => setTermino(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                buscar();
-                            }
-                        }}
-                        placeholder="Importe, empresa, CUIT u operación"
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={buscar}
-                        disabled={buscando}
-                    >
-                        <Search className="size-4" aria-hidden="true" />
-                        Buscar
-                    </Button>
-                </div>
-            </div>
-
-            {creditos !== undefined && (
-                <div className="max-h-60 overflow-y-auto rounded-md border">
-                    {creditos.length === 0 ? (
-                        <p className="p-3 text-sm text-muted-foreground">
-                            No hay créditos anteriores a la apertura que
-                            coincidan y estén libres.
-                        </p>
-                    ) : (
-                        <ul className="divide-y" role="radiogroup">
-                            {creditos.map((credito) => {
-                                const elegido =
-                                    data.bankTransactionId === credito.id;
-
-                                return (
-                                    <li key={credito.id}>
-                                        <button
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={elegido}
-                                            onClick={() =>
-                                                setData(
-                                                    'bankTransactionId',
-                                                    credito.id,
-                                                )
-                                            }
-                                            className={cn(
-                                                'flex w-full flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 py-2 text-left text-sm hover:bg-muted/50',
-                                                elegido &&
-                                                    'bg-primary/10 hover:bg-primary/10',
-                                            )}
-                                        >
-                                            <span className="font-medium">
-                                                <Money value={credito.amount} />
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {date(credito.date)}
-                                            </span>
-                                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                                                {credito.counterparty ??
-                                                    credito.description ??
-                                                    ''}
-                                                {credito.operationId &&
-                                                    ` · Op. ${credito.operationId}`}
-                                            </span>
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-                </div>
-            )}
-            <FieldError message={errors.bankTransactionId} />
+            <CreditPicker
+                prop="creditosDelBanco"
+                param="credito"
+                creditos={creditos}
+                selected={data.bankTransactionId}
+                onSelect={(id) => setData('bankTransactionId', id)}
+                emptyText="No hay créditos anteriores a la apertura que coincidan y estén libres."
+                error={errors.bankTransactionId}
+            />
 
             <Respaldo
                 value={data.evidence}

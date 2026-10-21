@@ -91,11 +91,18 @@ saldo y estado. Abajo:
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos**: los de la multa y, debajo, los del expediente.
-- **Pagos**: los cobrados en el sistema, con su medio, su recibo, si fue el
-  cancelatorio, si se presentó en término y, si sobró, cuánto quedó de
-  excedente. «Cobrar en caja» abre el cobro.
+- **Pagos**: los del sistema, con su medio, su estado, su recibo, si fue el
+  cancelatorio, si se presentó en término, su comprobante y, si sobró, cuánto
+  quedó de excedente. Desde acá se cobra en caja, se informa o verifica un pago
+  por banco y se registra o resuelve un recurso.
 - **Pagos anteriores al sistema**, con su respaldo, su revisión, su comprobante y,
   si vino del banco, el crédito que lo respalda.
+
+### Pagos por verificar · `/multas/pagos`
+
+La cola de quien concilia (`multas.verificar-pagos`): los pagos informados por el
+banco que esperan su crédito, del más viejo al más nuevo, y los recursos en
+revisión. Cada fila lleva a la ficha, donde se verifica, se descarta o se resuelve.
 
 ### Expediente · `/multas/expedientes/{id}`
 
@@ -241,6 +248,56 @@ acto, sin mover dinero.
 
 Anular un pago o cambiar su medio (P13) no está habilitado.
 
+<a id="banco"></a>
+
+## Pagos por banco
+
+«Pago por banco», en la ficha, registra una **transferencia, un depósito directo o
+un cheque electrónico** (M02):
+
+- **Informar** (quien cobra o quien concilia): el pago queda *informado*, sin tocar
+  el saldo ni llevar recibo. Se carga el importe, cuándo se presentó el comprobante
+  —hoy, o un día anterior con su respaldo: el sello de Mesa de Entradas, una nota—,
+  la fecha de pago que dice el comprobante y, si es una transferencia judicial, el
+  expediente judicial. El comprobante se adjunta al pago («Comprobante»).
+- **Verificar** (`multas.verificar-pagos`): se elige el crédito del extracto. Tiene
+  que ser de la cuenta de Multas, posterior al corte y a la apertura, libre y **por
+  el importe entero del pago**: un pago, un crédito, hasta que el área responda P14.
+  Al verificar, el pago se aplica, sale el recibo (casilla «Depósito Cta.») y el
+  crédito deja de estar en la cola de la caja.
+- **Reconocerlo del extracto**: quien concilia puede marcar «el crédito ya está en
+  el extracto» y hacer las dos cosas en un acto, por el importe del crédito. La
+  presentación es ese momento: identificar después del cierre del mes de la multa
+  es fuera de término (M08).
+- **Descartar** (`multas.verificar-pagos`): un informado que no corresponde, con su
+  motivo. Nunca tocó el saldo.
+
+Una transferencia es de una sola multa (M06). El cheque físico sigue entrando solo
+por la caja (P15).
+
+<a id="recurso"></a>
+
+## Recurso del 20 %
+
+«Recurso (20 %)» registra el pago para recurrir, jerárquico o en apelación (M07).
+El importe no se escribe: es el 20 % del importe vigente de la multa, con sus
+ajustes y sin descontar pagos, **sin centavos**, y queda con la base congelada.
+Se carga el recibo externo que trae el sancionado y lo que dice.
+
+- Si coincide: en **efectivo** se cobra en el acto y sale el recibo; por **depósito
+  directo** queda informado y se verifica como cualquier pago por banco. El
+  depósito puede haberse presentado antes de cargarlo: como en todo pago por banco,
+  se indica el día y su respaldo, y eso decide el término.
+- Si la multa ya tiene **otro recurso** sin descartar, el nuevo queda en revisión
+  aunque coincida (P05, provisorio hasta que el área defina los recursos repetidos).
+- Si no coincide: queda **en revisión**, sin cobro ni recibo. Lo resuelve el
+  administrador (`multas.resolver-recurso`, no delegable) después de revisar la
+  multa, sus ajustes y el redondeo: **aplicar** por el 20 % exigido —el recibo
+  externo estaba mal— o **descartar** —el dato propio estaba mal—, para corregirlo y
+  registrar otro intento con la base de ese momento. No hay excepción al 20 %.
+  Aplicar uno en efectivo recibe el dinero en ese momento: si la multa ya se pagó
+  mientras esperaba, no se cobra y queda el descarte.
+
 ---
 
 <a id="correcciones"></a>
@@ -275,7 +332,9 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ver` | Consultar la cuenta corriente | administrador, contador, administrativo, consulta |
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
-| `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo | administrador, administrativo |
+| `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
+| `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar | administrador, contador |
+| `multas.resolver-recurso` | Resolver la diferencia de un recurso. **No se delega** desde Roles | administrador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 

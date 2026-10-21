@@ -44,6 +44,7 @@ import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
 import { index as multas } from '@/routes/multas';
 import { index as cajaDeMultas } from '@/routes/multas/caja';
+import { index as pagosDeMultas } from '@/routes/multas/pagos';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
@@ -82,6 +83,14 @@ const navGroups: NavGroup[] = [
                         href: cajaDeMultas(),
                         icon: Wallet,
                         permission: 'multas.ver',
+                    },
+                    // La cola de quien concilia: lo informado por el banco y
+                    // los recursos en revisión.
+                    {
+                        title: 'Pagos por verificar',
+                        href: pagosDeMultas(),
+                        icon: ClipboardCheck,
+                        permission: 'multas.verificar-pagos',
                     },
                 ],
             },

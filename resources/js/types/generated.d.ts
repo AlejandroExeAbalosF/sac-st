@@ -1033,6 +1033,22 @@ declare namespace App {
                     isCancellation: boolean;
                     createdByName: string | null;
                     createdAt: string | null;
+                    declaredPaidOn: string | null;
+                    appealKind: App.Modules.Multas.Enums.AppealKind | null;
+                    appealBaseAmount: string | null;
+                    appealRequiredAmount: string | null;
+                    externalReceiptReference: string | null;
+                    externalReceiptAmount: string | null;
+                    appealRepeated: boolean;
+                    reviewReason: string | null;
+                    discardReason: string | null;
+                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                };
+                export type FinePendingPaymentData = {
+                    fineId: number;
+                    fineCaption: string;
+                    caseLabel: string;
+                    payment: App.Modules.Multas.Data.FinePaymentData;
                 };
             }
             namespace Enums {
@@ -1210,7 +1226,8 @@ declare namespace App {
                     | 'bank_account_opening'
                     | 'fine_case'
                     | 'fine'
-                    | 'fine_historical_movement';
+                    | 'fine_historical_movement'
+                    | 'fine_payment';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

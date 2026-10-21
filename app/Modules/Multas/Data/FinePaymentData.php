@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Data;
 
 use App\Models\User;
+use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineTimeliness;
@@ -46,12 +47,30 @@ final class FinePaymentData extends Data
         public bool $isCancellation,
         public ?string $createdByName,
         public ?string $createdAt,
+        public ?string $declaredPaidOn,
+        /** Recurso del 20 %: tipo, base congelada, exigido y lo que dice el recibo externo. */
+        public ?AppealKind $appealKind,
+        /** @var numeric-string|null */
+        public ?string $appealBaseAmount,
+        /** @var numeric-string|null */
+        public ?string $appealRequiredAmount,
+        public ?string $externalReceiptReference,
+        /** @var numeric-string|null */
+        public ?string $externalReceiptAmount,
+        /** Otro recurso de la misma multa ya estaba vigente al registrarlo (P05). */
+        public bool $appealRepeated,
+        public ?string $reviewReason,
+        public ?string $discardReason,
+        /** @var list<FineAttachmentData> */
+        public array $attachments,
     ) {}
 
     /**
      * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt` y `creator`.
+     *
+     * @param  list<FineAttachmentData>  $adjuntos
      */
-    public static function fromModel(FinePayment $pago): self
+    public static function fromModel(FinePayment $pago, array $adjuntos = []): self
     {
         $aplicacion = $pago->application;
         $recepcion = $aplicacion?->fundReceipt;
@@ -79,6 +98,16 @@ final class FinePaymentData extends Data
             isCancellation: $pago->paymentReceipt !== null && $pago->paymentReceipt->is_cancellation,
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $pago->created_at?->toIso8601String(),
+            declaredPaidOn: $pago->declared_paid_on?->toDateString(),
+            appealKind: $pago->appeal_kind,
+            appealBaseAmount: $pago->appeal_base_amount,
+            appealRequiredAmount: $pago->appeal_required_amount,
+            externalReceiptReference: $pago->external_receipt_reference,
+            externalReceiptAmount: $pago->external_receipt_amount,
+            appealRepeated: $pago->appeal_repeated,
+            reviewReason: $pago->review_reason,
+            discardReason: $pago->discard_reason,
+            attachments: $adjuntos,
         );
     }
 }

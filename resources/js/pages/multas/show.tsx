@@ -2,7 +2,9 @@ import { Head, Link } from '@inertiajs/react';
 import {
     Banknote,
     FilePlus2,
+    Gavel,
     History,
+    Landmark,
     Paperclip,
     Pencil,
     Receipt,
@@ -15,24 +17,29 @@ import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import AdjustDebtDialog from '@/features/multas/components/adjust-debt-dialog';
+import AppealDialog from '@/features/multas/components/appeal-dialog';
 import {
     AttachFileDialog,
     AttachmentList,
 } from '@/features/multas/components/attachments';
+import BankPaymentDialog from '@/features/multas/components/bank-payment-dialog';
 import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
+import ResolveAppealDialog from '@/features/multas/components/resolve-appeal-dialog';
 import ReviewHistoricalDialog from '@/features/multas/components/review-historical-dialog';
 import ReviseDateDialog from '@/features/multas/components/revise-date-dialog';
 import ReviseFineDialog from '@/features/multas/components/revise-fine-dialog';
+import VerifyPaymentDialog from '@/features/multas/components/verify-payment-dialog';
 import {
     DEBT_KIND,
     DEBT_STATUS,
     DOCUMENT_ROLE,
     HISTORICAL_KIND,
+    APPEAL_KIND,
     HISTORICAL_STATUS,
     PAYMENT_MEDIUM,
     PAYMENT_STATUS,
@@ -46,6 +53,8 @@ import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos
 import { store as reviseMovementDate } from '@/routes/multas/antecedentes/revisiones';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
+import { discard } from '@/routes/multas/pagos';
+import { store as attachToPayment } from '@/routes/multas/pagos/adjuntos';
 
 type Multa = App.Modules.Multas.Data.FineDetailData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
@@ -53,6 +62,7 @@ type Movimiento = App.Modules.Multas.Data.FineDebtEntryData;
 type Antecedente = App.Modules.Multas.Data.FineHistoricalMovementData;
 type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
 type Credito = App.Modules.Multas.Data.FineBankCreditData;
+type Pago = App.Modules.Multas.Data.FinePaymentData;
 
 type Props = {
     multa: Multa;
@@ -60,12 +70,19 @@ type Props = {
     adjuntosDelExpediente: Adjunto[];
     /** Llegan solo al buscar un crédito, con una recarga parcial. */
     creditosDelBanco?: Credito[];
+    /** Los créditos libres posteriores a la apertura; llegan al buscar. */
+    creditosDisponibles?: Credito[];
+    /** El 20 % del importe vigente, sin centavos (M07). */
+    recurso: { base: string; required: string; repeated: boolean };
     firmantes: Firmante[];
     /** La clave del cobro: un doble clic no cobra dos veces. */
     cobroKey: string;
     can: {
         register: boolean;
         collect: boolean;
+        reportBank: boolean;
+        verifyBank: boolean;
+        resolveAppeal: boolean;
         adjust: boolean;
         viewAttachments: boolean;
         linkBankCredit: boolean;
@@ -75,6 +92,12 @@ type Props = {
 type Dialogo =
     | { tipo: 'ajustar' }
     | { tipo: 'cobrar' }
+    | { tipo: 'banco' }
+    | { tipo: 'recurso' }
+    | { tipo: 'verificar'; pago: Pago }
+    | { tipo: 'descartar-pago'; pago: Pago }
+    | { tipo: 'resolver'; pago: Pago }
+    | { tipo: 'adjuntar-pago'; pago: Pago }
     | { tipo: 'recibo'; id: number; numero: string }
     | { tipo: 'revertir'; movimiento: Movimiento }
     | { tipo: 'vincular' }
@@ -102,6 +125,8 @@ export default function MultaShow({
     documentosDelExpediente,
     adjuntosDelExpediente,
     creditosDelBanco,
+    creditosDisponibles,
+    recurso,
     firmantes,
     cobroKey,
     can,
@@ -495,15 +520,45 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Pagos">
-                        {can.collect && isNonZero(multa.balance.debt) && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDialogo({ tipo: 'cobrar' })}
-                            >
-                                <Banknote aria-hidden="true" />
-                                Cobrar en caja
-                            </Button>
+                        {isNonZero(multa.balance.debt) && (
+                            <div className="flex flex-wrap justify-end gap-2">
+                                {can.collect && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setDialogo({ tipo: 'cobrar' })
+                                        }
+                                    >
+                                        <Banknote aria-hidden="true" />
+                                        Cobrar en caja
+                                    </Button>
+                                )}
+                                {can.reportBank && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setDialogo({ tipo: 'banco' })
+                                        }
+                                    >
+                                        <Landmark aria-hidden="true" />
+                                        Pago por banco
+                                    </Button>
+                                )}
+                                {(can.collect || can.reportBank) && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setDialogo({ tipo: 'recurso' })
+                                        }
+                                    >
+                                        <Gavel aria-hidden="true" />
+                                        Recurso (20 %)
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </Encabezado>
                     {multa.payments.length === 0 ? (
@@ -556,6 +611,65 @@ export default function MultaShow({
                                                 label={estadoPago.label}
                                                 tone={estadoPago.tone}
                                             />
+                                            {pago.status === 'reported' &&
+                                                can.verifyBank && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setDialogo({
+                                                                    tipo: 'verificar',
+                                                                    pago,
+                                                                })
+                                                            }
+                                                        >
+                                                            Verificar
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() =>
+                                                                setDialogo({
+                                                                    tipo: 'descartar-pago',
+                                                                    pago,
+                                                                })
+                                                            }
+                                                        >
+                                                            Descartar
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            {pago.status === 'under_review' &&
+                                                can.resolveAppeal && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'resolver',
+                                                                pago,
+                                                            })
+                                                        }
+                                                    >
+                                                        Resolver
+                                                    </Button>
+                                                )}
+                                            {can.reportBank &&
+                                                pago.status !== 'discarded' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'adjuntar-pago',
+                                                                pago,
+                                                            })
+                                                        }
+                                                    >
+                                                        Comprobante
+                                                    </Button>
+                                                )}
                                             {pago.receiptId !== null &&
                                                 pago.receiptNumber !== null && (
                                                     <Button
@@ -577,6 +691,47 @@ export default function MultaShow({
                                                     </Button>
                                                 )}
                                         </span>
+                                        {pago.appealKind !== null && (
+                                            <p className="w-full text-xs text-muted-foreground">
+                                                {APPEAL_KIND[pago.appealKind]}:
+                                                20 % de{' '}
+                                                <Money
+                                                    value={
+                                                        pago.appealBaseAmount ??
+                                                        '0.00'
+                                                    }
+                                                />
+                                                . Recibo externo{' '}
+                                                {pago.externalReceiptReference}{' '}
+                                                por{' '}
+                                                <Money
+                                                    value={
+                                                        pago.externalReceiptAmount ??
+                                                        '0.00'
+                                                    }
+                                                />
+                                                .
+                                                {pago.appealRepeated &&
+                                                    ' Registrado con otro recurso vigente.'}
+                                                {pago.reviewReason &&
+                                                    ` Resuelto: ${pago.reviewReason}`}
+                                            </p>
+                                        )}
+                                        {pago.discardReason && (
+                                            <p className="w-full text-xs text-muted-foreground">
+                                                Descartado: {pago.discardReason}
+                                            </p>
+                                        )}
+                                        {pago.attachments.length > 0 && (
+                                            <div className="w-full">
+                                                <AttachmentList
+                                                    adjuntos={pago.attachments}
+                                                    canView={
+                                                        can.viewAttachments
+                                                    }
+                                                />
+                                            </div>
+                                        )}
                                         {pago.excessAmount !== null &&
                                             isNonZero(pago.excessAmount) && (
                                                 <p className="w-full text-xs text-muted-foreground">
@@ -776,6 +931,60 @@ export default function MultaShow({
                     debt={multa.balance.debt}
                     idempotencyKey={cobroKey}
                     firmantes={firmantes}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'banco' && (
+                <BankPaymentDialog
+                    fineId={multa.id}
+                    canVerify={can.verifyBank}
+                    creditos={creditosDisponibles}
+                    firmantes={firmantes}
+                    idempotencyKey={cobroKey}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'recurso' && (
+                <AppealDialog
+                    fineId={multa.id}
+                    base={recurso.base}
+                    required={recurso.required}
+                    repeated={recurso.repeated}
+                    allowCash={can.collect}
+                    firmantes={firmantes}
+                    idempotencyKey={cobroKey}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'verificar' && (
+                <VerifyPaymentDialog
+                    pago={dialogo.pago}
+                    creditos={creditosDisponibles}
+                    firmantes={firmantes}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'descartar-pago' && (
+                <ReasonDialog
+                    title="Descartar el pago informado"
+                    description="Nunca redujo el saldo ni tuvo recibo: queda a la vista como descartado, con el motivo."
+                    url={discard(dialogo.pago.id).url}
+                    submitLabel="Descartar pago"
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'resolver' && (
+                <ResolveAppealDialog
+                    pago={dialogo.pago}
+                    firmantes={firmantes}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'adjuntar-pago' && (
+                <AttachFileDialog
+                    url={attachToPayment(dialogo.pago.id).url}
+                    title="Comprobante del pago"
+                    description="La transferencia, la boleta del depósito o el recibo externo del recurso."
                     onClose={cerrar}
                 />
             )}

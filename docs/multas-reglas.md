@@ -283,3 +283,43 @@ es la parte del excedente hecha de plata que está en el libro.
 - Una hoja del talonario se usa una sola vez por caja, aunque el recibo se haya
   anulado. **Base:** `receipts_talonario_number_unique`. **Action:** lo dice en el
   campo, también si dos cobros simultáneos chocan en la base.
+
+<a id="banco"></a>
+
+## Pagos por banco
+
+- Lo bancario nace `reported` y no toca la deuda. **Base:** `fine_payments_guard`.
+- Se verifica con **un** crédito de la cuenta de la caja de Multas, posterior al
+  corte de la cuenta y a la apertura de la caja, libre y por el importe entero del
+  pago (P14 provisorio). **Action:** `VerifyFineBankPayment` con
+  `FineBankCredits::pending`. **Base:** `bank_allocation_after_opening` (fechas) y
+  `fine_payment_application_bank_credit`: una sola imputación vigente detrás de la
+  recepción, por el crédito entero, y el crédito no respalda la aplicación de otro
+  pago (una transferencia, una multa).
+- La presentación anterior a la carga lleva respaldo. **Base:** CHECK
+  `fine_payments_presentation_check`; **Action:** mensaje en el campo.
+- Descartar exige motivo y solo un informado. **Base:** `fine_payments_guard` y CHECK
+  `fine_payments_discard_check`.
+
+<a id="recurso"></a>
+
+## Recurso del 20 %
+
+- Exigido = `trunc(base × 0,20, 0)`, con base = obligación vigente al registrarlo.
+  **Base:** CHECK `fine_payments_appeal_check` y `fine_payments_guard` (base
+  congelada). **Action:** `RegisterFineAppeal` con `AppealAmount`.
+- Solo efectivo o depósito directo, nunca de origen judicial. **Base:** CHECK.
+- Con diferencia, `under_review`, sin recepción ni recibo; sale solo resuelto, y
+  aplicado siempre por el exigido. **Base:** CHECK `fine_payments_review_check` y
+  `fine_payments_guard` (efectivo → `applied`, depósito → `reported`).
+- Un recurso sobre una multa con otro sin descartar nace `appeal_repeated` y en
+  revisión aunque coincida (P05 provisorio); un intento descartado no cuenta.
+  **Base:** `fine_payments_guard` (la marca es la que corresponde) y CHECK
+  `fine_payments_review_check`. **Action:** `RegisterFineAppeal`.
+- El depósito del recurso conserva su presentación anterior con respaldo; el
+  efectivo se presenta en el momento. **Base:** CHECK
+  `fine_payments_presentation_check`; **Action:** mensaje en el campo.
+- Resolver aplicando un recurso en efectivo exige saldo pendiente en ese momento.
+  **Solo Action** (`ResolveFineAppeal`).
+- `multas.resolver-recurso` no se delega. **Base:**
+  `role_has_permissions_guard_non_delegable`; **Action:** `UpdateRolePermissions`.

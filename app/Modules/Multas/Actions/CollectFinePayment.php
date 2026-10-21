@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Actions;
 
-use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
-use App\Modules\Ledger\Enums\Currency;
-use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\PresentationPrecision;
@@ -40,8 +36,7 @@ use Illuminate\Validation\ValidationException;
 final class CollectFinePayment
 {
     public function __construct(
-        private readonly RegisterCashFundReceipt $recibir,
-        private readonly ApplyFinePayment $aplicar,
+        private readonly ReceiveFinePaymentAtCounter $recibir,
         private readonly RecordAuditEvent $auditar,
         private readonly TalonarioSequence $talonarios,
     ) {}
@@ -115,23 +110,7 @@ final class CollectFinePayment
             }
 
             $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
-            $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->valueOrFail('id');
-
-            if (CashBookOpening::for($caja, Currency::from($multa->currency)) === null) {
-                throw ValidationException::withMessages([
-                    'amount' => $multa->currency === Currency::Ars->value
-                        ? 'La caja de Multas todavía no se abrió: no puede cobrar.'
-                        : 'La caja de Multas no opera en '.$multa->currency.'.',
-                ]);
-            }
-
             $saldo = (string) FineBalance::query()->whereKey($multa->id)->value('debt');
-
-            /*
-             * Una hoja del talonario se usa una vez, aunque el recibo se haya
-             * anulado. La base lo impide; esto lo dice en el campo.
-             */
-            $this->talonarios->assertFree(ReceiptType::Income, $caja, $talonario);
 
             if (Decimal::equals($saldo, '0')) {
                 throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay nada que cobrar.']);
@@ -161,20 +140,7 @@ final class CollectFinePayment
                 'created_by' => $actorId,
             ]);
 
-            $recepcion = $this->recibir->handle(
-                amount: $importe,
-                idempotencyKey: $idempotencyKey.':recepcion',
-                cashBoxId: $caja,
-                receivedDate: $fecha,
-                medium: $medio === FinePaymentMedium::Cheque ? PaymentMedium::Cheque : PaymentMedium::Cash,
-                depositorId: $multa->person_id,
-                actorId: $actorId,
-                notes: 'Multa '.$multa->caption,
-                cheque: $cheque,
-                currency: Currency::from($multa->currency),
-            );
-
-            $comprobante = $this->aplicar->handle($pago, $recepcion, $fecha, $talonario, $signedById, $actorId);
+            $comprobante = $this->recibir->handle($pago, $fecha, $cheque, $talonario, $signedById, $actorId);
 
             $this->auditar->handle(
                 'multa.pago-cobrado',

@@ -12,6 +12,7 @@ type ActType = App.Modules.Multas.Enums.FineActType;
 type PaymentMedium = App.Modules.Multas.Enums.FinePaymentMedium;
 type PaymentStatus = App.Modules.Multas.Enums.FinePaymentStatus;
 type Timeliness = App.Modules.Multas.Enums.FineTimeliness;
+type AppealKind = App.Modules.Multas.Enums.AppealKind;
 
 /*
  * Los rótulos de los enums de Multas, en un solo lugar.
@@ -86,6 +87,11 @@ export const PAYMENT_STATUS: Record<
     applied: { label: 'Aplicado', tone: 'done' },
     discarded: { label: 'Descartado', tone: 'neutral' },
     under_review: { label: 'En revisión', tone: 'blocked' },
+};
+
+export const APPEAL_KIND: Record<AppealKind, string> = {
+    hierarchical: 'Recurso jerárquico',
+    appeal: 'Apelación',
 };
 
 /** Si se presentó antes o después del cierre del mes de la multa (M08). */

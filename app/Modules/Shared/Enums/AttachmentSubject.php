@@ -45,6 +45,9 @@ enum AttachmentSubject: string
     /** El comprobante de un pago anterior al sistema. */
     case FineHistoricalMovement = 'fine_historical_movement';
 
+    /** El comprobante de un pago de una multa: la transferencia, el depósito o el recibo externo del recurso. */
+    case FinePayment = 'fine_payment';
+
     public function label(): string
     {
         return match ($this) {
@@ -62,6 +65,7 @@ enum AttachmentSubject: string
             self::FineCase => 'Expediente de multa',
             self::Fine => 'Multa',
             self::FineHistoricalMovement => 'Pago anterior de una multa',
+            self::FinePayment => 'Pago de una multa',
         };
     }
 }

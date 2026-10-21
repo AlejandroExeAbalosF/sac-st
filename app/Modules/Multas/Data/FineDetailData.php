@@ -62,8 +62,9 @@ final class FineDetailData extends Data
      *
      * @param  list<FineAttachmentData>  $adjuntos  los de la multa
      * @param  array<int, list<FineAttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior
+     * @param  array<int, list<FineAttachmentData>>  $adjuntosDePagos  por id del pago
      */
-    public static function fromModel(Fine $multa, array $adjuntos, array $adjuntosDeAntecedentes): self
+    public static function fromModel(Fine $multa, array $adjuntos, array $adjuntosDeAntecedentes, array $adjuntosDePagos = []): self
     {
         $autor = $multa->creator;
 
@@ -109,7 +110,7 @@ final class FineDetailData extends Data
                 ->all()),
             balance: FineBalanceData::fromModel($multa->balance),
             payments: array_values($multa->payments
-                ->map(fn (FinePayment $pago): FinePaymentData => FinePaymentData::fromModel($pago))
+                ->map(fn (FinePayment $pago): FinePaymentData => FinePaymentData::fromModel($pago, $adjuntosDePagos[$pago->id] ?? []))
                 ->all()),
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $multa->created_at?->toIso8601String(),

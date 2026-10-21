@@ -15,12 +15,15 @@ use App\Modules\Multas\Data\FineCaseData;
 use App\Modules\Multas\Data\FineDetailData;
 use App\Modules\Multas\Data\FineDocumentData;
 use App\Modules\Multas\Data\FineListItemData;
+use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Http\Requests\FineIndexRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseNumber;
@@ -155,12 +158,18 @@ final class FineController extends Controller
         ]);
 
         $usuario = $request->user();
+        $cobra = $usuario?->can('multas.cobrar') ?? false;
+        $verifica = $usuario?->can('multas.verificar-pagos') ?? false;
+        $resuelve = $usuario?->can('multas.resolver-recurso') ?? false;
+        $emiteRecibos = $cobra || $verifica || $resuelve;
+        $cajaAbierta = $this->cajaAbierta($fine);
 
         return Inertia::render('multas/show', [
             'multa' => FineDetailData::fromModel(
                 $fine,
                 $adjuntos->for(AttachmentSubject::Fine, [$fine->id])[$fine->id] ?? [],
                 $adjuntos->for(AttachmentSubject::FineHistoricalMovement, array_values($fine->historicalMovements->modelKeys())),
+                $adjuntos->for(AttachmentSubject::FinePayment, array_values($fine->payments->modelKeys())),
             ),
             'documentosDelExpediente' => $fine->fineCase->documents
                 ->sortBy('id')
@@ -174,10 +183,28 @@ final class FineController extends Controller
              */
             'creditosDelBanco' => Inertia::optional(fn (): array => $creditos->search($request->string('credito')->toString())),
             /*
+             * Los créditos posteriores al corte y a la apertura que nadie
+             * identificó, para verificar un pago por el banco. También al buscar.
+             */
+            'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),
+            /*
+             * El 20 % para recurrir, calculado sobre el importe vigente de hoy
+             * (M07). Es el anticipo de la pantalla: el que vale lo calcula el
+             * Action, con la multa bloqueada.
+             */
+            'recurso' => [
+                'base' => $fine->balance->obligation ?? '0.00',
+                'required' => AppealAmount::required($fine->balance->obligation ?? '0'),
+                // Con otro recurso sin descartar, el nuevo va a revisión (P05).
+                'repeated' => $fine->payments->contains(
+                    fn (FinePayment $pago): bool => $pago->appeal_kind !== null && $pago->status !== FinePaymentStatus::Discarded,
+                ),
+            ],
+            /*
              * Quienes pueden firmar el recibo, con su cargo, como en Haberes.
              * Opcional: sin firmante el pie queda para firmar a mano.
              */
-            'firmantes' => $usuario?->can('multas.cobrar') ? User::query()
+            'firmantes' => $emiteRecibos ? User::query()
                 ->where('is_active', true)
                 ->whereNotNull('position')
                 ->orderBy('name')
@@ -186,7 +213,12 @@ final class FineController extends Controller
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 // Cobrar exige la caja abierta en la moneda de la multa.
-                'collect' => ($usuario?->can('multas.cobrar') ?? false) && $this->cajaAbierta($fine),
+                'collect' => $cobra && $cajaAbierta,
+                // Informar lo que llega por el banco: el mostrador o la conciliación.
+                'reportBank' => $cobra || $verifica,
+                // Verificar contra el extracto exige la caja abierta con su cuenta.
+                'verifyBank' => $verifica && $cajaAbierta && $creditos->book() !== null,
+                'resolveAppeal' => $resuelve,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.

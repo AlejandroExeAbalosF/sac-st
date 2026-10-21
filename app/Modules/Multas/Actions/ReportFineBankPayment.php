@@ -1,0 +1,144 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Multas\Actions;
+
+use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Enums\PresentationPrecision;
+use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineBalance;
+use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+/**
+ * Un pago por el banco que alguien presentó: transferencia, depósito
+ * directo o cheque electrónico (M02).
+ *
+ * No toca la deuda ni lleva recibo: queda **informado** hasta que se
+ * verifique contra un crédito del extracto. Lo que sí queda es cuándo se
+ * presentó el comprobante, que es lo que decide el término (M08): hoy, en el
+ * momento de cargarlo, o un día anterior con su respaldo —el sello de Mesa
+ * de Entradas, una nota—.
+ */
+final class ReportFineBankPayment
+{
+    public function __construct(private readonly RecordAuditEvent $auditar) {}
+
+    /**
+     * @throws ValidationException
+     */
+    public function handle(
+        Fine $multa,
+        FinePaymentMedium $medio,
+        string $amount,
+        string $idempotencyKey,
+        ?int $actorId,
+        ?CarbonImmutable $presentedOn = null,
+        ?string $presentationEvidence = null,
+        ?CarbonImmutable $declaredPaidOn = null,
+        ?string $judicialReference = null,
+    ): FinePayment {
+        $importe = Decimal::scale($amount);
+        $hoy = BusinessDate::today();
+        $presentado = $presentedOn ?? $hoy;
+        $respaldo = trim((string) $presentationEvidence) ?: null;
+        $judicial = trim((string) $judicialReference) ?: null;
+
+        $this->assertReportable($medio, $importe, $presentado, $hoy, $respaldo, $declaredPaidOn, $judicial);
+
+        return DB::transaction(function () use (
+            $multa, $medio, $importe, $idempotencyKey, $actorId, $presentado, $hoy, $respaldo, $declaredPaidOn, $judicial
+        ): FinePayment {
+            $yaInformado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
+
+            if ($yaInformado !== null) {
+                return $yaInformado;
+            }
+
+            $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
+
+            if (Decimal::equals((string) FineBalance::query()->whereKey($multa->id)->value('debt'), '0')) {
+                throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay pago que informar.']);
+            }
+
+            $ahora = CarbonImmutable::now();
+            $delDia = $presentado->isSameDay($hoy);
+
+            $pago = FinePayment::query()->create([
+                'fine_id' => $multa->id,
+                'medium' => $medio,
+                'judicial_origin' => $judicial !== null,
+                'judicial_reference' => $judicial,
+                'status' => FinePaymentStatus::Reported,
+                'amount' => $importe,
+                'presented_at' => $delDia ? $ahora : BusinessDate::startOfDay($presentado->toDateString()),
+                'presented_precision' => $delDia ? PresentationPrecision::Instant : PresentationPrecision::Day,
+                'presentation_evidence' => $delDia ? null : $respaldo,
+                'reported_at' => $ahora,
+                'declared_paid_on' => $declaredPaidOn?->toDateString(),
+                'payer_person_id' => $multa->person_id,
+                'payer_name' => $multa->caption,
+                'idempotency_key' => $idempotencyKey,
+                'created_by' => $actorId,
+            ]);
+
+            $this->auditar->handle('multa.pago-informado', $multa, metadata: array_filter([
+                'medio' => $medio->label(),
+                'amount' => $importe,
+                'judicial' => $judicial,
+            ]), actorId: $actorId);
+
+            return $pago;
+        });
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function assertReportable(
+        FinePaymentMedium $medio,
+        string $importe,
+        CarbonImmutable $presentado,
+        CarbonImmutable $hoy,
+        ?string $respaldo,
+        ?CarbonImmutable $pagado,
+        ?string $judicial,
+    ): void {
+        if ($medio->isCounter()) {
+            throw ValidationException::withMessages([
+                'medium' => 'El efectivo y el cheque se cobran en la caja: no se informan.',
+            ]);
+        }
+
+        if (Decimal::isNegative($importe) || Decimal::equals($importe, '0')) {
+            throw ValidationException::withMessages(['amount' => 'El importe tiene que ser mayor que cero.']);
+        }
+
+        if ($presentado->greaterThan($hoy)) {
+            throw ValidationException::withMessages(['presentedOn' => 'La presentación no puede tener fecha futura.']);
+        }
+
+        if ($presentado->lessThan($hoy) && $respaldo === null) {
+            throw ValidationException::withMessages([
+                'presentationEvidence' => 'Una presentación de un día anterior lleva su respaldo: el sello de Mesa de Entradas, una nota.',
+            ]);
+        }
+
+        if ($pagado !== null && $pagado->greaterThan($hoy)) {
+            throw ValidationException::withMessages(['declaredPaidOn' => 'El pago no puede tener fecha futura.']);
+        }
+
+        if ($judicial !== null && $medio !== FinePaymentMedium::BankTransfer) {
+            throw ValidationException::withMessages([
+                'judicialReference' => 'Una orden de pago judicial llega como transferencia o como cheque en la caja.',
+            ]);
+        }
+    }
+}

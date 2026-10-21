@@ -7,6 +7,7 @@ namespace App\Modules\Multas\Actions;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -35,7 +36,7 @@ final class AttachFineFile
     ) {}
 
     public function handle(
-        FineCase|Fine|FineHistoricalMovement $sujeto,
+        FineCase|Fine|FineHistoricalMovement|FinePayment $sujeto,
         UploadedFile $archivo,
         ?string $title,
         ?int $actorId,
@@ -50,26 +51,31 @@ final class AttachFineFile
                     subject: match (true) {
                         $sujeto instanceof FineCase => AttachmentSubject::FineCase,
                         $sujeto instanceof Fine => AttachmentSubject::Fine,
+                        $sujeto instanceof FinePayment => AttachmentSubject::FinePayment,
                         default => AttachmentSubject::FineHistoricalMovement,
                     },
                     subjectId: (int) $sujeto->getKey(),
                     documentType: match (true) {
                         $sujeto instanceof FineCase => 'fine_case_paper',
                         $sujeto instanceof Fine => 'fine_support',
+                        $sujeto instanceof FinePayment => 'fine_payment_evidence',
                         default => 'fine_historical_evidence',
                     },
                     userId: $actorId,
                     title: $titulo,
                 );
 
-                // El pago anterior se audita sobre su multa: es donde se lee.
+                // Los pagos se auditan sobre su multa: es donde se leen.
                 $this->auditar->handle(
                     match (true) {
                         $sujeto instanceof FineCase => 'expediente-multa.adjunto-agregado',
                         $sujeto instanceof Fine => 'multa.adjunto-agregado',
+                        $sujeto instanceof FinePayment => 'multa.comprobante-de-pago-agregado',
                         default => 'multa.respaldo-de-antecedente-agregado',
                     },
-                    $sujeto instanceof FineHistoricalMovement ? Fine::query()->findOrFail($sujeto->fine_id) : $sujeto,
+                    $sujeto instanceof FineHistoricalMovement || $sujeto instanceof FinePayment
+                        ? Fine::query()->findOrFail($sujeto->fine_id)
+                        : $sujeto,
                     metadata: [
                         'titulo' => $adjunto->title,
                         'archivo' => $adjunto->original_filename,

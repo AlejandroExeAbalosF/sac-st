@@ -111,6 +111,8 @@ class HandleInertiaRequests extends Middleware
                      * se puede quitar desde Roles: la barra pregunta igual.
                      */
                     'multas.ver' => $user->can('multas.ver'),
+                    // La cola de pagos por verificar es de quien concilia.
+                    'multas.verificar-pagos' => $user->can('multas.verificar-pagos'),
                 ],
             ],
             'flash' => [
