@@ -26,7 +26,9 @@ use InvalidArgumentException;
  *
  * El importe original no se toca: el ajuste es otra fila, con su documento,
  * su fecha y su motivo. Los pagos ya hechos no cambian; si la obligación
- * queda por debajo de lo pagado, la deuda es cero y lo demás es excedente.
+ * queda por debajo de lo pagado, la deuda es cero y lo demás es excedente;
+ * si eso cambia cuánto de lo cobrado en el sistema es excedente, el libro se
+ * reclasifica en la misma transacción (M05).
  *
  * La resolución que lo respalda queda vinculada a la multa como
  * «modificación», si todavía no lo estaba: es lo que exige la base para
@@ -36,6 +38,7 @@ final class AdjustFineDebt
 {
     public function __construct(
         private readonly AttachFineDocument $registrarDocumento,
+        private readonly ReconcileFineExcess $reclasificar,
         private readonly RecordAuditEvent $auditar,
     ) {}
 
@@ -108,6 +111,8 @@ final class AdjustFineDebt
                 'provenance' => FineProvenance::Manual,
                 'created_by' => $actorId,
             ]);
+
+            $this->reclasificar->handle($multa, sprintf('%s de la obligación por %s', $tipo->label(), $respaldo->label()), $actorId);
 
             $this->auditar->handle(
                 'multa.ajuste-registrado',

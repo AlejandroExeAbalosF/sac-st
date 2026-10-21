@@ -174,6 +174,14 @@ final class Fine extends Model
     }
 
     /**
+     * @return HasMany<FinePayment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(FinePayment::class)->orderBy('id');
+    }
+
+    /**
      * @return HasMany<FineIdentifierRevision, $this>
      */
     public function revisions(): HasMany

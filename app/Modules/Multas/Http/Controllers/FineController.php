@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Actions\CreateFineCase;
 use App\Modules\Multas\Actions\RegisterFine;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
@@ -24,6 +27,7 @@ use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use App\Support\Excel\SpreadsheetWriter;
 use App\Support\Money\Decimal;
@@ -33,6 +37,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -144,6 +149,9 @@ final class FineController extends Controller
             'historicalMovements.creator:id,name',
             'historicalMovements.reviewer:id,name',
             'historicalMovements.bankTransaction',
+            'payments.application.fundReceipt',
+            'payments.paymentReceipt.receipt',
+            'payments.creator:id,name',
         ]);
 
         $usuario = $request->user();
@@ -165,8 +173,20 @@ final class FineController extends Controller
              * pago anterior. Se piden con una recarga parcial al buscar.
              */
             'creditosDelBanco' => Inertia::optional(fn (): array => $creditos->search($request->string('credito')->toString())),
+            /*
+             * Quienes pueden firmar el recibo, con su cargo, como en Haberes.
+             * Opcional: sin firmante el pie queda para firmar a mano.
+             */
+            'firmantes' => $usuario?->can('multas.cobrar') ? User::query()
+                ->where('is_active', true)
+                ->whereNotNull('position')
+                ->orderBy('name')
+                ->get(['id', 'name', 'position']) : [],
+            'cobroKey' => 'multa-cobro:'.$fine->id.':'.Str::ulid(),
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
+                // Cobrar exige la caja abierta en la moneda de la multa.
+                'collect' => ($usuario?->can('multas.cobrar') ?? false) && $this->cajaAbierta($fine),
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.
@@ -234,6 +254,15 @@ final class FineController extends Controller
                 ];
             }
         }
+    }
+
+    /** Sin la apertura en la moneda de la multa no hay libro donde asentar el cobro. */
+    private function cajaAbierta(Fine $multa): bool
+    {
+        $caja = CashBox::query()->where('code', CashBox::MULTAS)->value('id');
+        $moneda = Currency::tryFrom($multa->currency);
+
+        return $caja !== null && $moneda !== null && CashBookOpening::for((int) $caja, $moneda) !== null;
     }
 
     /**

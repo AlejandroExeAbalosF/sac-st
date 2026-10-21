@@ -28,7 +28,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class ReverseFineDebtEntry
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly ReconcileFineExcess $reclasificar,
+        private readonly RecordAuditEvent $auditar,
+    ) {}
 
     public function handle(FineDebtEntry $ajuste, string $reason, ?int $actorId): FineDebtEntry
     {
@@ -66,6 +69,8 @@ final class ReverseFineDebtEntry
                 'provenance' => FineProvenance::Manual,
                 'created_by' => $actorId,
             ]);
+
+            $this->reclasificar->handle($multa, 'Reversión de un '.mb_strtolower($ajuste->kind->label()).' de la obligación', $actorId);
 
             $this->auditar->handle(
                 'multa.ajuste-revertido',

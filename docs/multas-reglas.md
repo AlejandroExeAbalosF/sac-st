@@ -91,7 +91,7 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 ```text
 obligation         = constitución + aumentos − reducciones ± reversiones
 historical_paid    = pagos anteriores validados − devoluciones anteriores validadas
-operational_paid   = 0 hasta que existan los cobros
+operational_paid   = suma de fine_payment_applications.amount (cada recepción entera)
 debt               = max(obligation − operational_paid − historical_paid, 0)
 excess             = max(operational_paid + historical_paid − obligation, 0)
 operational_excess = max(operational_paid − max(obligation − historical_paid, 0), 0)
@@ -198,3 +198,88 @@ es la parte del excedente hecha de plata que está en el libro.
 - Su fecha no se revisa. **Base** (misma función, al actualizar) y **Action**.
 - Revertir el extracto de un crédito vinculado se rechaza con mensaje. **Base:**
   la FK; **Action:** `RollbackBankStatementImport` traduce el 23503.
+
+<a id="pagos"></a>
+
+## Pagos y su aplicación
+
+- `fine_payments`: un pago de una multa. Medio `cash` / `cheque` /
+  `bank_transfer` / `direct_deposit` / `echeq`; el origen judicial es aparte y solo
+  para transferencia o cheque, con su referencia. **Base:** CHECK.
+- Lo cobrado en la caja nace `applied`; lo bancario nace `reported`. Después solo
+  avanza: `reported` → `applied` o `discarded`; `under_review` (recurso) →
+  `applied` (efectivo), `reported` (depósito directo) o `discarded`. Lo aplicado y
+  lo descartado no cambian, y los datos del pago no se editan. **Base:**
+  `fine_payments_guard`.
+- La presentación tiene fecha y precisión (`instant` / `day` / `unknown`). Si no es
+  el instante de la carga, lleva respaldo. **Base:** CHECK.
+- El recurso del 20 %: base = obligación vigente al registrarlo, congelada;
+  exigido = `trunc(base × 0,20, 0)`; solo efectivo o depósito directo; el importe
+  del pago es el exigido; si el recibo externo dice otro, queda `under_review` y no
+  sale sin resolución. **Base:** CHECK y `fine_payments_guard`. El circuito se
+  habilita en la tanda bancaria.
+- `fine_payment_applications`: una por pago y una por recepción. El importe es la
+  recepción entera, de la caja de Multas, en la moneda de la multa y por el mismo
+  medio; `applied_amount + excess_amount = amount`; el asiento `funds_applied`
+  debita `UNASSIGNED_FUNDS` por el total y acredita `COLLECTED_FUNDS` y
+  `PENDING_EXCESS` por cada parte. **Base:** UNIQUE, CHECK y
+  `fine_payment_application_coherent`. Append-only.
+- Un pago aplicado tiene su aplicación y su recibo; uno no aplicado, ninguno.
+  **Base:** `fine_payments_settled`, diferido.
+- Un `funds_applied` o `excess_reclassified` sin su fila de Multas no se asienta.
+  **Base:** `financial_events_fine_events_linked`, diferido.
+- Lo cobrado para una multa no financia una cuota de Haberes ni se revierte por su
+  cuenta. **Base:** `funding_allocations_not_from_multas` y
+  `fund_receipts_keep_fine_applications`; las pantallas de Haberes no muestran
+  recepciones ni recibos de otra caja (**Action**, 404).
+- Cobrar exige la caja abierta en la moneda de la multa y saldo pendiente; un cobro
+  de un día anterior exige el número de talonario. **Solo Action.**
+
+<a id="excedente"></a>
+
+## Excedente asentado
+
+- Excedente asentado = `excess_amount` de las aplicaciones + reclasificaciones
+  (`fine_excess_reclassifications.amount`, positivo hacia el excedente). Tiene que
+  ser igual a `operational_excess`. **Base:** `fine_excess_settled`, diferido, al
+  insertar aplicaciones, reclasificaciones, movimientos de la obligación y al
+  insertar o revisar antecedentes.
+- `AdjustFineDebt`, `ReverseFineDebtEntry` y `ReviewFineHistoricalMovement`
+  (al validar) llaman a `ReconcileFineExcess` en la misma transacción: un
+  `excess_reclassified` entre `COLLECTED_FUNDS` y `PENDING_EXCESS`, sin mover
+  dinero. **Action.**
+
+<a id="termino"></a>
+
+## Término
+
+- Se juzga al aplicar contra el cierre **mensual** de la caja de Multas, en la
+  moneda de la multa, del mes de `fines.registered_on`, y se guarda con la versión
+  de `period_closing_evidence` y el instante de cierre. **Action**
+  (`FinePaymentTimeliness`); la base exige la evidencia para `late`.
+- Sin cierre cerrado de ese mes (incluido uno reabierto), `on_time`; sin fecha de
+  registro, sin presentación, cierre sin evidencia o, con precisión de día, el
+  mismo día del cierre: `undetermined`.
+
+<a id="recibo"></a>
+
+## Recibo de Multas
+
+- Serie `0210` de la caja Multas. **Base:** `document_series_active_type_unique`
+  por tipo y caja.
+- Sin persona del maestro: «recibí de» = carátula en `counterparty_name_snapshot`.
+  **Base:** `receipts_belong_to_cash_box`.
+- Todo recibo de la caja Multas documenta un pago, con su snapshot
+  (`fine_payment_receipts`), por el importe del pago y vigente. **Base:**
+  `fine_payment_receipt_coherent` y `receipts_multas_belong_to_a_payment`
+  (diferido). Append-only.
+- Vínculos del recibo con el libro: la recepción y la aplicación, en
+  `receipt_financial_events`.
+- La copia congelada (`snapshot`) guarda también el número de la cuenta que el
+  formulario imprime en «Depósito Cta.» y la fecha de cada pago anterior **con su
+  precisión**: un antecedente conocido por el mes sale «05/2026», no con un día.
+  Las reimpresiones leen la copia, nunca el maestro ni el antecedente actuales.
+  **Action.**
+- Una hoja del talonario se usa una sola vez por caja, aunque el recibo se haya
+  anulado. **Base:** `receipts_talonario_number_unique`. **Action:** lo dice en el
+  campo, también si dos cobros simultáneos chocan en la base.

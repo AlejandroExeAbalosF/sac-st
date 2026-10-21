@@ -1,5 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
-import { FilePlus2, History, Paperclip, Pencil, Scale } from 'lucide-react';
+import {
+    Banknote,
+    FilePlus2,
+    History,
+    Paperclip,
+    Pencil,
+    Receipt,
+    Scale,
+} from 'lucide-react';
 import { useState } from 'react';
 import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
@@ -11,6 +19,9 @@ import {
     AttachFileDialog,
     AttachmentList,
 } from '@/features/multas/components/attachments';
+import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
+import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
+import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
@@ -23,9 +34,12 @@ import {
     DOCUMENT_ROLE,
     HISTORICAL_KIND,
     HISTORICAL_STATUS,
+    PAYMENT_MEDIUM,
+    PAYMENT_STATUS,
+    TIMELINESS,
     partialDate,
 } from '@/features/multas/labels';
-import { dateTime, isNonZero, sumAmounts } from '@/lib/format';
+import { date, dateTime, isNonZero, sumAmounts } from '@/lib/format';
 import { store as attachToFine } from '@/routes/multas/adjuntos';
 import { reverse } from '@/routes/multas/ajustes';
 import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
@@ -46,8 +60,12 @@ type Props = {
     adjuntosDelExpediente: Adjunto[];
     /** Llegan solo al buscar un crédito, con una recarga parcial. */
     creditosDelBanco?: Credito[];
+    firmantes: Firmante[];
+    /** La clave del cobro: un doble clic no cobra dos veces. */
+    cobroKey: string;
     can: {
         register: boolean;
+        collect: boolean;
         adjust: boolean;
         viewAttachments: boolean;
         linkBankCredit: boolean;
@@ -56,6 +74,8 @@ type Props = {
 
 type Dialogo =
     | { tipo: 'ajustar' }
+    | { tipo: 'cobrar' }
+    | { tipo: 'recibo'; id: number; numero: string }
     | { tipo: 'revertir'; movimiento: Movimiento }
     | { tipo: 'vincular' }
     | { tipo: 'antecedente' }
@@ -82,6 +102,8 @@ export default function MultaShow({
     documentosDelExpediente,
     adjuntosDelExpediente,
     creditosDelBanco,
+    firmantes,
+    cobroKey,
     can,
 }: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -472,6 +494,116 @@ export default function MultaShow({
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
+                    <Encabezado titulo="Pagos">
+                        {can.collect && isNonZero(multa.balance.debt) && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialogo({ tipo: 'cobrar' })}
+                            >
+                                <Banknote aria-hidden="true" />
+                                Cobrar en caja
+                            </Button>
+                        )}
+                    </Encabezado>
+                    {multa.payments.length === 0 ? (
+                        <p className="px-5 py-4 text-sm text-muted-foreground">
+                            Sin pagos en el sistema.
+                        </p>
+                    ) : (
+                        <ul className="divide-y">
+                            {multa.payments.map((pago) => {
+                                const estadoPago = PAYMENT_STATUS[pago.status];
+                                const termino =
+                                    pago.timeliness === null
+                                        ? null
+                                        : TIMELINESS[pago.timeliness];
+
+                                return (
+                                    <li
+                                        key={pago.id}
+                                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm"
+                                    >
+                                        <span>
+                                            {PAYMENT_MEDIUM[pago.medium]} ·{' '}
+                                            <Money value={pago.amount} />
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {pago.receiptDate
+                                                ? date(pago.receiptDate)
+                                                : dateTime(pago.createdAt)}
+                                            {pago.chequeNumber &&
+                                                ` · Cheque ${pago.chequeNumber}`}
+                                            {pago.chequeBank &&
+                                                ` (${pago.chequeBank})`}
+                                            {pago.judicialReference &&
+                                                ` · Orden judicial ${pago.judicialReference}`}
+                                        </span>
+                                        <span className="ml-auto flex flex-wrap items-center gap-2">
+                                            {pago.isCancellation && (
+                                                <StatusBadge
+                                                    label="Cancelatorio"
+                                                    tone="done"
+                                                />
+                                            )}
+                                            {termino && (
+                                                <StatusBadge
+                                                    label={termino.label}
+                                                    tone={termino.tone}
+                                                />
+                                            )}
+                                            <StatusBadge
+                                                label={estadoPago.label}
+                                                tone={estadoPago.tone}
+                                            />
+                                            {pago.receiptId !== null &&
+                                                pago.receiptNumber !== null && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'recibo',
+                                                                id: pago.receiptId as number,
+                                                                numero: pago.receiptNumber as string,
+                                                            })
+                                                        }
+                                                    >
+                                                        <Receipt aria-hidden="true" />
+                                                        <span className="font-mono">
+                                                            {pago.talonarioNumber ??
+                                                                pago.receiptNumber}
+                                                        </span>
+                                                    </Button>
+                                                )}
+                                        </span>
+                                        {pago.excessAmount !== null &&
+                                            isNonZero(pago.excessAmount) && (
+                                                <p className="w-full text-xs text-muted-foreground">
+                                                    Aplicado{' '}
+                                                    <Money
+                                                        value={
+                                                            pago.appliedAmount ??
+                                                            '0.00'
+                                                        }
+                                                    />
+                                                    ; excedente{' '}
+                                                    <Money
+                                                        value={
+                                                            pago.excessAmount
+                                                        }
+                                                    />
+                                                    .
+                                                </p>
+                                            )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+
+                <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Pagos anteriores al sistema">
                         {can.register && (
                             <Button
@@ -634,6 +766,23 @@ export default function MultaShow({
                     title="Fecha del pago anterior"
                     url={reviseMovementDate(dialogo.antecedente.id).url}
                     value={dialogo.antecedente.occurredOn}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'cobrar' && (
+                <CollectPaymentDialog
+                    fineId={multa.id}
+                    caption={multa.caption}
+                    debt={multa.balance.debt}
+                    idempotencyKey={cobroKey}
+                    firmantes={firmantes}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'recibo' && (
+                <FineReceiptDialog
+                    receiptId={dialogo.id}
+                    numero={dialogo.numero}
                     onClose={cerrar}
                 />
             )}

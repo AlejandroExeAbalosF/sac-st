@@ -147,6 +147,12 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 'Multas',
                 metadata: ['amount' => 'Importe', 'respaldo' => 'Respaldo', 'reason' => 'Motivo'],
             ),
+            new AuditActionDefinition(
+                'multa.pago-cobrado',
+                'Se cobró un pago de la multa en caja',
+                'Multas',
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'judicial' => 'Orden de pago judicial'],
+            ),
         );
 
         $catalog->registerSubject(new FineCaseSubject);

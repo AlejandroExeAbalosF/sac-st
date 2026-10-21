@@ -54,6 +54,8 @@ const RUTAS_SIN_PANTALLA = [
     'pases.view',
     'recibos.print',
     'recibos.view',
+    'multas.recibos.print',
+    'multas.recibos.view',
     'haberes.installments.order.preview',
     'haberes.installments.pase.preview',
     // Las mismas dos hojas en PDF, que es lo que se manda al papel. La

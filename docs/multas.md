@@ -91,6 +91,9 @@ saldo y estado. Abajo:
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos**: los de la multa y, debajo, los del expediente.
+- **Pagos**: los cobrados en el sistema, con su medio, su recibo, si fue el
+  cancelatorio, si se presentó en término y, si sobró, cuánto quedó de
+  excedente. «Cobrar en caja» abre el cobro.
 - **Pagos anteriores al sistema**, con su respaldo, su revisión, su comprobante y,
   si vino del banco, el crédito que lo respalda.
 
@@ -201,6 +204,45 @@ mismo crédito no lo pueden consumir dos cajas por encima de su importe.
 
 ---
 
+<a id="cobro"></a>
+
+## Cobro en caja
+
+«Cobrar en caja», en la ficha (permiso `multas.cobrar`, con la caja abierta en la
+moneda de la multa y saldo pendiente), registra un pago en **efectivo o con
+cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
+
+- **Importe**: arranca en el saldo, pero se cobra lo que se recibe. Un pago
+  parcial deja saldo; uno que lo supera cancela la multa y lo que sobra queda como
+  **excedente pendiente**, que no se devuelve ni se acredita solo (M05). El cheque
+  se recibe por su importe entero y queda en custodia (M06); si es una **orden de
+  pago judicial**, se marca y se anota el expediente judicial.
+- **Fecha**: hoy. Un cobro de un día anterior se carga con el número del **recibo
+  de talonario** que se entregó ese día: ese papel respalda la fecha de
+  presentación.
+- **Recibo**: de la serie de Multas (`0210/…`, configurable en Numeración),
+  «recibí de» la carátula de la multa, con su concepto —pago parcial o
+  cancelatorio de la multa por su resolución—, el expediente administrativo y el
+  total de la multa. Se ve e imprime desde la fila del pago, sobre papel en blanco
+  o sobre la hoja del talonario. El del pago que deja la deuda en cero es el
+  **cancelatorio**: lista los pagos anteriores, con la fecha que se conoce de cada
+  uno, y separa el excedente. Lo que dice queda congelado, incluida la cuenta de
+  depósito: un ajuste posterior de la multa o un cambio en la cuenta no lo cambian
+  (M09). Una hoja del talonario ya usada se rechaza en el campo.
+- **Término** (M08): el pago se juzga contra el cierre mensual de la caja de
+  Multas del mes en que se registró la multa. Sin cierre todavía, en término;
+  presentado después del cierre, fuera de término; sin fecha de registro, o
+  presentado el mismo día del cierre cuando solo se sabe el día, queda «a
+  revisar». Se calcula una vez y no cambia si el mes se reabre.
+
+Un ajuste de la obligación, su reversión o validar un pago anterior pueden
+cambiar cuánto de lo ya cobrado es excedente: el sistema lo reclasifica en el mismo
+acto, sin mover dinero.
+
+Anular un pago o cambiar su medio (P13) no está habilitado.
+
+---
+
 <a id="correcciones"></a>
 
 ## Completar y corregir datos
@@ -233,6 +275,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ver` | Consultar la cuenta corriente | administrador, contador, administrativo, consulta |
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
+| `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo | administrador, administrativo |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 

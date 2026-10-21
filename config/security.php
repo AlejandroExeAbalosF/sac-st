@@ -65,6 +65,8 @@ return [
             'haberes.installments.pase.preview',
             'ordenes.view',
             'pases.view',
+            // El recibo de Multas, con su propio formulario.
+            'multas.recibos.view',
         ],
     ],
 

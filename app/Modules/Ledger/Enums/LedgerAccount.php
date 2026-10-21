@@ -63,6 +63,20 @@ enum LedgerAccount: string
     /** Diferencias de arqueo, que exigen explicación (invariante 28). */
     case CashDifference = 'CASH_DIFFERENCE';
 
+    /**
+     * Recaudado y aplicado a una obligación: la multa que se pagó.
+     *
+     * Es atribución, no lugar: el dinero sigue en la caja, en custodia o en
+     * el banco. Lo que dice es que ya no está sin identificar.
+     */
+    case CollectedFunds = 'COLLECTED_FUNDS';
+
+    /**
+     * Lo recibido de más sobre una obligación. No se devuelve ni se acredita
+     * solo: queda pendiente hasta que alguien decida qué hacer (M05).
+     */
+    case PendingExcess = 'PENDING_EXCESS';
+
     public function label(): string
     {
         return match ($this) {
@@ -74,6 +88,8 @@ enum LedgerAccount: string
             self::BeneficiaryFunds => 'Fondos de beneficiarios',
             self::LegacyFunds => 'Fondos del sistema anterior',
             self::CashDifference => 'Diferencia de arqueo',
+            self::CollectedFunds => 'Recaudación aplicada',
+            self::PendingExcess => 'Excedente pendiente',
         };
     }
 

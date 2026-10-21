@@ -12,6 +12,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\PartialDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -45,6 +46,8 @@ final class FineDetailData extends Data
         /** @var list<FineHistoricalMovementData> */
         public array $historicalMovements,
         public FineBalanceData $balance,
+        /** @var list<FinePaymentData> */
+        public array $payments,
         public ?string $createdByName,
         public ?string $createdAt,
         /** @var list<FineAttachmentData> */
@@ -54,7 +57,8 @@ final class FineDetailData extends Data
     /**
      * Espera cargados `fineCase`, `person`, `documents`, `balance`, `creator`,
      * `debtEntries.{document,reversedBy,creator}` e
-     * `historicalMovements.{creator,reviewer,bankTransaction}`.
+     * `historicalMovements.{creator,reviewer,bankTransaction}` y
+     * `payments.{application.fundReceipt,paymentReceipt.receipt,creator}`.
      *
      * @param  list<FineAttachmentData>  $adjuntos  los de la multa
      * @param  array<int, list<FineAttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior
@@ -104,6 +108,9 @@ final class FineDetailData extends Data
                 ))
                 ->all()),
             balance: FineBalanceData::fromModel($multa->balance),
+            payments: array_values($multa->payments
+                ->map(fn (FinePayment $pago): FinePaymentData => FinePaymentData::fromModel($pago))
+                ->all()),
             createdByName: $autor instanceof User ? $autor->name : null,
             createdAt: $multa->created_at?->toIso8601String(),
             attachments: $adjuntos,

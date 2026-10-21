@@ -859,7 +859,9 @@ declare namespace App {
                     | 'opening_balance'
                     | 'reversal'
                     | 'authorized_adjustment'
-                    | 'legacy_funds_allocated';
+                    | 'legacy_funds_allocated'
+                    | 'funds_applied'
+                    | 'excess_reclassified';
                 export type FundReceiptOrigin =
                     'received' | 'opening' | 'legacy';
                 export type LedgerAccount =
@@ -870,7 +872,9 @@ declare namespace App {
                     | 'UNASSIGNED_FUNDS'
                     | 'BENEFICIARY_FUNDS'
                     | 'LEGACY_FUNDS'
-                    | 'CASH_DIFFERENCE';
+                    | 'CASH_DIFFERENCE'
+                    | 'COLLECTED_FUNDS'
+                    | 'PENDING_EXCESS';
                 export type PaymentMedium = 'cash' | 'cheque' | 'bank';
                 export type PeriodClosingStatus =
                     'draft' | 'closed' | 'reopened';
@@ -962,6 +966,7 @@ declare namespace App {
                     debtEntries: App.Modules.Multas.Data.FineDebtEntryData[];
                     historicalMovements: App.Modules.Multas.Data.FineHistoricalMovementData[];
                     balance: App.Modules.Multas.Data.FineBalanceData;
+                    payments: App.Modules.Multas.Data.FinePaymentData[];
                     createdByName: string | null;
                     createdAt: string | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
@@ -1007,8 +1012,31 @@ declare namespace App {
                     balance: App.Modules.Multas.Data.FineBalanceData;
                     provenance: App.Modules.Multas.Enums.FineProvenance;
                 };
+                export type FinePaymentData = {
+                    id: number;
+                    medium: App.Modules.Multas.Enums.FinePaymentMedium;
+                    status: App.Modules.Multas.Enums.FinePaymentStatus;
+                    amount: string;
+                    appliedAmount: string | null;
+                    excessAmount: string | null;
+                    presentedAt: string | null;
+                    presentedPrecision: App.Modules.Multas.Enums.PresentationPrecision;
+                    presentationEvidence: string | null;
+                    timeliness: App.Modules.Multas.Enums.FineTimeliness | null;
+                    judicialReference: string | null;
+                    chequeNumber: string | null;
+                    chequeBank: string | null;
+                    receiptId: number | null;
+                    receiptNumber: string | null;
+                    talonarioNumber: string | null;
+                    receiptDate: string | null;
+                    isCancellation: boolean;
+                    createdByName: string | null;
+                    createdAt: string | null;
+                };
             }
             namespace Enums {
+                export type AppealKind = 'hierarchical' | 'appeal';
                 export type DatePrecision = 'day' | 'month' | 'unknown';
                 export type FineActType = 'LAB' | 'HYS';
                 export type FineDebtEntryKind =
@@ -1018,11 +1046,23 @@ declare namespace App {
                 export type FineDocumentKind = 'resolution' | 'act' | 'other';
                 export type FineDocumentRole =
                     'origin' | 'modification' | 'ratification' | 'support';
+                export type FinePaymentMedium =
+                    | 'cash'
+                    | 'cheque'
+                    | 'bank_transfer'
+                    | 'direct_deposit'
+                    | 'echeq';
+                export type FinePaymentStatus =
+                    'reported' | 'applied' | 'discarded' | 'under_review';
                 export type FineProvenance = 'manual' | 'import';
                 export type FineRevisionKind = 'completion' | 'correction';
+                export type FineTimeliness =
+                    'on_time' | 'late' | 'undetermined';
                 export type HistoricalMovementKind = 'payment' | 'refund';
                 export type HistoricalMovementStatus =
                     'pending_review' | 'validated' | 'rejected';
+                export type PresentationPrecision =
+                    'instant' | 'day' | 'unknown';
             }
         }
         namespace Shared {

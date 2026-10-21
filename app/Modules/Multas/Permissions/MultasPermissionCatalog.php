@@ -9,9 +9,9 @@ use App\Modules\Shared\Permissions\PermissionCatalogContributor;
 use App\Modules\Shared\Permissions\PermissionDefinition;
 
 /**
- * Lo que declara Multas en esta etapa: registrar las multas, su obligación
- * y sus antecedentes. Los cobros, la caja y el permiso no delegable del
- * 20 % llegan con sus etapas (DER físico v1.1, §8).
+ * Lo que declara Multas: registrar las multas, su obligación y sus
+ * antecedentes, abrir la caja y cobrar. La verificación bancaria y el
+ * permiso no delegable del 20 % llegan con su tanda (DER físico §8).
  */
 final class MultasPermissionCatalog implements PermissionCatalogContributor
 {
@@ -45,6 +45,14 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 'multas',
                 ['administrador', 'contador'],
                 sensitive: true,
+            ),
+            // Cobrar en el mostrador y entregar el recibo: lo de todos los días.
+            new PermissionDefinition(
+                'multas.cobrar',
+                'Cobrar multas en caja',
+                'Cobrar multas en efectivo o con cheque y emitir su recibo.',
+                'multas',
+                ['administrador', 'administrativo'],
             ),
             // Como la apertura de Haberes: define todos los saldos posteriores
             // de la caja y no se rehace. Se adelanta de la Etapa 6 (§8).

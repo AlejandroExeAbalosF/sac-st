@@ -9,14 +9,15 @@ use App\Modules\Multas\Http\Controllers\FineController;
 use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
+use App\Modules\Multas\Http\Controllers\FinePaymentController;
 use Illuminate\Support\Facades\Route;
 
 /*
 | Multas: la cuenta corriente de multas laborales y de higiene y seguridad.
 |
-| En esta etapa se registra qué se debe y por qué papel: expedientes,
-| documentos, multas, ajustes de la obligación y pagos anteriores al sistema.
-| Los cobros, la caja y el banco llegan en las etapas siguientes.
+| Se registra qué se debe y por qué papel —expedientes, documentos, multas,
+| ajustes de la obligación y pagos anteriores al sistema— y se cobra en la
+| caja con su recibo. La verificación bancaria llega en la etapa siguiente.
 |
 | Completar un dato que faltaba es parte de cargar (`multas.registrar`);
 | corregir uno que ya tenía valor exige `multas.ajustar`, y eso lo decide
@@ -87,7 +88,18 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('caja/apertura', [FineCashController::class, 'store'])->name('caja.apertura.store');
     });
 
+    /*
+     * El cobro en la caja: efectivo o cheque, con su recibo en el acto (M02).
+     */
+    Route::middleware('can:multas.cobrar')->group(function (): void {
+        Route::post('{fine}/cobros', [FinePaymentController::class, 'store'])->whereNumber('fine')->name('cobros.store');
+    });
+
     Route::middleware('can:multas.ver')->group(function (): void {
+        // El recibo de Multas: el mismo papel en el visor y en la impresora.
+        Route::get('recibos/{receipt}/ver', [FinePaymentController::class, 'view'])->whereNumber('receipt')->name('recibos.view');
+        Route::get('recibos/{receipt}/imprimir', [FinePaymentController::class, 'print'])->whereNumber('receipt')->name('recibos.print');
+
         Route::get('/', [FineController::class, 'index'])->name('index');
         Route::get('caja', [FineCashController::class, 'index'])->name('caja.index');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');

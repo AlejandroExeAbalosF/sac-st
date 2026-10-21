@@ -11,10 +11,10 @@ namespace App\Modules\Ledger\Enums;
  * que hace auditable al sistema: sabiendo el tipo de evento se sabe qué
  * cuentas tocó, sin leer las líneas.
  *
- * Están los once desde el principio aunque la tanda del motor solo use
- * dos. No es previsión ociosa: el tipo viaja en un `CHECK` de la base, y
- * ampliarlo después obliga a una migración sobre una tabla append-only
- * que para entonces ya tendría hechos reales.
+ * Los once primeros estuvieron desde el principio aunque la tanda del
+ * motor solo usara dos: el tipo viaja en un `CHECK` de la base, y ampliarlo
+ * obliga a una migración. Multas sumó los dos de la aplicación a una
+ * obligación con la suya.
  */
 enum FinancialEventType: string
 {
@@ -56,6 +56,18 @@ enum FinancialEventType: string
      */
     case LegacyFundsAllocated = 'legacy_funds_allocated';
 
+    /**
+     * Lo recibido se aplicó a una obligación: pasa de sin identificar a
+     * recaudado y, si sobra, a excedente. No mueve el dinero de lugar.
+     */
+    case FundsApplied = 'funds_applied';
+
+    /**
+     * Un cambio de la obligación cambió cuánto de lo ya cobrado es
+     * excedente. Tampoco mueve dinero: solo lo vuelve a atribuir.
+     */
+    case ExcessReclassified = 'excess_reclassified';
+
     public function label(): string
     {
         return match ($this) {
@@ -70,6 +82,8 @@ enum FinancialEventType: string
             self::Reversal => 'Reversión',
             self::AuthorizedAdjustment => 'Ajuste autorizado',
             self::LegacyFundsAllocated => 'Reservado del sistema anterior',
+            self::FundsApplied => 'Aplicación a una obligación',
+            self::ExcessReclassified => 'Reclasificación de excedente',
         };
     }
 

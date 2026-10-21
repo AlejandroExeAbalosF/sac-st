@@ -19,11 +19,15 @@ use InvalidArgumentException;
  *
  * Validarlo lo hace contar en el saldo de la multa. Descartarlo dice por
  * qué —es de otra multa, está duplicado— y lo deja a la vista. Ninguno de
- * los dos toca el libro.
+ * los dos toca el libro, salvo que validarlo cambie cuánto de lo cobrado en el
+ * sistema es excedente: el antecedente consume la obligación primero.
  */
 final class ReviewFineHistoricalMovement
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly ReconcileFineExcess $reclasificar,
+        private readonly RecordAuditEvent $auditar,
+    ) {}
 
     public function handle(
         FineHistoricalMovement $antecedente,
@@ -58,6 +62,14 @@ final class ReviewFineHistoricalMovement
                 'reviewed_at' => now(),
                 'review_note' => $nota === '' ? null : $nota,
             ]);
+
+            if ($resultado === HistoricalMovementStatus::Validated) {
+                $this->reclasificar->handle(
+                    Fine::query()->whereKey($fila->fine_id)->lockForUpdate()->firstOrFail(),
+                    'Validación de un pago anterior al sistema',
+                    $actorId,
+                );
+            }
 
             $this->auditar->handle(
                 $resultado === HistoricalMovementStatus::Validated ? 'multa.antecedente-validado' : 'multa.antecedente-descartado',

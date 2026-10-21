@@ -9,6 +9,9 @@ type HistoricalKind = App.Modules.Multas.Enums.HistoricalMovementKind;
 type HistoricalStatus = App.Modules.Multas.Enums.HistoricalMovementStatus;
 type Precision = App.Modules.Multas.Enums.DatePrecision;
 type ActType = App.Modules.Multas.Enums.FineActType;
+type PaymentMedium = App.Modules.Multas.Enums.FinePaymentMedium;
+type PaymentStatus = App.Modules.Multas.Enums.FinePaymentStatus;
+type Timeliness = App.Modules.Multas.Enums.FineTimeliness;
 
 /*
  * Los rótulos de los enums de Multas, en un solo lugar.
@@ -65,6 +68,34 @@ export const HISTORICAL_STATUS: Record<
     pending_review: { label: 'Pendiente de revisión', tone: 'action' },
     validated: { label: 'Validado', tone: 'done' },
     rejected: { label: 'Descartado', tone: 'neutral' },
+};
+
+export const PAYMENT_MEDIUM: Record<PaymentMedium, string> = {
+    cash: 'Efectivo',
+    cheque: 'Cheque',
+    bank_transfer: 'Transferencia',
+    direct_deposit: 'Depósito directo',
+    echeq: 'Cheque electrónico',
+};
+
+export const PAYMENT_STATUS: Record<
+    PaymentStatus,
+    { label: string; tone: StatusTone }
+> = {
+    reported: { label: 'Informado', tone: 'action' },
+    applied: { label: 'Aplicado', tone: 'done' },
+    discarded: { label: 'Descartado', tone: 'neutral' },
+    under_review: { label: 'En revisión', tone: 'blocked' },
+};
+
+/** Si se presentó antes o después del cierre del mes de la multa (M08). */
+export const TIMELINESS: Record<
+    Timeliness,
+    { label: string; tone: StatusTone }
+> = {
+    on_time: { label: 'En término', tone: 'done' },
+    late: { label: 'Fuera de término', tone: 'action' },
+    undetermined: { label: 'Término a revisar', tone: 'blocked' },
 };
 
 const MESES = [
