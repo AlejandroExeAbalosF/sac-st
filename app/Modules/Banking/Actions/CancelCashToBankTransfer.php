@@ -70,6 +70,13 @@ final class CancelCashToBankTransfer
                 ]);
             }
 
+            // Un traslado devuelto por el rechazo de su cheque no se cancela: el rechazo no es una cancelación.
+            if ($bloqueado->status !== CashTransferStatus::Deposited) {
+                throw ValidationException::withMessages([
+                    'transferId' => 'El cheque de ese traslado se rechazó: no se cancela, se regulariza con su reemplazo.',
+                ]);
+            }
+
             $importe = Decimal::scale($bloqueado->amount);
 
             /*

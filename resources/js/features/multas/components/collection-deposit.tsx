@@ -1,11 +1,13 @@
 import { Link } from '@inertiajs/react';
-import { Landmark, Undo2 } from 'lucide-react';
+import { Ban, Landmark, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
 import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
 import { AttachmentList } from '@/features/multas/components/attachments';
+import { RejectChequeDialog } from '@/features/multas/components/cheque-rejection-dialogs';
+import ChequeRejections from '@/features/multas/components/cheque-rejections';
 import { COLLECTION_PLACE } from '@/features/multas/labels';
 import { date } from '@/lib/format';
 import { create as nuevoDeposito } from '@/routes/multas/pagos/deposito';
@@ -24,6 +26,10 @@ type Deposito = App.Modules.Multas.Data.FineDepositData;
  * acredita contra el extracto o se cancela si no ocurrió; acreditado, ya
  * está en el banco. Los depósitos cancelados quedan a la vista con su
  * motivo.
+ *
+ * Si el cobro fue con cheque, el cheque vigente se puede registrar como
+ * rechazado —en la caja, depositado o acreditado— y debajo queda la historia
+ * de sus rechazos y reemplazos (M03).
  */
 export default function CollectionDeposit({
     paymentId,
@@ -33,6 +39,9 @@ export default function CollectionDeposit({
     canDeposit,
     canConfirm,
     canViewAttachments,
+    isCheque = false,
+    canManageRejections = false,
+    canReplaceCheque = false,
 }: {
     paymentId: number;
     amount: string;
@@ -42,10 +51,13 @@ export default function CollectionDeposit({
     canDeposit: boolean;
     canConfirm: boolean;
     canViewAttachments: boolean;
+    isCheque?: boolean;
+    canManageRejections?: boolean;
+    canReplaceCheque?: boolean;
 }) {
-    const [dialogo, setDialogo] = useState<'acreditar' | 'cancelar' | null>(
-        null,
-    );
+    const [dialogo, setDialogo] = useState<
+        'acreditar' | 'cancelar' | 'rechazar' | null
+    >(null);
     const lugar = COLLECTION_PLACE[deposito.place];
     const traslado =
         deposito.transferId === null || deposito.depositDate === null
@@ -60,6 +72,13 @@ export default function CollectionDeposit({
         <div className="grid gap-1.5 text-xs">
             <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge label={lugar.label} tone={lugar.tone} />
+                {/* Con rechazos, el cheque vigente puede ser un reemplazo. */}
+                {deposito.rejections.length > 0 && deposito.chequeNumber && (
+                    <span className="text-muted-foreground">
+                        Cheque vigente n.º {deposito.chequeNumber}
+                        {deposito.chequeBank && ` (${deposito.chequeBank})`}
+                    </span>
+                )}
                 {deposito.depositDate && (
                     <span className="text-muted-foreground">
                         Depositado el {date(deposito.depositDate)}
@@ -81,6 +100,18 @@ export default function CollectionDeposit({
                         </Link>
                     </Button>
                 )}
+                {isCheque &&
+                    deposito.place !== 'rejected' &&
+                    canManageRejections && (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDialogo('rechazar')}
+                        >
+                            <Ban aria-hidden="true" />
+                            Registrar rechazo
+                        </Button>
+                    )}
                 {deposito.place === 'in_transit' && canConfirm && traslado && (
                     <>
                         <Button
@@ -117,6 +148,24 @@ export default function CollectionDeposit({
                 </p>
             ))}
 
+            {deposito.rejections.length > 0 && (
+                <ChequeRejections
+                    rechazos={deposito.rejections}
+                    amount={amount}
+                    canManage={canManageRejections}
+                    canReplace={canReplaceCheque}
+                    canViewAttachments={canViewAttachments}
+                />
+            )}
+
+            {dialogo === 'rechazar' && (
+                <RejectChequeDialog
+                    paymentId={paymentId}
+                    chequeNumber={deposito.chequeNumber}
+                    amount={amount}
+                    onClose={() => setDialogo(null)}
+                />
+            )}
             {dialogo === 'acreditar' && traslado && (
                 <CreditMatchDialog
                     traslado={traslado}

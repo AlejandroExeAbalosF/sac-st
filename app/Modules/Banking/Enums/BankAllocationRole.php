@@ -23,18 +23,26 @@ enum BankAllocationRole: string
     /** Un crédito que confirma que el efectivo llegó al banco. */
     case CashDepositConfirmation = 'cash_deposit_confirmation';
 
+    /** El crédito de un cheque que después se rechazó. */
+    case ChequeRejectionCredit = 'cheque_rejection_credit';
+
+    /** El débito con que el banco revierte un cheque rechazado. */
+    case ChequeRejectionDebit = 'cheque_rejection_debit';
+
     public function label(): string
     {
         return match ($this) {
             self::FundsReceived => 'Recepción de fondos',
             self::PaymentConfirmation => 'Confirmación de pago',
             self::CashDepositConfirmation => 'Acreditación de depósito',
+            self::ChequeRejectionCredit => 'Crédito de un cheque rechazado',
+            self::ChequeRejectionDebit => 'Débito de un cheque rechazado',
         };
     }
 
     /** Si el rol espera un crédito o un débito en el extracto. */
     public function expectsCredit(): bool
     {
-        return $this !== self::PaymentConfirmation;
+        return $this !== self::PaymentConfirmation && $this !== self::ChequeRejectionDebit;
     }
 }

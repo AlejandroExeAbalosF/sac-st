@@ -178,7 +178,9 @@ final class DepositWholeReceiptToBank
             ]);
         }
 
-        if ($recepcion->origin !== FundReceiptOrigin::Received || $recepcion->reversed_at !== null) {
+        // Lo recibido por el mostrador, o el cheque que reemplaza a uno rechazado (M03).
+        if (! in_array($recepcion->origin, [FundReceiptOrigin::Received, FundReceiptOrigin::Replacement], true)
+            || $recepcion->reversed_at !== null) {
             throw ValidationException::withMessages([
                 'receiptId' => 'Solo se deposita un cobro recibido por la caja y vigente.',
             ]);

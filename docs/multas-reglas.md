@@ -269,6 +269,78 @@ no de Multas: Haberes deposita por cuota y no cambia.
 - El estado del cheque sigue al traslado (`cheque_follows_transfer`); lo mueve
   Banking (`TransferredCheques`), sin saber de quién era.
 
+<a id="rechazo"></a>
+
+## Cheque rechazado y reemplazo
+
+**Alcance vigente (22/10/2026):** rechazo manual con respaldo, reemplazo por otro
+cheque del mismo importe y documentación posterior. La conciliación específica del
+rechazo y «nunca acreditado» quedan diferidas. `config/multas.php` mantiene
+`cheque_bank_followup_enabled = false`, sin variable de entorno de activación.
+Los Actions de Multas bloquean movimientos y confirmación; rechazar tampoco
+admite un débito. Las consultas de candidatos devuelven 404. Las pantallas no
+ofrecen esas operaciones. El código de Banking y sus pruebas se conservan como
+preparación; habilitarlo requiere terminar el flujo de rectificación y su interfaz.
+
+Los estados y asientos bancarios avanzados descriptos debajo son infraestructura
+preparada, no acciones habilitadas al operador. El rechazo acreditado no modifica
+`BANK_ACCOUNT` ni su asignación original: la contrapartida provisoria se conserva
+en `PENDING_BANK_DEBITS` hasta resolver la revisión bancaria. No es un débito
+inventado en el extracto. Un reemplazo deja esa revisión abierta.
+
+`cheque_rejections` (Banking): un rechazo por instrumento, con dos seguimientos
+—la regularización de la empresa y el banco— y lo que se completa después.
+
+- Solo para cheques de cajas que depositan cobros enteros, recibidos por el
+  mostrador o de reemplazo. **Base:** `cheque_rejections_guard`; **Action:**
+  `RejectCheque`. Haberes no registra rechazos.
+- Un instrumento se rechaza una vez (`fund_receipt_id` UNIQUE); un rechazo
+  posterior es del reemplazo. Rechazado es tener el rechazo registrado, y al
+  revés. **Base:** UNIQUE y `cheque_follows_transfer`.
+- El rechazo sigue al traslado vigente: sin traslado, `not_applicable`;
+  depositado, el traslado pasa a `bounced` y el banco queda `unverified`;
+  acreditado, `debit_pending` o `debit_recorded`. **Base:**
+  `cheque_rejections_guard`, `cash_to_bank_transfers_bounced_by_rejection`.
+- Asientos (fechados el día del registro): desde custodia D `REJECTED_CHEQUES` /
+  C `CHEQUES_IN_CUSTODY`; desde tránsito / C `CASH_IN_TRANSIT`; acreditado /
+  C `PENDING_BANK_DEBITS`. Crédito tardío D `BANK_ACCOUNT` / C
+  `PENDING_BANK_DEBITS`; débito D `PENDING_BANK_DEBITS` / C `BANK_ACCOUNT`;
+  reemplazo D `CHEQUES_IN_CUSTODY` / C `REJECTED_CHEQUES`. En cualquier orden,
+  `REJECTED_CHEQUES` no queda acreedor ni `PENDING_BANK_DEBITS` deudor. **Action**
+  y pruebas por orden.
+- El seguimiento bancario solo avanza: `unverified` → `not_applicable` |
+  `debit_pending` | `debit_recorded`; `debit_pending` → `debit_recorded`.
+  `not_applicable` desde `unverified` lo afirma una persona, con nota y con el
+  extracto del día del depósito importado y completado —un archivo rechazado no
+  cuenta—. **Base:** `cheque_rejections_guard`; **Action:**
+  `ConfirmChequeNeverCredited`.
+- El crédito y el débito son movimientos enteros de la cuenta del traslado, por
+  el importe del cheque, sin otro uso y posteriores al corte. **Base:**
+  `cheque_rejection_movement_whole`; **Action:** `RejectedChequeMovements`.
+- En el motor preparado, de fecha posible: no anteriores al día previo al depósito, y el débito no
+  anterior al crédito. El aviso del rechazo no es un límite: puede llegar después
+  del débito. **Solo Action**, y los candidatos no ofrecen otros.
+- Un depósito devuelto no se cancela. **Base:** transiciones del traslado;
+  **Action:** `CancelCashToBankTransfer`.
+- El reemplazo es otro cheque del mismo importe, caja y moneda, en custodia, con
+  origen `replacement`; un solo sucesor por cheque; los dos vínculos —el del
+  reemplazo y el del rechazo— dicen lo mismo. **Base:**
+  `fund_receipts_replacement_matches`, `replaces_fund_receipt_id` UNIQUE,
+  `fund_receipts_replacement_linked` (diferido), `cheque_rejections_guard`.
+- El reemplazo no se aplica a otro pago ni se asigna a una cuota. **Base:**
+  `fine_payment_application_coherent` (origen `received`),
+  `funding_allocations_not_from_replacements`.
+- Lo pendiente de regularizar es el importe entero del instrumento, una vez por
+  cadena, mientras su rechazo esté abierto. **Base:** vista `fine_balances`
+  (`pending_regularization`, por `fund_receipt_root`).
+- Aviso, disposición, crédito, débito, «no acreditado» y reemplazo se escriben
+  una vez. **Base:** `cheque_rejections_guard`. La disposición lleva constancia:
+  **Form Request** y **Action**. El respaldo del rechazo es obligatorio salvo con
+  el débito del extracto en el motor preparado: **Action**. En el alcance vigente
+  siempre se exige el respaldo porque la imputación del débito está deshabilitada.
+- Rechazar bloquea el traslado y después el cheque, como acreditar y cancelar; dos
+  reemplazos del mismo cheque se serializan. Probado con dos procesos.
+
 <a id="excedente"></a>
 
 ## Excedente asentado

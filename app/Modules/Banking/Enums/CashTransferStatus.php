@@ -28,12 +28,20 @@ enum CashTransferStatus: string
      */
     case Cancelled = 'cancelled';
 
+    /**
+     * El cheque del traslado se rechazó sin que el sistema hubiera registrado
+     * la acreditación. Sigue vigente: el cheque no se redeposita, se
+     * reemplaza. Lo produce `RejectCheque`.
+     */
+    case Bounced = 'bounced';
+
     public function label(): string
     {
         return match ($this) {
             self::Deposited => 'En tránsito',
             self::BankConfirmed => 'Acreditado',
             self::Cancelled => 'Cancelado',
+            self::Bounced => 'Devuelto por rechazo',
         };
     }
 

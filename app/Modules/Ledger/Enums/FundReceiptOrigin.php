@@ -24,9 +24,15 @@ enum FundReceiptOrigin: string
     /** Efectivo o un depósito directo apartados del saldo anterior. */
     case Legacy = 'legacy';
 
+    /**
+     * El cheque que reemplaza a uno rechazado (Multas M03). No es plata nueva
+     * ni se asigna: regulariza un pago que ya está aplicado.
+     */
+    case Replacement = 'replacement';
+
     /** Si es plata del sistema anterior, que se asigna con un apartado. */
     public function isLegacy(): bool
     {
-        return $this !== self::Received;
+        return $this === self::Opening || $this === self::Legacy;
     }
 }

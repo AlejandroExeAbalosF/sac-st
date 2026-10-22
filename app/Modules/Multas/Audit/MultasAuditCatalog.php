@@ -204,6 +204,37 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 AuditSeverity::Critical,
                 metadata: ['amount' => 'Importe', 'traslado' => 'Traslado', 'motivo' => 'Motivo'],
             ),
+            new AuditActionDefinition(
+                'multa.cheque-rechazado',
+                'Se rechazó el cheque de un pago de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['cheque' => 'Cheque', 'amount' => 'Importe', 'fecha' => 'Fecha del rechazo', 'motivo' => 'Motivo', 'banco' => 'Banco'],
+            ),
+            new AuditActionDefinition(
+                'multa.cheque-reemplazado',
+                'Se recibió el cheque que reemplaza al rechazado',
+                'Multas',
+                metadata: ['rechazado' => 'Cheque rechazado', 'cheque' => 'Cheque de reemplazo', 'amount' => 'Importe'],
+            ),
+            new AuditActionDefinition(
+                'multa.rechazo-banco-registrado',
+                'Se registró en el extracto un movimiento del cheque rechazado',
+                'Multas',
+                metadata: ['credito' => 'Crédito del extracto', 'debito' => 'Débito del extracto', 'banco' => 'Banco'],
+            ),
+            new AuditActionDefinition(
+                'multa.rechazo-nunca-acreditado',
+                'Se confirmó que el banco nunca acreditó el cheque rechazado',
+                'Multas',
+                metadata: ['nota' => 'Cómo se comprobó'],
+            ),
+            new AuditActionDefinition(
+                'multa.rechazo-completado',
+                'Se completó el aviso o la disposición del cheque rechazado',
+                'Multas',
+                metadata: ['aviso' => 'Aviso a la empresa', 'disposicion' => 'Qué se hizo con el cheque'],
+            ),
         );
 
         $catalog->registerSubject(new FineCaseSubject);

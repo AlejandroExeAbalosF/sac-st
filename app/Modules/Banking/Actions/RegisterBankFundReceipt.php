@@ -12,6 +12,7 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Banking\Support\BankMovementAfterOpening;
+use App\Modules\Banking\Support\TransactionReconciliation;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -52,6 +53,7 @@ final class RegisterBankFundReceipt
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
+        private readonly TransactionReconciliation $conciliacion,
         private readonly RecordAuditEvent $auditar,
         private readonly BankMovementAfterOpening $posteriorALaApertura,
     ) {}
@@ -169,7 +171,7 @@ final class RegisterBankFundReceipt
                 'allocated_at' => now(),
             ]);
 
-            $this->updateReconciliation($transaction);
+            $this->conciliacion->refresh($transaction);
 
             $this->auditar->handle('recepcion.registrada', $recepcion, after: [
                 'bank_transaction_id' => $transaction->id,
@@ -203,26 +205,5 @@ final class RegisterBankFundReceipt
                 'amount' => 'El importe de la recepción tiene que ser mayor que cero.',
             ]);
         }
-    }
-
-    /**
-     * El estado del movimiento sale de lo que ya se le imputó.
-     *
-     * Es un marcador administrativo —de los que el §8 sí deja mutables— y
-     * se recalcula en vez de acumularse, por la misma razón de siempre: un
-     * contador que se incrementa se desincroniza; una suma, no.
-     */
-    private function updateReconciliation(BankTransaction $transaction): void
-    {
-        $imputado = $this->disponible->allocated($transaction);
-        $total = Decimal::abs($transaction->amount);
-
-        $estado = match (true) {
-            Decimal::equals($imputado, '0') => ReconciliationStatus::Pending,
-            Decimal::equals($imputado, $total) => ReconciliationStatus::Reconciled,
-            default => ReconciliationStatus::Partial,
-        };
-
-        $transaction->forceFill(['reconciliation_status' => $estado])->save();
     }
 }

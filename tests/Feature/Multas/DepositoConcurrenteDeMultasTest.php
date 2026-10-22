@@ -6,10 +6,14 @@ namespace Tests\Feature\Multas;
 
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
+use App\Modules\Banking\Actions\RejectCheque;
+use App\Modules\Banking\Actions\ReplaceRejectedCheque;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Models\CashToBankTransferItem;
+use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
 use App\Modules\Multas\Actions\DepositFineCollection;
 use App\Modules\Multas\Actions\RegisterFine;
@@ -132,6 +136,48 @@ class DepositoConcurrenteDeMultasTest extends TestCase
             ->and(DB::table('cash_to_bank_transfer_items')->where('fund_receipt_id', $recepcion)->count())->toBe(1);
     }
 
+    /**
+     * Rechazar mientras otro acredita: el rechazo espera al traslado y, al
+     * seguir, lo encuentra acreditado: el débito queda anunciado.
+     */
+    public function test_rejecting_while_it_is_being_credited_waits_and_follows_the_credit(): void
+    {
+        [$traslado, $credito] = $this->depositoConCredito(cheque: true);
+        $cheque = (int) CashToBankTransferItem::query()->where('cash_to_bank_transfer_id', $traslado->id)->value('fund_receipt_id');
+
+        DB::beginTransaction();
+        app(ConfirmCashDepositCredit::class)->handle($traslado, $credito, (string) Str::uuid(), $this->quienAbre());
+
+        $worker = $this->esperando(['mode' => 'reject', 'receipt' => $cheque, 'actor' => $this->quienAbre()]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('done')
+            ->and($resultado['bank'])->toBe('debit_pending')
+            ->and($traslado->refresh()->status)->toBe(CashTransferStatus::BankConfirmed);
+    }
+
+    /** Dos reemplazos del mismo cheque a la vez: el segundo espera y lo encuentra regularizado. */
+    public function test_two_replacements_of_the_same_cheque_leave_one(): void
+    {
+        [$cheque] = $this->cobroEnCaja(cheque: true);
+        $rechazo = app(RejectCheque::class)->handle(
+            FundReceipt::query()->findOrFail($cheque), BusinessDate::today(), 'Sin fondos', UploadedFile::fake()->image('aviso.jpg'),
+            null, (string) Str::uuid(), $this->quienAbre(),
+        );
+
+        DB::beginTransaction();
+        app(ReplaceRejectedCheque::class)->handle($rechazo, ['number' => '00099999', 'bank' => null, 'issueDate' => null], (string) Str::uuid(), $this->quienAbre());
+
+        $worker = $this->esperando(['mode' => 'replace', 'rejection' => $rechazo->id, 'actor' => $this->quienAbre()]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('validation')
+            ->and($resultado['errors'])->toHaveKey('chequeNumber')
+            ->and(FundReceipt::query()->where('replaces_fund_receipt_id', $cheque)->count())->toBe(1);
+    }
+
     // ── Andamiaje ───────────────────────────────────────────────────────
 
     /**
@@ -139,7 +185,7 @@ class DepositoConcurrenteDeMultasTest extends TestCase
      *
      * @return array{int, BankAccount}
      */
-    private function cobroEnCaja(): array
+    private function cobroEnCaja(bool $cheque = false): array
     {
         $cuenta = $this->cuenta();
         $this->cortar($cuenta, '2026-05-31');
@@ -154,15 +200,18 @@ class DepositoConcurrenteDeMultasTest extends TestCase
             'amount' => '1400000.00',
         ], $this->quienAbre());
 
-        $pago = app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '20000.00', (string) Str::uuid(), $this->quienAbre());
+        $pago = app(CollectFinePayment::class)->handle(
+            $multa, $cheque ? FinePaymentMedium::Cheque : FinePaymentMedium::Cash, '20000.00', (string) Str::uuid(), $this->quienAbre(),
+            cheque: $cheque ? ['number' => '00012345', 'bank' => 'Banco Nación', 'issueDate' => null] : null,
+        );
 
         return [$pago->application()->firstOrFail()->fund_receipt_id, $cuenta];
     }
 
     /** @return array{CashToBankTransfer, BankTransaction} */
-    private function depositoConCredito(): array
+    private function depositoConCredito(bool $cheque = false): array
     {
-        [$recepcion, $cuenta] = $this->cobroEnCaja();
+        [$recepcion, $cuenta] = $this->cobroEnCaja($cheque);
         $pago = FinePayment::query()->whereHas('application', fn ($q) => $q->where('fund_receipt_id', $recepcion))->firstOrFail();
 
         $traslado = app(DepositFineCollection::class)->handle($pago, [

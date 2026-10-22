@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property numeric-string $debt
  * @property numeric-string $excess
  * @property numeric-string $operational_excess
+ * @property numeric-string $pending_regularization Cheques rechazados sin reemplazo, por su importe entero (M03).
  */
 final class FineBalance extends Model
 {
@@ -42,6 +43,7 @@ final class FineBalance extends Model
             'debt' => 'decimal:2',
             'excess' => 'decimal:2',
             'operational_excess' => 'decimal:2',
+            'pending_regularization' => 'decimal:2',
         ];
     }
 }

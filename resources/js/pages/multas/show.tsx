@@ -88,6 +88,8 @@ type Props = {
         linkBankCredit: boolean;
         deposit: boolean;
         confirmDeposit: boolean;
+        manageRejections: boolean;
+        replaceCheque: boolean;
     };
 };
 
@@ -215,12 +217,35 @@ export default function MultaShow({
                                     tone="action"
                                 />
                             )}
+                            {isNonZero(multa.balance.pendingRegularization) && (
+                                <StatusBadge
+                                    label="Pago a regularizar"
+                                    tone="blocked"
+                                />
+                            )}
                         </div>
                         {isNonZero(multa.balance.excess) && (
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Excedente pendiente{' '}
                                 <Money value={multa.balance.excess} />. No se
                                 devuelve ni se acredita solo.
+                            </p>
+                        )}
+                        {/*
+                         * El rechazo no vuelve a deber la multa: el pago y su
+                         * recibo siguen (M03). Lo que falta se muestra aparte,
+                         * y con saldo cero se dice que no es una cancelación
+                         * sin pendientes.
+                         */}
+                        {isNonZero(multa.balance.pendingRegularization) && (
+                            <p className="mt-1 text-xs text-destructive-strong">
+                                {isNonZero(multa.balance.debt)
+                                    ? 'Pendiente de regularización '
+                                    : 'Saldo cero, con pago pendiente de regularización: '}
+                                <Money
+                                    value={multa.balance.pendingRegularization}
+                                />
+                                , por un cheque rechazado sin reemplazo.
                             </p>
                         )}
                     </div>
@@ -741,6 +766,15 @@ export default function MultaShow({
                                                     }
                                                     canViewAttachments={
                                                         can.viewAttachments
+                                                    }
+                                                    isCheque={
+                                                        pago.medium === 'cheque'
+                                                    }
+                                                    canManageRejections={
+                                                        can.manageRejections
+                                                    }
+                                                    canReplaceCheque={
+                                                        can.replaceCheque
                                                     }
                                                 />
                                             </div>

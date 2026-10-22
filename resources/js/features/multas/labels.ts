@@ -14,6 +14,8 @@ type PaymentStatus = App.Modules.Multas.Enums.FinePaymentStatus;
 type Timeliness = App.Modules.Multas.Enums.FineTimeliness;
 type AppealKind = App.Modules.Multas.Enums.AppealKind;
 type CollectionPlace = App.Modules.Multas.Enums.FineCollectionPlace;
+type ChequeBankStatus = App.Modules.Banking.Enums.ChequeRejectionBankStatus;
+type ChequeDisposition = App.Modules.Banking.Enums.ChequeDisposition;
 
 /*
  * Los rótulos de los enums de Multas, en un solo lugar.
@@ -112,6 +114,27 @@ export const COLLECTION_PLACE: Record<
     in_custody: { label: 'En la caja', tone: 'action' },
     in_transit: { label: 'Depositado, sin acreditar', tone: 'progress' },
     in_bank: { label: 'Acreditado en el banco', tone: 'done' },
+    rejected: { label: 'Cheque rechazado', tone: 'blocked' },
+};
+
+/** Qué se sabe del banco sobre un cheque rechazado (DER físico §6.6). */
+export const CHEQUE_BANK_STATUS: Record<
+    ChequeBankStatus,
+    { label: string; tone: StatusTone }
+> = {
+    not_applicable: { label: 'Banco: no corresponde', tone: 'neutral' },
+    unverified: { label: 'Revisión bancaria pendiente', tone: 'action' },
+    debit_pending: {
+        label: 'Rechazo con acreditación previa: revisión bancaria pendiente',
+        tone: 'action',
+    },
+    debit_recorded: { label: 'Banco: débito registrado', tone: 'done' },
+};
+
+/** Qué se hizo con el papel del cheque rechazado (M03). */
+export const CHEQUE_DISPOSITION: Record<ChequeDisposition, string> = {
+    voided_returned: 'Anulado y devuelto',
+    act: 'Acta de cheque rechazado',
 };
 
 const MESES = [

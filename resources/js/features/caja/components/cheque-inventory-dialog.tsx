@@ -160,6 +160,8 @@ const ORIGEN: Record<Cheque['origin'], string> = {
     received: 'Cobrado en el circuito',
     opening: 'De la apertura',
     legacy: 'Identificado al reservar',
+    // Solo en cajas que depositan cobros enteros; Haberes no lo produce.
+    replacement: 'Reemplazo de un cheque rechazado',
 };
 
 /** Un cheque: el papel, de dónde vino y para quién es. */

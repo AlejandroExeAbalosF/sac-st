@@ -51,6 +51,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $reversal_reason
  * @property FundReceiptOrigin $origin De dónde viene el dinero; decide por qué vía se asigna.
  * @property int|null $bank_account_id Solo en un depósito directo apartado del sistema anterior.
+ * @property int|null $replaces_fund_receipt_id El cheque rechazado que este reemplaza (Multas M03).
  */
 final class FundReceipt extends Model
 {
@@ -88,6 +89,7 @@ final class FundReceipt extends Model
         'notes',
         'origin',
         'bank_account_id',
+        'replaces_fund_receipt_id',
     ];
 
     /** @return BelongsTo<FinancialEvent, $this> */

@@ -52,6 +52,9 @@ type Props = {
     canDeposit: boolean;
     canConfirmDeposit: boolean;
     canViewAttachments: boolean;
+    rechazados: Cobro[];
+    canManageRejections: boolean;
+    canReplaceCheque: boolean;
 };
 
 const EFECTIVO = 'CASH_ON_HAND';
@@ -85,8 +88,17 @@ export default function CajaDeMultas({
     canDeposit,
     canConfirmDeposit,
     canViewAttachments,
+    rechazados,
+    canManageRejections,
+    canReplaceCheque,
 }: Props) {
-    const permisos = { canDeposit, canConfirmDeposit, canViewAttachments };
+    const permisos = {
+        canDeposit,
+        canConfirmDeposit,
+        canViewAttachments,
+        canManageRejections,
+        canReplaceCheque,
+    };
 
     return (
         <>
@@ -113,6 +125,17 @@ export default function CajaDeMultas({
                             titulo="Depositado, sin acreditar"
                             vacio="No hay depósitos esperando al extracto."
                             cobros={enTransito}
+                            {...permisos}
+                        />
+                        {/*
+                         * Un rechazo sigue acá mientras falte algo: el
+                         * reemplazo de la empresa, un hecho del banco o los
+                         * papeles. Con reemplazo y débito pendiente, también.
+                         */}
+                        <Cobros
+                            titulo="Cheques rechazados con algo pendiente"
+                            vacio="No hay cheques rechazados con algo pendiente."
+                            cobros={rechazados}
                             {...permisos}
                         />
                     </>
@@ -507,6 +530,8 @@ function Cobros({
     canDeposit,
     canConfirmDeposit,
     canViewAttachments,
+    canManageRejections,
+    canReplaceCheque,
 }: {
     titulo: string;
     vacio: string;
@@ -514,6 +539,8 @@ function Cobros({
     canDeposit: boolean;
     canConfirmDeposit: boolean;
     canViewAttachments: boolean;
+    canManageRejections: boolean;
+    canReplaceCheque: boolean;
 }) {
     return (
         <section className="rounded-lg border bg-card shadow-raised">
@@ -547,8 +574,9 @@ function Cobros({
                                 </span>
                                 <span>
                                     {PAYMENT_MEDIUM[fila.payment.medium]}
-                                    {fila.payment.chequeNumber &&
-                                        ` n.º ${fila.payment.chequeNumber}`}{' '}
+                                    {(fila.payment.deposit?.chequeNumber ??
+                                        fila.payment.chequeNumber) &&
+                                        ` n.º ${fila.payment.deposit?.chequeNumber ?? fila.payment.chequeNumber}`}{' '}
                                     · <Money value={fila.payment.amount} />
                                 </span>
                                 <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
@@ -569,6 +597,9 @@ function Cobros({
                                     canDeposit={canDeposit}
                                     canConfirm={canConfirmDeposit}
                                     canViewAttachments={canViewAttachments}
+                                    isCheque={fila.payment.medium === 'cheque'}
+                                    canManageRejections={canManageRejections}
+                                    canReplaceCheque={canReplaceCheque}
                                 />
                             )}
                         </li>

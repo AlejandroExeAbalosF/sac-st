@@ -77,6 +77,21 @@ enum LedgerAccount: string
      */
     case PendingExcess = 'PENDING_EXCESS';
 
+    /**
+     * Cheques rechazados que la empresa tiene que regularizar (Multas M03).
+     *
+     * No es un lugar: el cheque ya no es plata en custodia, en tránsito ni
+     * en el banco. Se cancela cuando llega el cheque que lo reemplaza.
+     */
+    case RejectedCheques = 'REJECTED_CHEQUES';
+
+    /**
+     * Débitos que el banco anunció por un cheque rechazado y el extracto
+     * todavía no trae. Reconoce el aviso sin tocar `BANK_ACCOUNT`, que solo
+     * se mueve con el extracto (DER físico de Multas §6.6).
+     */
+    case PendingBankDebits = 'PENDING_BANK_DEBITS';
+
     public function label(): string
     {
         return match ($this) {
@@ -90,6 +105,8 @@ enum LedgerAccount: string
             self::CashDifference => 'Diferencia de arqueo',
             self::CollectedFunds => 'Recaudación aplicada',
             self::PendingExcess => 'Excedente pendiente',
+            self::RejectedCheques => 'Cheques rechazados a regularizar',
+            self::PendingBankDebits => 'Débitos bancarios anunciados',
         };
     }
 

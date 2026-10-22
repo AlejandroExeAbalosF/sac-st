@@ -68,6 +68,24 @@ enum FinancialEventType: string
      */
     case ExcessReclassified = 'excess_reclassified';
 
+    /**
+     * Se rechazó un cheque: sale de custodia, de tránsito o queda un débito
+     * anunciado, y pasa a lo que la empresa tiene que regularizar.
+     */
+    case ChequeRejected = 'cheque_rejected';
+
+    /**
+     * El extracto trae el crédito de un cheque que se había registrado
+     * rechazado sin saber si el banco lo había acreditado.
+     */
+    case RejectedChequeCredited = 'rejected_cheque_credited';
+
+    /** El extracto trae el débito del cheque rechazado. */
+    case ChequeDebitRecorded = 'cheque_debit_recorded';
+
+    /** Llegó el cheque que reemplaza al rechazado: vuelve a custodia. */
+    case ChequeReplaced = 'cheque_replaced';
+
     public function label(): string
     {
         return match ($this) {
@@ -84,6 +102,10 @@ enum FinancialEventType: string
             self::LegacyFundsAllocated => 'Reservado del sistema anterior',
             self::FundsApplied => 'Aplicación a una obligación',
             self::ExcessReclassified => 'Reclasificación de excedente',
+            self::ChequeRejected => 'Cheque rechazado',
+            self::RejectedChequeCredited => 'Crédito de un cheque rechazado',
+            self::ChequeDebitRecorded => 'Débito de un cheque rechazado',
+            self::ChequeReplaced => 'Reemplazo de un cheque rechazado',
         };
     }
 

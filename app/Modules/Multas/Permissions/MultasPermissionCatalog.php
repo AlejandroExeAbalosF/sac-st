@@ -73,6 +73,17 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Registrar un rechazo cambia lo que la caja y el banco dicen tener,
+            // y lo que se imputa del extracto es conciliación: quien concilia.
+            // Recibir el reemplazo es un cobro de mostrador (`multas.cobrar`).
+            new PermissionDefinition(
+                'multas.gestionar-rechazos',
+                'Gestionar cheques rechazados de multas',
+                'Registrar el rechazo de un cheque con su respaldo y completar el aviso a la empresa y qué se hizo con el cheque.',
+                'multas',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
             // Como la apertura de Haberes: define todos los saldos posteriores
             // de la caja y no se rehace. Se adelanta de la Etapa 6 (§8).
             new PermissionDefinition(

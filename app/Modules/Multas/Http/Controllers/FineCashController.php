@@ -27,6 +27,7 @@ use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +74,10 @@ final class FineCashController extends Controller
              */
             'paraDepositar' => $apertura === null ? [] : $this->cobros(FineCollectionPlace::InCustody),
             'enTransito' => $apertura === null ? [] : $this->cobros(FineCollectionPlace::InTransit),
+            // Los cheques rechazados con algo pendiente: empresa, banco o papeles (M03).
+            'rechazados' => $apertura === null ? [] : $this->filas($this->depositos->paymentsWithPendingRejections()),
+            'canManageRejections' => $request->user()?->can('multas.gestionar-rechazos') ?? false,
+            'canReplaceCheque' => $request->user()?->can('multas.cobrar') ?? false,
             'canDeposit' => ($request->user()?->can('multas.depositar') ?? false) && $apertura?->bank_account_id !== null,
             'canConfirmDeposit' => $request->user()?->can('multas.verificar-pagos') ?? false,
             'canViewAttachments' => $request->user()?->can('adjuntos.ver') ?? false,
@@ -181,7 +186,16 @@ final class FineCashController extends Controller
      */
     private function cobros(FineCollectionPlace $lugar): array
     {
-        $pagos = $this->depositos->counterPayments($lugar)
+        return $this->filas($this->depositos->counterPayments($lugar));
+    }
+
+    /**
+     * @param  Builder<FinePayment>  $consulta
+     * @return list<FinePendingPaymentData>
+     */
+    private function filas(Builder $consulta): array
+    {
+        $pagos = $consulta
             ->with(['fine.fineCase', 'application.fundReceipt', 'paymentReceipt.receipt', 'creator:id,name'])
             ->orderBy('id')
             ->get();

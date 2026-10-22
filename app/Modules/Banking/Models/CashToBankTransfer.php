@@ -12,6 +12,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * El efectivo que salió de la caja camino al banco — §9.5 del DER.
@@ -92,6 +93,16 @@ final class CashToBankTransfer extends Model
     public function scopeAwaitingCredit(Builder $query): void
     {
         $query->where('status', CashTransferStatus::Deposited);
+    }
+
+    /**
+     * Lo que viajó: las recepciones, enteras o en parte.
+     *
+     * @return HasMany<CashToBankTransferItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(CashToBankTransferItem::class, 'cash_to_bank_transfer_id');
     }
 
     /** @param  Builder<self>  $query */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Banking\Actions;
 
+use App\Modules\Banking\Enums\ImportStatus;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankStatementImport;
@@ -90,11 +91,15 @@ final class ListCreditsForTransfer
      * Convierte «puede que falte importar el extracto» en una afirmación
      * o su contraria. Sin esto la pantalla ofrece una excusa genérica que
      * el operador no puede verificar sin salir a mirar.
+     *
+     * Solo cuenta una importación completada: un archivo rechazado conserva
+     * su período, pero ninguno de sus movimientos.
      */
     public function periodIsImported(CashToBankTransfer $transfer): bool
     {
         return BankStatementImport::query()
             ->where('bank_account_id', $transfer->bank_account_id)
+            ->where('status', ImportStatus::Completed->value)
             ->whereNotNull('period_from')
             ->whereNotNull('period_to')
             ->whereDate('period_from', '<=', $transfer->deposit_date)

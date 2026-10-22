@@ -222,6 +222,9 @@ final class FineController extends Controller
                 // Depositar lo cobrado y confirmar su acreditación, con la cuenta del libro.
                 'deposit' => ($usuario?->can('multas.depositar') ?? false) && $creditos->book() !== null,
                 'confirmDeposit' => $verifica,
+                // El rechazo y lo que trae el extracto, de quien concilia; el reemplazo, de la caja.
+                'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
+                'replaceCheque' => $cobra,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.

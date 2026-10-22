@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Actions;
 
 use App\Modules\Banking\Actions\DepositWholeReceiptToBank;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\FineDeposits;
@@ -69,6 +70,13 @@ final class DepositFineCollection
 
             $recepcion = $this->depositos->receiptOf($pago)
                 ?? throw ValidationException::withMessages(['receiptId' => 'Ese cobro no tiene su recepción en la caja.']);
+
+            // Se deposita el cheque vigente de la cadena; uno rechazado espera su reemplazo (M03).
+            if ($recepcion->cheque_status === ChequeStatus::Rejected) {
+                throw ValidationException::withMessages([
+                    'receiptId' => 'El cheque de este cobro se rechazó: se deposita el que lo reemplace, cuando llegue.',
+                ]);
+            }
 
             $traslado = $this->depositar->handle($recepcion, $ticket, $foto, $idempotencyKey, $actorId);
 

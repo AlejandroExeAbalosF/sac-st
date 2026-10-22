@@ -6,8 +6,8 @@ garantía en la base están en [reglas de Multas](multas-reglas.md).
 **Estado: en construcción.** Está la cuenta corriente —expedientes, documentos,
 multas, su obligación y los pagos anteriores al sistema—, la apertura de la caja
 con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
-banco, el recurso del 20 % y el depósito al banco de lo cobrado. Faltan el cheque
-rechazado y su reemplazo, y la caja del día con su arqueo y cierre.
+banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
+rechazado con su reemplazo. Falta la caja del día con su arqueo y cierre.
 
 ---
 
@@ -276,6 +276,52 @@ cada cobro de caja dónde está la plata.
 
 Depositar no es cobrar otra vez: la deuda no se mueve y el recibo no cambia.
 
+<a id="rechazo"></a>
+
+## Cheque rechazado y reemplazo
+
+Un cheque se puede rechazar en la caja, depositado o ya acreditado. **El pago, su
+aplicación y su recibo no cambian**: la multa no vuelve a deber, y la ficha
+muestra aparte lo **pendiente de regularización** —el cheque entero, excedente
+incluido—. Con saldo cero lo dice: «saldo cero, con pago pendiente de
+regularización» (M03).
+
+- **Registrar el rechazo** (`multas.gestionar-rechazos`): el día, el motivo y el
+  **respaldo** —el aviso del banco o la constancia— obligatorio. Lo registra
+  el usuario: la ausencia de crédito en el extracto no demuestra un rechazo.
+  El rechazo es del cheque vigente: el original o su último reemplazo.
+- **Recibir el reemplazo** (`multas.cobrar`): solo otro cheque del **mismo
+  importe**; el cambio de medio no es un reemplazo (P13). Vuelve a custodia y se
+  deposita como cualquier cobro, sin recibo nuevo ni nueva recaudación. Si también
+  se rechaza, se repite el circuito y la ficha conserva toda la cadena.
+- **Completar** (`multas.gestionar-rechazos`): cuándo se avisó a la empresa y qué
+  se hizo con el papel —anulado y devuelto, o acta—, con su constancia. Una vez
+  cada uno; se puede completar con la regularización ya cerrada.
+
+**La revisión bancaria queda pendiente para una etapa posterior** (decisión del
+usuario, 22/10/2026). Registrar el rechazo no revierte el crédito original ni
+imputa un débito del extracto:
+
+| Dónde estaba el cheque | Resultado del rechazo |
+| --- | --- |
+| En la caja | Sale de custodia y queda pendiente el reemplazo; no hay movimiento bancario |
+| Depositado, sin acreditación registrada | El depósito queda devuelto y sale de tránsito; la revisión bancaria sigue pendiente, sin afirmar «nunca acreditado» |
+| Acreditado | Conserva el crédito y su vinculación; muestra «Rechazo con acreditación previa: revisión bancaria pendiente» |
+
+No se ofrecen «Imputar crédito/débito» ni «El banco no lo acreditó». El servidor
+también bloquea esas operaciones, incluido enviar un débito junto con el rechazo.
+El motor bancario conserva sus controles y pruebas para el trabajo futuro; no
+forma parte de la operación habilitada. El reemplazo no cierra la revisión bancaria.
+
+Un depósito devuelto no se cancela: el cheque no vuelve a custodia, se reemplaza.
+La caja lista los rechazos con reemplazo, revisión bancaria o papeles pendientes.
+
+**Pendientes:** asociar un cheque de apertura al pago anterior de una multa sin
+volver a ingresar dinero; P13, regularización con otro medio; conciliación del
+crédito/débito y rectificación auditada de una confirmación equivocada de «nunca
+acreditado». Cargar la multa y un pago anterior no vincula automáticamente un
+cheque de apertura. No registrar ese cheque como un cobro nuevo: duplicaría fondos.
+
 <a id="banco"></a>
 
 ## Pagos por banco
@@ -365,6 +411,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
+| `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar; acreditar o cancelar un depósito de la caja | administrador, contador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |

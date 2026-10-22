@@ -51,7 +51,8 @@ final class FineDepositController extends Controller
         // Solo lo que sigue en la caja; el Action lo rechazaría igual.
         abort_if($deposito?->place !== FineCollectionPlace::InCustody || $cuenta === null, 404);
 
-        $recepcion = $payment->application?->fundReceipt;
+        // El cheque vigente de la cadena: el que se deposita, aunque sea un reemplazo.
+        $recepcion = $this->depositos->receiptOf($payment);
         $recibo = $payment->paymentReceipt?->receipt;
 
         return Inertia::render('multas/depositos/create', [

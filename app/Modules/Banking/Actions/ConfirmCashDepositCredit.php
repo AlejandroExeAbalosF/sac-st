@@ -14,6 +14,7 @@ use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Banking\Support\BankMovementAfterOpening;
+use App\Modules\Banking\Support\TransactionReconciliation;
 use App\Modules\Banking\Support\TransferredCheques;
 use App\Modules\Banking\Support\WholeReceiptDeposits;
 use App\Modules\Ledger\Actions\PostJournalEntry;
@@ -47,6 +48,7 @@ final class ConfirmCashDepositCredit
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
+        private readonly TransactionReconciliation $conciliacion,
         private readonly RecordAuditEvent $auditar,
         private readonly TransferredCheques $contenido,
         private readonly BankMovementAfterOpening $posteriorALaApertura,
@@ -127,7 +129,7 @@ final class ConfirmCashDepositCredit
             // Los cheques que viajaron quedan acreditados.
             $this->contenido->credited($transfer);
 
-            $this->updateReconciliation($transaction);
+            $this->conciliacion->refresh($transaction);
 
             $this->auditar->handle('traslado.acreditado', $transfer, after: [
                 'bank_transaction_id' => $transaction->id,
@@ -202,23 +204,5 @@ final class ConfirmCashDepositCredit
                 'bankTransactionId' => 'Ese crédito es anterior al depósito: no puede ser su acreditación.',
             ]);
         }
-    }
-
-    /**
-     * El estado del movimiento sale de lo que ya se le imputó — se
-     * recalcula en vez de acumularse, igual que en las recepciones.
-     */
-    private function updateReconciliation(BankTransaction $transaction): void
-    {
-        $imputado = $this->disponible->allocated($transaction);
-        $total = Decimal::abs($transaction->amount);
-
-        $estado = match (true) {
-            Decimal::equals($imputado, '0') => ReconciliationStatus::Pending,
-            Decimal::equals($imputado, $total) => ReconciliationStatus::Reconciled,
-            default => ReconciliationStatus::Partial,
-        };
-
-        $transaction->forceFill(['reconciliation_status' => $estado])->save();
     }
 }

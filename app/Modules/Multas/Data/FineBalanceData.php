@@ -29,6 +29,13 @@ final class FineBalanceData extends Data
         /** @var numeric-string */
         public string $excess,
         public FineDebtStatus $status,
+        /**
+         * Lo aplicado con un cheque rechazado que la empresa todavía no
+         * reemplazó (M03). No cambia la deuda: se muestra aparte.
+         *
+         * @var numeric-string
+         */
+        public string $pendingRegularization = '0.00',
     ) {}
 
     /**
@@ -48,6 +55,7 @@ final class FineBalanceData extends Data
             debt: $saldo->debt,
             excess: $saldo->excess,
             status: FineDebtStatus::of($saldo->obligation, $saldo->debt),
+            pendingRegularization: $saldo->pending_regularization,
         );
     }
 }

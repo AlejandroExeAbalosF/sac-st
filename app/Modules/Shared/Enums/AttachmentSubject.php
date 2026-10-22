@@ -48,6 +48,9 @@ enum AttachmentSubject: string
     /** El comprobante de un pago de una multa: la transferencia, el depósito o el recibo externo del recurso. */
     case FinePayment = 'fine_payment';
 
+    /** El respaldo de un cheque rechazado, el aviso a la empresa o la disposición del papel. */
+    case ChequeRejection = 'cheque_rejection';
+
     public function label(): string
     {
         return match ($this) {
@@ -66,6 +69,7 @@ enum AttachmentSubject: string
             self::Fine => 'Multa',
             self::FineHistoricalMovement => 'Pago anterior de una multa',
             self::FinePayment => 'Pago de una multa',
+            self::ChequeRejection => 'Cheque rechazado',
         };
     }
 }

@@ -116,9 +116,17 @@ declare namespace App {
                 export type BankAllocationRole =
                     | 'funds_received'
                     | 'payment_confirmation'
-                    | 'cash_deposit_confirmation';
+                    | 'cash_deposit_confirmation'
+                    | 'cheque_rejection_credit'
+                    | 'cheque_rejection_debit';
                 export type CashTransferStatus =
-                    'deposited' | 'bank_confirmed' | 'cancelled';
+                    'deposited' | 'bank_confirmed' | 'cancelled' | 'bounced';
+                export type ChequeDisposition = 'voided_returned' | 'act';
+                export type ChequeRejectionBankStatus =
+                    | 'not_applicable'
+                    | 'unverified'
+                    | 'debit_pending'
+                    | 'debit_recorded';
                 export type ImportStatus =
                     'uploaded' | 'parsing' | 'completed' | 'failed';
                 export type MatchMethod =
@@ -861,9 +869,13 @@ declare namespace App {
                     | 'authorized_adjustment'
                     | 'legacy_funds_allocated'
                     | 'funds_applied'
-                    | 'excess_reclassified';
+                    | 'excess_reclassified'
+                    | 'cheque_rejected'
+                    | 'rejected_cheque_credited'
+                    | 'cheque_debit_recorded'
+                    | 'cheque_replaced';
                 export type FundReceiptOrigin =
-                    'received' | 'opening' | 'legacy';
+                    'received' | 'opening' | 'legacy' | 'replacement';
                 export type LedgerAccount =
                     | 'CASH_ON_HAND'
                     | 'CHEQUES_IN_CUSTODY'
@@ -874,7 +886,9 @@ declare namespace App {
                     | 'LEGACY_FUNDS'
                     | 'CASH_DIFFERENCE'
                     | 'COLLECTED_FUNDS'
-                    | 'PENDING_EXCESS';
+                    | 'PENDING_EXCESS'
+                    | 'REJECTED_CHEQUES'
+                    | 'PENDING_BANK_DEBITS';
                 export type PaymentMedium = 'cash' | 'cheque' | 'bank';
                 export type PeriodClosingStatus =
                     'draft' | 'closed' | 'reopened';
@@ -899,6 +913,7 @@ declare namespace App {
                     debt: string;
                     excess: string;
                     status: App.Modules.Multas.Enums.FineDebtStatus;
+                    pendingRegularization: string;
                 };
                 export type FineBankCreditData = {
                     id: number;
@@ -940,6 +955,24 @@ declare namespace App {
                         label: string;
                     }[];
                 };
+                export type FineChequeRejectionData = {
+                    id: number;
+                    chequeNumber: string;
+                    chequeBank: string | null;
+                    rejectedOn: string;
+                    reason: string;
+                    registeredByName: string | null;
+                    bankStatus: App.Modules.Banking.Enums.ChequeRejectionBankStatus;
+                    depositDate: string | null;
+                    creditOn: string | null;
+                    debitOn: string | null;
+                    neverCreditedNote: string | null;
+                    companyNotifiedOn: string | null;
+                    disposition: App.Modules.Banking.Enums.ChequeDisposition | null;
+                    regularized: boolean;
+                    replacementChequeNumber: string | null;
+                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                };
                 export type FineDebtEntryData = {
                     id: number;
                     kind: App.Modules.Multas.Enums.FineDebtEntryKind;
@@ -961,6 +994,10 @@ declare namespace App {
                     creditedOn: string | null;
                     ticket: App.Modules.Multas.Data.FineAttachmentData | null;
                     cancelled: App.Modules.Multas.Data.FineCancelledDepositData[];
+                    chequeNumber: string | null;
+                    chequeBank: string | null;
+                    openRejectionId: number | null;
+                    rejections: App.Modules.Multas.Data.FineChequeRejectionData[];
                 };
                 export type FineDetailData = {
                     id: number;
@@ -1070,7 +1107,7 @@ declare namespace App {
                 export type DatePrecision = 'day' | 'month' | 'unknown';
                 export type FineActType = 'LAB' | 'HYS';
                 export type FineCollectionPlace =
-                    'in_custody' | 'in_transit' | 'in_bank';
+                    'in_custody' | 'in_transit' | 'in_bank' | 'rejected';
                 export type FineDebtEntryKind =
                     'constitution' | 'increase' | 'reduction' | 'reversal';
                 export type FineDebtStatus =
@@ -1243,7 +1280,8 @@ declare namespace App {
                     | 'fine_case'
                     | 'fine'
                     | 'fine_historical_movement'
-                    | 'fine_payment';
+                    | 'fine_payment'
+                    | 'cheque_rejection';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

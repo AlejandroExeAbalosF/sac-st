@@ -7,6 +7,7 @@ use App\Modules\Multas\Http\Controllers\FineAttachmentController;
 use App\Modules\Multas\Http\Controllers\FineBankPaymentController;
 use App\Modules\Multas\Http\Controllers\FineCaseController;
 use App\Modules\Multas\Http\Controllers\FineCashController;
+use App\Modules\Multas\Http\Controllers\FineChequeRejectionController;
 use App\Modules\Multas\Http\Controllers\FineController;
 use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDepositController;
@@ -114,6 +115,22 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.depositar')->group(function (): void {
         Route::get('pagos/{payment}/deposito', [FineDepositController::class, 'create'])->whereNumber('payment')->name('pagos.deposito.create');
         Route::post('pagos/{payment}/deposito', [FineDepositController::class, 'store'])->whereNumber('payment')->name('pagos.deposito.store');
+    });
+
+    /*
+     * El cheque rechazado (M03): el rechazo, lo que trae el extracto y lo que
+     * se completa después son de quien concilia; el reemplazo, de la caja.
+     */
+    Route::middleware('can:multas.gestionar-rechazos')->group(function (): void {
+        Route::post('pagos/{payment}/rechazo', [FineChequeRejectionController::class, 'store'])->whereNumber('payment')->name('pagos.rechazo.store');
+        Route::get('pagos/{payment}/rechazo/debitos', [FineChequeRejectionController::class, 'debitOptions'])->whereNumber('payment')->name('pagos.rechazo.debitos');
+        Route::get('rechazos/{rejection}/movimientos', [FineChequeRejectionController::class, 'movementOptions'])->whereNumber('rejection')->name('rechazos.movimientos.index');
+        Route::post('rechazos/{rejection}/movimientos', [FineChequeRejectionController::class, 'movements'])->whereNumber('rejection')->name('rechazos.movimientos.store');
+        Route::post('rechazos/{rejection}/no-acreditado', [FineChequeRejectionController::class, 'neverCredited'])->whereNumber('rejection')->name('rechazos.no-acreditado');
+        Route::post('rechazos/{rejection}/completar', [FineChequeRejectionController::class, 'complete'])->whereNumber('rejection')->name('rechazos.completar');
+    });
+    Route::middleware('can:multas.cobrar')->group(function (): void {
+        Route::post('rechazos/{rejection}/reemplazo', [FineChequeRejectionController::class, 'replace'])->whereNumber('rejection')->name('rechazos.reemplazo');
     });
 
     // Verificar contra el extracto, o descartar, es de quien concilia.
