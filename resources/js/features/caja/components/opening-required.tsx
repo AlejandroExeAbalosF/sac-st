@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import { BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { aperturaPendiente, nombreDeMoneda } from '@/features/caja/apertura';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 
@@ -22,7 +23,11 @@ export default function OpeningRequired({
     moneda: CurrencyCode;
     puedeAbrir: boolean;
 }) {
-    const aviso = aperturaPendiente(moneda, puedeAbrir);
+    const aviso = aperturaPendiente(
+        moneda,
+        puedeAbrir,
+        useRutasDeCaja().apertura().url,
+    );
 
     return (
         <div className="flex flex-col items-start gap-4 rounded-lg border border-warning-soft bg-warning-soft px-5 py-5 text-warning-strong sm:flex-row sm:items-center">

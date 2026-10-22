@@ -213,6 +213,8 @@ const GRUPOS_DE_COLAS = [
             'egresos_por_validar',
             'caja_sin_cerrar',
             'caja_mes_sin_cerrar',
+            'multas_caja_sin_cerrar',
+            'multas_caja_mes_sin_cerrar',
         ],
     },
     {

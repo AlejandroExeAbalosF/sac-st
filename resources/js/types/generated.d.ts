@@ -966,6 +966,27 @@ declare namespace App {
                         label: string;
                     }[];
                 };
+                export type FineChequeInCustodyData = {
+                    id: number;
+                    number: string | null;
+                    bank: string | null;
+                    issueDate: string | null;
+                    amount: string;
+                    receivedDate: string;
+                    origin: App.Modules.Ledger.Enums.FundReceiptOrigin;
+                    fineId: number | null;
+                    caseLabel: string | null;
+                    caption: string | null;
+                    declaredExpediente: string | null;
+                    declaredDrawer: string | null;
+                };
+                export type FineChequeInventoryData = {
+                    cheques: App.Modules.Multas.Data.FineChequeInCustodyData[];
+                    detailed: string;
+                    undetailed: string;
+                    total: string;
+                    canOpenFines: boolean;
+                };
                 export type FineChequeRejectionData = {
                     id: number;
                     chequeNumber: string;

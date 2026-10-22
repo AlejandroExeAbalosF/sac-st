@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Support;
 
 use App\Modules\Ledger\Enums\CashBoxAbility;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
+use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Support\Money\Decimal;
+use Illuminate\Contracts\Auth\Access\Authorizable;
 
 /**
  * La caja de Multas, para las pantallas de caja de Ledger.
@@ -53,6 +56,12 @@ final class FineCashBoxModule implements CashBoxModule
         };
     }
 
+    /** Multas no cobra en dólares: un solo libro. */
+    public function currencies(): array
+    {
+        return [Currency::Ars];
+    }
+
     public function chequeColumns(): array
     {
         return self::CHEQUE_COLUMNS;
@@ -64,7 +73,25 @@ final class FineCashBoxModule implements CashBoxModule
      */
     public function bankColumnNote(): string
     {
-        return 'DEPÓSITOS DIRECTOS: lo reconocido en el libro de Multas. La cuenta es compartida con Aranceles; esto no es su saldo.';
+        return 'Lo reconocido en el libro de Multas. La cuenta es compartida con Aranceles: no es su saldo.';
+    }
+
+    /**
+     * Cada recibo de Multas abre la ficha de la multa que cobró, a quien
+     * puede ver multas. Quien solo opera la caja ve el recibo como texto.
+     */
+    public function rowLinks(array $receiptIds, ?Authorizable $viewer): array
+    {
+        if ($receiptIds === [] || ! ($viewer?->can('multas.ver') ?? false)) {
+            return [];
+        }
+
+        return FinePaymentReceipt::query()
+            ->join('fine_payments', 'fine_payments.id', '=', 'fine_payment_receipts.fine_payment_id')
+            ->whereIn('fine_payment_receipts.receipt_id', $receiptIds)
+            ->pluck('fine_payments.fine_id', 'fine_payment_receipts.receipt_id')
+            ->map(fn (mixed $multa): string => route('multas.show', ['fine' => (int) $multa], absolute: false))
+            ->all();
     }
 
     /**

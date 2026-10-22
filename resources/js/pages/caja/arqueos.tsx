@@ -29,6 +29,8 @@ type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 type Props = {
     selected: {
         cashBoxCode: string;
+        /** Los libros que lleva la caja, según el servidor. */
+        currencies: CurrencyCode[];
         currency: CurrencyCode;
         defaultDate: string;
     };
@@ -58,11 +60,12 @@ export default function CajaArqueos({
 
             <div className="flex flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
-                    eyebrow="Caja"
+                    eyebrow={rutas.rotulo}
                     title="Arqueos"
                     description="El conteo físico del efectivo, contra lo que dice el libro."
                     actions={
                         <SelectorDeMoneda
+                            monedas={selected.currencies}
                             moneda={selected.currency}
                             href={(otra) =>
                                 conMoneda(

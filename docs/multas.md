@@ -7,7 +7,9 @@ garantía en la base están en [reglas de Multas](multas-reglas.md).
 multas, su obligación y los pagos anteriores al sistema—, la apertura de la caja
 con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
 banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
-rechazado con su reemplazo. Falta la caja del día con su arqueo y cierre.
+rechazado con su reemplazo, y la caja del día con su arqueo, su cierre y su
+planilla. Falta la cola para identificar los créditos de la cuenta compartida y la
+consulta operativa de movimientos.
 
 ---
 
@@ -48,6 +50,10 @@ conoce. El test de fronteras lo exige.
 | Expediente | `/multas/expedientes/{id}` | `multas.ver` |
 | Exportar la cuenta corriente | `/multas/exportar` | `multas.ver` |
 | Caja de Multas | `/multas/caja` | `multas.ver`; abrirla, `multas.caja.abrir` |
+| Caja del día | `/multas/caja/dia` | `multas.caja.ver` |
+| Arqueos | `/multas/caja/arqueos` | `multas.caja.ver`; contar, `multas.caja.arquear` |
+| Cierres | `/multas/caja/cierres` | `multas.caja.ver`; cerrar, `multas.caja.cerrar` |
+| Calendario | `/multas/caja/calendario` | `multas.caja.ver` |
 
 ### Cuenta corriente · `/multas`
 
@@ -209,6 +215,42 @@ vuelve.
 La importación de extractos no cambia: es por cuenta, con su control de
 continuidad, vista previa y movimientos repetidos, y no depende de la caja. Un
 mismo crédito no lo pueden consumir dos cajas por encima de su importe.
+
+---
+
+<a id="caja-del-dia"></a>
+
+## Caja del día, arqueo y cierre
+
+Son **las pantallas de Caja de Haberes**, con la caja de Multas y sus permisos
+propios (`multas.caja.*`): cerrar una caja no habilita a cerrar la otra, y los
+botones de cada pantalla se encienden con el permiso de la caja que se mira. Se
+entra desde `/multas/caja`, que enlaza al día, los arqueos, los cierres y el
+calendario, y desde la barra lateral.
+
+Lo que cambia respecto de Haberes:
+
+- **Solo pesos**: Multas no cobra en dólares. No hay selector de moneda, el
+  servidor muestra pesos aunque la dirección pida dólares, y rechaza un arqueo o
+  un cierre en dólares.
+- **Sin saldo del sistema anterior**: la apertura de Multas no reserva por cuota.
+  Abrir los libros lleva a `/multas/caja`.
+- **Cada recibo del libro abre su multa.** Los cheques en custodia muestran qué
+  multa paga cada uno —el reemplazo, la del cheque original— y un cheque de la
+  apertura muestra lo que declaró la apertura. Quien opera la caja sin
+  `multas.ver` ve los mismos datos sin enlaces a las fichas, y encuentra la caja
+  del día y los cierres en la barra lateral aunque no vea la cuenta corriente.
+- **La columna de banco** son los pagos por banco verificados, el día en que se
+  verifican, sin los movimientos ficticios que usa el Excel del área. Es lo que el
+  libro de Multas reconoció, **no el saldo de la cuenta compartida**: la pantalla y
+  la planilla lo aclaran. Un crédito sin identificar de esa cuenta no impide cerrar.
+- **La planilla** es la misma, con el título de la caja de Multas y el reverso con
+  expediente, carátula y librador ([rechazo](#rechazo) para los renglones del
+  cheque rechazado y su reemplazo). La copia firmada no bloquea el cierre (M10).
+
+Con el cierre mensual, el término de un pago (M08) se juzga contra él y queda
+guardado con la evidencia del cierre: reabrir el mes no reclasifica lo ya juzgado.
+Inicio lista los días y los meses de Multas sin cerrar a quien puede cerrarlos.
 
 ---
 
@@ -432,6 +474,14 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar; acreditar o cancelar un depósito de la caja | administrador, contador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
+| `multas.caja.ver` | Ver la caja del día, los arqueos, los cierres y el calendario de Multas | administrador, contador, administrativo, consulta |
+| `multas.caja.arquear` | Registrar arqueos de Multas | administrador, contador, administrativo |
+| `multas.caja.revisar-arqueo` | Revisar arqueos de Multas | administrador, contador |
+| `multas.caja.ajustar-diferencia` | Imputar la diferencia de un arqueo de Multas | administrador, contador |
+| `multas.caja.cerrar` | Cerrar un día o un mes de Multas | administrador, contador |
+| `multas.caja.reabrir` | Reabrir un período de Multas, con motivo | administrador, contador |
+| `multas.caja.exportar` | Descargar la planilla de un cierre de Multas | administrador, contador, administrativo, consulta |
+| `multas.caja.regenerar-planilla` | Rehacer la planilla de un cierre de Multas | administrador |
 | `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a

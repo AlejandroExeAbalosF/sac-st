@@ -43,7 +43,11 @@ import { index as roles } from '@/routes/configuracion/roles';
 import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
 import { index as multas } from '@/routes/multas';
-import { index as cajaDeMultas } from '@/routes/multas/caja';
+import {
+    dia as diaDeMultas,
+    index as cajaDeMultas,
+} from '@/routes/multas/caja';
+import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
 import { index as pagosDeMultas } from '@/routes/multas/pagos';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
@@ -56,7 +60,7 @@ import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
  * abajo está siguiendo el circuito real. Los módulos futuros se incorporan
  * cuando estén disponibles para que la navegación describa acciones reales.
  */
-const navGroups: NavGroup[] = [
+export const navGroups: NavGroup[] = [
     {
         label: 'Operación',
         items: [
@@ -64,13 +68,13 @@ const navGroups: NavGroup[] = [
             { title: 'Haberes', href: haberes(), icon: FileText },
             /*
              * Multas es hermana de Haberes: otra caja, el mismo recorrido.
-             * Lleva permiso porque se puede quitar desde Roles; el de
-             * consulta lo tiene por omisión.
+             * El grupo no lleva permiso propio: cada pantalla lleva el suyo,
+             * y el grupo aparece si queda alguna. Quien solo opera la caja
+             * del día —`multas.caja.ver` sin `multas.ver`— la encuentra igual.
              */
             {
                 title: 'Multas',
                 icon: Gavel,
-                permission: 'multas.ver',
                 children: [
                     {
                         title: 'Cuenta corriente',
@@ -83,6 +87,23 @@ const navGroups: NavGroup[] = [
                         href: cajaDeMultas(),
                         icon: Wallet,
                         permission: 'multas.ver',
+                    },
+                    /*
+                     * El día, el arqueo y el cierre de Multas: las pantallas
+                     * de Caja, con su caja y su permiso. Los arqueos y el
+                     * calendario se abren desde ellas, como en Haberes.
+                     */
+                    {
+                        title: 'Caja del día',
+                        href: diaDeMultas(),
+                        icon: Scale,
+                        permission: 'multas.caja.ver',
+                    },
+                    {
+                        title: 'Cierres de caja',
+                        href: cierresDeMultas(),
+                        icon: Lock,
+                        permission: 'multas.caja.ver',
                     },
                     // La cola de quien concilia: lo informado por el banco y
                     // los recursos en revisión.
@@ -227,7 +248,7 @@ const navGroups: NavGroup[] = [
  * que existe pero no le corresponde a este usuario es otra cosa, y
  * mostrarla apagada solo ofrece una puerta que termina en un 403.
  */
-function visiblesPara(
+export function visiblesPara(
     grupos: NavGroup[],
     can: Record<string, boolean>,
 ): NavGroup[] {

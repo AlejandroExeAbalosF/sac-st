@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Exceptions;
 
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
+use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonInterface;
 use Exception;
 
@@ -29,6 +30,7 @@ use Exception;
 final class CashBookNotOpenedException extends Exception
 {
     private function __construct(
+        public readonly int $cashBoxId,
         public readonly Currency $currency,
         public readonly CarbonInterface $attemptedOn,
         public readonly ?CarbonInterface $openedOn,
@@ -38,9 +40,9 @@ final class CashBookNotOpenedException extends Exception
     }
 
     /** El libro de esa moneda no tiene apertura. */
-    public static function missing(Currency $currency, CarbonInterface $attemptedOn): self
+    public static function missing(int $cashBoxId, Currency $currency, CarbonInterface $attemptedOn): self
     {
-        return new self($currency, $attemptedOn, null, sprintf(
+        return new self($cashBoxId, $currency, $attemptedOn, null, sprintf(
             'Los libros en %s de esta caja todavía no se abrieron. '
             .'Antes de registrar movimientos hay que declarar lo que ya estaba en el cajón.',
             mb_strtolower($currency->label()),
@@ -50,7 +52,7 @@ final class CashBookNotOpenedException extends Exception
     /** La fecha es anterior a la apertura de ese libro. */
     public static function before(CashBookOpening $opening, CarbonInterface $attemptedOn): self
     {
-        return new self($opening->currency, $attemptedOn, $opening->opened_on, sprintf(
+        return new self((int) $opening->cash_box_id, $opening->currency, $attemptedOn, $opening->opened_on, sprintf(
             'La apertura en %s es del %s: no se registra nada con fecha %s.',
             mb_strtolower($opening->currency->label()),
             $opening->opened_on->format('d/m/Y'),
@@ -61,11 +63,13 @@ final class CashBookNotOpenedException extends Exception
     /**
      * Lo que la pantalla necesita para explicarlo y ofrecer la salida.
      *
-     * @return array{currency: string, currencyLabel: string, attemptedOn: string, openedOn: string|null, message: string}
+     * @return array{cashBoxCode: string, currency: string, currencyLabel: string, attemptedOn: string, openedOn: string|null, message: string}
      */
     public function toArray(): array
     {
         return [
+            // De qué caja: cada una se abre en su propia pantalla.
+            'cashBoxCode' => (string) CashBox::query()->whereKey($this->cashBoxId)->value('code'),
             'currency' => $this->currency->value,
             'currencyLabel' => $this->currency->label(),
             'attemptedOn' => $this->attemptedOn->toDateString(),

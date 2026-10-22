@@ -102,7 +102,11 @@ class CierreDeCajaDeMultasTest extends TestCase
         $reverso = $libro->getSheetByName('REVERSO 031026')?->toArray(null, false, false) ?? [];
         $encabezado = array_values(array_filter($reverso, fn (array $f): bool => $f[0] === 'RECIBO'))[0] ?? [];
 
-        expect($fila)->not->toBeFalse()
+        $columnaA = array_column($anverso?->toArray(null, false, false) ?? [], 0);
+
+        // La columna de banco no es el saldo de la cuenta compartida, y la planilla lo dice.
+        expect($columnaA)->toContain('DEPÓSITOS DIRECTOS: Lo reconocido en el libro de Multas. La cuenta es compartida con Aranceles: no es su saldo.')
+            ->and($fila)->not->toBeFalse()
             ->and($anverso?->getStyle('A'.((int) $fila + 1))->getAlignment()->getWrapText())->toBeTrue()
             ->and(array_slice($encabezado, 0, 8))->toBe(['RECIBO', 'EXPTE', 'CARÁTULA', 'LIBRADOR', 'CHEQUE Nº', 'BANCO', 'FECHA', 'IMPORTE']);
     }

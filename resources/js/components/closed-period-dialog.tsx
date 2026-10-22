@@ -10,10 +10,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { rutasDeCajaSiExiste } from '@/features/caja/rutas';
 import { date as formatDate } from '@/lib/format';
-import { index as cierres } from '@/routes/caja/cierres';
 
 type Aviso = {
+    /** De qué caja: la salida es la pantalla de Cierres de esa caja. */
+    cashBoxCode: string | null;
     periodType: string;
     from: string;
     to: string;
@@ -59,6 +61,7 @@ export default function ClosedPeriodDialog() {
     }
 
     const abierto = aviso.occurrence !== descartado;
+    const cierres = rutasDeCajaSiExiste(aviso.cashBoxCode)?.cierres.index;
     const cerrar = () => setDescartado(aviso.occurrence);
 
     return (
@@ -100,7 +103,7 @@ export default function ClosedPeriodDialog() {
                     <Button variant="outline" onClick={cerrar} type="button">
                         Entendido
                     </Button>
-                    {aviso.canSeeClosings && (
+                    {aviso.canSeeClosings && cierres && (
                         <Button asChild>
                             <Link href={cierres().url} onClick={cerrar}>
                                 Ir a Cierres

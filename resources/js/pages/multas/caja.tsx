@@ -1,5 +1,12 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { BookOpen, Landmark, Wallet } from 'lucide-react';
+import {
+    BookOpen,
+    CalendarDays,
+    Landmark,
+    Lock,
+    Scale,
+    Wallet,
+} from 'lucide-react';
 import { useMemo } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
@@ -35,7 +42,13 @@ import { PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { businessToday, date, isNonZero } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { show as verMulta } from '@/routes/multas';
+import {
+    calendario as calendarioDeMultas,
+    dia as diaDeMultas,
+} from '@/routes/multas/caja';
 import { store } from '@/routes/multas/caja/apertura';
+import { index as arqueosDeMultas } from '@/routes/multas/caja/arqueos';
+import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
 
 type CuentaBancaria = { id: number; label: string; cutoffOn: string | null };
 type Banco = App.Modules.Multas.Data.FineBankPanelData;
@@ -55,6 +68,8 @@ type Props = {
     rechazados: Cobro[];
     canManageRejections: boolean;
     canReplaceCheque: boolean;
+    /** Ver la caja del día, los arqueos y los cierres de Multas. */
+    canViewCashDay: boolean;
 };
 
 const EFECTIVO = 'CASH_ON_HAND';
@@ -91,6 +106,7 @@ export default function CajaDeMultas({
     rechazados,
     canManageRejections,
     canReplaceCheque,
+    canViewCashDay,
 }: Props) {
     const permisos = {
         canDeposit,
@@ -109,6 +125,42 @@ export default function CajaDeMultas({
                     eyebrow="Multas"
                     title="Caja de Multas"
                     description="El efectivo y los cheques de la caja, y la cuenta bancaria con la que opera."
+                    actions={
+                        /*
+                         * La caja del día, el arqueo y el cierre de Multas
+                         * son las pantallas de Caja: esta es su puerta.
+                         * Sin apertura no hay día que mirar.
+                         */
+                        opening &&
+                        canViewCashDay && (
+                            <>
+                                <Button variant="outline" asChild>
+                                    <Link href={calendarioDeMultas().url}>
+                                        <CalendarDays className="size-4" />
+                                        Calendario
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <Link href={arqueosDeMultas().url}>
+                                        <Scale className="size-4" />
+                                        Arqueos
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <Link href={cierresDeMultas().url}>
+                                        <Lock className="size-4" />
+                                        Cierres
+                                    </Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link href={diaDeMultas().url}>
+                                        <Wallet className="size-4" />
+                                        Caja del día
+                                    </Link>
+                                </Button>
+                            </>
+                        )
+                    }
                 />
 
                 {opening ? (

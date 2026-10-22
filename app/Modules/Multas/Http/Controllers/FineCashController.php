@@ -22,12 +22,14 @@ use App\Modules\Multas\Data\FinePendingPaymentData;
 use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Http\Requests\OpenFineCashBookRequest;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineChequeInventory;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +83,21 @@ final class FineCashController extends Controller
             'canDeposit' => ($request->user()?->can('multas.depositar') ?? false) && $apertura?->bank_account_id !== null,
             'canConfirmDeposit' => $request->user()?->can('multas.verificar-pagos') ?? false,
             'canViewAttachments' => $request->user()?->can('adjuntos.ver') ?? false,
+            'canViewCashDay' => $request->user()?->can('multas.caja.ver') ?? false,
         ]);
+    }
+
+    /**
+     * La cartera de cheques de la caja, para el modal de la caja del día.
+     * Responde JSON: se abre encima de la caja del día, sin dejarla.
+     */
+    public function cheques(Request $request, FineChequeInventory $cartera): JsonResponse
+    {
+        return response()->json($cartera->for(
+            (int) $this->cashBox()->id,
+            // Quien solo opera la caja ve de qué multa es cada cheque, sin enlace.
+            canOpenFines: $request->user()?->can('multas.ver') ?? false,
+        ));
     }
 
     public function store(OpenFineCashBookRequest $request, OpenFineCashBook $abrir): RedirectResponse

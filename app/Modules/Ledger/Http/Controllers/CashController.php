@@ -68,6 +68,7 @@ final class CashController extends Controller
         $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
         $fecha = $this->selectedDate($request);
+        $libro = $this->libro->entries((int) $caja->id, $fecha, $fecha, $moneda);
 
         $arqueos = CashCount::query()
             ->with(['performedBy', 'reviewedBy', 'lines', 'carryLines'])
@@ -91,18 +92,33 @@ final class CashController extends Controller
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
                 'cashBoxCode' => $caja->code,
+                // Los libros que lleva la caja: el selector de moneda no ofrece otros.
+                'currencies' => array_map(fn (Currency $c): string => $c->value, $this->currenciesOf($request)),
                 'currency' => $moneda->value,
                 'date' => $fecha->toDateString(),
                 'cashBoxName' => $caja->name,
             ],
             'state' => $this->state($caja, $moneda, $fecha),
             /*
+             * Qué es el saldo «en la cuenta» cuando la cuenta es compartida:
+             * lo que el libro de esta caja reconoció, no lo que dice el banco.
+             */
+            'bankColumnNote' => $this->cashBoxModule($request)->bankColumnNote(),
+            /*
              * Lo que entró hoy y sigue en el cajón, para que el arqueo
              * pueda comparar el conteo contra algo que el operador no
              * eligió. El saldo del día anterior se sigue declarando.
              */
             'dayTakings' => $this->recaudacion->of((int) $caja->id, $fecha, $moneda),
-            'book' => $this->libro->entries((int) $caja->id, $fecha, $fecha, $moneda),
+            'book' => $libro,
+            /*
+             * A dónde lleva cada recibo del libro, si la caja lo dice: en
+             * Multas, la ficha de la multa. Se resuelve al mirar y no se
+             * congela, y en una sola consulta para todo el día.
+             */
+            'bookLinks' => (object) $this->cashBoxModule($request)->rowLinks(array_values(array_filter(
+                array_column([...$libro['income'], ...$libro['expense']], 'receiptId'),
+            )), $request->user()),
             'activity' => $this->actividad->entries((int) $caja->id, $fecha, $moneda),
             'counts' => $arqueos->map(CashCountListItemData::fromModel(...))->values()->all(),
             /*

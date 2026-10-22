@@ -1,13 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
     aperturaPendiente,
     esAnteriorALaApertura,
     nombreDeMoneda,
 } from './apertura';
-
-vi.mock('@/routes/caja/apertura', () => ({
-    index: () => ({ url: '/caja/apertura' }),
-}));
 
 describe('nombreDeMoneda', () => {
     it('nombra las dos monedas en minúscula', () => {
@@ -18,7 +14,7 @@ describe('nombreDeMoneda', () => {
 
 describe('aperturaPendiente', () => {
     it('lleva a la apertura de ese libro a quien puede abrirlo', () => {
-        const aviso = aperturaPendiente('USD', true);
+        const aviso = aperturaPendiente('USD', true, '/caja/apertura');
 
         expect(aviso.titulo).toContain('en dólares');
         expect(aviso.href).toBe('/caja/apertura?moneda=usd');
@@ -26,11 +22,23 @@ describe('aperturaPendiente', () => {
     });
 
     it('en pesos no anota la moneda en la dirección', () => {
-        expect(aperturaPendiente('ARS', true).href).toBe('/caja/apertura');
+        expect(aperturaPendiente('ARS', true, '/caja/apertura').href).toBe(
+            '/caja/apertura',
+        );
+    });
+
+    it('lleva a la pantalla de la caja, que en Multas es su caja', () => {
+        expect(aperturaPendiente('ARS', true, '/multas/caja').href).toBe(
+            '/multas/caja',
+        );
+    });
+
+    it('sin pantalla de apertura no ofrece enlace', () => {
+        expect(aperturaPendiente('ARS', true, null).href).toBeNull();
     });
 
     it('a quien no puede abrir le dice a quién pedírselo, sin enlace', () => {
-        const aviso = aperturaPendiente('USD', false);
+        const aviso = aperturaPendiente('USD', false, '/caja/apertura');
 
         expect(aviso.href).toBeNull();
         expect(aviso.accion).toContain('administrador');

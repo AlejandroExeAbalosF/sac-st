@@ -55,6 +55,8 @@ final class CashCountController extends Controller
         return Inertia::render('caja/arqueos', [
             'selected' => [
                 'cashBoxCode' => $caja->code,
+                // Los libros que lleva la caja: el selector de moneda no ofrece otros.
+                'currencies' => array_map(fn (Currency $c): string => $c->value, $this->currenciesOf($request)),
                 'currency' => $moneda->value,
                 'defaultDate' => $fechaPredeterminada->toDateString(),
             ],
@@ -90,6 +92,8 @@ final class CashCountController extends Controller
 
     public function store(RecordCashCountRequest $request, RecordCashCount $registrar): RedirectResponse
     {
+        $this->assertCurrencyAllowed($request, Currency::from((string) $request->validated('currency')));
+
         $arqueo = $registrar->handle(
             cashBoxId: (int) $this->cashBox($request)->id,
             countedOn: CarbonImmutable::parse((string) $request->validated('countedOn')),

@@ -209,7 +209,7 @@ final class CashSheetWorkbook
          */
         if ($planilla->bankColumnNote !== null) {
             $fila += 2;
-            $hoja->setCellValue('A'.$fila, $planilla->bankColumnNote);
+            $hoja->setCellValue('A'.$fila, 'DEPÓSITOS DIRECTOS: '.$planilla->bankColumnNote);
             $hoja->mergeCells("A{$fila}:D{$fila}");
             $hoja->getStyle('A'.$fila)->getFont()->setItalic(true)->setSize(9);
             $hoja->getStyle('A'.$fila)->getAlignment()->setWrapText(true);

@@ -94,6 +94,72 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador'],
                 sensitive: true,
             ),
+
+            /*
+             * La caja del día, el arqueo y el cierre de Multas (Etapa 6). Son
+             * las mismas pantallas que las de Haberes, con permisos propios:
+             * cerrar una caja no habilita a cerrar la otra. Cada uno con el
+             * reparto de roles de su par de Haberes (`caja.*`, `cierres.*`).
+             */
+            new PermissionDefinition(
+                'multas.caja.ver',
+                'Ver la caja de Multas',
+                'Consultar la caja del día de Multas, sus arqueos, sus cierres y el calendario de días cerrados y abiertos.',
+                'multas',
+                ['administrador', 'contador', 'administrativo', 'consulta'],
+            ),
+            new PermissionDefinition(
+                'multas.caja.arquear',
+                'Registrar arqueos de Multas',
+                'Cargar el conteo del efectivo del cajón de Multas para compararlo con el saldo del sistema.',
+                'multas',
+                ['administrador', 'contador', 'administrativo'],
+            ),
+            new PermissionDefinition(
+                'multas.caja.revisar-arqueo',
+                'Revisar arqueos de Multas',
+                'Dar por revisado un arqueo de la caja de Multas. Si lo revisa quien lo contó, queda a la vista.',
+                'multas',
+                ['administrador', 'contador'],
+            ),
+            new PermissionDefinition(
+                'multas.caja.ajustar-diferencia',
+                'Imputar diferencias de arqueo de Multas',
+                'Registrar como sobrante o faltante la diferencia del arqueo de Multas. Mueve el saldo sin que entre ni salga dinero del cajón.',
+                'multas',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
+            new PermissionDefinition(
+                'multas.caja.cerrar',
+                'Cerrar períodos de Multas',
+                'Cerrar un día o un mes de la caja de Multas: congela sus totales e impide registrar movimientos con fecha dentro de él.',
+                'multas',
+                ['administrador', 'contador'],
+            ),
+            new PermissionDefinition(
+                'multas.caja.reabrir',
+                'Reabrir períodos de Multas',
+                'Deshacer un cierre de la caja de Multas para volver a admitir movimientos en esas fechas. Exige un motivo y queda en la auditoría.',
+                'multas',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
+            new PermissionDefinition(
+                'multas.caja.exportar',
+                'Descargar la planilla de Multas',
+                'Bajar la planilla de un cierre de la caja de Multas. Es solo lectura.',
+                'multas',
+                ['administrador', 'contador', 'administrativo', 'consulta'],
+            ),
+            new PermissionDefinition(
+                'multas.caja.regenerar-planilla',
+                'Rehacer la planilla de Multas',
+                'Generar de nuevo la planilla de un cierre de Multas ya emitido. Los números no cambian; la anterior se conserva.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
         );
     }
 }

@@ -190,6 +190,8 @@ class InicioTest extends TestCase
             'beneficiarios_sin_cbu',
             'caja_sin_cerrar',
             'caja_mes_sin_cerrar',
+            'multas_caja_sin_cerrar',
+            'multas_caja_mes_sin_cerrar',
         ], $this->clavesDeColas());
     }
 

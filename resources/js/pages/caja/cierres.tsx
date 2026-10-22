@@ -32,6 +32,8 @@ type Props = {
     selected: {
         cashBoxId: number;
         cashBoxCode: string;
+        /** Los libros que lleva la caja, según el servidor. */
+        currencies: CurrencyCode[];
         cashBoxName: string;
         currency: CurrencyCode;
         defaultDate: string;
@@ -89,12 +91,13 @@ export default function CajaCierres({
 
             <div className="flex flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
-                    eyebrow="Caja"
+                    eyebrow={rutas.rotulo}
                     title="Cierres de período"
                     description="Congelan los totales del período y traban las operaciones retroactivas."
                     actions={
                         <>
                             <SelectorDeMoneda
+                                monedas={selected.currencies}
                                 moneda={selected.currency}
                                 href={(otra) =>
                                     conMoneda(rutas.cierres.index().url, otra)

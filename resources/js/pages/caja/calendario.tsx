@@ -53,6 +53,8 @@ type Props = {
     selected: {
         cashBoxId: number;
         cashBoxCode: string;
+        /** Los libros que lleva la caja, según el servidor. */
+        currencies: CurrencyCode[];
         cashBoxName: string;
         currency: CurrencyCode;
         year: number;
@@ -208,7 +210,7 @@ export default function CajaCalendario({
 
             <div className="flex flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
-                    eyebrow="Caja"
+                    eyebrow={rutas.rotulo}
                     title="Calendario"
                     description={
                         enMes
@@ -218,6 +220,7 @@ export default function CajaCalendario({
                     actions={
                         <>
                             <SelectorDeMoneda
+                                monedas={selected.currencies}
                                 moneda={moneda}
                                 href={(otra) =>
                                     conMoneda(

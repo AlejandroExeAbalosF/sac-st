@@ -104,7 +104,7 @@ final class InicioController extends Controller
                 'verExpedientes' => $verExpedientes,
                 'verMovimientos' => $verCaja,
                 'verVolumen' => $verExpedientes,
-                'verColas' => $verBanco || $verExpedientes || $verCierres,
+                'verColas' => $verBanco || $verExpedientes || $verCierres || $user->can('multas.caja.cerrar'),
                 'crearExpediente' => $user->can('expedientes.crear'),
                 'importarExtracto' => $user->can('banco.extractos.importar'),
             ],
@@ -283,6 +283,33 @@ final class InicioController extends Controller
                     pesos: $this->mesesSinCerrar->count($caja, $fecha, Currency::Ars),
                     dolares: $this->mesesSinCerrar->count($caja, $fecha, Currency::Usd),
                 ),
+            );
+        }
+
+        /*
+         * Lo mismo para la caja de Multas, que se cierra aparte y con su
+         * permiso: son colas de quien la cierra. Solo en pesos, porque
+         * Multas no cobra en dólares.
+         */
+        if ($user->can('multas.caja.cerrar')) {
+            $multas = (int) CashBox::query()->active()->where('code', CashBox::MULTAS)->valueOrFail('id');
+
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_caja_sin_cerrar',
+                title: 'Días de caja de Multas sin cerrar',
+                description: 'Días anteriores de la caja de Multas con movimientos que todavía no se cerraron',
+                count: $this->diasSinCerrar->count($multas, $fecha, Currency::Ars),
+                tone: QueueTone::Action,
+                href: route('multas.caja.cierres.index', absolute: false),
+            );
+
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_caja_mes_sin_cerrar',
+                title: 'Meses de Multas sin cerrar',
+                description: 'Meses terminados de la caja de Multas con movimientos que todavía no se cerraron',
+                count: $this->mesesSinCerrar->count($multas, $fecha, Currency::Ars),
+                tone: QueueTone::Action,
+                href: route('multas.caja.cierres.index', absolute: false),
             );
         }
 

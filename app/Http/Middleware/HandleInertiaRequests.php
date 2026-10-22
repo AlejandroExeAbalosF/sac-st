@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Modules\Ledger\Enums\CashBoxAbility;
+use App\Modules\Ledger\Support\CashBoxModules;
 use App\Support\Navigation\Breadcrumbs;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -113,6 +115,8 @@ class HandleInertiaRequests extends Middleware
                     'multas.ver' => $user->can('multas.ver'),
                     // La cola de pagos por verificar es de quien concilia.
                     'multas.verificar-pagos' => $user->can('multas.verificar-pagos'),
+                    // La caja del día y los cierres de Multas, con su permiso propio.
+                    'multas.caja.ver' => $user->can('multas.caja.ver'),
                 ],
             ],
             'flash' => [
@@ -137,7 +141,7 @@ class HandleInertiaRequests extends Middleware
 
                     return [
                         ...$aviso,
-                        'canSeeClosings' => $request->user()?->can('cierres.ver') ?? false,
+                        'canSeeClosings' => $this->canOnCashBox($request, $aviso, CashBoxAbility::ViewClosings),
                         /*
                          * Identifica **este** rechazo. El diálogo vive en el
                          * layout persistente, que no se remonta al navegar:
@@ -162,7 +166,7 @@ class HandleInertiaRequests extends Middleware
 
                     return [
                         ...$aviso,
-                        'canOpen' => $request->user()?->can('caja.abrir-saldo-inicial') ?? false,
+                        'canOpen' => $this->canOnCashBox($request, $aviso, CashBoxAbility::Open),
                         // Ver el comentario de `closedPeriod`.
                         'occurrence' => (string) Str::uuid(),
                     ];
@@ -267,5 +271,24 @@ class HandleInertiaRequests extends Middleware
             'type' => 'success',
             'message' => $status,
         ]);
+    }
+
+    /**
+     * Si quien mira puede seguir la salida de un aviso de caja **en la caja
+     * del aviso**: con el permiso de otra caja, el enlace terminaría en un
+     * 403. Un aviso sin caja, o de una caja sin módulo, no ofrece salida.
+     *
+     * @param  array<mixed>  $aviso
+     */
+    private function canOnCashBox(Request $request, array $aviso, CashBoxAbility $ability): bool
+    {
+        $codigo = $aviso['cashBoxCode'] ?? null;
+        $modulos = app(CashBoxModules::class);
+
+        if (! is_string($codigo) || ! $modulos->has($codigo)) {
+            return false;
+        }
+
+        return $request->user()?->can($modulos->for($codigo)->permission($ability)) ?? false;
     }
 }

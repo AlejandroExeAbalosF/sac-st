@@ -1,5 +1,4 @@
 import type { CurrencyCode } from '@/lib/format';
-import { index as apertura } from '@/routes/caja/apertura';
 import { conMoneda } from './moneda';
 
 const NOMBRES: Record<CurrencyCode, string> = {
@@ -43,10 +42,14 @@ export function esAnteriorALaApertura(
  *
  * Abrir es del administrador. A quien no puede, no se le ofrece un enlace
  * que terminaría en un 403: se le dice a quién pedírselo.
+ *
+ * Dónde se abre lo dice la caja (`rutasDeCaja(...).apertura`): cada una
+ * tiene su pantalla. Sin ella, no hay enlace.
  */
 export function aperturaPendiente(
     moneda: CurrencyCode,
     puedeAbrir: boolean,
+    apertura: string | null,
 ): AperturaPendiente {
     const nombre = nombreDeMoneda(moneda);
 
@@ -56,9 +59,13 @@ export function aperturaPendiente(
             `Antes de registrar cobros, pagos, arqueos o cierres en ${nombre} hay que ` +
             'declarar lo que ya estaba en el cajón, los cheques y la cuenta. Si no había ' +
             'nada, se abre igual, declarándolo.',
-        href: puedeAbrir ? conMoneda(apertura().url, moneda) : null,
-        accion: puedeAbrir
-            ? `Abrir libros en ${nombre}`
-            : 'Pedile a un administrador que abra los libros.',
+        href:
+            puedeAbrir && apertura !== null
+                ? conMoneda(apertura, moneda)
+                : null,
+        accion:
+            puedeAbrir && apertura !== null
+                ? `Abrir libros en ${nombre}`
+                : 'Pedile a un administrador que abra los libros.',
     };
 }

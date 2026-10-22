@@ -446,6 +446,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_la_salida_se_ofrece_solo_a_quien_puede_abrir(): void
     {
         $aviso = [
+            'cashBoxCode' => 'haberes',
             'currency' => 'USD',
             'currencyLabel' => 'Dólares',
             'attemptedOn' => '2026-06-02',

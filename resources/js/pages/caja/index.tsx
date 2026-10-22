@@ -24,9 +24,9 @@ import OpeningRequired, {
 import { conMoneda } from '@/features/caja/moneda';
 import { useRutasDeCaja } from '@/features/caja/rutas';
 import { useDrawer } from '@/features/drawer/drawer-context';
+import FineChequeInventoryDialog from '@/features/multas/components/fine-cheque-inventory-dialog';
 import { businessToday, date as formatDate, isNonZero } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
-import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
 
 type Estado = App.Modules.Ledger.Data.CashBoxStateData;
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
@@ -54,12 +54,18 @@ type Props = {
     selected: {
         cashBoxId: number;
         cashBoxCode: string;
+        /** Los libros que lleva la caja, según el servidor. */
+        currencies: CurrencyCode[];
         cashBoxName: string;
         currency: CurrencyCode;
         date: string;
     };
     state: Estado;
+    /** Qué es «en la cuenta» si la cuenta es compartida (Multas). */
+    bankColumnNote: string | null;
     book: { income: Fila[]; expense: Fila[] };
+    /** A dónde lleva cada recibo del libro, si la caja lo dice (Multas). */
+    bookLinks: Record<string, string>;
     /** Lo que entró hoy y sigue en el cajón, según el libro. */
     dayTakings: string;
     activity: DayActivityEntry[];
@@ -101,7 +107,9 @@ type Props = {
 export default function CajaIndex({
     selected,
     state,
+    bankColumnNote,
     book,
+    bookLinks,
     dayTakings,
     activity,
     counts,
@@ -164,6 +172,7 @@ export default function CajaIndex({
                     actions={
                         <>
                             <SelectorDeMoneda
+                                monedas={selected.currencies}
                                 moneda={moneda}
                                 href={(otra) =>
                                     conMoneda(
@@ -327,12 +336,24 @@ export default function CajaIndex({
                                     )
                                 }
                             />
-                            <Saldo titulo="En la cuenta" valor={state.bank} />
                             <Saldo
-                                titulo="Sin identificar"
-                                valor={state.unassigned}
-                                nota="La cola de trabajo: entró y todavía no se sabe de quién es."
+                                titulo="En la cuenta"
+                                valor={state.bank}
+                                nota={bankColumnNote ?? undefined}
                             />
+                            {/*
+                             * Lo que entró y espera cuota es del circuito de
+                             * Haberes. En Multas un cobro nace aplicado, y los
+                             * créditos sin identificar son de la cuenta
+                             * compartida: se ven en la caja de Multas.
+                             */}
+                            {selected.cashBoxCode === 'haberes' && (
+                                <Saldo
+                                    titulo="Sin identificar"
+                                    valor={state.unassigned}
+                                    nota="La cola de trabajo: entró y todavía no se sabe de quién es."
+                                />
+                            )}
                         </div>
 
                         {/*
@@ -340,7 +361,7 @@ export default function CajaIndex({
                          * algo. Baja con cada reserva para una cuota histórica; el día que llega a cero se apaga la
                          * planilla en paralelo.
                          */}
-                        {/[1-9]/.test(legacyPending) && (
+                        {rutas.saldoAnterior && /[1-9]/.test(legacyPending) && (
                             <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3 text-sm">
                                 <HandCoins className="size-4 shrink-0 text-muted-foreground" />
                                 <span>
@@ -353,7 +374,7 @@ export default function CajaIndex({
                                     className="ml-auto"
                                     asChild
                                 >
-                                    <Link href={saldoAnterior().url}>
+                                    <Link href={rutas.saldoAnterior().url}>
                                         Ver el detalle
                                     </Link>
                                 </Button>
@@ -377,6 +398,7 @@ export default function CajaIndex({
                                 <Libro
                                     income={book.income}
                                     expense={book.expense}
+                                    enlaces={bookLinks}
                                 />
                                 <DayActivity entries={activity} />
                             </section>
@@ -403,15 +425,23 @@ export default function CajaIndex({
                     </>
                 )}
             </div>
-            {viendoCheques && (
-                <ChequeInventoryDialog
-                    abierto
-                    onCerrar={() => setViendoCheques(false)}
-                    moneda={moneda}
-                    fechaMirada={selected.date}
-                    hoy={hoy}
-                />
-            )}
+            {/* Quién es cada cheque lo sabe el módulo de la caja. */}
+            {viendoCheques &&
+                (selected.cashBoxCode === 'multas' ? (
+                    <FineChequeInventoryDialog
+                        onCerrar={() => setViendoCheques(false)}
+                        fechaMirada={selected.date}
+                        hoy={hoy}
+                    />
+                ) : (
+                    <ChequeInventoryDialog
+                        abierto
+                        onCerrar={() => setViendoCheques(false)}
+                        moneda={moneda}
+                        fechaMirada={selected.date}
+                        hoy={hoy}
+                    />
+                ))}
         </EnMoneda>
     );
 }
@@ -453,7 +483,15 @@ function Saldo({
 }
 
 /** El detalle del día, con la misma forma que el anverso de la planilla. */
-function Libro({ income, expense }: { income: Fila[]; expense: Fila[] }) {
+function Libro({
+    income,
+    expense,
+    enlaces,
+}: {
+    income: Fila[];
+    expense: Fila[];
+    enlaces: Record<string, string>;
+}) {
     /*
      * Solo las tres columnas de importe. Escrito como `keyof Omit<Fila,
      * 'number'>` dejaba entrar `spoiled`, que es un booleano: el tipo
@@ -501,6 +539,7 @@ function Libro({ income, expense }: { income: Fila[]; expense: Fila[] }) {
                         <tbody className="divide-y">
                             <Bloque
                                 filas={income}
+                                enlaces={enlaces}
                                 rotulo="Ingresos"
                                 total={[
                                     total(income, 'cash'),
@@ -510,6 +549,7 @@ function Libro({ income, expense }: { income: Fila[]; expense: Fila[] }) {
                             />
                             <Bloque
                                 filas={expense}
+                                enlaces={enlaces}
                                 rotulo="Egresos"
                                 total={[
                                     total(expense, 'cash'),
@@ -527,10 +567,12 @@ function Libro({ income, expense }: { income: Fila[]; expense: Fila[] }) {
 
 function Bloque({
     filas,
+    enlaces,
     rotulo,
     total,
 }: {
     filas: Fila[];
+    enlaces: Record<string, string>;
     rotulo: string;
     total: [string, string, string];
 }) {
@@ -539,7 +581,7 @@ function Bloque({
             {filas.map((fila) => (
                 <tr key={`${rotulo}-${fila.receiptId ?? `e${fila.eventId}`}`}>
                     <td className="px-4 py-1.5 font-mono text-xs">
-                        <ReciboLink fila={fila} />
+                        <ReciboLink fila={fila} enlaces={enlaces} />
                     </td>
                     <td className="px-4 py-1.5 text-right">
                         <Money value={fila.cash} dimWhenZero />
@@ -573,8 +615,29 @@ function Bloque({
  * apuntar. Un número que parece clicable y no hace
  * nada es peor que uno que no lo parece.
  */
-function ReciboLink({ fila }: { fila: Fila }) {
+function ReciboLink({
+    fila,
+    enlaces,
+}: {
+    fila: Fila;
+    enlaces: Record<string, string>;
+}) {
     const { openDrawer } = useDrawer();
+    const destino =
+        fila.receiptId === null ? undefined : enlaces[String(fila.receiptId)];
+
+    // En Multas el recibo lleva a la ficha de la multa que cobró.
+    if (destino !== undefined) {
+        return (
+            <Link
+                href={destino}
+                className="rounded-sm underline decoration-dotted underline-offset-4 transition-colors hover:text-primary hover:decoration-solid focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                aria-label={`Ver la multa del recibo ${fila.number}`}
+            >
+                {fila.number}
+            </Link>
+        );
+    }
 
     if (fila.installmentId === null || fila.receiptId === null) {
         return <span>{fila.number}</span>;

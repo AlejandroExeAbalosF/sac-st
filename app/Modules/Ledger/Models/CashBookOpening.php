@@ -74,7 +74,7 @@ final class CashBookOpening extends Model
         $apertura = self::for($cashBoxId, $currency);
 
         if ($apertura === null) {
-            throw CashBookNotOpenedException::missing($currency, $date);
+            throw CashBookNotOpenedException::missing($cashBoxId, $currency, $date);
         }
 
         if ($date->toDateString() < $apertura->opened_on->toDateString()) {

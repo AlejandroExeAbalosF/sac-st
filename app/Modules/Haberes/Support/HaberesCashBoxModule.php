@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Support;
 
 use App\Modules\Ledger\Enums\CashBoxAbility;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Excel\CashSheet;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
 use App\Support\Money\Decimal;
+use Illuminate\Contracts\Auth\Access\Authorizable;
 
 /**
  * La caja de Haberes, para las pantallas de caja de Ledger.
@@ -37,6 +39,12 @@ final class HaberesCashBoxModule implements CashBoxModule
         };
     }
 
+    /** Haberes recibe depósitos en pesos y en dólares: dos libros. */
+    public function currencies(): array
+    {
+        return [Currency::Ars, Currency::Usd];
+    }
+
     /** Las de la planilla del área, que son las de siempre. */
     public function chequeColumns(): array
     {
@@ -46,6 +54,15 @@ final class HaberesCashBoxModule implements CashBoxModule
     public function bankColumnNote(): ?string
     {
         return null;
+    }
+
+    /**
+     * Ninguno: en Haberes el renglón abre el panel del recibo en la misma
+     * pantalla, con la cuota que ya viaja en la fila.
+     */
+    public function rowLinks(array $receiptIds, ?Authorizable $viewer): array
+    {
+        return [];
     }
 
     /**

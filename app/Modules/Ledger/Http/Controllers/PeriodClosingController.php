@@ -80,6 +80,8 @@ final class PeriodClosingController extends Controller
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
                 'cashBoxCode' => $caja->code,
+                // Los libros que lleva la caja: el selector de moneda no ofrece otros.
+                'currencies' => array_map(fn (Currency $c): string => $c->value, $this->currenciesOf($request)),
                 'cashBoxName' => $caja->name,
                 'currency' => $moneda->value,
                 'defaultDate' => $fechaPredeterminada->toDateString(),
@@ -155,6 +157,8 @@ final class PeriodClosingController extends Controller
             // mensual no alcanza con que la fecha no sea futura.
             'date.before_or_equal' => 'No se puede cerrar con una fecha que todavía no llegó.',
         ]);
+
+        $this->assertCurrencyAllowed($request, Currency::from((string) $datos['currency']));
 
         $cierre = $cerrar->handle(
             cashBoxId: (int) $this->cashBox($request)->id,

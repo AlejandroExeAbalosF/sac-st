@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Ledger\Http\Controllers\CashCalendarController;
+use App\Modules\Ledger\Http\Controllers\CashController;
+use App\Modules\Ledger\Http\Controllers\CashCountController;
+use App\Modules\Ledger\Http\Controllers\PeriodClosingController;
 use App\Modules\Multas\Http\Controllers\FineAppealController;
 use App\Modules\Multas\Http\Controllers\FineAttachmentController;
 use App\Modules\Multas\Http\Controllers\FineBankPaymentController;
@@ -156,5 +160,63 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->whereNumber('fineCase')->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');
+    });
+});
+
+/*
+| La caja del día de Multas: arqueo, cierre, calendario y planilla (Etapa 6).
+|
+| Son las pantallas de caja de Ledger, las mismas de Haberes, con la caja de
+| Multas (`caja:multas`) y sus permisos propios: cerrar una caja no habilita
+| a cerrar la otra. La apertura, la cuenta y los depósitos siguen en
+| `/multas/caja`, que es la puerta de esta caja.
+*/
+Route::middleware(['auth', 'verified', 'caja:multas'])->prefix('multas/caja')->name('multas.caja.')->group(function (): void {
+    Route::middleware('can:multas.caja.ver')->group(function (): void {
+        Route::get('dia', [CashController::class, 'index'])->name('dia');
+        Route::get('arqueos', [CashCountController::class, 'index'])->name('arqueos.index');
+        Route::get('cierres', [PeriodClosingController::class, 'index'])->name('cierres.index');
+        Route::get('calendario', [CashCalendarController::class, 'index'])->name('calendario');
+        // La cartera de cheques de hoy, para el modal de la caja del día.
+        Route::get('cheques-en-custodia', [FineCashController::class, 'cheques'])->name('cheques');
+    });
+
+    Route::middleware('can:multas.caja.arquear')->group(function (): void {
+        Route::post('arqueos', [CashCountController::class, 'store'])->name('arqueos.store');
+    });
+
+    Route::middleware('can:multas.caja.revisar-arqueo')->group(function (): void {
+        Route::post('arqueos/{cashCount}/revisar', [CashCountController::class, 'review'])
+            ->whereNumber('cashCount')
+            ->name('arqueos.review');
+    });
+
+    Route::middleware('can:multas.caja.ajustar-diferencia')->group(function (): void {
+        Route::post('arqueos/{cashCount}/imputar', [CashCountController::class, 'adjust'])
+            ->whereNumber('cashCount')
+            ->name('arqueos.adjust');
+    });
+
+    Route::middleware('can:multas.caja.cerrar')->group(function (): void {
+        Route::post('cierres', [PeriodClosingController::class, 'store'])->name('cierres.store');
+    });
+
+    Route::middleware('can:multas.caja.reabrir')->group(function (): void {
+        Route::post('cierres/{closing}/reabrir', [PeriodClosingController::class, 'reopen'])
+            ->whereNumber('closing')
+            ->name('cierres.reopen');
+    });
+
+    // Como en Haberes: bajarla es un GET, rehacerla un POST.
+    Route::middleware('can:multas.caja.exportar')->group(function (): void {
+        Route::get('cierres/{closing}/planilla', [PeriodClosingController::class, 'sheet'])
+            ->whereNumber('closing')
+            ->name('cierres.sheet');
+    });
+
+    Route::middleware('can:multas.caja.regenerar-planilla')->group(function (): void {
+        Route::post('cierres/{closing}/planilla/regenerar', [PeriodClosingController::class, 'regenerateSheet'])
+            ->whereNumber('closing')
+            ->name('cierres.sheet.regenerate');
     });
 });

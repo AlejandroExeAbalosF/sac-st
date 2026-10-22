@@ -39,6 +39,7 @@ const RUTAS_SIN_PANTALLA = [
     'adjuntos.download',
     'adjuntos.preview',
     'caja.cierres.sheet',
+    'multas.caja.cierres.sheet',
     'configuracion.auditoria.exportar',
     'multas.exportar',
 
@@ -87,6 +88,7 @@ const RUTAS_SIN_PANTALLA = [
     'recibos.panel',
     'haberes.installments.panel',
     'haberes.cheques-en-custodia',
+    'multas.caja.cheques',
     'haberes.installments.disbursement.debits',
 
     /*

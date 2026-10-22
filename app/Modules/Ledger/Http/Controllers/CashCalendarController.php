@@ -83,6 +83,8 @@ final class CashCalendarController extends Controller
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
                 'cashBoxCode' => $caja->code,
+                // Los libros que lleva la caja: el selector de moneda no ofrece otros.
+                'currencies' => array_map(fn (Currency $c): string => $c->value, $this->currenciesOf($request)),
                 'currency' => $moneda->value,
                 'cashBoxName' => $caja->name,
                 'year' => $anio,

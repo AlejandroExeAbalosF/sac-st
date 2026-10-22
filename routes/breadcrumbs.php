@@ -308,6 +308,26 @@ Breadcrumbs::for('multas.caja.index', fn (): array => [
     Crumb::make('Caja'),
 ]);
 
+// Las pantallas de caja de Ledger, con la caja de Multas. Quien solo opera
+// la caja (`multas.caja.ver` sin `multas.ver`) ve las migas sin enlace: las
+// dos pantallas de arriba le darían 403.
+foreach ([
+    'multas.caja.dia' => 'Caja del día',
+    'multas.caja.arqueos.index' => 'Arqueos',
+    'multas.caja.cierres.index' => 'Cierres',
+    'multas.caja.calendario' => 'Calendario',
+] as $ruta => $titulo) {
+    Breadcrumbs::for($ruta, function () use ($titulo): array {
+        $veMultas = auth()->user()?->can('multas.ver') ?? false;
+
+        return [
+            Crumb::make('Multas', $veMultas ? route('multas.index') : null),
+            Crumb::make('Caja', $veMultas ? route('multas.caja.index') : null),
+            Crumb::make($titulo),
+        ];
+    });
+}
+
 Breadcrumbs::for('multas.pagos.index', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
     Crumb::make('Pagos por verificar'),

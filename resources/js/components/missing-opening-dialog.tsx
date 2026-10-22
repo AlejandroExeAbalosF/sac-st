@@ -11,9 +11,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { aperturaPendiente } from '@/features/caja/apertura';
+import { rutasDeCajaSiExiste } from '@/features/caja/rutas';
 import type { CurrencyCode } from '@/lib/format';
 
 type Aviso = {
+    /** De qué caja: cada una se abre en su propia pantalla. */
+    cashBoxCode: string | null;
     currency: CurrencyCode;
     currencyLabel: string;
     attemptedOn: string;
@@ -52,7 +55,11 @@ export default function MissingOpeningDialog() {
     const abierto = aviso.occurrence !== descartado;
     const cerrar = () => setDescartado(aviso.occurrence);
     const sinApertura = aviso.openedOn === null;
-    const salida = aperturaPendiente(aviso.currency, aviso.canOpen);
+    const salida = aperturaPendiente(
+        aviso.currency,
+        aviso.canOpen,
+        rutasDeCajaSiExiste(aviso.cashBoxCode)?.apertura().url ?? null,
+    );
 
     return (
         <Dialog open={abierto} onOpenChange={(open) => open || cerrar()}>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Exceptions;
 
 use App\Modules\Ledger\Models\PeriodClosing;
+use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonInterface;
 use Exception;
 
@@ -80,6 +81,8 @@ final class ClosedPeriodException extends Exception
     public function toArray(): array
     {
         return [
+            // De qué caja: la salida es la pantalla de Cierres de esa caja.
+            'cashBoxCode' => (string) CashBox::query()->whereKey($this->closing->cash_box_id)->value('code'),
             'periodType' => $this->closing->period_type->label(),
             'from' => $this->closing->period_from->toDateString(),
             'to' => $this->closing->period_to->toDateString(),
