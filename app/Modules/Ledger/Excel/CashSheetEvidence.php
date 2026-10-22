@@ -16,9 +16,16 @@ use Illuminate\Validation\ValidationException;
 /**
  * Evidencia de cada cierre efectivo, independiente de las versiones del Excel.
  *
- * @phpstan-type ReceiptRow array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string}
- * @phpstan-type ChequeRow array{receipt: string, expediente: string, company: string, beneficiary: string, number: string, bank: string, date: string, amount: numeric-string}
- * @phpstan-type Evidence array{schema: int, closing: array<string, mixed>, cashBox: array<string, mixed>, title: string, sheetName: string, reverseSheetName: string, income: list<ReceiptRow>, expense: list<ReceiptRow>, cheques: list<ChequeRow>, bankDepositsLabel: string, count: array<string, mixed>|null, lines: list<array<string, mixed>>, dailyEvidenceIds: list<int>}
+ * `schema 2` congela también **el formato del reverso**: qué columnas
+ * identifican cada cheque y qué representa la columna de banco. Cada caja
+ * declara las suyas, y una planilla rehecha dentro de un año no puede
+ * preguntarle al módulo de hoy cómo eran. La de `schema 1` es toda de
+ * Haberes, de cuando era la única caja, y se lee con sus columnas de
+ * siempre.
+ *
+ * @phpstan-type ReceiptRow array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string, eventId?: int|null}
+ * @phpstan-type ChequeColumn array{key: string, header: string}
+ * @phpstan-type Evidence array{schema: int, closing: array<string, mixed>, cashBox: array<string, mixed>, title: string, sheetName: string, reverseSheetName: string, income: list<ReceiptRow>, expense: list<ReceiptRow>, cheques: list<array<string, string>>, bankDepositsLabel: string, count: array<string, mixed>|null, lines: list<array<string, mixed>>, dailyEvidenceIds: list<int>, chequeColumns?: list<ChequeColumn>, bankColumnNote?: string|null}
  */
 final class CashSheetEvidence
 {
@@ -42,7 +49,7 @@ final class CashSheetEvidence
             'period_closing_id' => $sheet->closing->id,
             'version' => $sheet->closing->evidence_version,
             'payload' => json_encode([
-                'schema' => 1,
+                'schema' => 2,
                 'closing' => $sheet->closing->getAttributes(),
                 'cashBox' => $sheet->closing->cashBox->getAttributes(),
                 'title' => $sheet->title,
@@ -52,6 +59,8 @@ final class CashSheetEvidence
                 'expense' => $sheet->expense,
                 'cheques' => $sheet->cheques,
                 'bankDepositsLabel' => $sheet->bankDepositsLabel,
+                'chequeColumns' => $sheet->chequeColumns,
+                'bankColumnNote' => $sheet->bankColumnNote,
                 'count' => $sheet->count?->getAttributes(),
                 'lines' => $sheet->count?->lines->map(fn (CashCountLine $line): array => $line->getAttributes())->all() ?? [],
                 'dailyEvidenceIds' => $dailyIds,
@@ -101,7 +110,7 @@ final class CashSheetEvidence
     {
         /** @var Evidence $data */
         $data = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
-        if ($data['schema'] !== 1) {
+        if (! in_array($data['schema'], [1, 2], true)) {
             throw ValidationException::withMessages(['status' => 'La versión del detalle del cierre no es compatible.']);
         }
 
@@ -120,6 +129,8 @@ final class CashSheetEvidence
             closing: $closing, title: $data['title'], sheetName: $data['sheetName'],
             reverseSheetName: $data['reverseSheetName'], income: $data['income'], expense: $data['expense'],
             count: $count, cheques: $data['cheques'], bankDepositsLabel: $data['bankDepositsLabel'],
+            chequeColumns: $data['chequeColumns'] ?? CashSheet::HABERES_CHEQUE_COLUMNS,
+            bankColumnNote: $data['bankColumnNote'] ?? null,
         );
     }
 }

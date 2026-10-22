@@ -7,11 +7,13 @@ namespace App\Modules\Ledger\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Ledger\Data\CashCountListItemData;
 use App\Modules\Ledger\Data\PeriodClosingListItemData;
+use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Excel\CashSheetWorkbook;
+use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\CashCountLine;
@@ -21,7 +23,6 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Ledger\Support\CashDayTakings;
-use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ use Throwable;
  */
 final class CashCalendarController extends Controller
 {
+    use ResolvesCashBox;
     use SelectsCurrency;
 
     public function __construct(
@@ -51,7 +53,7 @@ final class CashCalendarController extends Controller
 
     public function index(Request $request): Response
     {
-        $caja = $this->cashBox();
+        $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
 
         $hoy = BusinessDate::today();
@@ -80,6 +82,7 @@ final class CashCalendarController extends Controller
         return Inertia::render('caja/calendario', [
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
+                'cashBoxCode' => $caja->code,
                 'currency' => $moneda->value,
                 'cashBoxName' => $caja->name,
                 'year' => $anio,
@@ -102,13 +105,13 @@ final class CashCalendarController extends Controller
              */
             'dayDetail' => $this->dayDetail((int) $caja->id, $moneda, $dia, $mes),
             'can' => [
-                'count' => $request->user()?->can('caja.arquear') ?? false,
-                'review' => $request->user()?->can('caja.revisar-arqueo') ?? false,
-                'adjust' => $request->user()?->can('caja.ajustar-diferencia') ?? false,
-                'close' => $request->user()?->can('cierres.cerrar') ?? false,
-                'reopen' => $request->user()?->can('cierres.reabrir') ?? false,
-                'export' => $request->user()?->can('cierres.exportar') ?? false,
-                'regenerate' => $request->user()?->can('cierres.regenerar-planilla') ?? false,
+                'count' => $this->canOnCashBox($request, CashBoxAbility::Count),
+                'review' => $this->canOnCashBox($request, CashBoxAbility::ReviewCount),
+                'adjust' => $this->canOnCashBox($request, CashBoxAbility::AdjustDifference),
+                'close' => $this->canOnCashBox($request, CashBoxAbility::Close),
+                'reopen' => $this->canOnCashBox($request, CashBoxAbility::Reopen),
+                'export' => $this->canOnCashBox($request, CashBoxAbility::Export),
+                'regenerate' => $this->canOnCashBox($request, CashBoxAbility::RegenerateSheet),
             ],
             /*
              * Lo que el panel del día necesita para operar y no solo
@@ -285,20 +288,5 @@ final class CashCalendarController extends Controller
         } catch (Throwable) {
             return null;
         }
-    }
-
-    /**
-     * La caja de Haberes.
-     *
-     * `cash_boxes` tiene tres filas —Haberes, Aranceles, Multas— porque el
-     * motor contable lleva esa dimensión desde la Etapa 2 y es lo que
-     * permitirá reutilizarlo. Pero **hoy solo Haberes tiene circuito**, así
-     * que ofrecer un selector sería poner dos opciones apagadas en cada
-     * pantalla. El día que otra caja opere, el selector vuelve; mientras
-     * tanto la dimensión vive en los datos y no en la interfaz.
-     */
-    private function cashBox(): CashBox
-    {
-        return CashBox::query()->active()->where('code', CashBox::HABERES)->firstOrFail();
     }
 }

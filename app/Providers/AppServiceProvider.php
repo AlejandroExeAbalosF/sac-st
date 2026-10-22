@@ -11,16 +11,20 @@ use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
 use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
+use App\Modules\Haberes\Support\HaberesCashBoxModule;
 use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
 use App\Modules\Ledger\Permissions\LedgerPermissionCatalog;
+use App\Modules\Ledger\Support\CashBoxModules;
 use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Multas\Audit\MultasAuditCatalog;
 use App\Modules\Multas\Permissions\MultasPermissionCatalog;
+use App\Modules\Multas\Support\FineCashBoxModule;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
 use App\Modules\Shared\Audit\SharedAuditCatalog;
 use App\Modules\Shared\Enums\SystemRole;
+use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Permissions\PermissionCatalog;
 use App\Modules\Shared\Permissions\PermissionCatalogContributor;
 use App\Modules\Shared\Permissions\SharedPermissionCatalog;
@@ -55,6 +59,16 @@ class AppServiceProvider extends ServiceProvider
          * Haberes: Ledger pregunta si la fecha sirve sin nombrarlo.
          */
         $this->app->bind(OpeningDateRule::class, LegacyPapersBeforeOpening::class);
+
+        /*
+         * Qué módulo opera cada caja. Las pantallas de caja son de Ledger;
+         * permisos, inventario de cheques y columna de banco los responde
+         * el módulo, sin que Ledger lo nombre.
+         */
+        $this->app->singleton(CashBoxModules::class, fn ($app): CashBoxModules => new CashBoxModules($app, [
+            CashBox::HABERES => HaberesCashBoxModule::class,
+            CashBox::MULTAS => FineCashBoxModule::class,
+        ]));
     }
 
     /**

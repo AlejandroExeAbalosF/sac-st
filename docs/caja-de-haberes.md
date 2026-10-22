@@ -335,6 +335,10 @@ Un `.xlsx` que reproduce el formulario del área —anverso `CAJA ddmmyy`, rever
 `REVERSO ddmmyy`—. El reverso lleva **dos tablas**: la rendición del efectivo
 —denominaciones, recaudación, arrastre, total— y el **inventario de cheques**,
 con recibo, expediente, empresa, beneficiario, número, banco, fecha e importe.
+Las columnas que identifican cada cheque las declara la caja: Haberes usa
+expediente, empresa y beneficiario; Multas, expediente, carátula y librador.
+El librador de Multas es solo el que declaró la apertura: el cobro no lo
+registra, y quien paga no es necesariamente quien libró el cheque.
 En el cierre mensual la rendición no se repite —el arqueo es un acto del día—
 pero el inventario sí: es una posición de cierre.
 
@@ -358,8 +362,16 @@ El libro mensual conserva las referencias a las versiones diarias incluidas.
 Exportar o regenerar lee esta evidencia, aunque después se depositen cheques,
 se anulen recibos o cambien los nombres de la caja y de la cuenta bancaria.
 
+Desde `schema 2` la evidencia congela también el formato del reverso —sus
+columnas— y la aclaración de la columna de banco cuando la cuenta es compartida.
+Regenerar no le pregunta al módulo de hoy cómo era el formato. La evidencia de
+`schema 1`, anterior a que Multas cerrara, es toda de Haberes y se lee con sus
+columnas de siempre. La base acepta las dos, con la versión como número entero,
+y en la nueva exige cada columna con clave y encabezado de texto no vacíos, sin
+claves repetidas, y la aclaración de banco (texto o nula).
+
 Al cerrar tarde, la custodia se determina a la fecha del período, considerando
-recepciones, depósitos, entregas y reversiones. No se copia el estado actual del
+recepciones, depósitos, rechazos, entregas y reversiones. No se copia el estado actual del
 cheque. Un cheque que financia varias cuotas se cuenta físicamente una sola vez.
 La moneda del cierre filtra los recibos y las cuentas y figura en el título,
 el nombre del archivo y los importes (`$` o `US$`).

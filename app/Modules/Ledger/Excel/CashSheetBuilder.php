@@ -8,8 +8,8 @@ use App\Modules\Ledger\Enums\CashCountStatus;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\PeriodClosing;
+use App\Modules\Ledger\Support\CashBoxModules;
 use App\Modules\Ledger\Support\CashDayBook;
-use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -36,6 +36,7 @@ final class CashSheetBuilder
     public function __construct(
         private readonly CashDayBook $dayBook,
         private readonly CashSheetEvidence $evidence,
+        private readonly CashBoxModules $modules,
     ) {}
 
     public function build(PeriodClosing $closing): CashSheet
@@ -50,6 +51,7 @@ final class CashSheetBuilder
         $hasta = $closing->period_to;
 
         $recibos = $this->dayBook->entries($closing->cash_box_id, $desde, $hasta, $closing->currency);
+        $modulo = $this->modules->for($closing->cashBox->code);
 
         return new CashSheet(
             closing: $closing,
@@ -84,8 +86,15 @@ final class CashSheetBuilder
             count: $closing->period_type === PeriodType::Monthly
                 ? null
                 : $this->cashCount($closing),
-            cheques: $this->chequesInCustody($closing),
+            /*
+             * El inventario es una posición de cierre, a esa fecha, y quién
+             * es cada cheque lo sabe el módulo de la caja. Sus columnas y lo
+             * que significa la de banco se congelan con los datos.
+             */
+            cheques: $modulo->chequesInCustody($closing),
             bankDepositsLabel: $this->bankDepositsLabel($closing),
+            chequeColumns: $modulo->chequeColumns(),
+            bankColumnNote: $modulo->bankColumnNote(),
         );
     }
 
@@ -114,155 +123,6 @@ final class CashSheetBuilder
             ->where('status', '!=', CashCountStatus::Draft)
             ->orderByDesc('sequence')
             ->first();
-    }
-
-    /**
-     * El inventario de cheques, como el reverso lo lista.
-     *
-     * **Es la custodia a la fecha del cierre, no la de hoy**: los cheques
-     * recibidos hasta ese día, menos los depositados, entregados o
-     * revertidos hasta ese día. Filtrar por `cheque_status` respondía qué
-     * sigue en custodia ahora, y un cierre hecho tarde —o uno reabierto y
-     * vuelto a cerrar— perdía cheques que ese día estaban en el cajón
-     * mientras su saldo los seguía contando. Se calcula al cerrar y queda
-     * congelado.
-     *
-     * El expediente y el beneficiario vienen de los **snapshots del
-     * recibo**, que están en `receipts`: son texto congelado al emitir, no
-     * una relación hacia Haberes, y por eso Ledger puede leerlos sin romper
-     * la frontera.
-     *
-     * ─── Por qué el camino pasa por `funding_allocations` ────────────────
-     *
-     * Un cobro produce **dos** eventos: la recepción del dinero y su
-     * asignación a la cuota. El cheque cuelga del primero y el recibo del
-     * segundo —`receipt_financial_events` vincula asignaciones—. Unirlos por
-     * el evento de recepción devuelve el importe correcto y **todas las
-     * columnas que identifican el cheque en blanco**, que es lo que el
-     * reverso necesita. `funding_allocations` es la única tabla que registra
-     * qué recepción pagó qué cuota, así que es el único puente posible. Se
-     * lee con `DB::table` y sin importar el modelo, que vive en Haberes: la
-     * frontera prohíbe que Ledger **conozca el modelo** de otro módulo. Un
-     * cheque que financia varias cuotas aparece una vez, con todos sus
-     * recibos.
-     *
-     * @return list<array{receipt: string, expediente: string, company: string, beneficiary: string, number: string, bank: string, date: string, amount: numeric-string}>
-     */
-    private function chequesInCustody(PeriodClosing $closing): array
-    {
-        $filas = DB::table('fund_receipts')
-            ->join('financial_events AS reception', 'reception.id', '=', 'fund_receipts.financial_event_id')
-            ->whereDate('reception.event_date', '<=', $closing->period_to)
-            ->leftJoin('funding_allocations AS imputacion', function ($join) use ($closing): void {
-                $join->on('imputacion.fund_receipt_id', '=', 'fund_receipts.id')
-                    ->whereNull('imputacion.reversal_of_id')
-                    ->whereRaw('(SELECT event_date FROM financial_events WHERE id = imputacion.allocation_event_id) <= ?', [$closing->period_to->toDateString()])
-                    ->whereRaw('imputacion.amount > (SELECT COALESCE(SUM(r.amount), 0)
-                        FROM funding_allocations r JOIN financial_events re ON re.id = r.allocation_event_id
-                        WHERE r.reversal_of_id = imputacion.id AND re.event_date <= ?)', [$closing->period_to->toDateString()]);
-            })
-            ->leftJoin('receipt_financial_events AS pivote', 'pivote.financial_event_id', '=', 'imputacion.allocation_event_id')
-            ->leftJoin('receipts', 'receipts.id', '=', 'pivote.receipt_id')
-            ->where('fund_receipts.cash_box_id', $closing->cash_box_id)
-            ->where('fund_receipts.currency', $closing->currency->value)
-            ->where('fund_receipts.medium', 'cheque')
-            // El estado actual no representa la custodia en un cierre tardío.
-            ->whereNotExists(function ($query) use ($closing): void {
-                $query->selectRaw('1')->from('financial_events AS reversal')
-                    ->whereColumn('reversal.id', 'fund_receipts.reversal_event_id')
-                    ->whereDate('reversal.event_date', '<=', $closing->period_to);
-            })
-            ->whereNotExists(function ($query) use ($closing): void {
-                $query->selectRaw('1')->from('cash_to_bank_transfer_items AS item')
-                    ->join('cash_to_bank_transfers AS transfer', 'transfer.id', '=', 'item.cash_to_bank_transfer_id')
-                    ->join('financial_events AS deposit', 'deposit.id', '=', 'transfer.deposit_event_id')
-                    ->whereColumn('item.fund_receipt_id', 'fund_receipts.id')
-                    ->whereDate('deposit.event_date', '<=', $closing->period_to)
-                    ->whereNotExists(function ($reversal) use ($closing): void {
-                        $reversal->selectRaw('1')->from('financial_events AS undone')
-                            ->whereColumn('undone.reversal_of_id', 'deposit.id')
-                            ->whereDate('undone.event_date', '<=', $closing->period_to);
-                    });
-            })
-            ->whereNotExists(function ($query) use ($closing): void {
-                $query->selectRaw('1')->from('disbursements AS payment')
-                    ->join('financial_events AS paid', 'paid.id', '=', 'payment.financial_event_id')
-                    ->where('payment.method', 'cheque')
-                    ->whereDate('paid.event_date', '<=', $closing->period_to)
-                    ->whereRaw('(SELECT COALESCE(SUM(CASE WHEN a.reversal_of_id IS NULL THEN a.amount ELSE -a.amount END), 0)
-                        FROM funding_allocations a JOIN financial_events ae ON ae.id = a.allocation_event_id
-                        WHERE a.fund_receipt_id = fund_receipts.id
-                          AND a.beneficiary_installment_id = payment.beneficiary_installment_id
-                          AND ae.id <= paid.id) > 0')
-                    ->whereNotExists(function ($reversal) use ($closing): void {
-                        $reversal->selectRaw('1')->from('financial_events AS undone')
-                            ->whereColumn('undone.reversal_of_id', 'paid.id')
-                            ->whereDate('undone.event_date', '<=', $closing->period_to);
-                    });
-            })
-            /*
-             * El inventario es a la fecha del cierre: un cheque recibido
-             * después no estaba en el cajón ese día.
-             */
-            ->whereDate('fund_receipts.received_date', '<=', $closing->period_to)
-            ->select([
-                // `id` va en el SELECT porque el DISTINCT lo exige para
-                // poder ordenar por él.
-                'fund_receipts.id',
-                'fund_receipts.amount',
-                'fund_receipts.cheque_number',
-                'fund_receipts.cheque_bank',
-                'fund_receipts.cheque_issue_date',
-                'receipts.talonario_number',
-                'receipts.formatted_number',
-                /*
-                 * El snapshot del recibo manda; el de la recepción es el
-                 * respaldo. Un cheque cargado en la apertura no tiene
-                 * recibo emitido ni cuota asignada, pero sí lo que decía
-                 * el papel cuando se abrieron los libros, y el reverso lo
-                 * lista igual. El día que ese cheque se impute a una cuota
-                 * real, el recibo pasa a tener la última palabra.
-                 */
-                'receipts.expediente_number_snapshot',
-                'receipts.counterparty_name_snapshot',
-                'receipts.beneficiary_name_snapshot',
-                'fund_receipts.expediente_number_snapshot AS expediente_declarado',
-                'fund_receipts.counterparty_name_snapshot AS empresa_declarada',
-                'fund_receipts.beneficiary_name_snapshot AS beneficiario_declarado',
-            ])
-            ->distinct()
-            ->orderBy('fund_receipts.id')
-            ->get();
-
-        $inventario = [];
-
-        foreach ($filas as $fila) {
-            $detalle = [
-                'receipt' => (string) ($fila->talonario_number ?? $fila->formatted_number ?? ''),
-                'expediente' => (string) ($fila->expediente_number_snapshot ?? $fila->expediente_declarado ?? ''),
-                'company' => (string) ($fila->counterparty_name_snapshot ?? $fila->empresa_declarada ?? ''),
-                'beneficiary' => (string) ($fila->beneficiary_name_snapshot ?? $fila->beneficiario_declarado ?? ''),
-                'number' => (string) ($fila->cheque_number ?? ''),
-                'bank' => (string) ($fila->cheque_bank ?? ''),
-                'date' => $fila->cheque_issue_date === null
-                    ? ''
-                    : date('d/m/Y', (int) strtotime((string) $fila->cheque_issue_date)),
-                'amount' => Decimal::scale((string) $fila->amount),
-            ];
-
-            // Un cheque puede financiar varias cuotas: se identifican todas,
-            // pero su importe físico se suma una sola vez en el inventario.
-            if (isset($inventario[$fila->id])) {
-                foreach (['receipt', 'expediente', 'company', 'beneficiary'] as $field) {
-                    $detalle[$field] = implode(' / ', array_unique(array_filter([
-                        ...explode(' / ', $inventario[$fila->id][$field]), $detalle[$field],
-                    ])));
-                }
-            }
-            $inventario[$fila->id] = $detalle;
-        }
-
-        return array_values($inventario);
     }
 
     /**

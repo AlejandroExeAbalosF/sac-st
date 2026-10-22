@@ -22,16 +22,16 @@ import {
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import OpeningRequired from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
-import { calendario, dia as caja } from '@/routes/caja';
-import { index as cierres, sheet } from '@/routes/caja/cierres';
 
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
 
 type Props = {
     selected: {
         cashBoxId: number;
+        cashBoxCode: string;
         cashBoxName: string;
         currency: CurrencyCode;
         defaultDate: string;
@@ -67,6 +67,7 @@ export default function CajaCierres({
     needsOpening,
     sheetVersion,
 }: Props) {
+    const rutas = useRutasDeCaja();
     /** Solo una fila reabierta abre el diálogo, con su tipo y fecha. */
     const [cerrando, setCerrando] = useState<{
         date: string;
@@ -95,12 +96,14 @@ export default function CajaCierres({
                         <>
                             <SelectorDeMoneda
                                 moneda={selected.currency}
-                                href={(otra) => conMoneda(cierres().url, otra)}
+                                href={(otra) =>
+                                    conMoneda(rutas.cierres.index().url, otra)
+                                }
                             />
                             <Button variant="outline" asChild>
                                 <Link
                                     href={conMoneda(
-                                        calendario().url,
+                                        rutas.calendario().url,
                                         selected.currency,
                                     )}
                                 >
@@ -126,7 +129,7 @@ export default function CajaCierres({
                             <Button variant="outline" asChild>
                                 <Link
                                     href={conMoneda(
-                                        caja({
+                                        rutas.dia({
                                             query: {
                                                 fecha: selected.defaultDate,
                                             },
@@ -209,6 +212,7 @@ function Tarjeta({
     onReabrir: () => void;
     onCerrar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const cerrado = cierre.status === 'closed';
     const unDia = cierre.periodFrom === cierre.periodTo;
 
@@ -267,7 +271,7 @@ function Tarjeta({
                             <Button size="sm" asChild>
                                 <Link
                                     href={conMoneda(
-                                        caja({
+                                        rutas.dia({
                                             query: {
                                                 fecha: cierre.periodFrom,
                                             },
@@ -287,7 +291,12 @@ function Tarjeta({
                         ))}
                     {can.export && cerrado && (
                         <Button variant="outline" size="sm" asChild>
-                            <a href={sheet({ closing: cierre.id }).url}>
+                            <a
+                                href={
+                                    rutas.cierres.sheet({ closing: cierre.id })
+                                        .url
+                                }
+                            >
                                 <FileSpreadsheet className="size-4" />
                                 Planilla
                             </a>

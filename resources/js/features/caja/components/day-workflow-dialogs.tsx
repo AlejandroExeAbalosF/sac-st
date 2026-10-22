@@ -15,9 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import DetalleComposicionDelFajo from '@/features/caja/components/carry-composition';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { date as formatDate } from '@/lib/format';
-import { adjust, review } from '@/routes/caja/arqueos';
-import { store as cerrar } from '@/routes/caja/cierres';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 
@@ -230,13 +229,14 @@ export function DialogoRevision({
     /** Cierra esta revisión y abre el conteo, que es a dónde se vuelve. */
     volverAContar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const form = useForm({});
     const { auth } = usePage().props;
     const autorrevision = arqueo.performedById === auth.user.id;
     const errores = form.errors as Record<string, string>;
 
     const confirmar = () => {
-        form.post(review({ cashCount: arqueo.id }).url, {
+        form.post(rutas.arqueos.review({ cashCount: arqueo.id }).url, {
             preserveScroll: true,
             onSuccess: cerrar,
         });
@@ -421,6 +421,7 @@ export function DialogoCierreDelDia({
     recierre: boolean;
     cerrar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const form = useForm({
         cashBoxId,
         date: fecha,
@@ -516,7 +517,7 @@ export function DialogoCierreDelDia({
                         type="button"
                         disabled={form.processing || diferenciaPendiente}
                         onClick={() =>
-                            form.post(cerrar().url, {
+                            form.post(rutas.cierres.store().url, {
                                 preserveScroll: true,
                                 onSuccess: cerrarDialogo,
                             })
@@ -547,6 +548,7 @@ export function DialogoImputacion({
     arqueo: Arqueo;
     cerrar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const form = useForm({ authorization: '' });
     const esFaltante = arqueo.differenceAmount.startsWith('-');
     const importe = esFaltante
@@ -595,10 +597,14 @@ export function DialogoImputacion({
                         type="button"
                         disabled={form.processing}
                         onClick={() =>
-                            form.post(adjust({ cashCount: arqueo.id }).url, {
-                                preserveScroll: true,
-                                onSuccess: cerrarDialogo,
-                            })
+                            form.post(
+                                rutas.arqueos.adjust({ cashCount: arqueo.id })
+                                    .url,
+                                {
+                                    preserveScroll: true,
+                                    onSuccess: cerrarDialogo,
+                                },
+                            )
                         }
                     >
                         {form.processing && <Spinner />}

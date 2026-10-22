@@ -10,6 +10,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Ledger\Exceptions\CashBookNotOpenedException;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
+use App\Modules\Ledger\Http\Middleware\ResolveCashBox;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -44,6 +45,9 @@ return Application::configure(basePath: dirname(__DIR__))
          * Laravel no lo aplica en `local` ni en los tests.
          */
         $middleware->trustHosts(at: ['^127\.0\.0\.1$', '^localhost$']);
+
+        // La caja de las pantallas de caja de Ledger: `caja:haberes`, `caja:multas`.
+        $middleware->alias(['caja' => ResolveCashBox::class]);
 
         $middleware->web(append: [
             /*

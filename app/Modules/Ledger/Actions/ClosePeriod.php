@@ -77,6 +77,22 @@ final class ClosePeriod
          * cuentas de ubicación.
          */
         FinancialEventType::FundsAllocated->value => 'received',
+        /*
+         * El cheque rechazado sale de donde estaba y el reemplazo entra a
+         * custodia. Como el reparto es por cuenta de ubicación, cada caso
+         * cae solo donde corresponde: rechazado en el cajón baja la columna
+         * de cheques; rechazado en tránsito o ya acreditado no toca ninguna
+         * —salió con el depósito, o el banco lo conserva hasta el débito—.
+         * El reemplazo va a ingresos porque la planilla no tiene otro
+         * renglón donde la custodia crezca, y el libro del día lo rotula
+         * para que no se lea como recaudación.
+         *
+         * El crédito y el débito del extracto de un cheque rechazado **no
+         * están acá a propósito**: siguen deshabilitados, y el día que se
+         * habiliten hay que decidir su renglón con el área.
+         */
+        FinancialEventType::ChequeRejected->value => 'disbursed',
+        FinancialEventType::ChequeReplaced->value => 'received',
     ];
 
     public function __construct(

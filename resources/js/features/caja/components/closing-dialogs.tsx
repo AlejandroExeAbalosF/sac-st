@@ -20,10 +20,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { businessToday, dateTime as formatDateTime } from '@/lib/format';
 import { download } from '@/routes/adjuntos';
-import { reopen, store } from '@/routes/caja/cierres';
-import { regenerate } from '@/routes/caja/cierres/sheet';
 
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
 
@@ -132,6 +131,7 @@ export function DialogoRehacerPlanilla({
         errors: Record<string, string>;
     };
 
+    const rutas = useRutasDeCaja();
     const form = useForm({ reason: '' });
 
     return (
@@ -165,13 +165,17 @@ export function DialogoRehacerPlanilla({
                             return;
                         }
 
-                        form.post(regenerate({ closing: cierre.id }).url, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                form.reset();
-                                cerrar();
+                        form.post(
+                            rutas.cierres.regenerate({ closing: cierre.id })
+                                .url,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    form.reset();
+                                    cerrar();
+                                },
                             },
-                        });
+                        );
                     }}
                     className="grid gap-2"
                 >
@@ -217,6 +221,7 @@ export function DialogoReapertura({
         errors: Record<string, string>;
     };
 
+    const rutas = useRutasDeCaja();
     const form = useForm({ reason: '' });
 
     return (
@@ -249,13 +254,16 @@ export function DialogoReapertura({
                             return;
                         }
 
-                        form.post(reopen({ closing: cierre.id }).url, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                form.reset();
-                                cerrar();
+                        form.post(
+                            rutas.cierres.reopen({ closing: cierre.id }).url,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    form.reset();
+                                    cerrar();
+                                },
                             },
-                        });
+                        );
                     }}
                     className="grid gap-2"
                 >
@@ -315,6 +323,7 @@ export function DialogoCierre({
     };
 
     const hoy = businessToday();
+    const rutas = useRutasDeCaja();
 
     const form = useForm({
         cashBoxId: selected.cashBoxId,
@@ -356,7 +365,7 @@ export function DialogoCierre({
                     id="form-cierre"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.post(store().url, {
+                        form.post(rutas.cierres.store().url, {
                             preserveScroll: true,
                             onSuccess: () => {
                                 form.reset();

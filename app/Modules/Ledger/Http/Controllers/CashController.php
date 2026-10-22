@@ -9,10 +9,12 @@ use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Data\CashBoxStateData;
 use App\Modules\Ledger\Data\CashCountListItemData;
 use App\Modules\Ledger\Data\PeriodClosingListItemData;
+use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Excel\CashSheetWorkbook;
+use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\CashCountLine;
@@ -45,6 +47,7 @@ use Throwable;
  */
 final class CashController extends Controller
 {
+    use ResolvesCashBox;
     use SelectsCurrency;
 
     public function __construct(
@@ -62,7 +65,7 @@ final class CashController extends Controller
 
     public function index(Request $request): Response
     {
-        $caja = $this->cashBox();
+        $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
         $fecha = $this->selectedDate($request);
 
@@ -82,12 +85,12 @@ final class CashController extends Controller
             ->whereDate('period_from', $fecha)
             ->first();
 
-        $usuario = $request->user();
         $apertura = $this->abrir->existingFor((int) $caja->id, $moneda);
 
         return Inertia::render('caja/index', [
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
+                'cashBoxCode' => $caja->code,
                 'currency' => $moneda->value,
                 'date' => $fecha->toDateString(),
                 'cashBoxName' => $caja->name,
@@ -152,14 +155,14 @@ final class CashController extends Controller
              */
             'suggestedDenominations' => CashCountLine::suggestedDenominations($moneda),
             'can' => [
-                'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
-                'count' => $usuario?->can('caja.arquear') ?? false,
-                'review' => $usuario?->can('caja.revisar-arqueo') ?? false,
-                'adjust' => $usuario?->can('caja.ajustar-diferencia') ?? false,
-                'close' => $usuario?->can('cierres.cerrar') ?? false,
-                'reopen' => $usuario?->can('cierres.reabrir') ?? false,
-                'export' => $usuario?->can('cierres.exportar') ?? false,
-                'regenerate' => $usuario?->can('cierres.regenerar-planilla') ?? false,
+                'open' => $this->canOnCashBox($request, CashBoxAbility::Open),
+                'count' => $this->canOnCashBox($request, CashBoxAbility::Count),
+                'review' => $this->canOnCashBox($request, CashBoxAbility::ReviewCount),
+                'adjust' => $this->canOnCashBox($request, CashBoxAbility::AdjustDifference),
+                'close' => $this->canOnCashBox($request, CashBoxAbility::Close),
+                'reopen' => $this->canOnCashBox($request, CashBoxAbility::Reopen),
+                'export' => $this->canOnCashBox($request, CashBoxAbility::Export),
+                'regenerate' => $this->canOnCashBox($request, CashBoxAbility::RegenerateSheet),
             ],
             /*
              * La versión del dibujo que produce el generador de hoy, para
@@ -220,21 +223,6 @@ final class CashController extends Controller
             unassigned: $this->saldos->of(LedgerAccount::UnassignedFunds, $id, $moneda, $fecha),
             inTransit: $this->saldos->of(LedgerAccount::CashInTransit, $id, $moneda, $fecha),
         );
-    }
-
-    /**
-     * La caja de Haberes.
-     *
-     * `cash_boxes` tiene tres filas —Haberes, Aranceles, Multas— porque el
-     * motor contable lleva esa dimensión desde la Etapa 2 y es lo que
-     * permitirá reutilizarlo. Pero **hoy solo Haberes tiene circuito**, así
-     * que ofrecer un selector sería poner dos opciones apagadas en cada
-     * pantalla. El día que otra caja opere, el selector vuelve; mientras
-     * tanto la dimensión vive en los datos y no en la interfaz.
-     */
-    private function cashBox(): CashBox
-    {
-        return CashBox::query()->active()->where('code', CashBox::HABERES)->firstOrFail();
     }
 
     /**

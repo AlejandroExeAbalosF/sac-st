@@ -20,15 +20,15 @@ import DetalleComposicionDelFajo from '@/features/caja/components/carry-composit
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import OpeningRequired from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { date as formatDate } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
-import { dia as caja } from '@/routes/caja';
-import { adjust, index as arqueos, review } from '@/routes/caja/arqueos';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 
 type Props = {
     selected: {
+        cashBoxCode: string;
         currency: CurrencyCode;
         defaultDate: string;
     };
@@ -49,6 +49,7 @@ export default function CajaArqueos({
     needsOpening,
     can,
 }: Props) {
+    const rutas = useRutasDeCaja();
     const [imputando, setImputando] = useState<Arqueo | null>(null);
 
     return (
@@ -65,7 +66,7 @@ export default function CajaArqueos({
                             moneda={selected.currency}
                             href={(otra) =>
                                 conMoneda(
-                                    arqueos({
+                                    rutas.arqueos.index({
                                         query: {
                                             fecha: selected.defaultDate,
                                         },
@@ -92,7 +93,7 @@ export default function CajaArqueos({
                                 <Button variant="outline" asChild>
                                     <Link
                                         href={conMoneda(
-                                            caja({
+                                            rutas.dia({
                                                 query: {
                                                     fecha: selected.defaultDate,
                                                 },
@@ -166,6 +167,7 @@ function Renglon({
     can: Props['can'];
     onImputar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const revisar = useForm({});
     const [confirmando, setConfirmando] = useState(false);
 
@@ -317,7 +319,9 @@ function Renglon({
                             disabled={revisar.processing}
                             onClick={() =>
                                 revisar.post(
-                                    review({ cashCount: arqueo.id }).url,
+                                    rutas.arqueos.review({
+                                        cashCount: arqueo.id,
+                                    }).url,
                                     {
                                         preserveScroll: true,
                                         onSuccess: () => setConfirmando(false),
@@ -365,6 +369,7 @@ function DialogoImputacion({
     arqueo: Arqueo | null;
     cerrar: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     const form = useForm({ authorization: '' });
     const esFaltante = arqueo?.differenceAmount.startsWith('-') ?? false;
     const importe = arqueo
@@ -406,13 +411,16 @@ function DialogoImputacion({
                             return;
                         }
 
-                        form.post(adjust({ cashCount: arqueo.id }).url, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                form.reset();
-                                cerrar();
+                        form.post(
+                            rutas.arqueos.adjust({ cashCount: arqueo.id }).url,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    form.reset();
+                                    cerrar();
+                                },
                             },
-                        });
+                        );
                     }}
                     className="grid gap-2"
                 >

@@ -6,6 +6,8 @@ namespace App\Modules\Ledger\Support;
 
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
+use App\Modules\Ledger\Enums\FinancialEventType;
+use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +32,17 @@ use Illuminate\Support\Facades\DB;
  * porque sin ellos la pantalla muestra un número de comprobante y ninguna
  * forma de averiguar de quién es.
  *
- * @phpstan-type Fila array{number: string, receiptId: int, installmentId: int|null, cash: numeric-string, cheques: numeric-string, bank: numeric-string}
+ * ─── Los hechos sin recibo ───────────────────────────────────────────
+ *
+ * El rechazo de un cheque y su reemplazo mueven la caja sin emitir recibo,
+ * y sin una fila los totales de la planilla no cuadrarían con su detalle.
+ * Van con su propia identidad —el asiento, `eventId`, y ningún recibo— y
+ * con el importe de **las líneas reales** de efectivo, cheques y banco: un
+ * rechazo en tránsito o ya acreditado no mueve ninguna de las tres y no
+ * tiene fila; uno en el cajón baja los cheques. El rótulo va en `number`,
+ * que es la columna que el papel usa para identificar cada renglón.
+ *
+ * @phpstan-type Fila array{number: string, receiptId: int|null, eventId: int|null, installmentId: int|null, cash: numeric-string, cheques: numeric-string, bank: numeric-string}
  */
 final class CashDayBook
 {
@@ -92,6 +104,7 @@ final class CashDayBook
                  */
                 'number' => (string) ($fila->talonario_number ?? $fila->formatted_number),
                 'receiptId' => (int) $fila->id,
+                'eventId' => null,
                 /*
                  * Nulo si el comprobante no tiene cuota. La pantalla lo usa
                  * para decidir qué fila abre panel y cuál no —ofrecer uno
@@ -103,6 +116,82 @@ final class CashDayBook
                 'cash' => $fila->medium_snapshot === 'cash' ? Decimal::scale((string) $fila->amount) : '0.00',
                 'cheques' => $fila->medium_snapshot === 'cheque' ? Decimal::scale((string) $fila->amount) : '0.00',
                 'bank' => $fila->medium_snapshot === 'bank' ? Decimal::scale((string) $fila->amount) : '0.00',
+            ];
+        }
+
+        foreach ($this->chequeIncidents($cashBoxId, $from, $to, $currency) as $bloque => $filasDelHecho) {
+            array_push($libro[$bloque], ...$filasDelHecho);
+        }
+
+        return $libro;
+    }
+
+    /**
+     * Los rechazos y reemplazos de cheques que movieron efectivo, cheques o
+     * banco en el período: los rechazos como egreso y los reemplazos como
+     * ingreso, que es como los reparte el cierre.
+     *
+     * @return array{income: list<Fila>, expense: list<Fila>}
+     */
+    private function chequeIncidents(int $cashBoxId, CarbonInterface $from, CarbonInterface $to, Currency $currency): array
+    {
+        $filas = DB::table('financial_events')
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'financial_events.id')
+            // El cheque del que se trata: el rechazado, en los dos hechos.
+            ->join('cheque_rejections AS rechazo', function ($join): void {
+                $join->on('rechazo.rejection_event_id', '=', 'financial_events.id')
+                    ->orOn('rechazo.replacement_event_id', '=', 'financial_events.id');
+            })
+            ->join('fund_receipts AS cheque', 'cheque.id', '=', 'rechazo.fund_receipt_id')
+            ->where('journal_lines.cash_box_id', $cashBoxId)
+            ->where('journal_lines.currency', $currency->value)
+            ->whereIn('journal_lines.account_code', [
+                LedgerAccount::CashOnHand->value,
+                LedgerAccount::ChequesInCustody->value,
+                LedgerAccount::BankAccount->value,
+            ])
+            ->whereIn('financial_events.event_type', [
+                FinancialEventType::ChequeRejected->value,
+                FinancialEventType::ChequeReplaced->value,
+            ])
+            ->whereIn('financial_events.status', [
+                FinancialEventStatus::Posted->value,
+                FinancialEventStatus::Reversed->value,
+            ])
+            ->whereDate('financial_events.event_date', '>=', $from)
+            ->whereDate('financial_events.event_date', '<=', $to)
+            ->groupBy('financial_events.id', 'financial_events.event_type', 'cheque.cheque_number')
+            ->select(['financial_events.id', 'financial_events.event_type', 'cheque.cheque_number'])
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS cash', [LedgerAccount::CashOnHand->value])
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS cheques', [LedgerAccount::ChequesInCustody->value])
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS bank', [LedgerAccount::BankAccount->value])
+            ->orderBy('financial_events.id')
+            ->get();
+
+        $libro = ['income' => [], 'expense' => []];
+
+        foreach ($filas as $fila) {
+            $rechazo = $fila->event_type === FinancialEventType::ChequeRejected->value;
+            // El egreso se muestra en positivo, como los recibos de egreso.
+            $signo = fn (string $neto): string => Decimal::scale($rechazo ? Decimal::sub('0', $neto) : $neto);
+            $importes = [
+                'cash' => $signo((string) $fila->cash),
+                'cheques' => $signo((string) $fila->cheques),
+                'bank' => $signo((string) $fila->bank),
+            ];
+
+            if (Decimal::equals($importes['cash'], '0') && Decimal::equals($importes['cheques'], '0') && Decimal::equals($importes['bank'], '0')) {
+                continue;
+            }
+
+            $libro[$rechazo ? 'expense' : 'income'][] = [
+                'number' => $rechazo
+                    ? sprintf('Cheque n.º %s rechazado', $fila->cheque_number)
+                    : sprintf('Reemplazo del cheque n.º %s — no es recaudación', $fila->cheque_number),
+                'receiptId' => null,
+                'eventId' => (int) $fila->id,
+                'installmentId' => null,
+                ...$importes,
             ];
         }
 

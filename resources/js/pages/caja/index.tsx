@@ -22,12 +22,10 @@ import OpeningRequired, {
     BeforeOpening,
 } from '@/features/caja/components/opening-required';
 import { conMoneda } from '@/features/caja/moneda';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { businessToday, date as formatDate, isNonZero } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
-import { calendario, dia as caja } from '@/routes/caja';
-import { index as arqueos } from '@/routes/caja/arqueos';
-import { index as cierres } from '@/routes/caja/cierres';
 import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
 
 type Estado = App.Modules.Ledger.Data.CashBoxStateData;
@@ -36,7 +34,12 @@ type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
 
 type Fila = {
     number: string;
-    receiptId: number;
+    /**
+     * El recibo de la fila, o el asiento si es un hecho sin recibo —el
+     * rechazo de un cheque, su reemplazo—. Uno de los dos, nunca ambos.
+     */
+    receiptId: number | null;
+    eventId: number | null;
     /**
      * Nulo si el comprobante no tiene cuota. Decide qué fila abre panel:
      * ofrecer uno que no lleva a ningún lado es peor que no ofrecerlo.
@@ -50,6 +53,7 @@ type Fila = {
 type Props = {
     selected: {
         cashBoxId: number;
+        cashBoxCode: string;
         cashBoxName: string;
         currency: CurrencyCode;
         date: string;
@@ -112,6 +116,7 @@ export default function CajaIndex({
     suggestedDenominations,
     can,
 }: Props) {
+    const rutas = useRutasDeCaja();
     /*
      * La fecha de hoy es la de Salta, no la del navegador: `businessToday`
      * la fija sin depender de la zona del cliente, igual que el resto de
@@ -128,7 +133,7 @@ export default function CajaIndex({
 
     const irA = (fecha: string) =>
         router.get(
-            enlace(caja({ query: { fecha } }).url),
+            enlace(rutas.dia({ query: { fecha } }).url),
             {},
             { preserveScroll: true },
         );
@@ -162,7 +167,7 @@ export default function CajaIndex({
                                 moneda={moneda}
                                 href={(otra) =>
                                     conMoneda(
-                                        caja({
+                                        rutas.dia({
                                             query: { fecha: selected.date },
                                         }).url,
                                         otra,
@@ -213,7 +218,7 @@ export default function CajaIndex({
                             <Button variant="outline" asChild>
                                 <Link
                                     href={enlace(
-                                        calendario({
+                                        rutas.calendario({
                                             query: { dia: selected.date },
                                         }).url,
                                     )}
@@ -227,7 +232,7 @@ export default function CajaIndex({
                                 <Button variant="outline" asChild>
                                     <Link
                                         href={enlace(
-                                            arqueos({
+                                            rutas.arqueos.index({
                                                 query: { fecha: selected.date },
                                             }).url,
                                         )}
@@ -241,7 +246,7 @@ export default function CajaIndex({
                                 <Button asChild>
                                     <Link
                                         href={enlace(
-                                            cierres({
+                                            rutas.cierres.index({
                                                 query: { fecha: selected.date },
                                             }).url,
                                         )}
@@ -284,7 +289,7 @@ export default function CajaIndex({
                         moneda={moneda}
                         fechaApertura={opening.date}
                         hrefApertura={enlace(
-                            caja({ query: { fecha: opening.date } }).url,
+                            rutas.dia({ query: { fecha: opening.date } }).url,
                         )}
                     />
                 ) : (
@@ -532,7 +537,7 @@ function Bloque({
     return (
         <>
             {filas.map((fila) => (
-                <tr key={`${rotulo}-${fila.receiptId}`}>
+                <tr key={`${rotulo}-${fila.receiptId ?? `e${fila.eventId}`}`}>
                     <td className="px-4 py-1.5 font-mono text-xs">
                         <ReciboLink fila={fila} />
                     </td>
@@ -571,14 +576,16 @@ function Bloque({
 function ReciboLink({ fila }: { fila: Fila }) {
     const { openDrawer } = useDrawer();
 
-    if (fila.installmentId === null) {
+    if (fila.installmentId === null || fila.receiptId === null) {
         return <span>{fila.number}</span>;
     }
+
+    const receiptId = fila.receiptId;
 
     return (
         <button
             type="button"
-            onClick={() => openDrawer({ kind: 'receipt', id: fila.receiptId })}
+            onClick={() => openDrawer({ kind: 'receipt', id: receiptId })}
             className="rounded-sm underline decoration-dotted underline-offset-4 transition-colors hover:text-primary hover:decoration-solid focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             aria-label={`Ver de quién es el comprobante ${fila.number}`}
         >

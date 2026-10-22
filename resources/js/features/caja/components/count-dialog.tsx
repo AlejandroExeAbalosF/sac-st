@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { composicionCompleta } from '@/features/caja/components/carry-composition';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import {
     businessToday,
     compareAmounts,
@@ -25,7 +26,6 @@ import {
     subtractAmounts,
     sumAmounts,
 } from '@/lib/format';
-import { store } from '@/routes/caja/arqueos';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 
@@ -145,6 +145,7 @@ export default function DialogoConteo({
      */
     const loCalculaElLibro = arrastreDelLibro !== '';
 
+    const rutas = useRutasDeCaja();
     const form = useForm<ConteoForm>({
         cashBoxId,
         countedOn: fecha,
@@ -293,7 +294,7 @@ export default function DialogoConteo({
                     id="form-arqueo"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.post(store().url, {
+                        form.post(rutas.arqueos.store().url, {
                             preserveScroll: true,
                             onSuccess: () => {
                                 form.reset();

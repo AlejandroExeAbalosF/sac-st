@@ -20,12 +20,10 @@ import DayActivity from '@/features/caja/components/day-activity';
 import type { DayActivityEntry } from '@/features/caja/components/day-activity';
 import FlujoDelDia from '@/features/caja/components/day-workflow';
 import { conMoneda } from '@/features/caja/moneda';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 import { businessToday, date as formatDate, money } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { dia as caja } from '@/routes/caja';
-import { calendario } from '@/routes/caja';
-import { index as cierres, sheet } from '@/routes/caja/cierres';
 
 type Dia = App.Modules.Ledger.Data.CalendarDayData;
 type Mes = App.Modules.Ledger.Data.CalendarMonthData;
@@ -54,6 +52,7 @@ type DetalleDia = {
 type Props = {
     selected: {
         cashBoxId: number;
+        cashBoxCode: string;
         cashBoxName: string;
         currency: CurrencyCode;
         year: number;
@@ -160,6 +159,7 @@ export default function CajaCalendario({
     sheetVersion,
     pendingDaysByMonth,
 }: Props) {
+    const rutas = useRutasDeCaja();
     const enMes = selected.month !== null;
 
     /** El mes que se está por cerrar, si alguien apretó el botón. */
@@ -171,7 +171,9 @@ export default function CajaCalendario({
     const enlace = (url: string) => conMoneda(url, moneda);
 
     const ir = (query: Record<string, number | undefined>) =>
-        enlace(calendario({ query: { anio: selected.year, ...query } }).url);
+        enlace(
+            rutas.calendario({ query: { anio: selected.year, ...query } }).url,
+        );
 
     /*
      * Clic en un día lo elige: manda solo `?dia=`, del que salen el año y
@@ -180,7 +182,7 @@ export default function CajaCalendario({
      * calendario.
      */
     const hrefDia = (fecha: string) =>
-        enlace(calendario({ query: { dia: fecha } }).url);
+        enlace(rutas.calendario({ query: { dia: fecha } }).url);
 
     /*
      * Las flechas mueven lo que se está mirando —el mes cuando se entró a
@@ -195,7 +197,9 @@ export default function CajaCalendario({
 
     const hrefDe = (destino: DestinoDeCalendario) =>
         enlace(
-            calendario({ query: { anio: destino.anio, mes: destino.mes } }).url,
+            rutas.calendario({
+                query: { anio: destino.anio, mes: destino.mes },
+            }).url,
         );
 
     return (
@@ -217,7 +221,7 @@ export default function CajaCalendario({
                                 moneda={moneda}
                                 href={(otra) =>
                                     conMoneda(
-                                        calendario({
+                                        rutas.calendario({
                                             query: {
                                                 anio: selected.year,
                                                 mes:
@@ -229,7 +233,7 @@ export default function CajaCalendario({
                                 }
                             />
                             <Button variant="outline" asChild>
-                                <Link href={enlace(cierres().url)}>
+                                <Link href={enlace(rutas.cierres.index().url)}>
                                     <List className="size-4" />
                                     Ver como lista
                                 </Link>
@@ -356,6 +360,8 @@ function PanelDelDia({
     denominaciones: number[];
     sheetVersion: string;
 }) {
+    const rutas = useRutasDeCaja();
+
     if (detalle === null) {
         return (
             <aside className="rounded-lg border border-dashed bg-card/50 p-6 text-center text-sm text-muted-foreground lg:w-80 lg:shrink-0">
@@ -373,7 +379,7 @@ function PanelDelDia({
                 <Button variant="ghost" size="sm" asChild>
                     <Link
                         href={conMoneda(
-                            caja({ query: { fecha: detalle.date } }).url,
+                            rutas.dia({ query: { fecha: detalle.date } }).url,
                             selected.currency,
                         )}
                     >
@@ -426,6 +432,8 @@ function GrillaDelAnio({
     hrefDe: (mes: number) => string;
     can: Props['can'];
 }) {
+    const rutas = useRutasDeCaja();
+
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {months.map((mes) => (
@@ -470,7 +478,13 @@ function GrillaDelAnio({
                         )}
                         {can.export && mes.closed && mes.closingId && (
                             <Button variant="ghost" size="sm" asChild>
-                                <a href={sheet({ closing: mes.closingId }).url}>
+                                <a
+                                    href={
+                                        rutas.cierres.sheet({
+                                            closing: mes.closingId,
+                                        }).url
+                                    }
+                                >
                                     <FileSpreadsheet className="size-4" />
                                     Libro
                                 </a>
@@ -500,6 +514,7 @@ function GrillaDelMes({
     hrefDia: (fecha: string) => string;
     onCerrarMes: () => void;
 }) {
+    const rutas = useRutasDeCaja();
     /*
      * Cerrar el mes se ofrece acá porque acá es donde se lo está mirando.
      *
@@ -585,7 +600,13 @@ function GrillaDelMes({
                             className="ml-auto"
                             asChild
                         >
-                            <a href={sheet({ closing: monthlyClosing.id }).url}>
+                            <a
+                                href={
+                                    rutas.cierres.sheet({
+                                        closing: monthlyClosing.id,
+                                    }).url
+                                }
+                            >
                                 <FileSpreadsheet className="size-4" />
                                 Libro del mes
                             </a>

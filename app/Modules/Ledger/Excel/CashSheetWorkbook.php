@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Excel;
 
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Support\Money\Decimal;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -67,8 +68,13 @@ final class CashSheetWorkbook
      * recontado, también en el cuadro de billetes.
      *
      * `8`: moneda explícita en título e importes; detalle congelado al cerrar.
+     *
+     * `9`: las columnas que identifican cada cheque del reverso salen de la
+     * evidencia —cada caja declara las suyas— y, si la cuenta no es solo de
+     * la caja, el anverso aclara debajo del saldo qué es la columna de
+     * banco. Una planilla de Haberes se dibuja igual que en `8`.
      */
-    public const VERSION = '8';
+    public const VERSION = '9';
 
     private const AZUL = 'FF1F3864';
 
@@ -195,6 +201,20 @@ final class CashSheetWorkbook
         $this->totalRow($hoja, $fila, 'SALDO FINAL', [
             $cierre->closing_cash, $cierre->closing_cheques, $cierre->closing_bank_deposits,
         ], destacada: true);
+
+        /*
+         * Si la cuenta es compartida, la columna de banco no es su saldo:
+         * es lo que el libro de esta caja reconoció. Sin la aclaración, el
+         * número se lee como lo que hay en el banco.
+         */
+        if ($planilla->bankColumnNote !== null) {
+            $fila += 2;
+            $hoja->setCellValue('A'.$fila, $planilla->bankColumnNote);
+            $hoja->mergeCells("A{$fila}:D{$fila}");
+            $hoja->getStyle('A'.$fila)->getFont()->setItalic(true)->setSize(9);
+            $hoja->getStyle('A'.$fila)->getAlignment()->setWrapText(true);
+            $hoja->getRowDimension($fila)->setRowHeight(26);
+        }
 
         $hoja->getColumnDimension('A')->setWidth(42);
 
@@ -380,14 +400,19 @@ final class CashSheetWorkbook
             $hoja->setCellValue('A'.$fila, mb_strtoupper($planilla->closing->cashBox->name));
             $hoja->getStyle('A'.$fila)->getFont()->setBold(true);
 
+            /*
+             * Las columnas que identifican el cheque son las que la caja
+             * congeló al cerrar; las del cheque mismo, las de siempre. El
+             * importe va al final, en la última columna.
+             */
+            $claves = array_column($planilla->chequeColumns, 'key');
+            $encabezados = [...array_column($planilla->chequeColumns, 'header'), 'CHEQUE Nº', 'BANCO', 'FECHA', 'IMPORTE'];
+            $ultima = Coordinate::stringFromColumnIndex(count($encabezados));
+
             $fila++;
-            $hoja->fromArray(
-                ['RECIBO', 'EXPTE', 'EMPRESA', 'BENEFICIARIO', 'CHEQUE Nº', 'BANCO', 'FECHA', 'IMPORTE'],
-                null,
-                'A'.$fila,
-            );
-            $hoja->getStyle("A{$fila}:H{$fila}")->getFont()->setBold(true);
-            $hoja->getStyle("A{$fila}:H{$fila}")->getFill()
+            $hoja->fromArray($encabezados, null, 'A'.$fila);
+            $hoja->getStyle("A{$fila}:{$ultima}{$fila}")->getFont()->setBold(true);
+            $hoja->getStyle("A{$fila}:{$ultima}{$fila}")->getFill()
                 ->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(self::GRIS);
 
             $total = '0.00';
@@ -395,26 +420,28 @@ final class CashSheetWorkbook
             foreach ($planilla->cheques as $cheque) {
                 $fila++;
                 $hoja->fromArray([
-                    $cheque['receipt'], $cheque['expediente'], $cheque['company'],
-                    $cheque['beneficiary'], $cheque['number'], $cheque['bank'], $cheque['date'],
+                    ...array_map(fn (string $clave): string => $cheque[$clave] ?? '', $claves),
+                    $cheque['number'], $cheque['bank'], $cheque['date'],
                 ], null, 'A'.$fila);
-                $hoja->setCellValueExplicit('H'.$fila, $cheque['amount'], 'n');
-                $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
+                $hoja->setCellValueExplicit($ultima.$fila, $cheque['amount'], 'n');
+                $hoja->getStyle($ultima.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
 
-                $total = bcadd($total, $cheque['amount'], 2);
+                $total = Decimal::add($total, $cheque['amount']);
             }
 
             $fila++;
             $hoja->setCellValue('A'.$fila, 'TOTAL');
-            $hoja->setCellValueExplicit('H'.$fila, $total, 'n');
-            $hoja->getStyle("A{$fila}:H{$fila}")->getFont()->setBold(true);
-            $hoja->getStyle('H'.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
+            $hoja->setCellValueExplicit($ultima.$fila, $total, 'n');
+            $hoja->getStyle("A{$fila}:{$ultima}{$fila}")->getFont()->setBold(true);
+            $hoja->getStyle($ultima.$fila)->getNumberFormat()->setFormatCode($this->amountFormat);
         }
 
         $hoja->getColumnDimension('A')->setWidth(30);
 
-        foreach (['B', 'C', 'D', 'E', 'F', 'G', 'H'] as $columna) {
-            $hoja->getColumnDimension($columna)->setWidth(20);
+        $columnas = max(8, count($planilla->chequeColumns) + 4);
+
+        for ($indice = 2; $indice <= $columnas; $indice++) {
+            $hoja->getColumnDimension(Coordinate::stringFromColumnIndex($indice))->setWidth(20);
         }
     }
 
@@ -431,13 +458,23 @@ final class CashSheetWorkbook
     /**
      * Las filas de detalle, una por recibo.
      *
-     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string}>  $rows
+     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string, eventId?: int|null}>  $rows
      * @return int La fila siguiente a la última escrita.
      */
     private function detalle(Worksheet $hoja, int $fila, array $rows): int
     {
         foreach ($rows as $row) {
             $hoja->setCellValueExplicit('A'.$fila, $row['number'], 's');
+
+            /*
+             * Un hecho sin recibo —el rechazo de un cheque, su reemplazo— se
+             * identifica con un rótulo y no con un número, y el rótulo es
+             * más largo que la columna: se ajusta en su celda en vez de
+             * quedar cortado por el importe de al lado.
+             */
+            if (($row['eventId'] ?? null) !== null) {
+                $hoja->getStyle('A'.$fila)->getAlignment()->setWrapText(true);
+            }
 
             foreach (['B' => 'cash', 'C' => 'cheques', 'D' => 'bank'] as $columna => $clave) {
                 // Las celdas en cero se dejan vacías, como el papel: una

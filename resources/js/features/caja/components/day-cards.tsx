@@ -12,8 +12,7 @@ import Money, { useMoneda } from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { conMoneda } from '@/features/caja/moneda';
-import { index as arqueos } from '@/routes/caja/arqueos';
-import { index as cierres, sheet } from '@/routes/caja/cierres';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
@@ -44,9 +43,10 @@ export function TarjetaArqueo({
      */
     accion?: ReactNode;
 }) {
+    const rutas = useRutasDeCaja();
     // El enlace conserva el libro que la pantalla está mirando.
     const enlaceArqueo = conMoneda(
-        arqueos({ query: { fecha } }).url,
+        rutas.arqueos.index({ query: { fecha } }).url,
         useMoneda(),
     );
 
@@ -186,9 +186,10 @@ export function TarjetaCierre({
     fecha: string;
     accion?: ReactNode;
 }) {
+    const rutas = useRutasDeCaja();
     const reabierto = cierre?.status === 'reopened';
     const enlaceCierre = conMoneda(
-        cierres({ query: { fecha } }).url,
+        rutas.cierres.index({ query: { fecha } }).url,
         useMoneda(),
     );
 
@@ -279,7 +280,12 @@ export function TarjetaCierre({
                             className="mt-3 w-full"
                             asChild
                         >
-                            <a href={sheet({ closing: cierre.id }).url}>
+                            <a
+                                href={
+                                    rutas.cierres.sheet({ closing: cierre.id })
+                                        .url
+                                }
+                            >
                                 <FileSpreadsheet className="size-4" />
                                 Planilla del día
                             </a>

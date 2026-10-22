@@ -9,12 +9,13 @@ use App\Modules\Ledger\Actions\AdjustCashDifference;
 use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Data\CashCountListItemData;
+use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RecordCashCountRequest;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
-use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -33,11 +34,12 @@ use Throwable;
  */
 final class CashCountController extends Controller
 {
+    use ResolvesCashBox;
     use SelectsCurrency;
 
     public function index(Request $request): Response
     {
-        $caja = $this->cashBox();
+        $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
         $fechaPredeterminada = $this->selectedDate($request);
 
@@ -50,10 +52,9 @@ final class CashCountController extends Controller
             ->limit(120)
             ->get();
 
-        $usuario = $request->user();
-
         return Inertia::render('caja/arqueos', [
             'selected' => [
+                'cashBoxCode' => $caja->code,
                 'currency' => $moneda->value,
                 'defaultDate' => $fechaPredeterminada->toDateString(),
             ],
@@ -61,23 +62,11 @@ final class CashCountController extends Controller
             /* Sin apertura no hay contra qué contar: la pantalla lo dice en vez de listar. */
             'needsOpening' => CashBookOpening::for((int) $caja->id, $moneda) === null,
             'can' => [
-                'review' => $usuario?->can('caja.revisar-arqueo') ?? false,
-                'adjust' => $usuario?->can('caja.ajustar-diferencia') ?? false,
-                'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
+                'review' => $this->canOnCashBox($request, CashBoxAbility::ReviewCount),
+                'adjust' => $this->canOnCashBox($request, CashBoxAbility::AdjustDifference),
+                'open' => $this->canOnCashBox($request, CashBoxAbility::Open),
             ],
         ]);
-    }
-
-    /**
-     * La caja de Haberes.
-     *
-     * `cash_boxes` tiene tres filas porque el motor contable lleva esa
-     * dimensión desde la Etapa 2, pero hoy solo Haberes tiene circuito:
-     * ofrecer un selector sería poner dos opciones apagadas en la pantalla.
-     */
-    private function cashBox(): CashBox
-    {
-        return CashBox::query()->active()->where('code', CashBox::HABERES)->firstOrFail();
     }
 
     /** La fecha desde la que se llegó, limitada a la jornada actual. */
@@ -102,7 +91,7 @@ final class CashCountController extends Controller
     public function store(RecordCashCountRequest $request, RecordCashCount $registrar): RedirectResponse
     {
         $arqueo = $registrar->handle(
-            cashBoxId: (int) $this->cashBox()->id,
+            cashBoxId: (int) $this->cashBox($request)->id,
             countedOn: CarbonImmutable::parse((string) $request->validated('countedOn')),
             denominations: $request->denominations(),
             currency: Currency::from((string) $request->validated('currency')),

@@ -844,6 +844,17 @@ declare namespace App {
                 };
             }
             namespace Enums {
+                export type CashBoxAbility =
+                    | 'ver'
+                    | 'ver-cierres'
+                    | 'arquear'
+                    | 'revisar-arqueo'
+                    | 'ajustar-diferencia'
+                    | 'cerrar'
+                    | 'reabrir'
+                    | 'exportar'
+                    | 'regenerar-planilla'
+                    | 'abrir';
                 export type CashCountScope = 'day' | 'carry';
                 export type CashCountStatus =
                     'draft' | 'reviewed' | 'adjusted' | 'closed';

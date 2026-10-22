@@ -10,17 +10,18 @@ use App\Modules\Ledger\Actions\ExportCashSheet;
 use App\Modules\Ledger\Actions\RegenerateCashSheet;
 use App\Modules\Ledger\Actions\ReopenPeriod;
 use App\Modules\Ledger\Data\PeriodClosingListItemData;
+use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Excel\CashSheetWorkbook;
+use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RegenerateCashSheetRequest;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashCalendar;
-use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -41,6 +42,7 @@ use Throwable;
  */
 final class PeriodClosingController extends Controller
 {
+    use ResolvesCashBox;
     use SelectsCurrency;
 
     public function __construct(
@@ -50,7 +52,7 @@ final class PeriodClosingController extends Controller
 
     public function index(Request $request): Response
     {
-        $caja = $this->cashBox();
+        $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
         $fechaPredeterminada = $this->selectedDate($request);
 
@@ -62,8 +64,6 @@ final class PeriodClosingController extends Controller
             ->orderBy('period_type')
             ->limit(120)
             ->get();
-
-        $usuario = $request->user();
 
         /*
          * El acumulado del libro día por día, una sola vez: comparar
@@ -79,6 +79,7 @@ final class PeriodClosingController extends Controller
         return Inertia::render('caja/cierres', [
             'selected' => [
                 'cashBoxId' => (int) $caja->id,
+                'cashBoxCode' => $caja->code,
                 'cashBoxName' => $caja->name,
                 'currency' => $moneda->value,
                 'defaultDate' => $fechaPredeterminada->toDateString(),
@@ -104,12 +105,12 @@ final class PeriodClosingController extends Controller
                 ->values()
                 ->all(),
             'can' => [
-                'viewDay' => $usuario?->can('caja.ver') ?? false,
-                'close' => $usuario?->can('cierres.cerrar') ?? false,
-                'reopen' => $usuario?->can('cierres.reabrir') ?? false,
-                'export' => $usuario?->can('cierres.exportar') ?? false,
-                'regenerate' => $usuario?->can('cierres.regenerar-planilla') ?? false,
-                'open' => $usuario?->can('caja.abrir-saldo-inicial') ?? false,
+                'viewDay' => $this->canOnCashBox($request, CashBoxAbility::View),
+                'close' => $this->canOnCashBox($request, CashBoxAbility::Close),
+                'reopen' => $this->canOnCashBox($request, CashBoxAbility::Reopen),
+                'export' => $this->canOnCashBox($request, CashBoxAbility::Export),
+                'regenerate' => $this->canOnCashBox($request, CashBoxAbility::RegenerateSheet),
+                'open' => $this->canOnCashBox($request, CashBoxAbility::Open),
             ],
             /* Sin apertura no hay saldo inicial que congelar: no hay nada que cerrar. */
             'needsOpening' => CashBookOpening::for((int) $caja->id, $moneda) === null,
@@ -121,18 +122,6 @@ final class PeriodClosingController extends Controller
              */
             'sheetVersion' => CashSheetWorkbook::VERSION,
         ]);
-    }
-
-    /**
-     * La caja de Haberes.
-     *
-     * `cash_boxes` tiene tres filas porque el motor contable lleva esa
-     * dimensión desde la Etapa 2, pero hoy solo Haberes tiene circuito:
-     * ofrecer un selector sería poner dos opciones apagadas en la pantalla.
-     */
-    private function cashBox(): CashBox
-    {
-        return CashBox::query()->active()->where('code', CashBox::HABERES)->firstOrFail();
     }
 
     /** La fecha desde la que se llegó, limitada a la jornada actual. */
@@ -157,7 +146,6 @@ final class PeriodClosingController extends Controller
     public function store(Request $request, ClosePeriod $cerrar): RedirectResponse
     {
         $datos = $request->validate([
-            'cashBoxId' => ['required', 'integer', Rule::exists('cash_boxes', 'id')->where('is_active', true)],
             'date' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'periodType' => ['required', Rule::enum(PeriodType::class)],
             'currency' => ['required', Rule::enum(Currency::class)],
@@ -169,7 +157,7 @@ final class PeriodClosingController extends Controller
         ]);
 
         $cierre = $cerrar->handle(
-            cashBoxId: (int) $this->cashBox()->id,
+            cashBoxId: (int) $this->cashBox($request)->id,
             date: CarbonImmutable::parse((string) $datos['date']),
             type: PeriodType::from((string) $datos['periodType']),
             currency: Currency::from((string) $datos['currency']),

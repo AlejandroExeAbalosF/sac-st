@@ -24,7 +24,12 @@ use Illuminate\Support\Facades\Route;
 | donde el operador entiende qué está mirando.
 */
 
-Route::middleware(['auth', 'verified'])->prefix('caja')->name('caja.')->group(function (): void {
+/*
+ * Las pantallas de la caja de Haberes. La caja la declara la ruta
+ * (`caja:haberes`): las mismas pantallas atienden a Multas desde
+ * `/multas/caja/*`, cada una con su caja y sus permisos.
+ */
+Route::middleware(['auth', 'verified', 'caja:haberes'])->prefix('caja')->name('caja.')->group(function (): void {
     Route::middleware('can:caja.ver')->group(function (): void {
         Route::get('/', [CashController::class, 'redirect'])->name('index');
         Route::get('dia', [CashController::class, 'index'])->name('dia');

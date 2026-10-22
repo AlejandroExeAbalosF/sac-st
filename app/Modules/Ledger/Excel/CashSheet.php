@@ -22,9 +22,23 @@ use App\Modules\Ledger\Models\PeriodClosing;
 final readonly class CashSheet
 {
     /**
-     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string}>  $income
-     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string}>  $expense
-     * @param  list<array{receipt: string, expediente: string, company: string, beneficiary: string, number: string, bank: string, date: string, amount: numeric-string}>  $cheques
+     * Las columnas del reverso de antes de que cada caja declarara las
+     * suyas. Es con lo que se lee la evidencia de `schema 1`, que es toda de
+     * Haberes.
+     */
+    public const HABERES_CHEQUE_COLUMNS = [
+        ['key' => 'receipt', 'header' => 'RECIBO'],
+        ['key' => 'expediente', 'header' => 'EXPTE'],
+        ['key' => 'company', 'header' => 'EMPRESA'],
+        ['key' => 'beneficiary', 'header' => 'BENEFICIARIO'],
+    ];
+
+    /**
+     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string, eventId?: int|null}>  $income
+     * @param  list<array{number: string, cash: numeric-string, cheques: numeric-string, bank: numeric-string, eventId?: int|null}>  $expense
+     * @param  list<array<string, string>>  $cheques  Una fila por cheque: las columnas de `$chequeColumns` y además `number`, `bank`, `date` y `amount`.
+     * @param  list<array{key: string, header: string}>  $chequeColumns  Las que identifican cada cheque, congeladas con la evidencia.
+     * @param  string|null  $bankColumnNote  Qué representa la columna de banco, si la cuenta no es solo de esta caja.
      */
     public function __construct(
         public PeriodClosing $closing,
@@ -36,6 +50,8 @@ final readonly class CashSheet
         public ?CashCount $count,
         public array $cheques,
         public string $bankDepositsLabel,
+        public array $chequeColumns = self::HABERES_CHEQUE_COLUMNS,
+        public ?string $bankColumnNote = null,
     ) {}
 
     /**

@@ -316,6 +316,24 @@ forma parte de la operación habilitada. El reemplazo no cierra la revisión ban
 Un depósito devuelto no se cancela: el cheque no vuelve a custodia, se reemplaza.
 La caja lista los rechazos con reemplazo, revisión bancaria o papeles pendientes.
 
+**En la planilla de caja** el rechazo y el reemplazo van sin recibo y con el
+importe de lo que de verdad movieron:
+
+- rechazado en la caja, la columna de cheques baja con un renglón de egreso
+  «Cheque n.º X rechazado»;
+- rechazado depositado o acreditado, no hay renglón: el cheque ya había salido de
+  la caja con el depósito, y el banco conserva el crédito hasta la revisión
+  bancaria;
+- el reemplazo entra a custodia con un renglón de ingreso «Reemplazo del cheque
+  n.º X — no es recaudación». Va en ingresos porque la planilla no tiene otro
+  renglón donde crezca la custodia; **no está relevado** y queda para confirmar
+  con el área.
+
+El inventario del reverso es el de la fecha del cierre: cerrar tarde un día en
+que el cheque estaba en la caja lo lista aunque después se haya rechazado. El
+reemplazo se identifica con la multa del cheque original, y un cheque de la
+apertura figura aunque todavía no pague ninguna multa.
+
 **Pendientes:** asociar un cheque de apertura al pago anterior de una multa sin
 volver a ingresar dinero; P13, regularización con otro medio; conciliación del
 crédito/débito y rectificación auditada de una confirmación equivocada de «nunca
