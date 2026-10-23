@@ -30,7 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global y no del grupo `web`: los 404 sin ruta y las pantallas de
         // error también tienen que salir con su CSP.
         $middleware->append(SecurityHeaders::class);
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        // Las escribe el front con `document.cookie`: cifradas no las leería.
+        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'sidebar_sections']);
 
         /*
          * Solo se atienden pedidos dirigidos al dominio de `APP_URL`.

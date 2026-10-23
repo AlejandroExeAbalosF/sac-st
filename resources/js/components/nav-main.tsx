@@ -1,5 +1,6 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import {
     Collapsible,
     CollapsibleContent,
@@ -17,6 +18,7 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { rememberSection } from '@/lib/sidebar-state';
 import type { NavGroup, NavItem } from '@/types';
 
 /**
@@ -26,8 +28,8 @@ import type { NavGroup, NavItem } from '@/types';
  * módulo que el área espera pero que todavía no existe. Ocultarlo daría
  * a entender que se descartó; dejarlo enlazado llevaría a un 404.
  *
- * Un ítem con `children` se dibuja como acordeón —Caja y sus pantallas
- * hermanas—: el título despliega la lista, y arranca abierto si se está
+ * Un ítem con `children` se dibuja como acordeón —un circuito y sus
+ * pantallas—: el título despliega la lista, y arranca abierto si se está
  * parado en alguna de ellas.
  */
 export function NavMain({ groups = [] }: { groups: NavGroup[] }) {
@@ -112,10 +114,12 @@ function ItemSimple({ item, activo }: { item: NavItem; activo: Activo }) {
  * Un ítem que agrupa a sus hermanas.
  *
  * El título es el disparador del acordeón y no un enlace: la primera
- * sub-pantalla —«Caja del día»— es la que lleva a donde iría el título, así
- * que hacerlo también navegar duplicaría el destino y volvería ambiguo qué
- * hace un clic. Arranca abierto si alguna hija está activa, para que no haya
- * que desplegarlo cada vez que se entra a una de ellas.
+ * sub-pantalla —«Expedientes» en Haberes— es la que lleva a donde iría el
+ * título, así que hacerlo también navegar duplicaría el destino y volvería
+ * ambiguo qué hace un clic. Arranca abierto si alguna hija está activa, para
+ * que no haya que desplegarlo cada vez que se entra a una de ellas, o si el
+ * usuario lo dejó abierto antes de recargar (ver `sidebar-state`). La hija
+ * activa gana sobre lo guardado: nunca se pierde de vista dónde se está.
  *
  * La flecha resume el estado —cerrado apunta a la derecha, abierto hacia
  * abajo— y el `isActive` marca al padre cuando la pantalla actual es una de
@@ -124,11 +128,21 @@ function ItemSimple({ item, activo }: { item: NavItem; activo: Activo }) {
 function ItemConHijos({ item, activo }: { item: NavItem; activo: Activo }) {
     const hijos = item.children ?? [];
     const algunaActiva = hijos.some((hijo) => activo(hijo.href));
+    const { sidebarSections } = usePage().props;
+    const [abierto, setAbierto] = useState(
+        () => algunaActiva || sidebarSections.includes(item.title),
+    );
+
+    const alternar = (open: boolean) => {
+        setAbierto(open);
+        rememberSection(item.title, open);
+    };
 
     return (
         <Collapsible
             asChild
-            defaultOpen={algunaActiva}
+            open={abierto}
+            onOpenChange={alternar}
             className="group/collapsible"
         >
             <SidebarMenuItem>

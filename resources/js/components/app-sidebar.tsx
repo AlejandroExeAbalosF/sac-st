@@ -55,18 +55,62 @@ import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
 
 /*
- * La navegación sigue el recorrido del dinero, no el esquema de la base:
- * el expediente entra, el dinero se recibe, se identifica contra el banco,
- * se paga y se cierra la caja. Un operador que sigue el menú de arriba hacia
- * abajo está siguiendo el circuito real. Los módulos futuros se incorporan
- * cuando estén disponibles para que la navegación describa acciones reales.
+ * Cada circuito es un acordeón con sus pantallas, y adentro siguen el
+ * recorrido del dinero, no el esquema de la base: el expediente entra, se
+ * paga y se cierra la caja. Lo que sirve a más de un circuito —el banco y
+ * sus extractos— queda afuera, porque no es de ninguno. Los módulos futuros
+ * se incorporan cuando estén disponibles para que la navegación describa
+ * acciones reales.
  */
 export const navGroups: NavGroup[] = [
     {
         label: 'Operación',
         items: [
             { title: 'Inicio', href: inicio(), icon: LayoutGrid },
-            { title: 'Haberes', href: haberes(), icon: FileText },
+            {
+                title: 'Haberes',
+                icon: FileText,
+                children: [
+                    { title: 'Expedientes', href: haberes(), icon: FileText },
+                    /*
+                     * «Se paga»: las dos colas del egreso —lo que está listo
+                     * para entregarse en mano y lo que salió por el banco y
+                     * todavía nadie dio por hecho—.
+                     *
+                     * El área lo llama «Planillas», que es lo que viene a
+                     * buscar: la hoja para trabajar la fila. El permiso sigue
+                     * siendo `egresos.registrar` porque nombra el acto, no la
+                     * pantalla. Es la única hija con permiso: el rol de
+                     * consulta mira expedientes y caja, pero una cola de
+                     * trabajo es de quien la trabaja.
+                     *
+                     * Sin contador a propósito. La barra no se remonta al
+                     * navegar, así que un número acá no se refresca solo y
+                     * habría que compartirlo desde `HandleInertiaRequests` en
+                     * cada respuesta. Los contadores que el área usa viven en
+                     * el tablero.
+                     */
+                    {
+                        title: 'Planillas',
+                        href: planillas(),
+                        icon: Banknote,
+                        permission: 'egresos.registrar',
+                    },
+                    // Y acá cierra el recorrido: contar el cajón y cerrar el día.
+                    { title: 'Caja del día', href: caja(), icon: Scale },
+                    {
+                        title: 'Arqueos',
+                        href: arqueos(),
+                        icon: ClipboardCheck,
+                    },
+                    { title: 'Cierres de caja', href: cierres(), icon: Lock },
+                    {
+                        title: 'Calendario',
+                        href: calendario(),
+                        icon: CalendarDays,
+                    },
+                ],
+            },
             /*
              * Multas es hermana de Haberes: otra caja, el mismo recorrido.
              * El grupo no lleva permiso propio: cada pantalla lleva el suyo,
@@ -134,62 +178,14 @@ export const navGroups: NavGroup[] = [
              * «repartirlo a mano» de la cuota.
              */
             /*
-             * Entra por «Movimientos» y no por «Extractos»: importar es
-             * el medio, y lo que el operador viene a hacer es mirar qué
-             * entró al banco. Los extractos y las cuentas cuelgan de esa
-             * pantalla.
+             * Banco y Extractos son de los dos circuitos: los extractos de la
+             * cuenta de Multas se importan acá y de ahí salen los créditos que
+             * verifica su caja. Entra por «Movimientos» y no por «Extractos»:
+             * importar es el medio, y lo que el operador viene a hacer es
+             * mirar qué entró al banco.
              */
             { title: 'Banco', href: movimientos(), icon: ArrowLeftRight },
             { title: 'Extractos', href: extractos(), icon: FileSpreadsheet },
-            /*
-             * «Se paga»: las dos colas del egreso —lo que está listo para
-             * entregarse en mano y lo que salió por el banco y todavía nadie
-             * dio por hecho—. Va acá y no junto a Haberes porque ese es el
-             * lugar que ocupa en el recorrido del dinero.
-             *
-             * El área lo llama «Planillas», que es lo que viene a buscar:
-             * la hoja para trabajar la fila. El permiso sigue siendo
-             * `egresos.registrar` porque nombra el acto, no la pantalla.
-             *
-             * Es el único ítem de este grupo con permiso: el rol de consulta
-             * mira expedientes y caja, pero una cola de trabajo es de quien
-             * la trabaja.
-             *
-             * Sin contador a propósito. La barra no se remonta al navegar,
-             * así que un número acá no se refresca solo y habría que
-             * compartirlo desde `HandleInertiaRequests` en cada respuesta del
-             * sistema. Los contadores que el área usa viven en el tablero.
-             */
-            {
-                title: 'Planillas',
-                href: planillas(),
-                icon: Banknote,
-                permission: 'egresos.registrar',
-            },
-            /*
-             * Y acá cierra el recorrido: contar el cajón y cerrar el día.
-             * Va último porque es lo último que pasa, no porque importe
-             * menos. Es un acordeón porque el módulo tiene varias pantallas
-             * hermanas: el día, los arqueos, los cierres, el calendario.
-             */
-            {
-                title: 'Caja',
-                icon: Scale,
-                children: [
-                    { title: 'Caja del día', href: caja(), icon: Scale },
-                    {
-                        title: 'Arqueos',
-                        href: arqueos(),
-                        icon: ClipboardCheck,
-                    },
-                    { title: 'Cierres', href: cierres(), icon: Lock },
-                    {
-                        title: 'Calendario',
-                        href: calendario(),
-                        icon: CalendarDays,
-                    },
-                ],
-            },
         ],
     },
     {

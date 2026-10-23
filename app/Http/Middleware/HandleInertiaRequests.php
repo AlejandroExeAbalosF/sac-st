@@ -190,6 +190,14 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
 
             /*
+             * Los acordeones de la barra que el usuario dejó abiertos. Los
+             * escribe el front (`resources/js/lib/sidebar-state.ts`); el
+             * servidor los lee para que el renderizado inicial dibuje la
+             * barra igual que el navegador y React no tenga que rehacerla.
+             */
+            'sidebarSections' => $this->seccionesAbiertas($request),
+
+            /*
              * Qué direcciones pueden mirarse dentro de un `<iframe>`.
              *
              * Van las plantillas de las rutas declaradas en
@@ -206,6 +214,27 @@ class HandleInertiaRequests extends Middleware
              */
             'framableDocuments' => fn (): array => $this->plantillasEnmarcables(),
         ];
+    }
+
+    /**
+     * La cookie la escribe el navegador y puede traer cualquier cosa: lo que
+     * no sea una lista de textos se descarta, y la barra arranca como si no
+     * hubiera nada guardado.
+     *
+     * @return list<string>
+     */
+    private function seccionesAbiertas(Request $request): array
+    {
+        // Un `sidebar_sections[]=…` llega como arreglo y no como texto.
+        $crudo = $request->cookie('sidebar_sections');
+
+        if (! is_string($crudo)) {
+            return [];
+        }
+
+        $guardado = json_decode($crudo, true);
+
+        return is_array($guardado) ? array_values(array_filter($guardado, is_string(...))) : [];
     }
 
     /**

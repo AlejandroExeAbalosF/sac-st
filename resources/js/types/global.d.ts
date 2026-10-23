@@ -15,6 +15,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             breadcrumbs: BreadcrumbItem[];
             sidebarOpen: boolean;
+            sidebarSections: string[];
             [key: string]: unknown;
         };
     }
