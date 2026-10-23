@@ -23,7 +23,7 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'multas.ver',
                 'Ver multas',
-                'Consultar la cuenta corriente de multas: expedientes, documentos, obligación, antecedentes y saldo.',
+                'Consultar los expedientes y las multas: documentos, obligación, antecedentes y saldo.',
                 'multas',
                 ['administrador', 'contador', 'administrativo', 'consulta'],
             ),

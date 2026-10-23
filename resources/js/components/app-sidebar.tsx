@@ -121,11 +121,17 @@ export const navGroups: NavGroup[] = [
                 title: 'Multas',
                 icon: Gavel,
                 children: [
+                    /*
+                     * El listado, por expediente o por multa, igual que en
+                     * Haberes. La ficha de la multa y el alta viven fuera de
+                     * `/multas/expedientes`, pero son de acá.
+                     */
                     {
-                        title: 'Cuenta corriente',
+                        title: 'Expedientes',
                         href: multas(),
                         icon: Gavel,
                         permission: 'multas.ver',
+                        activeOn: ['multas/show', 'multas/create'],
                     },
                     {
                         title: 'Caja de Multas',

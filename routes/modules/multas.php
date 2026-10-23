@@ -20,10 +20,11 @@ use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
 use App\Modules\Multas\Http\Controllers\FineMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
 use App\Modules\Multas\Http\Controllers\FinePaymentQueueController;
+use Illuminate\Routing\RedirectController;
 use Illuminate\Support\Facades\Route;
 
 /*
-| Multas: la cuenta corriente de multas laborales y de higiene y seguridad.
+| Multas: los expedientes, sus multas y lo que se debe de cada una.
 |
 | Se registra qué se debe y por qué papel —expedientes, documentos, multas,
 | ajustes de la obligación y pagos anteriores al sistema— y se cobra en la
@@ -33,6 +34,20 @@ use Illuminate\Support\Facades\Route;
 | corregir uno que ya tenía valor exige `multas.ajustar`, y eso lo decide
 | `ReviseFineIdentifiers`, que es quien sabe qué cambió.
 */
+/*
+ * `/multas` era el listado y ahora vive en `/multas/expedientes`, como en
+ * Haberes. Redirige en vez de quedar muerta: sin esto respondía 405 y no 404,
+ * porque el alta es un `POST` a la misma dirección.
+ *
+ * Solo en GET y no con `Route::redirect`, que responde a todos los verbos y
+ * se tragaba ese `POST`. Va fuera del grupo `multas.` para no quedar
+ * registrada con el prefijo del grupo como nombre.
+ */
+Route::middleware(['auth', 'verified', 'can:multas.ver'])
+    ->get('multas', RedirectController::class)
+    ->defaults('destination', '/multas/expedientes')
+    ->defaults('status', 302);
+
 Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->group(function (): void {
     Route::middleware('can:multas.registrar')->group(function (): void {
         // Antes de `{fine}`: una ruta literal delante de una con parámetro.
@@ -158,7 +173,8 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('recibos/{receipt}/ver', [FinePaymentController::class, 'view'])->whereNumber('receipt')->name('recibos.view');
         Route::get('recibos/{receipt}/imprimir', [FinePaymentController::class, 'print'])->whereNumber('receipt')->name('recibos.print');
 
-        Route::get('/', [FineController::class, 'index'])->name('index');
+        // Como `/haberes/expedientes`: el listado, por expediente o por multa.
+        Route::get('expedientes', [FineController::class, 'index'])->name('index');
         Route::get('caja', [FineCashController::class, 'index'])->name('caja.index');
         // La consulta operativa de un mes: no es la rendición oficial (P02).
         Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');

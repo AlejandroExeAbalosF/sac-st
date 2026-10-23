@@ -12,6 +12,7 @@ use App\Modules\Multas\Actions\CreateFineCase;
 use App\Modules\Multas\Actions\RegisterFine;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Data\FineCaseData;
+use App\Modules\Multas\Data\FineCaseListItemData;
 use App\Modules\Multas\Data\FineDetailData;
 use App\Modules\Multas\Data\FineDocumentData;
 use App\Modules\Multas\Data\FineListItemData;
@@ -26,6 +27,7 @@ use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
+use App\Modules\Multas\Support\FineCaseListQuery;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Multas\Support\FineListQuery;
@@ -48,7 +50,7 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * La cuenta corriente de multas: el listado, el alta y la ficha.
+ * Las multas: el listado, el alta y la ficha.
  *
  * Acá no se mueve un peso: se registra qué se debe y por qué papel. Los
  * cobros llegan en la Etapa 4.
@@ -57,18 +59,33 @@ final class FineController extends Controller
 {
     private const POR_PAGINA = 25;
 
-    public function index(FineIndexRequest $request, FineListQuery $listado): Response
+    /**
+     * Dos lecturas del mismo material, como el listado de Haberes: por
+     * expediente o por multa. Solo viajan las filas de la vista pedida.
+     */
+    public function index(FineIndexRequest $request, FineListQuery $multas, FineCaseListQuery $expedientes): Response
     {
         $filtros = $request->filters();
+        $vista = $request->view();
+        $filasDeMultas = [];
+        $filasDeExpedientes = [];
 
-        $paginador = $listado->query($filtros)
-            ->paginate(self::POR_PAGINA)
-            ->withQueryString();
+        if ($vista === 'multas') {
+            $paginador = $multas->query($filtros)->paginate(self::POR_PAGINA)->withQueryString();
+            $filasDeMultas = $paginador->getCollection()
+                ->map(fn (Fine $multa): FineListItemData => FineListItemData::fromModel($multa))
+                ->values();
+        } else {
+            $paginador = $expedientes->query($filtros)->paginate(self::POR_PAGINA)->withQueryString();
+            $filasDeExpedientes = $paginador->getCollection()
+                ->map(fn (FineCase $expediente): FineCaseListItemData => FineCaseListItemData::fromModel($expediente))
+                ->values();
+        }
 
         return Inertia::render('multas/index', [
-            'multas' => $paginador->getCollection()
-                ->map(fn (Fine $multa): FineListItemData => FineListItemData::fromModel($multa))
-                ->values(),
+            'vista' => $vista,
+            'multas' => $filasDeMultas,
+            'expedientes' => $filasDeExpedientes,
             'filters' => $filtros,
             'canRegister' => $request->user()?->can('multas.registrar') ?? false,
             // La forma que espera `PaginationFooter`.

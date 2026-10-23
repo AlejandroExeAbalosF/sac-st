@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Ban, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
+import ListViewTab from '@/components/list-view-tab';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import ExpedienteRow, {
@@ -9,7 +10,6 @@ import ExpedienteRow, {
 import HaberTable, {
     HaberCardList,
 } from '@/features/haberes/components/haber-table';
-import { cn } from '@/lib/utils';
 import { create, index } from '@/routes/expedientes';
 
 type Vista = 'expedientes' | 'haberes';
@@ -102,18 +102,18 @@ export default function HaberesIndex({
                     aria-label="Vista del listado"
                     className="-mt-2 flex gap-1 border-b"
                 >
-                    <Pestana
-                        activa={!porHaber}
+                    <ListViewTab
+                        active={!porHaber}
                         onClick={() => consultar({ vista: 'expedientes' })}
                     >
                         Expedientes
-                    </Pestana>
-                    <Pestana
-                        activa={porHaber}
+                    </ListViewTab>
+                    <ListViewTab
+                        active={porHaber}
                         onClick={() => consultar({ vista: 'haberes' })}
                     >
                         Haberes
-                    </Pestana>
+                    </ListViewTab>
                 </nav>
 
                 <form onSubmit={buscar} className="flex gap-2">
@@ -347,39 +347,5 @@ export default function HaberesIndex({
                 </div>
             </div>
         </>
-    );
-}
-
-/**
- * Una pestaña del listado.
- *
- * Es un botón y no un enlace porque cambiar de vista conserva lo que ya
- * está escrito en el buscador —la consulta viaja con `preserveState`—,
- * y `aria-current` es lo que le dice al lector de pantalla cuál de las
- * dos se está viendo.
- */
-function Pestana({
-    activa,
-    onClick,
-    children,
-}: {
-    activa: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-current={activa ? 'page' : undefined}
-            className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                activa
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
-            )}
-        >
-            {children}
-        </button>
     );
 }

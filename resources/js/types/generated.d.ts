@@ -966,6 +966,21 @@ declare namespace App {
                         label: string;
                     }[];
                 };
+                export type FineCaseListItemData = {
+                    id: number;
+                    label: string;
+                    captions: string[];
+                    personNames: string[];
+                    finesCount: number;
+                    finesWithDebt: number;
+                    hasExcess: boolean;
+                    totals: App.Modules.Multas.Data.FineCaseTotalData[];
+                };
+                export type FineCaseTotalData = {
+                    currency: App.Modules.Ledger.Enums.Currency;
+                    obligation: string;
+                    debt: string;
+                };
                 export type FineChequeInCustodyData = {
                     id: number;
                     number: string | null;

@@ -3,8 +3,8 @@
 Qué hace hoy la Caja de Multas. Describe lo implementado; las reglas con su
 garantía en la base están en [reglas de Multas](multas-reglas.md).
 
-**Estado: en construcción.** Está la cuenta corriente —expedientes, documentos,
-multas, su obligación y los pagos anteriores al sistema—, la apertura de la caja
+**Estado: en construcción.** Están los expedientes y sus multas —documentos,
+obligación y pagos anteriores al sistema—, la apertura de la caja
 con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
 banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
 rechazado con su reemplazo, la caja del día con su arqueo, su cierre y su
@@ -45,11 +45,11 @@ conoce. El test de fronteras lo exige.
 
 | Pantalla | Ruta | Permiso |
 | --- | --- | --- |
-| Cuenta corriente | `/multas` | `multas.ver` |
+| Expedientes y multas | `/multas/expedientes` | `multas.ver` |
 | Nueva multa | `/multas/nueva` | `multas.registrar` |
 | Ficha de la multa | `/multas/{id}` | `multas.ver` |
 | Expediente | `/multas/expedientes/{id}` | `multas.ver` |
-| Exportar la cuenta corriente | `/multas/exportar` | `multas.ver` |
+| Exportar las multas | `/multas/exportar` | `multas.ver` |
 | Caja de Multas | `/multas/caja` | `multas.ver`; abrirla, `multas.caja.abrir` |
 | Caja del día | `/multas/caja/dia` | `multas.caja.ver` |
 | Arqueos | `/multas/caja/arqueos` | `multas.caja.ver`; contar, `multas.caja.arquear` |
@@ -57,16 +57,29 @@ conoce. El test de fronteras lo exige.
 | Calendario | `/multas/caja/calendario` | `multas.caja.ver` |
 | Movimientos del mes | `/multas/movimientos` | `multas.ver` |
 
-### Cuenta corriente · `/multas`
+<a id="listado"></a>
+
+### Expedientes y multas · `/multas/expedientes`
+
+Dos lecturas del mismo material, como el listado de Haberes: la pestaña
+**Expedientes**, que es la que abre, y la pestaña **Multas** (`?vista=multas`).
+Comparten el buscador, los filtros y la paginación.
 
 Busca por lo que trae quien viene a pagar: número de expediente («169607/24»
 encuentra «169607/2024-0»), de resolución, de acta, o la carátula. Filtra por
-deuda (con o sin) y por año de registro. Cada fila dice el importe vigente, el
-saldo y la situación: pendiente, con pagos parciales, cancelada o sin efecto, y si
-tiene excedente.
+deuda (con o sin) y por año de registro.
 
-**Exportar a Excel** baja lo que está filtrado, entero y sin paginar: una fila por
-multa con expediente, carátula, persona, documentos de origen, fecha de registro,
+- **Expedientes**: una fila por expediente, con las carátulas de sus multas,
+  cuántas tiene y cuántas deben, el importe vigente y el saldo sumados —uno por
+  moneda: pesos y dólares no se suman en una cifra— y si debe o no. Un expediente
+  aparece si **alguna** de sus multas coincide con la búsqueda o se registró en el
+  año pedido; en cambio, «sin deuda» quiere decir que **ninguna** de sus multas
+  debe.
+- **Multas**: una fila por multa, con el importe vigente, el saldo y la situación:
+  pendiente, con pagos parciales, cancelada o sin efecto, y si tiene excedente.
+
+**Exportar a Excel**, solo en la pestaña Multas, baja lo que está filtrado,
+entero y sin paginar: una fila por multa con expediente, carátula, persona, documentos de origen, fecha de registro,
 importe vigente, pagado en el sistema, pagado antes del sistema, saldo, excedente,
 estado y procedencia. Los importes van escritos («1.400.000,00»), como en pantalla,
 no como número de Excel. Todo el archivo sale de una misma foto de los datos: lo
@@ -298,7 +311,7 @@ Lo que cambia respecto de Haberes:
   multa paga cada uno —el reemplazo, la del cheque original— y un cheque de la
   apertura muestra lo que declaró la apertura. Quien opera la caja sin
   `multas.ver` ve los mismos datos sin enlaces a las fichas, y encuentra la caja
-  del día y los cierres en la barra lateral aunque no vea la cuenta corriente.
+  del día y los cierres en la barra lateral aunque no vea los expedientes.
 - **La columna de banco** son los pagos por banco verificados, el día en que se
   verifican, sin los movimientos ficticios que usa el Excel del área. Es lo que el
   libro de Multas reconoció, **no el saldo de la cuenta compartida**: la pantalla y
@@ -525,7 +538,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 
 | Permiso | Para qué | Roles por omisión |
 | --- | --- | --- |
-| `multas.ver` | Consultar la cuenta corriente | administrador, contador, administrativo, consulta |
+| `multas.ver` | Consultar los expedientes y las multas | administrador, contador, administrativo, consulta |
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |

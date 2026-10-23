@@ -7,7 +7,7 @@ namespace App\Modules\Multas\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Los filtros de la cuenta corriente.
+ * Los filtros del listado de Multas, en sus dos vistas.
  *
  * Un filtro mal formado vuelve a la misma pantalla sin filtros, no a la
  * anterior: `$redirectRoute` evita el ciclo de volver a una URL que vuelve a
@@ -27,6 +27,7 @@ final class FineIndexRequest extends FormRequest
             'estado' => ['nullable', 'in:con-deuda,sin-deuda'],
             'anio' => ['nullable', 'integer', 'between:1990,2100'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'vista' => ['nullable', 'in:expedientes,multas'],
         ];
     }
 
@@ -40,7 +41,18 @@ final class FineIndexRequest extends FormRequest
             'estado' => 'deuda',
             'anio' => 'año de registro',
             'page' => 'página',
+            'vista' => 'vista',
         ];
+    }
+
+    /**
+     * Por qué fila se pregunta: el expediente, salvo que se pidan las multas.
+     *
+     * @return 'expedientes'|'multas'
+     */
+    public function view(): string
+    {
+        return $this->validated('vista') === 'multas' ? 'multas' : 'expedientes';
     }
 
     /**

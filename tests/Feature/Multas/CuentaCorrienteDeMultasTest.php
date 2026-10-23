@@ -142,17 +142,136 @@ class CuentaCorrienteDeMultasTest extends TestCase
 
         foreach (['169607/24', 'N°0649/26', '1089657', 'cristomax', '169607'] as $termino) {
             $this->actingAs($operador)
-                ->get(route('multas.index', ['q' => $termino]))
+                ->get(route('multas.index', ['q' => $termino, 'vista' => 'multas']))
                 ->assertInertia(fn (Assert $page) => $page->has('multas', 1));
+
+            $this->actingAs($operador)
+                ->get(route('multas.index', ['q' => $termino]))
+                ->assertInertia(fn (Assert $page) => $page->has('expedientes', 1));
         }
 
         $this->actingAs($operador)
-            ->get(route('multas.index', ['q' => 'otra empresa']))
+            ->get(route('multas.index', ['q' => 'otra empresa', 'vista' => 'multas']))
             ->assertInertia(fn (Assert $page) => $page->has('multas', 0));
 
         $this->actingAs($operador)
-            ->get(route('multas.index', ['estado' => 'sin-deuda']))
+            ->get(route('multas.index', ['estado' => 'sin-deuda', 'vista' => 'multas']))
             ->assertInertia(fn (Assert $page) => $page->has('multas', 0));
+    }
+
+    public function test_the_list_opens_by_case_and_adds_up_its_fines(): void
+    {
+        $this->dosMultasEnUnExpediente();
+        $this->actingAs($this->operador())->post(route('multas.store'), [
+            ...$this->alta(),
+            'caseNumber' => '1/25-0',
+            'resolution' => ['text' => 'N°0001/25', 'issuedOn' => '2025-01-07'],
+            'acts' => [['actType' => 'LAB', 'text' => 'N°5', 'issuedOn' => null]],
+            'caption' => 'OTRA EMPRESA SA',
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('multas/index')
+                ->where('vista', 'expedientes')
+                ->has('multas', 0)
+                ->has('expedientes', 2)
+                ->where('pagination.total', 2)
+                ->where('expedientes.1.label', '169607/2024-0')
+                ->where('expedientes.1.captions', ['CRISTOMAX S.A.S', 'DISTRIBUIDORA VIDT SRL'])
+                ->where('expedientes.1.finesCount', 2)
+                ->where('expedientes.1.finesWithDebt', 2)
+                ->where('expedientes.1.totals', [['currency' => 'ARS', 'obligation' => '2800000.00', 'debt' => '2800000.00']]));
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index', ['vista' => 'multas']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vista', 'multas')
+                ->has('expedientes', 0)
+                ->has('multas', 3));
+    }
+
+    /**
+     * La deuda del expediente es la de todas sus multas: «sin deuda» quiere
+     * decir que ninguna debe, no que alguna no deba.
+     */
+    public function test_a_case_without_debt_is_one_where_no_fine_owes(): void
+    {
+        [$primera] = $this->dosMultasEnUnExpediente();
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.ajustes.store', $primera), $this->ajuste('reduction', '1400000.00'))
+            ->assertSessionHasNoErrors();
+
+        $consulta = $this->operador('consulta');
+
+        $this->actingAs($consulta)
+            ->get(route('multas.index', ['estado' => 'sin-deuda']))
+            ->assertInertia(fn (Assert $page) => $page->has('expedientes', 0));
+
+        $this->actingAs($consulta)
+            ->get(route('multas.index', ['estado' => 'con-deuda']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('expedientes', 1)
+                ->where('expedientes.0.finesWithDebt', 1)
+                ->where('expedientes.0.totals.0.obligation', '1400000.00'));
+
+        $this->actingAs($consulta)
+            ->get(route('multas.index', ['estado' => 'sin-deuda', 'vista' => 'multas']))
+            ->assertInertia(fn (Assert $page) => $page->has('multas', 1));
+    }
+
+    /** Lo encuentra cualquiera de sus multas, y la fila trae el expediente entero. */
+    public function test_a_case_is_found_by_any_of_its_fines(): void
+    {
+        $this->dosMultasEnUnExpediente();
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index', ['q' => 'distribuidora']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('expedientes', 1)
+                ->where('expedientes.0.finesCount', 2));
+    }
+
+    public function test_the_module_root_leads_to_the_list(): void
+    {
+        $this->actingAs($this->operador('consulta'))
+            ->get('/multas')
+            ->assertRedirect('/multas/expedientes');
+    }
+
+    public function test_an_unknown_view_goes_back_to_the_list(): void
+    {
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index', ['vista' => 'otra']))
+            ->assertRedirect(route('multas.index'));
+    }
+
+    /** Pesos y dólares no se suman en una sola cifra. */
+    public function test_a_case_totals_each_currency_apart(): void
+    {
+        $expediente = FineCase::query()->create(['original_text' => 'S/N', 'provenance' => 'import']);
+
+        foreach (['ARS' => '1000.00', 'USD' => '50.00'] as $moneda => $importe) {
+            DB::transaction(function () use ($expediente, $moneda, $importe): void {
+                $multa = Fine::query()->create([
+                    'fine_case_id' => $expediente->id, 'caption_original' => 'IMPORTADA SRL', 'caption' => 'IMPORTADA SRL',
+                    'currency' => $moneda, 'provenance' => 'import',
+                ]);
+                FineDebtEntry::query()->create([
+                    'fine_id' => $multa->id, 'kind' => 'constitution', 'amount' => $importe, 'provenance' => 'import',
+                ]);
+            });
+        }
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('expedientes.0.captions', ['IMPORTADA SRL'])
+                ->where('expedientes.0.totals', [
+                    ['currency' => 'ARS', 'obligation' => '1000.00', 'debt' => '1000.00'],
+                    ['currency' => 'USD', 'obligation' => '50.00', 'debt' => '50.00'],
+                ]));
     }
 
     // ── Ajustes ─────────────────────────────────────────────────────────
@@ -512,6 +631,29 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $this->actingAs($operador ?? $this->operador())->post(route('multas.store'), $this->alta());
 
         return Fine::query()->latest('id')->firstOrFail();
+    }
+
+    /**
+     * Como en `test_a_second_fine_reuses_the_case_and_its_shared_act`.
+     *
+     * @return array{Fine, Fine}
+     */
+    private function dosMultasEnUnExpediente(): array
+    {
+        $operador = $this->operador();
+        $primera = $this->multa($operador);
+        $acta = FineDocument::query()->where('kind', 'act')->sole();
+
+        $this->actingAs($operador)->post(route('multas.store'), [
+            ...$this->alta(),
+            'caseNumber' => '169607/2024-0',
+            'resolution' => ['text' => 'N°0906/26', 'issuedOn' => '2026-05-07'],
+            'acts' => [],
+            'actIds' => [$acta->id],
+            'caption' => 'DISTRIBUIDORA VIDT SRL',
+        ])->assertSessionHasNoErrors();
+
+        return [$primera, Fine::query()->latest('id')->firstOrFail()];
     }
 
     /**

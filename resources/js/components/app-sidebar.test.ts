@@ -60,9 +60,9 @@ describe('el grupo Multas de la barra', () => {
         ]);
     });
 
-    it('muestra la cuenta corriente y la caja a quien ve multas', () => {
+    it('muestra los expedientes y la caja a quien ve multas', () => {
         expect(multasPara({ 'multas.ver': true })).toEqual([
-            'Cuenta corriente',
+            'Expedientes',
             'Caja de Multas',
             'Movimientos',
         ]);
