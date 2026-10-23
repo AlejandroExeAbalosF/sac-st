@@ -20,13 +20,11 @@ use Illuminate\Validation\ValidationException;
  * propias de esta caja:
  *
  * - **Sin saldo bancario.** La cuenta de Multas es compartida con
- *   Aranceles, y su saldo se declara una vez, para la cuenta, sin repartir
- *   (`DeclareBankAccountCutoff`). Ponerlo acá lo atribuiría entero a
- *   Multas. La base lo impide sobre una cuenta con corte
- *   (`journal_lines_opening_without_shared_bank`).
- * - **Con su cuenta.** El libro dice con qué cuenta opera: es lo que
- *   separa un crédito viejo, que va como pago anterior, de un cobro, que
- *   entra al libro. Si la cuenta tiene corte, la caja abre después.
+ *   Aranceles, y su saldo no se reparte: cada caja reconoce solo lo que
+ *   identifica. Ponerlo acá lo atribuiría entero a Multas.
+ * - **Con su cuenta.** El libro dice con qué cuenta opera, y su fecha de
+ *   apertura separa un crédito viejo, que va como pago anterior, de un
+ *   cobro, que entra al libro.
  *
  * Solo en pesos: Multas no cobra en dólares.
  */

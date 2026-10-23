@@ -161,7 +161,6 @@ class CierreDeCajaDeMultasTest extends TestCase
     public function test_an_opening_cheque_without_a_fine_is_in_the_inventory(): void
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
 
         app(OpenFineCashBook::class)->handle(
             date: CarbonImmutable::parse('2026-06-01'),
@@ -197,7 +196,6 @@ class CierreDeCajaDeMultasTest extends TestCase
     private function escenario(): Fine
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
         $this->abrirMultas($this->laCuenta, '2026-06-01');
 
         $this->travelTo(CarbonImmutable::parse('2026-09-01 10:00'));

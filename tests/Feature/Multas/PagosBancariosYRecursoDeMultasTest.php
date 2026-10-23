@@ -121,7 +121,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         expect($pago->refresh()->status)->toBe(FinePaymentStatus::Reported);
     }
 
-    public function test_a_credit_before_the_cutoff_or_already_used_is_not_available(): void
+    public function test_a_credit_before_the_box_opened_or_already_used_is_not_available(): void
     {
         $multa = $this->escenario();
         $otra = $this->multa('170000/24-0');
@@ -574,7 +574,6 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
     private function escenario(string $registrada = '2026-05-07'): Fine
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
         $this->abrirMultas($this->laCuenta, '2026-06-01');
 
         return $this->multa(registrada: $registrada);

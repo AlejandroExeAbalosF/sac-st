@@ -52,7 +52,7 @@ import { store } from '@/routes/multas/caja/apertura';
 import { index as arqueosDeMultas } from '@/routes/multas/caja/arqueos';
 import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
 
-type CuentaBancaria = { id: number; label: string; cutoffOn: string | null };
+type CuentaBancaria = { id: number; label: string };
 type Banco = App.Modules.Multas.Data.FineBankPanelData;
 type Cobro = App.Modules.Multas.Data.FinePendingPaymentData;
 
@@ -84,14 +84,6 @@ type Props = {
 
 const EFECTIVO = 'CASH_ON_HAND';
 const CHEQUES = 'CHEQUES_IN_CUSTODY';
-
-/** El día siguiente a una fecha `AAAA-MM-DD`, sin pasar por la zona horaria. */
-function diaSiguiente(fecha: string): string {
-    const [anio, mes, dia] = fecha.split('-').map(Number);
-    const siguiente = new Date(Date.UTC(anio, mes - 1, dia + 1));
-
-    return siguiente.toISOString().slice(0, 10);
-}
 
 /**
  * La caja de Multas: su apertura y la cuenta con la que opera.
@@ -249,9 +241,7 @@ function FormularioDeApertura({
         notes: string;
         declaredEmpty: boolean;
     }>({
-        date: primera?.cutoffOn
-            ? diaSiguiente(primera.cutoffOn)
-            : businessToday(),
+        date: businessToday(),
         bankAccountId: primera?.id ?? null,
         balances: {},
         denominations: {},
@@ -261,7 +251,6 @@ function FormularioDeApertura({
     });
 
     const errores = form.errors as unknown as Record<string, string>;
-    const cuenta = cuentas.find((c) => c.id === form.data.bankAccountId);
     const contado = useMemo(
         () => totalDeBilletes(form.data.denominations),
         [form.data.denominations],
@@ -338,18 +327,9 @@ function FormularioDeApertura({
                                     ? String(form.data.bankAccountId)
                                     : ''
                             }
-                            onValueChange={(valor) => {
-                                const elegida = cuentas.find(
-                                    (c) => c.id === Number(valor),
-                                );
-                                form.setData({
-                                    ...form.data,
-                                    bankAccountId: Number(valor),
-                                    date: elegida?.cutoffOn
-                                        ? diaSiguiente(elegida.cutoffOn)
-                                        : form.data.date,
-                                });
-                            }}
+                            onValueChange={(valor) =>
+                                form.setData('bankAccountId', Number(valor))
+                            }
                         >
                             <SelectTrigger id="bankAccountId">
                                 <SelectValue placeholder="Elegí la cuenta" />
@@ -363,9 +343,9 @@ function FormularioDeApertura({
                             </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
-                            {cuenta?.cutoffOn
-                                ? `Su saldo está declarado al ${date(cuenta.cutoffOn)}: la caja abre después.`
-                                : 'Su saldo no se suma acá: es compartido y se declara para la cuenta en Banco › Cuentas.'}
+                            Su saldo no se suma acá: la cuenta es compartida con
+                            Aranceles y cada caja reconoce solo lo que
+                            identifica.
                         </p>
                         <InputError message={form.errors.bankAccountId} />
                     </div>
@@ -548,41 +528,27 @@ function PanelBancario({ banco }: { banco: Banco }) {
                         Es la cuenta entera, compartida con Aranceles: no es
                         plata de Multas.
                     </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        {banco.cutoffOn ? (
-                            <>
-                                Saldo declarado al {date(banco.cutoffOn)}:{' '}
-                                <Money value={banco.cutoffBalance} />, sin
-                                repartir.
-                            </>
-                        ) : (
-                            <span className="text-warning-strong">
-                                La cuenta todavía no tiene su corte declarado en
-                                Banco › Cuentas.
-                            </span>
-                        )}
-                    </p>
                 </div>
 
                 <div className="bg-card p-5">
                     <p className="flex items-center gap-1.5 text-xs tracking-wide text-field-label uppercase">
                         <Wallet className="size-3.5" aria-hidden="true" />
-                        Cobros de Multas en el banco
+                        Reconocido en el libro de Multas
                     </p>
                     <p className="mt-1 text-lg font-semibold">
                         <Money value={banco.bookBalance} />
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        Lo que el libro de Multas tiene en la cuenta: los
-                        depósitos de la caja ya acreditados y los pagos por el
-                        banco ya verificados.
+                        Depósitos acreditados y pagos bancarios verificados de
+                        Multas, menos las salidas registradas en su libro. No
+                        representa una parte del saldo de la cuenta compartida.
                     </p>
                     {isNonZero(banco.unclassifiedAmount) && (
                         <p className="mt-2 text-xs text-warning-strong">
                             {banco.unclassifiedCount}{' '}
                             {banco.unclassifiedCount === 1
-                                ? 'crédito posterior al corte sin reconocer'
-                                : 'créditos posteriores al corte sin reconocer'}{' '}
+                                ? 'crédito desde la apertura sin reconocer'
+                                : 'créditos desde la apertura sin reconocer'}{' '}
                             por <Money value={banco.unclassifiedAmount} />:
                             todavía no se sabe de qué caja{' '}
                             {banco.unclassifiedCount === 1 ? 'es' : 'son'}.

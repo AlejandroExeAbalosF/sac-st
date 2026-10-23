@@ -117,28 +117,14 @@ export default function UnidentifiedCredits({
                                     </p>
                                 )}
                             </div>
-                            {/*
-                             * Lo que entró antes de abrir la caja no se
-                             * verifica como un pago nuevo: es un pago
-                             * anterior de una multa, y se registra desde su
-                             * ficha.
-                             */}
-                            {fila.beforeOpening ? (
-                                <p className="w-full text-xs text-muted-foreground sm:w-auto sm:max-w-56">
-                                    Anterior a la apertura de la caja: se
-                                    registra como pago anterior desde la ficha
-                                    de la multa.
-                                </p>
-                            ) : (
-                                puedeIdentificar && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setIdentificando(fila)}
-                                    >
-                                        Identificar
-                                    </Button>
-                                )
+                            {puedeIdentificar && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setIdentificando(fila)}
+                                >
+                                    Identificar
+                                </Button>
                             )}
                         </li>
                     ))}

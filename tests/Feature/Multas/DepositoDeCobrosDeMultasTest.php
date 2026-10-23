@@ -283,7 +283,6 @@ class DepositoDeCobrosDeMultasTest extends TestCase
     private function escenario(): Fine
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
         $this->abrirMultas($this->laCuenta, '2026-06-01');
 
         $this->actingAs($this->operador())->post(route('multas.store'), [

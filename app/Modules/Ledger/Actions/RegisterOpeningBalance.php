@@ -17,7 +17,6 @@ use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
-use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -149,7 +148,6 @@ final class RegisterOpeningBalance
 
             $this->assertNotOpenedYet($cashBoxId, $currency);
             $this->reglaDeFecha->assertAllows($cashBoxId, $currency, $date);
-            $this->assertAfterBankCutoff($bankAccountId, $date);
 
             /*
              * Primero el hecho, después sus asientos: la base controla al
@@ -563,18 +561,6 @@ final class RegisterOpeningBalance
         }
 
         /*
-         * El saldo de una cuenta compartida se declaró para la cuenta, sin
-         * repartir: ninguna caja lo trae como propio en su apertura. La
-         * base lo impide igual (`journal_lines_opening_without_shared_bank`).
-         */
-        if (isset($saldos[LedgerAccount::BankAccount->value]) && $bankAccountId !== null
-            && DB::table('bank_account_openings')->where('bank_account_id', $bankAccountId)->exists()) {
-            throw ValidationException::withMessages([
-                'balances' => 'La cuenta elegida es compartida y su saldo ya se declaró al corte, sin repartir: no se suma a la apertura de una caja.',
-            ]);
-        }
-
-        /*
          * Y esa cuenta es de la moneda del libro: dólares en una cuenta en
          * pesos no existen. `journal_lines_bank_currency` y la FK compuesta
          * de `cash_book_openings` lo impiden en la base; acá se dice al lado
@@ -596,34 +582,6 @@ final class RegisterOpeningBalance
         }
 
         return $saldos;
-    }
-
-    /**
-     * Un libro que opera con una cuenta compartida abre después de su corte.
-     *
-     * Lo de hasta el corte está en el saldo de la cuenta, sin repartir; lo
-     * de después es cobro de alguna caja. Si el libro abriera antes, un
-     * cobro hecho entre la apertura y el corte no podría entrar a ningún
-     * lado. La base lo impide igual (`cash_book_openings_after_bank_cutoff`).
-     *
-     * @throws ValidationException
-     */
-    private function assertAfterBankCutoff(?int $bankAccountId, CarbonInterface $date): void
-    {
-        if ($bankAccountId === null) {
-            return;
-        }
-
-        $corte = DB::table('bank_account_openings')->where('bank_account_id', $bankAccountId)->value('cutoff_on');
-
-        if (is_string($corte) && $corte >= $date->toDateString()) {
-            throw ValidationException::withMessages([
-                'date' => sprintf(
-                    'La cuenta tiene su saldo declarado al %s: el libro se abre después de esa fecha.',
-                    CarbonImmutable::parse($corte)->format('d/m/Y'),
-                ),
-            ]);
-        }
     }
 
     /**

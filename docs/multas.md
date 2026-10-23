@@ -203,26 +203,26 @@ la cubran; si no, queda pendiente hasta validar el pago que devuelve.
 ## Caja y cuenta bancaria
 
 La cuenta bancaria de Multas es **compartida con Aranceles**, y su saldo no se
-puede repartir entre las dos (M08, M12). Por eso hay dos aperturas distintas:
+puede repartir entre las dos (M08, M12): cada caja reconoce solo lo que
+identifica. Por eso la caja no declara un saldo bancario:
 
-- **El corte de la cuenta** (Banco › Cuentas, permiso `banco.cuentas.declarar-corte`):
-  el saldo que informa el banco al cierre de un día, una sola vez y sin repartir,
-  con su comprobante. Si un extracto importado atraviesa ese día —tiene filas
-  antes y después—, el saldo tiene que ser el suyo; si no, se acepta y la pantalla
-  dice que la verificación queda pendiente hasta que llegue ese archivo. Lo que el
-  extracto trae hasta ese día queda adentro y **no entra a ningún libro como
-  cobro**. La pantalla muestra si el saldo al corte más lo movido hasta el último
-  saldo informado cierra contra ese saldo, y cuántos movimientos posteriores
-  todavía no se pueden contrastar.
 - **La apertura de la caja** (`/multas/caja`, permiso `multas.caja.abrir`): como la
   de Haberes —fecha, efectivo contado por billete, cheques detallados, total
-  calculado—, pero **sin saldo bancario** y diciendo con qué cuenta opera. Abre
-  después del corte de esa cuenta; la pantalla sugiere el día siguiente.
+  calculado—, pero **sin saldo bancario** y diciendo con qué cuenta opera. Su
+  fecha es la frontera: lo que el extracto trae antes ya estaba en el saldo que el
+  área traía y **no entra al libro como cobro**; solo puede respaldar un pago
+  anterior de una multa.
+
+No hay un corte declarado para la cuenta: el saldo del banco lo trae el extracto
+(ver [corte de la cuenta compartida](#sin-corte-de-cuenta)).
 
 Abierta la caja, la pantalla muestra la cuenta en **dos números que no se suman
-nunca**: el saldo según el banco —la cuenta entera, compartida— y los cobros de
-Multas en el banco —lo que el libro de Multas tiene ahí: los depósitos de la caja
-ya acreditados y los pagos por banco ya verificados—. Debajo, los créditos posteriores al corte que todavía nadie
+nunca**: el saldo según el banco —el último que informó un extracto, de la cuenta
+entera y compartida— y lo **reconocido en el libro de Multas** —lo que el libro
+tiene asentado ahí: los depósitos de la caja ya acreditados y los pagos por banco
+ya verificados, menos los débitos de cheques rechazados—. Lo segundo no es la
+parte de Multas en el saldo del banco: de las salidas de la cuenta solo se conocen
+las que el libro registró. Debajo, los créditos desde la apertura que todavía nadie
 identificó: es la cola de «pendiente de clasificación de caja». Un crédito que ya
 respalda un pago anterior vigente sale de la cola; si ese pago se descarta,
 vuelve.
@@ -231,16 +231,26 @@ La importación de extractos no cambia: es por cuenta, con su control de
 continuidad, vista previa y movimientos repetidos, y no depende de la caja. Un
 mismo crédito no lo pueden consumir dos cajas por encima de su importe.
 
+<a id="sin-corte-de-cuenta"></a>
+
+### Sin corte de la cuenta compartida
+
+Hubo un «corte» que declaraba una vez, para la cuenta entera, el saldo del banco
+a una fecha. Se sacó el 23/10/2026: no lo necesita ni Multas ni Aranceles. El
+saldo compartido no se reparte, cada caja reconoce solo lo que identifica, la
+frontera entre lo viejo y lo nuevo la pone la apertura de cada caja, y el saldo
+del banco lo trae el extracto. La migración `drop_bank_account_cutoffs` se niega
+a correr si encuentra un corte cargado.
+
 <a id="sin-identificar"></a>
 
 ### Créditos sin identificar
 
-Debajo de la cuenta, la caja lista los créditos posteriores al corte de la cuenta
-que nadie reconoció, del más viejo al más nuevo y de a cincuenta por página (M08):
-los de Aranceles se quedan en la cola, y sin recorrerla los de atrás no se
-alcanzarían. Los que llegaron entre el
-corte y la apertura de la caja también: no se verifican como un pago nuevo —la base
-lo impide— sino que se registran como pago anterior desde la ficha de la multa. Son **de la cuenta
+Debajo de la cuenta, la caja lista los créditos desde su apertura que nadie
+reconoció, del más viejo al más nuevo y de a cincuenta por página (M08): los de
+Aranceles se quedan en la cola, y sin recorrerla los de atrás no se alcanzarían.
+Lo anterior a la apertura no está en la cola: se registra como pago anterior
+desde la ficha de la multa. Son **de la cuenta
 compartida, no una deuda de Multas**: lo que no sea de Multas queda en la cola, sin
 asignarle una caja por descarte. El número del panel sale de la misma consulta, así
 que no cuenta lo ya imputado —la acreditación de un depósito de la caja, un pago
@@ -467,7 +477,7 @@ un cheque electrónico** (M02):
   la fecha de pago que dice el comprobante y, si es una transferencia judicial, el
   expediente judicial. El comprobante se adjunta al pago («Comprobante»).
 - **Verificar** (`multas.verificar-pagos`): se elige el crédito del extracto. Tiene
-  que ser de la cuenta de Multas, posterior al corte y a la apertura, libre y **por
+  que ser de la cuenta de Multas, desde la apertura de la caja, libre y **por
   el importe entero del pago**: un pago, un crédito, hasta que el área responda P14.
   Al verificar, el pago se aplica, sale el recibo (casilla «Depósito Cta.») y el
   crédito deja de estar en la cola de la caja.
@@ -554,7 +564,6 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.caja.reabrir` | Reabrir un período de Multas, con motivo | administrador, contador |
 | `multas.caja.exportar` | Descargar la planilla de un cierre de Multas | administrador, contador, administrativo, consulta |
 | `multas.caja.regenerar-planilla` | Rehacer la planilla de un cierre de Multas | administrador |
-| `banco.cuentas.declarar-corte` | Declarar el corte de una cuenta compartida, una sola vez | administrador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a
 los roles ya configurados (`RolesAndPermissionsSeeder`); uno que ya existía no se

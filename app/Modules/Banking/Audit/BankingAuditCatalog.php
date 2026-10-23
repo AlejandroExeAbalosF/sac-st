@@ -30,14 +30,6 @@ final class BankingAuditCatalog implements AuditCatalogContributor
         $catalog->registerActions(
             new AuditActionDefinition('banco.cuenta.registrada', 'Se registró una cuenta del organismo', 'Banco'),
             new AuditActionDefinition('banco.cuenta.corregida', 'Se corrigió la cuenta del organismo', 'Banco'),
-            // Fija qué créditos del extracto ya no entran a ningún libro.
-            new AuditActionDefinition(
-                'banco.cuenta.corte-declarado',
-                'Se declaró el corte de la cuenta compartida',
-                'Banco',
-                AuditSeverity::Critical,
-                metadata: ['corte' => 'Último día incluido', 'saldo' => 'Saldo según el banco', 'comprobante' => 'Comprobante'],
-            ),
             new AuditActionDefinition('banco.extracto.importado', 'Se importó el extracto', 'Banco'),
             new AuditActionDefinition('banco.extracto.rechazado', 'Se rechazó la importación del extracto', 'Banco'),
             new AuditActionDefinition(

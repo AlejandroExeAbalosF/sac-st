@@ -95,7 +95,7 @@ final class VerifyFineBankPayment
 
             if ($credito === null || ! $this->creditos->pending($apertura)->whereKey($creditoId)->exists()) {
                 throw ValidationException::withMessages([
-                    'bankTransactionId' => 'Ese crédito no está disponible: tiene que ser de la cuenta de Multas, posterior al corte y a la apertura, y nadie tiene que haberlo identificado.',
+                    'bankTransactionId' => 'Ese crédito no está disponible: tiene que ser de la cuenta de Multas, desde la apertura de la caja, y nadie tiene que haberlo identificado.',
                 ]);
             }
 

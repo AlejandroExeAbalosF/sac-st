@@ -457,12 +457,12 @@ Lo comprueban el Action y la base al vincular el movimiento. El día mismo de
 la apertura sí pertenece al circuito nuevo. Esto no cambia el registro tardío
 de movimientos posteriores a la apertura, aunque su día operativo esté cerrado.
 
-**Una cuenta compartida tiene además su propio corte.** Si una cuenta la usan
-varias cajas —la de Multas, mañana Aranceles—, su saldo se declara una vez, para
-la cuenta, en Banco › Cuentas (`bank_account_openings`). Un movimiento hasta ese
-día tampoco entra como dinero nuevo, sea cual sea la caja. La cuenta de Haberes
-no tiene corte —su saldo lo declaró la apertura de la caja, como «depósitos
-directos»— y no se le puede declarar uno, así que para Haberes nada cambia.
+**Una cuenta compartida no tiene un corte propio.** La de Multas, que mañana usa
+también Aranceles, no declara su saldo en ninguna apertura: no se reparte, y cada
+caja reconoce solo lo que identifica desde su propia apertura
+([multas.md#sin-corte-de-cuenta](multas.md#sin-corte-de-cuenta)). Para Haberes
+nada cambia: su saldo bancario lo declaró la apertura de la caja, como «depósitos
+directos».
 
 Una fecha antigua no demuestra por sí sola que el movimiento haya sido
 incluido correctamente en el saldo inicial. Se debe verificar esa inclusión;

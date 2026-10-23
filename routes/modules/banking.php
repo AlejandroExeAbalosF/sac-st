@@ -28,16 +28,6 @@ Route::middleware(['auth', 'verified'])->prefix('banco')->name('banco.')->group(
             ->name('cuentas.update');
     });
 
-    /*
-     * El corte de una cuenta compartida: su saldo se declara una vez, sin
-     * repartir entre las cajas que la usan, y no se corrige.
-     */
-    Route::middleware('can:banco.cuentas.declarar-corte')->group(function (): void {
-        Route::post('cuentas/{account}/corte', [BankAccountController::class, 'declareCutoff'])
-            ->whereNumber('account')
-            ->name('cuentas.corte.store');
-    });
-
     Route::middleware('can:banco.extractos.ver')->group(function (): void {
         Route::get('extractos', [BankStatementImportController::class, 'index'])->name('extractos.index');
         Route::get('movimientos', [BankTransactionController::class, 'index'])->name('movimientos.index');

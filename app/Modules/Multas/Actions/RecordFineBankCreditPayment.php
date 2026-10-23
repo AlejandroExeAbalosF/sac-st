@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
  * multa.
  *
  * Entró al banco antes de la apertura de la caja, así que está en el saldo
- * informado al corte, sin repartir: no entra al libro como cobro. Se
+ * que el área traía: no entra al libro como cobro. Se
  * registra como pago anterior al sistema, con el movimiento que lo
  * respalda (DER físico §3.8 y §4), y cuenta en el saldo de la multa cuando
  * alguien con permiso de ajustar lo valida.

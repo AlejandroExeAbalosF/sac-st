@@ -150,38 +150,24 @@ es la parte del excedente hecha de plata que está en el libro.
 
 ## Caja y cuenta compartida
 
-- El corte de una cuenta es uno, append-only (`bank_account_openings`, UNIQUE por
-  cuenta, `forbid_mutation()`). **Base.**
-- No hay corte sobre una cuenta cuyo saldo ya declaró la apertura de una caja
-  (pata `BANK_ACCOUNT` de un asiento de apertura), ni sobre una con créditos
-  imputados hasta esa fecha, ni que caiga en la vida de un libro que opera con
-  ella. **Base:** `bank_account_openings_guard`, con el candado de la cuenta.
-- Una apertura no declara saldo bancario sobre una cuenta con corte. **Base:**
-  `journal_lines_opening_without_shared_bank`.
+- No hay corte de la cuenta compartida: se sacó el 23/10/2026
+  (`drop_bank_account_cutoffs`). El saldo no se reparte y la frontera entre lo
+  viejo y lo nuevo es la apertura de cada caja; ver
+  [multas.md#sin-corte-de-cuenta](multas.md#sin-corte-de-cuenta).
 - El libro dice con qué cuenta opera, de su misma moneda. **Base:** FK compuesta
   `cash_book_openings (bank_account_id, currency) → bank_accounts (id, currency)`.
-- Un libro que opera con una cuenta con corte abre después del corte. **Base:**
-  `cash_book_openings_after_bank_cutoff`.
-- Un movimiento hasta el corte de su cuenta no se imputa en ningún libro, además
-  de la regla de la apertura de cada caja. **Base:** `bank_allocation_after_opening`.
+- Un movimiento anterior a la apertura de una caja no se imputa en su libro.
+  **Base:** `bank_allocation_after_opening`.
 - La caja de Multas abre en pesos, sin saldo bancario y con su cuenta. **Solo
   Action** (`OpenFineCashBook`): es política de la caja.
-- El saldo declarado coincide con el del extracto al cierre de ese día **solo si
-  un mismo archivo lo demuestra**: uno con filas antes y después del corte, leído
-  en su orden cronológico (fecha y, dentro del día, de abajo hacia arriba). Un
-  extracto que arranca después no dice nada del corte. **Solo Action**; sin ese
-  archivo, la pantalla muestra la verificación pendiente y se completa cuando
-  llega.
-- La conciliación compara el último saldo informado con lo movido **hasta ese
-  mismo movimiento**, incluido el orden dentro del día; lo posterior se cuenta
-  aparte como no contrastable. **Solo pantalla.**
 - El orden de un día sale de los extractos (`BankDayOrder`): cada archivo ordena
   sus filas y los movimientos que dos archivos comparten unen esos órdenes. Si no
   queda un único orden posible, el día es indeterminado y de él no se afirma ni
   un saldo final ni un salto. Cuál archivo se importó último no ordena nada. Lo
-  usan el último saldo, la conciliación y el aviso de continuidad entre extractos.
-- La cola de créditos sin clasificar excluye los que respaldan un pago anterior
-  vigente. **Solo pantalla.**
+  usan el último saldo informado (`LatestStatementBalance`) y el aviso de
+  continuidad entre extractos.
+- La cola de créditos sin clasificar arranca en la apertura de la caja y excluye
+  los que respaldan un pago anterior vigente. **Solo pantalla.**
 
 <a id="credito-viejo"></a>
 
@@ -315,7 +301,7 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
   cuenta—. **Base:** `cheque_rejections_guard`; **Action:**
   `ConfirmChequeNeverCredited`.
 - El crédito y el débito son movimientos enteros de la cuenta del traslado, por
-  el importe del cheque, sin otro uso y posteriores al corte. **Base:**
+  el importe del cheque, sin otro uso y desde la apertura. **Base:**
   `cheque_rejection_movement_whole`; **Action:** `RejectedChequeMovements`.
 - En el motor preparado, de fecha posible: no anteriores al día previo al depósito, y el débito no
   anterior al crédito. El aviso del rechazo no es un límite: puede llegar después
@@ -395,8 +381,8 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 ## Pagos por banco
 
 - Lo bancario nace `reported` y no toca la deuda. **Base:** `fine_payments_guard`.
-- Se verifica con **un** crédito de la cuenta de la caja de Multas, posterior al
-  corte de la cuenta y a la apertura de la caja, libre y por el importe entero del
+- Se verifica con **un** crédito de la cuenta de la caja de Multas, desde la
+  apertura de la caja, libre y por el importe entero del
   pago (P14 provisorio). **Action:** `VerifyFineBankPayment` con
   `FineBankCredits::pending`. **Base:** `bank_allocation_after_opening` (fechas) y
   `fine_payment_application_bank_credit`: una sola imputación vigente detrás de la

@@ -188,7 +188,6 @@ class DepositoConcurrenteDeMultasTest extends TestCase
     private function cobroEnCaja(bool $cheque = false): array
     {
         $cuenta = $this->cuenta();
-        $this->cortar($cuenta, '2026-05-31');
         $this->abrirMultas($cuenta, '2026-06-01');
 
         $multa = app(RegisterFine::class)->handle([

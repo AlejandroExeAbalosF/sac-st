@@ -388,7 +388,6 @@ class CobroEnCajaDeMultasTest extends TestCase
     private function escenario(string $registrada = '2026-05-07'): Fine
     {
         $cuenta = $this->cuenta();
-        $this->cortar($cuenta, '2026-05-31');
         $this->abrirMultas($cuenta, '2026-06-01');
 
         return $this->multa($registrada);

@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Concerns;
 
-use App\Modules\Banking\Actions\DeclareBankAccountCutoff;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankStatementRow;
 use App\Modules\Banking\Models\BankTransaction;
@@ -17,8 +15,8 @@ use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonImmutable;
 
 /**
- * Una cuenta bancaria compartida por Multas y Aranceles, sus movimientos,
- * su corte y la apertura de la caja de Multas.
+ * Una cuenta bancaria compartida por Multas y Aranceles, sus movimientos y
+ * la apertura de la caja de Multas.
  *
  * Los movimientos se crean directo, con su importación, como en
  * `SalidasDelAppendOnlyTest`: lo que se prueba es lo que pasa después.
@@ -135,18 +133,6 @@ trait BuildsSharedBankAccount
             $movimientos,
             array_keys($movimientos),
         ));
-    }
-
-    protected function cortar(BankAccount $cuenta, string $fecha = '2026-05-31', string $saldo = '1500000.00'): BankAccountOpening
-    {
-        return app(DeclareBankAccountCutoff::class)->handle(
-            $cuenta,
-            CarbonImmutable::parse($fecha),
-            $saldo,
-            'Extracto del banco',
-            null,
-            $this->quienAbre(),
-        );
     }
 
     protected function abrirMultas(BankAccount $cuenta, string $fecha = '2026-06-01'): CashBookOpening

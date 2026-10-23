@@ -6,7 +6,6 @@ namespace App\Modules\Multas\Support;
 
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
-use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
@@ -23,8 +22,8 @@ use Illuminate\Database\Eloquent\Builder;
  * - **Viejos** (`search`): anteriores a la apertura de la caja, para un pago
  *   anterior al sistema. La base repite cada condición
  *   (`fine_historical_bank_credit`).
- * - **Disponibles** (`available`): posteriores al corte de la cuenta y a la
- *   apertura, para verificar un pago por el banco. La base repite las suyas
+ * - **Disponibles** (`available`): desde la apertura de la caja, para
+ *   verificar un pago por el banco. La base repite las suyas
  *   (`bank_allocation_after_opening`, `fine_payment_application_bank_credit`).
  *
  * En los dos casos, sin imputar en ningún libro y sin un pago anterior
@@ -61,8 +60,8 @@ final class FineBankCredits
     }
 
     /**
-     * Los créditos libres posteriores al corte y a la apertura, para verificar
-     * un pago por el banco.
+     * Los créditos libres desde la apertura de la caja, para verificar un pago
+     * por el banco.
      *
      * @return list<FineBankCreditData>
      */
@@ -78,47 +77,22 @@ final class FineBankCredits
     }
 
     /**
-     * Lo que entró a la cuenta de la caja después de su corte y de la apertura
-     * de la caja, y nadie identificó todavía.
+     * Lo que entró a la cuenta de la caja desde su apertura y nadie
+     * identificó todavía.
+     *
+     * Es también la cola de «pendiente de clasificación de caja» (M08): lo
+     * anterior a la apertura ya está en el saldo que el área traía y solo
+     * puede respaldar un pago anterior de una multa (`eligible`).
      *
      * @return Builder<BankTransaction>
      */
     public function pending(CashBookOpening $apertura): Builder
     {
-        $corte = BankAccountOpening::query()->where('bank_account_id', $apertura->bank_account_id)->value('cutoff_on');
-
         return $this->libres(BankTransaction::query()
             ->where('bank_account_id', $apertura->bank_account_id)
             ->where('direction', TransactionDirection::Credit->value)
             ->where('reconciliation_status', ReconciliationStatus::Pending->value)
-            ->where('transaction_date', '>=', $apertura->opened_on->toDateString())
-            ->when($corte !== null, fn (Builder $q) => $q->where('transaction_date', '>', $corte)));
-    }
-
-    /**
-     * La cola de «pendiente de clasificación de caja» (M08): lo que entró a
-     * la cuenta después de su corte —o de la apertura de la caja, si la
-     * cuenta no tiene corte— y nadie identificó.
-     *
-     * Incluye lo que llegó entre el corte y la apertura de la caja: sigue
-     * sin dueño, aunque no se pueda verificar como un pago nuevo —la base lo
-     * impide— sino registrar como pago anterior de una multa.
-     *
-     * @return Builder<BankTransaction>
-     */
-    public function unidentified(CashBookOpening $apertura): Builder
-    {
-        $corte = BankAccountOpening::query()->where('bank_account_id', $apertura->bank_account_id)->value('cutoff_on');
-
-        return $this->libres(BankTransaction::query()
-            ->where('bank_account_id', $apertura->bank_account_id)
-            ->where('direction', TransactionDirection::Credit->value)
-            ->where('reconciliation_status', ReconciliationStatus::Pending->value)
-            ->when(
-                $corte !== null,
-                fn (Builder $q) => $q->where('transaction_date', '>', $corte),
-                fn (Builder $q) => $q->where('transaction_date', '>=', $apertura->opened_on->toDateString()),
-            ));
+            ->where('transaction_date', '>=', $apertura->opened_on->toDateString()));
     }
 
     /**

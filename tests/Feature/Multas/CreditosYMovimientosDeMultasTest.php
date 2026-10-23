@@ -189,23 +189,6 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('creditos.items.0.credit.id', $credito->id));
     }
 
-    /** Lo que entró entre el corte y la apertura sigue en la cola, como pago anterior. */
-    public function test_a_credit_before_the_opening_stays_in_the_queue_as_a_previous_payment(): void
-    {
-        $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
-        $this->abrirMultas($this->laCuenta, '2026-06-10');
-        $anterior = $this->movimiento($this->laCuenta, '2026-06-05', '6000.00');
-
-        $this->actingAs($this->operador('contador'))
-            ->get(route('multas.caja.index'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('creditos.items.0.credit.id', $anterior->id)
-                ->where('creditos.items.0.beforeOpening', true)
-                ->where('creditos.items.0.reported', [])
-                ->where('bank.unclassifiedCount', 1));
-    }
-
     /** Mirar la cola es de cualquiera que mire la caja; identificar, de quien concilia. */
     public function test_only_who_verifies_payments_can_identify(): void
     {
@@ -403,7 +386,6 @@ class CreditosYMovimientosDeMultasTest extends TestCase
     private function escenario(): Fine
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-05-31');
         $this->abrirMultas($this->laCuenta, '2026-06-01');
 
         $this->travelTo(CarbonImmutable::parse('2026-09-01 10:00'));

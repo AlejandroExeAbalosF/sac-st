@@ -12,7 +12,9 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * suman nunca (M08, M12):
  *
  * - lo que dice el banco de la cuenta entera, compartida con Aranceles;
- * - lo que el libro de Multas tiene cobrado en ella.
+ * - lo reconocido en el libro de Multas, que no es su parte del saldo del
+ *   banco: de las salidas de la cuenta solo se conocen las que el libro
+ *   registró.
  */
 #[TypeScript]
 final class FineBankPanelData extends Data
@@ -20,21 +22,22 @@ final class FineBankPanelData extends Data
     public function __construct(
         public int $bankAccountId,
         public string $bankAccountLabel,
-        /** El último día incluido en el saldo declarado; nulo si todavía no se declaró. */
-        public ?string $cutoffOn,
-        /** @var numeric-string|null */
-        public ?string $cutoffBalance,
-        /** @var numeric-string|null */
+        /**
+         * El último saldo que informó un extracto: el de la cuenta entera.
+         *
+         * @var numeric-string|null
+         */
         public ?string $latestStatementBalance,
         public ?string $latestStatementDate,
         /**
-         * Lo que el libro de Multas tiene en la cuenta. En cero hasta que
-         * existan los cobros (Etapa 4).
+         * Lo que el libro de Multas tiene asentado en la cuenta: depósitos
+         * acreditados y pagos verificados, menos los débitos de cheques
+         * rechazados.
          *
          * @var numeric-string
          */
         public string $bookBalance,
-        /** Créditos posteriores al corte que todavía ninguna caja reconoció. */
+        /** Créditos desde la apertura de la caja que todavía ninguna caja reconoció. */
         public int $unclassifiedCount,
         /** @var numeric-string */
         public string $unclassifiedAmount,

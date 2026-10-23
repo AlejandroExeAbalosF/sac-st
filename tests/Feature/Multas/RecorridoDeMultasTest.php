@@ -53,7 +53,6 @@ class RecorridoDeMultasTest extends TestCase
     public function test_the_whole_multas_circuit_closes_september_and_judges_october(): void
     {
         $this->laCuenta = $this->cuenta();
-        $this->cortar($this->laCuenta, '2026-08-31');
         $this->abrirMultas($this->laCuenta, '2026-09-01');
 
         // ── Septiembre ──────────────────────────────────────────────────

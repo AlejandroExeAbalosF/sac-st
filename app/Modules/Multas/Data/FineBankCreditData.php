@@ -24,7 +24,7 @@ final class FineBankCreditData extends Data
         public ?string $description,
         public ?string $counterparty,
         public ?string $operationId,
-        /** Lo dejaron fuera del circuito: está en el saldo al corte. */
+        /** Lo dejaron fuera del circuito: ya estaba en el saldo anterior a la caja. */
         public bool $ignored,
     ) {}
 

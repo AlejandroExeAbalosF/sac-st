@@ -201,7 +201,7 @@ final class FineController extends Controller
              */
             'creditosDelBanco' => Inertia::optional(fn (): array => $creditos->search($request->string('credito')->toString())),
             /*
-             * Los créditos posteriores al corte y a la apertura que nadie
+             * Los créditos desde la apertura de la caja que nadie
              * identificó, para verificar un pago por el banco. También al buscar.
              */
             'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),

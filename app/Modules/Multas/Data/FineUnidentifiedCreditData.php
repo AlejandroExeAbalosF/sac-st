@@ -20,11 +20,6 @@ final class FineUnidentifiedCreditData extends Data
 {
     public function __construct(
         public FineBankCreditData $credit,
-        /**
-         * Entró antes de que la caja abriera: no se verifica como un pago
-         * nuevo, se registra como pago anterior desde la ficha de la multa.
-         */
-        public bool $beforeOpening,
         /** @var list<FinePendingPaymentData> */
         public array $reported,
     ) {}

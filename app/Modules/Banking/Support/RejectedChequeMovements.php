@@ -23,8 +23,8 @@ use Illuminate\Validation\ValidationException;
  * Los movimientos del extracto de un cheque rechazado: el crédito que el banco
  * hizo antes de rechazarlo y el débito con que lo revierte.
  *
- * Cada uno es un movimiento entero de la cuenta del traslado, posterior al
- * corte y a la apertura, y sin otro uso: el remanente de otro movimiento no
+ * Cada uno es un movimiento entero de la cuenta del traslado, desde la
+ * apertura, y sin otro uso: el remanente de otro movimiento no
  * es el débito de este cheque. Y de fecha posible: el banco no acredita ni
  * debita un cheque antes de que se deposite —se admite un día antes, por si
  * el ticket se cargó con la fecha mal—, ni lo debita antes de haberlo

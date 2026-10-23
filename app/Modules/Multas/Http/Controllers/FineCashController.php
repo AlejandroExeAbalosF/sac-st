@@ -7,9 +7,8 @@ namespace App\Modules\Multas\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankTransaction;
-use App\Modules\Banking\Support\AccountCutoffBalance;
+use App\Modules\Banking\Support\LatestStatementBalance;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Models\CashBookOpening;
@@ -47,7 +46,7 @@ use Inertia\Response;
  *
  * Antes de abrir, el formulario; después, lo declarado y la cuenta en dos
  * números separados —el saldo del banco, compartido con Aranceles, y lo
- * cobrado por Multas— que no se suman nunca, y los cobros por depositar y
+ * reconocido en el libro de Multas— que no se suman nunca, y los cobros por depositar y
  * en tránsito. Arqueos y cierres llegan en la Etapa 6.
  */
 final class FineCashController extends Controller
@@ -57,7 +56,7 @@ final class FineCashController extends Controller
 
     public function __construct(
         private readonly OpeningLines $lineas,
-        private readonly AccountCutoffBalance $saldos,
+        private readonly LatestStatementBalance $saldos,
         private readonly FineDeposits $depositos,
         private readonly FineBankCredits $creditos,
     ) {}
@@ -174,36 +173,25 @@ final class FineCashController extends Controller
     }
 
     /**
-     * Las cuentas en pesos que la caja puede declarar, con su corte.
+     * Las cuentas en pesos con las que la caja puede operar.
      *
-     * El corte se muestra para sugerir la fecha: la caja abre después.
-     *
-     * @return list<array{id: int, label: string, cutoffOn: string|null}>
+     * @return list<array{id: int, label: string}>
      */
     private function bankAccounts(): array
     {
-        $cortes = BankAccountOpening::query()->pluck('cutoff_on', 'bank_account_id');
-
         return array_values(BankAccount::query()
             ->where('is_active', true)
             ->where('currency', Currency::Ars->value)
             ->orderBy('label')
             ->get()
-            ->map(fn (BankAccount $cuenta): array => [
-                'id' => $cuenta->id,
-                'label' => $cuenta->label,
-                'cutoffOn' => isset($cortes[$cuenta->id])
-                    ? CarbonImmutable::parse((string) $cortes[$cuenta->id])->toDateString()
-                    : null,
-            ])
+            ->map(fn (BankAccount $cuenta): array => ['id' => $cuenta->id, 'label' => $cuenta->label])
             ->all());
     }
 
     private function bankPanel(CashBox $caja, CashBookOpening $apertura): FineBankPanelData
     {
         $cuenta = BankAccount::query()->findOrFail($apertura->bank_account_id);
-        $corte = BankAccountOpening::query()->where('bank_account_id', $cuenta->id)->first();
-        $ultimo = $this->saldos->latest($cuenta->id);
+        $ultimo = $this->saldos->of($cuenta->id);
 
         $enElLibro = DB::table('journal_lines')
             ->join('financial_events', 'financial_events.id', '=', 'journal_lines.financial_event_id')
@@ -215,19 +203,17 @@ final class FineCashController extends Controller
             ->value('saldo');
 
         /*
-         * Lo que entró después del corte y de la apertura y nadie identificó:
+         * Lo que entró desde la apertura de la caja y nadie identificó:
          * es la cola de «pendiente de clasificación de caja» (M08), sin tabla
          * propia. La misma consulta que la cola, así que descarta también lo
          * ya imputado —la acreditación de un depósito de la caja, un pago
          * verificado— y lo que respalda un pago anterior vigente.
          */
-        $pendientes = $this->creditos->unidentified($apertura);
+        $pendientes = $this->creditos->pending($apertura);
 
         return new FineBankPanelData(
             bankAccountId: $cuenta->id,
             bankAccountLabel: $cuenta->label,
-            cutoffOn: $corte?->cutoff_on->toDateString(),
-            cutoffBalance: $corte?->statement_balance,
             latestStatementBalance: $ultimo['balance'] ?? null,
             latestStatementDate: $ultimo['date'] ?? null,
             bookBalance: Decimal::scale((string) ($enElLibro ?? '0')),
@@ -245,7 +231,7 @@ final class FineCashController extends Controller
      */
     private function creditosSinIdentificar(CashBookOpening $apertura, int $pagina): array
     {
-        $consulta = fn (int $pagina) => $this->creditos->unidentified($apertura)
+        $consulta = fn (int $pagina) => $this->creditos->pending($apertura)
             ->orderBy('transaction_date')
             ->orderBy('id')
             ->paginate(perPage: self::COLA, pageName: 'creditos', page: $pagina);
@@ -268,19 +254,13 @@ final class FineCashController extends Controller
             ->orderBy('id')
             ->get();
 
-        $filas = array_values($creditos->map(function (BankTransaction $credito) use ($apertura, $informados): FineUnidentifiedCreditData {
-            $anterior = $credito->transaction_date?->lt($apertura->opened_on) ?? false;
-
-            return new FineUnidentifiedCreditData(
-                credit: FineBankCreditData::fromModel($credito),
-                beforeOpening: $anterior,
-                // Uno anterior a la apertura no puede respaldar un pago informado: no se ofrece ninguno.
-                reported: $anterior ? [] : array_values($informados
-                    ->filter(fn (FinePayment $pago): bool => Decimal::equals($pago->amount, Decimal::abs($credito->amount)))
-                    ->map(fn (FinePayment $pago): FinePendingPaymentData => FinePendingPaymentData::fromModel($pago))
-                    ->all()),
-            );
-        })->all());
+        $filas = array_values($creditos->map(fn (BankTransaction $credito): FineUnidentifiedCreditData => new FineUnidentifiedCreditData(
+            credit: FineBankCreditData::fromModel($credito),
+            reported: array_values($informados
+                ->filter(fn (FinePayment $pago): bool => Decimal::equals($pago->amount, Decimal::abs($credito->amount)))
+                ->map(fn (FinePayment $pago): FinePendingPaymentData => FinePendingPaymentData::fromModel($pago))
+                ->all()),
+        ))->all());
 
         return ['items' => $filas, 'page' => $paginados->currentPage(), 'lastPage' => $paginados->lastPage()];
     }

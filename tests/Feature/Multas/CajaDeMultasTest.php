@@ -38,7 +38,6 @@ class CajaDeMultasTest extends TestCase
     public function test_the_box_opens_with_cash_cheques_and_its_account_but_no_bank_balance(): void
     {
         $cuenta = $this->cuenta();
-        $this->cortar($cuenta, '2026-05-31', '1500000.00');
         $this->movimiento($cuenta, '2026-06-03', '80000.00', saldo: '1580000.00');
 
         $this->actingAs($this->operador('administrador'))
@@ -69,7 +68,6 @@ class CajaDeMultasTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/caja')
                 ->where('opening.date', '2026-06-01')
-                ->where('bank.cutoffBalance', '1500000.00')
                 ->where('bank.latestStatementBalance', '1580000.00')
                 ->where('bank.bookBalance', '0.00')
                 ->where('bank.unclassifiedCount', 1)
@@ -186,9 +184,9 @@ class CajaDeMultasTest extends TestCase
     public function test_a_linked_credit_is_not_booked_and_its_date_is_the_banks(): void
     {
         /*
-         * Un crédito entre el corte (31/05) y la apertura de la caja (10/06):
-         * no está en el saldo declarado, así que la guarda del corte no lo
-         * frena; lo frena el pago anterior que lo usa.
+         * Un crédito anterior a la apertura de la caja (10/06), imputado en
+         * otro libro —Haberes, que abrió mucho antes—: la regla de la
+         * apertura no lo frena; lo frena el pago anterior que lo usa.
          */
         [$cuenta, $multa] = $this->escenario(apertura: '2026-06-10');
         $credito = $this->movimiento($cuenta, '2026-06-05', '500.00');
@@ -225,26 +223,27 @@ class CajaDeMultasTest extends TestCase
             ->assertSessionHasNoErrors();
     }
 
-    /** Revisión de la etapa 3, R3: un crédito identificado sale de la cola de pendientes. */
-    public function test_an_identified_credit_leaves_the_unclassified_queue(): void
+    /**
+     * La cola de créditos sin reconocer arranca en la apertura de la caja: lo
+     * anterior ya estaba en el saldo que el área traía, y solo puede
+     * respaldar un pago anterior de una multa.
+     */
+    public function test_the_unclassified_queue_starts_when_the_box_opened(): void
     {
         [$cuenta, $multa] = $this->escenario(apertura: '2026-06-10');
-        $identificado = $this->movimiento($cuenta, '2026-06-05', '500.00');
-        $this->movimiento($cuenta, '2026-06-06', '300.00');
-
-        $this->actingAs($this->operador())
-            ->post(route('multas.antecedentes.credito.store', $multa), ['bankTransactionId' => $identificado->id, 'evidence' => 'Nota de la empresa'])
-            ->assertSessionHasNoErrors();
-        $antecedente = FineHistoricalMovement::query()->sole();
-        $this->actingAs($this->operador('contador'))
-            ->post(route('multas.antecedentes.review', $antecedente), ['status' => 'validated'])
-            ->assertSessionHasNoErrors();
+        $anterior = $this->movimiento($cuenta, '2026-06-05', '500.00');
+        $this->movimiento($cuenta, '2026-06-12', '300.00');
 
         $this->actingAs($this->operador('consulta'))
             ->get(route('multas.caja.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('bank.unclassifiedCount', 1)
                 ->where('bank.unclassifiedAmount', '300.00'));
+
+        // El anterior sigue a mano para respaldar un pago anterior.
+        $this->actingAs($this->operador())
+            ->post(route('multas.antecedentes.credito.store', $multa), ['bankTransactionId' => $anterior->id, 'evidence' => 'Nota de la empresa'])
+            ->assertSessionHasNoErrors();
     }
 
     public function test_without_the_box_opened_no_credit_is_old_yet(): void
@@ -282,15 +281,14 @@ class CajaDeMultasTest extends TestCase
     // ── Andamiaje ───────────────────────────────────────────────────────
 
     /**
-     * La cuenta de Multas con corte al 31/05, la caja abierta después —el
-     * 01/06 si no se dice otra cosa— y una multa de 1.400.000.
+     * La cuenta de Multas, la caja abierta con ella —el 01/06 si no se dice
+     * otra cosa— y una multa de 1.400.000.
      *
      * @return array{0: BankAccount, 1: Fine}
      */
     private function escenario(string $apertura = '2026-06-01'): array
     {
         $cuenta = $this->cuenta();
-        $this->cortar($cuenta, '2026-05-31');
         $this->abrirMultas($cuenta, $apertura);
 
         return [$cuenta, $this->multa()];
