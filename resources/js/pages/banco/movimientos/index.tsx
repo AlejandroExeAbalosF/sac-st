@@ -108,7 +108,7 @@ export default function MovimientosIndex({
             <div className="space-y-6 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Banco"
-                    title="Movimientos"
+                    title="Movimientos bancarios"
                     description={`${transactions.total} movimientos registrados desde los extractos importados.`}
                 />
 

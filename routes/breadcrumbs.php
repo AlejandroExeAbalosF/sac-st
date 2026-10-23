@@ -78,12 +78,14 @@ Breadcrumbs::for('caja.calendario', fn (): array => [
 // ── Banking ──────────────────────────────────────────────────────────────
 
 /*
- * «Banco» es la pantalla de movimientos y no un rótulo suelto: es la decisión
- * que ya está tomada en la barra lateral —se entra por movimientos, y extractos
- * y cuentas cuelgan de ahí—, y las migas no pueden contar otra jerarquía.
+ * Las migas cuentan lo mismo que la barra lateral: el acordeón «Banco» con
+ * Movimientos y Extractos adentro. «Banco» enlaza a los movimientos porque es
+ * por donde se entra; en la pantalla de movimientos va sin enlace, que
+ * llevaría al mismo lugar.
  */
 Breadcrumbs::for('banco.movimientos.index', fn (): array => [
     Crumb::make('Banco'),
+    Crumb::make('Movimientos'),
 ]);
 
 Breadcrumbs::for('banco.extractos.index', fn (): array => [

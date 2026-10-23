@@ -38,17 +38,32 @@ describe('el grupo Haberes de la barra', () => {
 });
 
 describe('la sección Operación', () => {
-    it('deja afuera de los circuitos lo que sirve a los dos', () => {
-        const operacion = visiblesPara(navGroups, {}).find(
-            (grupo) => grupo.label === 'Operación',
-        );
+    it('pone el banco en su propio acordeón, aparte de los circuitos', () => {
+        const operacion = visiblesPara(navGroups, {
+            'banco.extractos.ver': true,
+        }).find((grupo) => grupo.label === 'Operación');
 
         expect(operacion?.items.map((item) => item.title)).toEqual([
             'Inicio',
             'Haberes',
             'Banco',
-            'Extractos',
         ]);
+        expect(
+            hijosPara('Banco', {
+                'banco.extractos.ver': true,
+                'banco.cuentas.ver': true,
+            }),
+        ).toEqual(['Movimientos', 'Extractos', 'Cuentas']);
+    });
+
+    it('muestra las cuentas a quien solo puede verlas', () => {
+        expect(hijosPara('Banco', { 'banco.cuentas.ver': true })).toEqual([
+            'Cuentas',
+        ]);
+    });
+
+    it('no ofrece el banco a quien no puede verlo', () => {
+        expect(hijosPara('Banco', {})).toBeUndefined();
     });
 });
 

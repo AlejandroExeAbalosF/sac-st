@@ -54,7 +54,7 @@ export default function ExtractosIndex({ imports, canImport }: Props) {
             <div className="space-y-6 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Banco"
-                    title="Extractos importados"
+                    title="Extractos bancarios"
                     description="Cada archivo descargado del banco, con lo que trajo y lo que ya estaba."
                     actions={
                         canImport ? (

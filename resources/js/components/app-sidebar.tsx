@@ -58,9 +58,9 @@ import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
  * Cada circuito es un acordeón con sus pantallas, y adentro siguen el
  * recorrido del dinero, no el esquema de la base: el expediente entra, se
  * paga y se cierra la caja. Lo que sirve a más de un circuito —el banco y
- * sus extractos— queda afuera, porque no es de ninguno. Los módulos futuros
- * se incorporan cuando estén disponibles para que la navegación describa
- * acciones reales.
+ * sus extractos— va en su propio acordeón, porque no es de ninguno. Los
+ * módulos futuros se incorporan cuando estén disponibles para que la
+ * navegación describa acciones reales.
  */
 export const navGroups: NavGroup[] = [
     {
@@ -184,25 +184,48 @@ export const navGroups: NavGroup[] = [
              * «repartirlo a mano» de la cuota.
              */
             /*
-             * Banco y Extractos son de los dos circuitos: los extractos de la
-             * cuenta de Multas se importan acá y de ahí salen los créditos que
-             * verifica su caja. Entra por «Movimientos» y no por «Extractos»:
-             * importar es el medio, y lo que el operador viene a hacer es
-             * mirar qué entró al banco.
+             * El banco es de los dos circuitos: los extractos de la cuenta de
+             * Multas se importan acá y de ahí salen los créditos que verifica
+             * su caja. Es un acordeón como los circuitos, y adentro los
+             * nombres cortos se entienden solos, igual que Multas ›
+             * Movimientos. Movimientos va primero: importar es el medio, y
+             * lo que el operador viene a hacer es mirar qué entró al banco.
              */
-            { title: 'Banco', href: movimientos(), icon: ArrowLeftRight },
-            { title: 'Extractos', href: extractos(), icon: FileSpreadsheet },
+            {
+                title: 'Banco',
+                icon: ArrowLeftRight,
+                children: [
+                    {
+                        title: 'Movimientos',
+                        href: movimientos(),
+                        icon: ArrowLeftRight,
+                        permission: 'banco.extractos.ver',
+                    },
+                    {
+                        title: 'Extractos',
+                        href: extractos(),
+                        icon: FileSpreadsheet,
+                        permission: 'banco.extractos.ver',
+                    },
+                    /*
+                     * Las cuentas contra las que se importan los extractos y
+                     * se declara el corte: se tocan poco, pero son del banco
+                     * y no un maestro general como Personas.
+                     */
+                    {
+                        title: 'Cuentas',
+                        href: cuentasBancarias(),
+                        icon: Landmark,
+                        permission: 'banco.cuentas.ver',
+                    },
+                ],
+            },
         ],
     },
     {
         label: 'Administración',
         items: [
             { title: 'Personas', href: personas(), icon: Contact },
-            {
-                title: 'Cuentas bancarias',
-                href: cuentasBancarias(),
-                icon: Landmark,
-            },
             /*
              * «Configuración» es un acordeón, igual que Caja, porque agrupa
              * varias pantallas hermanas y su título no es ninguna de ellas.

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -36,6 +38,25 @@ class BarraLateralTest extends TestCase
             ->get(route('inicio'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('sidebarSections', []));
+    }
+
+    /**
+     * El acordeón Banco se dibuja con este permiso: si no viajara, la barra
+     * lo escondería a todos, y si se mostrara sin él, terminaría en un 403.
+     */
+    public function test_tells_the_sidebar_who_can_see_the_bank(): void
+    {
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('inicio'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('auth.can', fn (Collection $can): bool => $can->get('banco.extractos.ver') === true
+                    && $can->get('banco.cuentas.ver') === true));
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('inicio'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('auth.can', fn (Collection $can): bool => $can->get('banco.extractos.ver') === false
+                    && $can->get('banco.cuentas.ver') === false));
     }
 
     public function test_discards_what_is_not_a_list_of_titles(): void

@@ -142,7 +142,7 @@ export default function BancoCuentas({
             <div className="space-y-6 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Banco"
-                    title="Cuentas del organismo"
+                    title="Cuentas bancarias"
                     description="Las cuentas contra las que se importan los extractos y se concilia el saldo."
                     actions={
                         canManage ? (
