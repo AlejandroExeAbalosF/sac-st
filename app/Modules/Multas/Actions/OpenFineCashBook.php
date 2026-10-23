@@ -56,7 +56,7 @@ final class OpenFineCashBook
 
         if ($ajenas !== []) {
             throw ValidationException::withMessages([
-                'balances' => 'La caja de Multas abre con su efectivo y sus cheques. El saldo de la cuenta bancaria se declara una vez, para la cuenta, en Banco › Cuentas.',
+                'balances' => 'La caja de Multas abre con su efectivo y sus cheques. El saldo de la cuenta bancaria es compartido con Aranceles y no se declara al abrir.',
             ]);
         }
 

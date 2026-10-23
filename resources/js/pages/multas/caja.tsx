@@ -90,9 +90,9 @@ const CHEQUES = 'CHEQUES_IN_CUSTODY';
  *
  * Abre como la de Haberes —el efectivo contado por billete y los cheques
  * detallados—, pero **sin saldo bancario**: la cuenta es compartida con
- * Aranceles y su saldo se declara una vez, para la cuenta, en Banco ›
- * Cuentas. Abierta, muestra los dos números que no se suman nunca: lo que
- * dice el banco de la cuenta entera y lo que Multas tiene cobrado en ella.
+ * Aranceles y su saldo no se reparte. Abierta, muestra los dos números que
+ * no se suman nunca: lo que dice el banco de la cuenta entera y lo
+ * reconocido en el libro de Multas.
  */
 export default function CajaDeMultas({
     opening,

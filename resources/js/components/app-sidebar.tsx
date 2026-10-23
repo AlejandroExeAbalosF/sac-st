@@ -208,9 +208,9 @@ export const navGroups: NavGroup[] = [
                         permission: 'banco.extractos.ver',
                     },
                     /*
-                     * Las cuentas contra las que se importan los extractos y
-                     * se declara el corte: se tocan poco, pero son del banco
-                     * y no un maestro general como Personas.
+                     * Las cuentas contra las que se importan los extractos:
+                     * se tocan poco, pero son del banco y no un maestro
+                     * general como Personas.
                      */
                     {
                         title: 'Cuentas',

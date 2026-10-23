@@ -12,9 +12,8 @@ use Illuminate\Validation\Rule;
  * La apertura de la caja de Multas: en pesos, con su efectivo y sus
  * cheques, y la cuenta bancaria con la que opera.
  *
- * El saldo de esa cuenta no viaja: es compartido con Aranceles y se declara
- * una vez, para la cuenta, en Banco › Cuentas (M08, M12). Lee los importes
- * igual que la apertura de Haberes.
+ * El saldo de esa cuenta no viaja: es compartido con Aranceles y no se
+ * reparte (M08, M12). Lee los importes igual que la apertura de Haberes.
  */
 final class OpenFineCashBookRequest extends RegisterOpeningBalanceRequest
 {
@@ -40,7 +39,7 @@ final class OpenFineCashBookRequest extends RegisterOpeningBalanceRequest
     {
         return [
             ...parent::messages(),
-            'balances.array' => 'La caja de Multas abre con su efectivo y sus cheques. El saldo de la cuenta bancaria se declara una vez, para la cuenta, en Banco › Cuentas.',
+            'balances.array' => 'La caja de Multas abre con su efectivo y sus cheques. El saldo de la cuenta bancaria es compartido con Aranceles y no se declara al abrir.',
             'bankAccountId.required' => 'Elegí la cuenta bancaria con la que opera la caja de Multas.',
             'bankAccountId.exists' => 'La cuenta tiene que estar activa y ser en pesos.',
         ];

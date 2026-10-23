@@ -77,9 +77,9 @@ export default function UnidentifiedCredits({
                     Créditos sin identificar
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Lo que entró a la cuenta compartida con Aranceles después de
-                    su corte y nadie reconoció todavía. No es una deuda de
-                    Multas: lo que no sea de Multas queda acá.
+                    Lo que entró a la cuenta compartida con Aranceles desde la
+                    apertura de la caja y nadie reconoció todavía. No es una
+                    deuda de Multas: lo que no sea de Multas queda acá.
                 </p>
             </header>
 
