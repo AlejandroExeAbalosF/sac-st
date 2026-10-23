@@ -18,6 +18,7 @@ import {
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
+import { activeChild } from '@/lib/nav-active';
 import { rememberSection } from '@/lib/sidebar-state';
 import type { NavGroup, NavItem } from '@/types';
 
@@ -49,11 +50,7 @@ export function NavMain({ groups = [] }: { groups: NavGroup[] }) {
                     <SidebarMenu>
                         {group.items.map((item) =>
                             item.children && item.children.length > 0 ? (
-                                <ItemConHijos
-                                    key={item.title}
-                                    item={item}
-                                    activo={isCurrentOrParentUrl}
-                                />
+                                <ItemConHijos key={item.title} item={item} />
                             ) : (
                                 <ItemSimple
                                     key={item.title}
@@ -124,11 +121,15 @@ function ItemSimple({ item, activo }: { item: NavItem; activo: Activo }) {
  * La flecha resume el estado —cerrado apunta a la derecha, abierto hacia
  * abajo— y el `isActive` marca al padre cuando la pantalla actual es una de
  * sus hijas, para que el módulo se reconozca aun con el acordeón cerrado.
+ * Se marca una sola hija, la más específica (ver `activeChild`).
  */
-function ItemConHijos({ item, activo }: { item: NavItem; activo: Activo }) {
+function ItemConHijos({ item }: { item: NavItem }) {
     const hijos = item.children ?? [];
-    const algunaActiva = hijos.some((hijo) => activo(hijo.href));
-    const { sidebarSections } = usePage().props;
+    const { currentUrl } = useCurrentUrl();
+    const { component, props } = usePage();
+    const activa = activeChild(hijos, currentUrl, component);
+    const algunaActiva = activa !== undefined;
+    const { sidebarSections } = props;
     const [abierto, setAbierto] = useState(
         () => algunaActiva || sidebarSections.includes(item.title),
     );
@@ -163,7 +164,7 @@ function ItemConHijos({ item, activo }: { item: NavItem; activo: Activo }) {
                             <SidebarMenuSubItem key={hijo.title}>
                                 <SidebarMenuSubButton
                                     asChild
-                                    isActive={activo(hijo.href)}
+                                    isActive={hijo === activa}
                                 >
                                     <Link href={hijo.href} prefetch>
                                         {hijo.icon && <hijo.icon />}

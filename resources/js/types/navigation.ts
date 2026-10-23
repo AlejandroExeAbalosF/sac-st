@@ -44,6 +44,13 @@ export type NavItem = {
      * navegar. Es para un módulo con varias pantallas hermanas, como Caja.
      */
     children?: NavLink[];
+    /**
+     * Componentes de Inertia que también marcan activa a esta sub-pantalla
+     * aunque su dirección no cuelgue de la suya: la ficha de una multa
+     * (`multas/show`, en `/multas/{id}`) es del listado de Multas. Ver
+     * `lib/nav-active`.
+     */
+    activeOn?: string[];
 };
 
 /**
