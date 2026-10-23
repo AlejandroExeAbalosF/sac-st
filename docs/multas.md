@@ -7,9 +7,10 @@ garantía en la base están en [reglas de Multas](multas-reglas.md).
 multas, su obligación y los pagos anteriores al sistema—, la apertura de la caja
 con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
 banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
-rechazado con su reemplazo, y la caja del día con su arqueo, su cierre y su
-planilla. Falta la cola para identificar los créditos de la cuenta compartida y la
-consulta operativa de movimientos.
+rechazado con su reemplazo, la caja del día con su arqueo, su cierre y su
+planilla, la cola de créditos sin identificar de la cuenta compartida y la
+consulta operativa del mes. Falta la rendición oficial, que espera el modelo del
+área (P02).
 
 ---
 
@@ -54,6 +55,7 @@ conoce. El test de fronteras lo exige.
 | Arqueos | `/multas/caja/arqueos` | `multas.caja.ver`; contar, `multas.caja.arquear` |
 | Cierres | `/multas/caja/cierres` | `multas.caja.ver`; cerrar, `multas.caja.cerrar` |
 | Calendario | `/multas/caja/calendario` | `multas.caja.ver` |
+| Movimientos del mes | `/multas/movimientos` | `multas.ver` |
 
 ### Cuenta corriente · `/multas`
 
@@ -215,6 +217,63 @@ vuelve.
 La importación de extractos no cambia: es por cuenta, con su control de
 continuidad, vista previa y movimientos repetidos, y no depende de la caja. Un
 mismo crédito no lo pueden consumir dos cajas por encima de su importe.
+
+<a id="sin-identificar"></a>
+
+### Créditos sin identificar
+
+Debajo de la cuenta, la caja lista los créditos posteriores al corte de la cuenta
+que nadie reconoció, del más viejo al más nuevo y de a cincuenta por página (M08):
+los de Aranceles se quedan en la cola, y sin recorrerla los de atrás no se
+alcanzarían. Los que llegaron entre el
+corte y la apertura de la caja también: no se verifican como un pago nuevo —la base
+lo impide— sino que se registran como pago anterior desde la ficha de la multa. Son **de la cuenta
+compartida, no una deuda de Multas**: lo que no sea de Multas queda en la cola, sin
+asignarle una caja por descarte. El número del panel sale de la misma consulta, así
+que no cuenta lo ya imputado —la acreditación de un depósito de la caja, un pago
+verificado— ni lo que respalda un pago anterior vigente.
+
+**Identificar** (`multas.verificar-pagos`) tiene dos caminos:
+
+- **Alguien lo informó**: la cola ofrece primero los pagos informados del mismo
+  importe. Se verifica ese pago, que conserva su presentación —la que decide el
+  término— y su respaldo. Un pago presentado el 29/09 e identificado el 02/10, con
+  septiembre cerrado el 30/09, queda en término.
+- **Nadie lo informó**: se busca la multa por expediente, resolución, acta o
+  carátula y se registra el pago verificado, presentado ese día.
+
+Identificar no crea otro movimiento bancario ni duplica nada: registra por primera
+vez en el libro de Multas el crédito que ya estaba en el extracto, con su
+aplicación y su recibo. Siguen el crédito entero, una sola multa, la clave contra
+el doble clic y la base frente a dos operadores con el mismo crédito; si el recibo
+falla, no queda nada a medias.
+
+<a id="movimientos"></a>
+
+## Movimientos del mes · `/multas/movimientos`
+
+Una **consulta operativa, no la rendición oficial** (P02): lo dicen la pantalla y el
+Excel. Va por secciones, cada una con la fecha que filtra y su propio total, **sin
+total general** (M10):
+
+| Sección | Filtra por |
+| --- | --- |
+| Cobros en caja | fecha de recepción |
+| Aplicaciones a la deuda, con su término: lo que redujo la deuda | fecha de aplicación |
+| Excedentes al aplicar: lo que el pago trajo de más (M05) | fecha de aplicación |
+| Depósitos al banco | fecha del depósito |
+| Cheques rechazados | fecha del rechazo |
+| Reemplazos de cheques | fecha de recepción del reemplazo |
+| Créditos del banco identificados | fecha de verificación |
+
+Un cobro, su aplicación, su depósito y el reemplazo de su cheque son hechos
+distintos del mismo dinero: sumarlos lo contaría varias veces. El depósito es un
+traslado y el reemplazo no es recaudación. Un depósito **cancelado** queda en la
+lista como antecedente pero no suma —el dinero no salió de la caja, y volver a
+depositarlo lo contaría dos veces—; la sección dice aparte cuánto quedó fuera de su
+total, y el Excel lo marca fila por fila. Uno devuelto por un rechazo sí ocurrió y
+suma. La pantalla muestra las primeras cien
+filas de cada sección; el Excel, que se arma por cursor, las trae todas.
 
 ---
 

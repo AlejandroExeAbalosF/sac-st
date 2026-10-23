@@ -1133,6 +1133,11 @@ declare namespace App {
                     caseLabel: string;
                     payment: App.Modules.Multas.Data.FinePaymentData;
                 };
+                export type FineUnidentifiedCreditData = {
+                    credit: App.Modules.Multas.Data.FineBankCreditData;
+                    beforeOpening: boolean;
+                    reported: App.Modules.Multas.Data.FinePendingPaymentData[];
+                };
             }
             namespace Enums {
                 export type AppealKind = 'hierarchical' | 'appeal';

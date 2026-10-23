@@ -308,6 +308,11 @@ Breadcrumbs::for('multas.caja.index', fn (): array => [
     Crumb::make('Caja'),
 ]);
 
+Breadcrumbs::for('multas.movimientos.index', fn (): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Movimientos'),
+]);
+
 // Las pantallas de caja de Ledger, con la caja de Multas. Quien solo opera
 // la caja (`multas.caja.ver` sin `multas.ver`) ve las migas sin enlace: las
 // dos pantallas de arriba le darían 403.

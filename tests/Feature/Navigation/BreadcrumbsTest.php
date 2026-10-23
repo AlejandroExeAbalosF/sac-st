@@ -42,6 +42,7 @@ const RUTAS_SIN_PANTALLA = [
     'multas.caja.cierres.sheet',
     'configuracion.auditoria.exportar',
     'multas.exportar',
+    'multas.movimientos.exportar',
 
     // Acceso anterior a la caja del día; ahora redirige a su URL canónica.
     'caja.index',
@@ -89,6 +90,7 @@ const RUTAS_SIN_PANTALLA = [
     'haberes.installments.panel',
     'haberes.cheques-en-custodia',
     'multas.caja.cheques',
+    'multas.caja.multas',
     'haberes.installments.disbursement.debits',
 
     /*

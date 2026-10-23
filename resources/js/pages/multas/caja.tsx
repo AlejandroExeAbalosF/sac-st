@@ -37,7 +37,9 @@ import type {
     AperturaExistente,
     Cheque,
 } from '@/features/caja/components/opening-parts';
+import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import CollectionDeposit from '@/features/multas/components/collection-deposit';
+import UnidentifiedCredits from '@/features/multas/components/unidentified-credits';
 import { PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { businessToday, date, isNonZero } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
@@ -70,6 +72,14 @@ type Props = {
     canReplaceCheque: boolean;
     /** Ver la caja del día, los arqueos y los cierres de Multas. */
     canViewCashDay: boolean;
+    /** Los créditos de la cuenta compartida que nadie identificó, los más viejos. */
+    creditos: {
+        items: App.Modules.Multas.Data.FineUnidentifiedCreditData[];
+        page: number;
+        lastPage: number;
+    };
+    canIdentify: boolean;
+    firmantes: Firmante[];
 };
 
 const EFECTIVO = 'CASH_ON_HAND';
@@ -107,6 +117,9 @@ export default function CajaDeMultas({
     canManageRejections,
     canReplaceCheque,
     canViewCashDay,
+    creditos,
+    canIdentify,
+    firmantes,
 }: Props) {
     const permisos = {
         canDeposit,
@@ -167,6 +180,17 @@ export default function CajaDeMultas({
                     <>
                         <AperturaHecha existing={opening} />
                         {bank && <PanelBancario banco={bank} />}
+                        {bank && (
+                            <UnidentifiedCredits
+                                creditos={creditos.items}
+                                pagina={creditos.page}
+                                ultimaPagina={creditos.lastPage}
+                                cantidad={bank.unclassifiedCount}
+                                total={bank.unclassifiedAmount}
+                                puedeIdentificar={canIdentify}
+                                firmantes={firmantes}
+                            />
+                        )}
                         <Cobros
                             titulo="Cobros por depositar"
                             vacio="No hay cobros en la caja esperando el depósito."

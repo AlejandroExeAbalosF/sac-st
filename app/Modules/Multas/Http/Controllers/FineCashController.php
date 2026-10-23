@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Banking\Enums\ReconciliationStatus;
-use App\Modules\Banking\Enums\TransactionDirection;
+use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankAccountOpening;
 use App\Modules\Banking\Models\BankTransaction;
@@ -17,11 +16,17 @@ use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\OpeningLines;
 use App\Modules\Multas\Actions\OpenFineCashBook;
+use App\Modules\Multas\Data\FineBankCreditData;
 use App\Modules\Multas\Data\FineBankPanelData;
 use App\Modules\Multas\Data\FinePendingPaymentData;
+use App\Modules\Multas\Data\FineUnidentifiedCreditData;
 use App\Modules\Multas\Enums\FineCollectionPlace;
+use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Http\Requests\OpenFineCashBookRequest;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineChequeInventory;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Shared\Models\CashBox;
@@ -47,16 +52,21 @@ use Inertia\Response;
  */
 final class FineCashController extends Controller
 {
+    /** Cuántos créditos sin identificar muestra cada página de la cola. */
+    private const COLA = 50;
+
     public function __construct(
         private readonly OpeningLines $lineas,
         private readonly AccountCutoffBalance $saldos,
         private readonly FineDeposits $depositos,
+        private readonly FineBankCredits $creditos,
     ) {}
 
     public function index(Request $request): Response
     {
         $caja = $this->cashBox();
         $apertura = CashBookOpening::for((int) $caja->id, Currency::Ars);
+        $identifica = ($request->user()?->can('multas.verificar-pagos') ?? false) && $apertura?->bank_account_id !== null;
 
         return Inertia::render('multas/caja', [
             'opening' => $apertura === null ? null : [
@@ -84,6 +94,24 @@ final class FineCashController extends Controller
             'canConfirmDeposit' => $request->user()?->can('multas.verificar-pagos') ?? false,
             'canViewAttachments' => $request->user()?->can('adjuntos.ver') ?? false,
             'canViewCashDay' => $request->user()?->can('multas.caja.ver') ?? false,
+            /*
+             * Los créditos de la cuenta compartida que nadie identificó (M08),
+             * del más viejo al más nuevo. Identificar es de quien concilia;
+             * mirar la cola, de cualquiera que mire la caja.
+             */
+            /*
+             * Por páginas: los de Aranceles se quedan en la cola, y sin
+             * recorrerla entera los de atrás nunca se alcanzarían.
+             */
+            'creditos' => $apertura?->bank_account_id === null
+                ? ['items' => [], 'page' => 1, 'lastPage' => 1]
+                : $this->creditosSinIdentificar($apertura, max(1, $request->integer('creditos', 1))),
+            'canIdentify' => $identifica,
+            'firmantes' => $identifica ? User::query()
+                ->where('is_active', true)
+                ->whereNotNull('position')
+                ->orderBy('name')
+                ->get(['id', 'name', 'position']) : [],
         ]);
     }
 
@@ -98,6 +126,33 @@ final class FineCashController extends Controller
             // Quien solo opera la caja ve de qué multa es cada cheque, sin enlace.
             canOpenFines: $request->user()?->can('multas.ver') ?? false,
         ));
+    }
+
+    /**
+     * Las multas que coinciden con lo que se busca, para identificar un
+     * crédito que nadie informó: expediente, resolución, acta o carátula.
+     */
+    public function fines(Request $request): JsonResponse
+    {
+        $termino = trim((string) $request->query('q', ''));
+
+        if (mb_strlen($termino) < 2) {
+            return response()->json([]);
+        }
+
+        return response()->json(Fine::query()
+            ->buscar($termino)
+            ->with(['fineCase', 'balance'])
+            ->orderByDesc('id')
+            ->limit(15)
+            ->get()
+            ->map(fn (Fine $multa): array => [
+                'id' => $multa->id,
+                'caseLabel' => $multa->fineCase->label(),
+                'caption' => $multa->caption,
+                'debt' => $multa->balance->debt ?? '0.00',
+            ])
+            ->values());
     }
 
     public function store(OpenFineCashBookRequest $request, OpenFineCashBook $abrir): RedirectResponse
@@ -160,26 +215,13 @@ final class FineCashController extends Controller
             ->value('saldo');
 
         /*
-         * Lo que entró después del corte —o de la apertura, si la cuenta
-         * todavía no tiene corte— y nadie identificó: es la cola de
-         * «pendiente de clasificación de caja» (M08), sin tabla propia. Un
-         * crédito que ya respalda un pago anterior vigente está identificado
-         * aunque no tenga imputación en el libro; si ese pago se descarta,
-         * vuelve a la cola.
+         * Lo que entró después del corte y de la apertura y nadie identificó:
+         * es la cola de «pendiente de clasificación de caja» (M08), sin tabla
+         * propia. La misma consulta que la cola, así que descarta también lo
+         * ya imputado —la acreditación de un depósito de la caja, un pago
+         * verificado— y lo que respalda un pago anterior vigente.
          */
-        $desde = $corte?->cutoff_on->addDay() ?? $apertura->opened_on;
-
-        $pendientes = BankTransaction::query()
-            ->where('bank_account_id', $cuenta->id)
-            ->where('direction', TransactionDirection::Credit->value)
-            ->where('reconciliation_status', ReconciliationStatus::Pending->value)
-            ->where('transaction_date', '>=', $desde->toDateString())
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')
-                ->from('fine_historical_movements')
-                ->whereColumn('fine_historical_movements.bank_transaction_id', 'bank_transactions.id')
-                ->where('fine_historical_movements.status', '<>', 'rejected'))
-            ->selectRaw('COUNT(*) AS cantidad, COALESCE(SUM(amount), 0) AS total')
-            ->first();
+        $pendientes = $this->creditos->unidentified($apertura);
 
         return new FineBankPanelData(
             bankAccountId: $cuenta->id,
@@ -189,9 +231,58 @@ final class FineCashController extends Controller
             latestStatementBalance: $ultimo['balance'] ?? null,
             latestStatementDate: $ultimo['date'] ?? null,
             bookBalance: Decimal::scale((string) ($enElLibro ?? '0')),
-            unclassifiedCount: (int) ($pendientes?->getAttribute('cantidad') ?? 0),
-            unclassifiedAmount: Decimal::scale((string) ($pendientes?->getAttribute('total') ?? '0')),
+            unclassifiedCount: (clone $pendientes)->count(),
+            unclassifiedAmount: Decimal::scale((string) (clone $pendientes)->sum('amount')),
         );
+    }
+
+    /**
+     * Los créditos sin identificar, con los pagos informados del mismo
+     * importe que podrían ser el suyo. Del más viejo al más nuevo: es lo que
+     * lleva más tiempo esperando.
+     *
+     * @return array{items: list<FineUnidentifiedCreditData>, page: int, lastPage: int}
+     */
+    private function creditosSinIdentificar(CashBookOpening $apertura, int $pagina): array
+    {
+        $consulta = fn (int $pagina) => $this->creditos->unidentified($apertura)
+            ->orderBy('transaction_date')
+            ->orderBy('id')
+            ->paginate(perPage: self::COLA, pageName: 'creditos', page: $pagina);
+
+        $paginados = $consulta($pagina);
+
+        // Una página que ya no existe —se identificaron los de la última— cae en la última.
+        if ($paginados->currentPage() > $paginados->lastPage()) {
+            $paginados = $consulta($paginados->lastPage());
+        }
+        $creditos = collect($paginados->items());
+
+        $informados = FinePayment::query()
+            ->where('status', FinePaymentStatus::Reported)
+            // Lo que llega por el banco: el cobro de mostrador no se informa.
+            ->whereNotIn('medium', [FinePaymentMedium::Cash, FinePaymentMedium::Cheque])
+            ->whereIn('amount', $creditos->map(fn (BankTransaction $c): string => Decimal::abs($c->amount))->unique()->values()->all())
+            ->with(['fine.fineCase', 'creator:id,name'])
+            ->orderBy('presented_at')
+            ->orderBy('id')
+            ->get();
+
+        $filas = array_values($creditos->map(function (BankTransaction $credito) use ($apertura, $informados): FineUnidentifiedCreditData {
+            $anterior = $credito->transaction_date?->lt($apertura->opened_on) ?? false;
+
+            return new FineUnidentifiedCreditData(
+                credit: FineBankCreditData::fromModel($credito),
+                beforeOpening: $anterior,
+                // Uno anterior a la apertura no puede respaldar un pago informado: no se ofrece ninguno.
+                reported: $anterior ? [] : array_values($informados
+                    ->filter(fn (FinePayment $pago): bool => Decimal::equals($pago->amount, Decimal::abs($credito->amount)))
+                    ->map(fn (FinePayment $pago): FinePendingPaymentData => FinePendingPaymentData::fromModel($pago))
+                    ->all()),
+            );
+        })->all());
+
+        return ['items' => $filas, 'page' => $paginados->currentPage(), 'lastPage' => $paginados->lastPage()];
     }
 
     /**

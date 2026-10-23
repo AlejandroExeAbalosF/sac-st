@@ -17,6 +17,7 @@ use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDepositController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
+use App\Modules\Multas\Http\Controllers\FineMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
 use App\Modules\Multas\Http\Controllers\FinePaymentQueueController;
 use Illuminate\Support\Facades\Route;
@@ -147,6 +148,8 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
             ->whereNumber('fine')
             ->name('pagos-bancarios.verificados.store');
         Route::post('pagos/{payment}/verificacion', [FineBankPaymentController::class, 'verify'])->whereNumber('payment')->name('pagos.verify');
+        // Las multas candidatas para identificar un crédito que nadie informó (M08).
+        Route::get('caja/multas', [FineCashController::class, 'fines'])->name('caja.multas');
         Route::post('pagos/{payment}/descarte', [FineBankPaymentController::class, 'discard'])->whereNumber('payment')->name('pagos.discard');
     });
 
@@ -157,6 +160,9 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 
         Route::get('/', [FineController::class, 'index'])->name('index');
         Route::get('caja', [FineCashController::class, 'index'])->name('caja.index');
+        // La consulta operativa de un mes: no es la rendición oficial (P02).
+        Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');
+        Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->whereNumber('fineCase')->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');

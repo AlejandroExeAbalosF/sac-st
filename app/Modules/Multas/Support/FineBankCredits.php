@@ -96,6 +96,32 @@ final class FineBankCredits
     }
 
     /**
+     * La cola de «pendiente de clasificación de caja» (M08): lo que entró a
+     * la cuenta después de su corte —o de la apertura de la caja, si la
+     * cuenta no tiene corte— y nadie identificó.
+     *
+     * Incluye lo que llegó entre el corte y la apertura de la caja: sigue
+     * sin dueño, aunque no se pueda verificar como un pago nuevo —la base lo
+     * impide— sino registrar como pago anterior de una multa.
+     *
+     * @return Builder<BankTransaction>
+     */
+    public function unidentified(CashBookOpening $apertura): Builder
+    {
+        $corte = BankAccountOpening::query()->where('bank_account_id', $apertura->bank_account_id)->value('cutoff_on');
+
+        return $this->libres(BankTransaction::query()
+            ->where('bank_account_id', $apertura->bank_account_id)
+            ->where('direction', TransactionDirection::Credit->value)
+            ->where('reconciliation_status', ReconciliationStatus::Pending->value)
+            ->when(
+                $corte !== null,
+                fn (Builder $q) => $q->where('transaction_date', '>', $corte),
+                fn (Builder $q) => $q->where('transaction_date', '>=', $apertura->opened_on->toDateString()),
+            ));
+    }
+
+    /**
      * @param  Builder<BankTransaction>  $query
      * @return list<FineBankCreditData>
      */

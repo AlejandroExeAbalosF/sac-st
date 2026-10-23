@@ -48,6 +48,7 @@ import {
     index as cajaDeMultas,
 } from '@/routes/multas/caja';
 import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
+import { index as movimientosDeMultas } from '@/routes/multas/movimientos';
 import { index as pagosDeMultas } from '@/routes/multas/pagos';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
@@ -112,6 +113,13 @@ export const navGroups: NavGroup[] = [
                         href: pagosDeMultas(),
                         icon: ClipboardCheck,
                         permission: 'multas.verificar-pagos',
+                    },
+                    // La consulta operativa del mes: no es la rendición oficial.
+                    {
+                        title: 'Movimientos',
+                        href: movimientosDeMultas(),
+                        icon: ArrowLeftRight,
+                        permission: 'multas.ver',
                     },
                 ],
             },
