@@ -1,21 +1,35 @@
 import { useId, useState } from 'react';
+import { NumericFormat } from 'react-number-format';
+import { useMoneda } from '@/components/money';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+    amountFromPaste,
+    amountOnBlur,
+    amountToNumeric,
+} from '@/lib/amount-input';
 import { amountInWords } from '@/lib/amount-words';
-import { money, parseAmount } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type Props = {
     id?: string;
     name?: string;
+    /**
+     * El importe: el decimal del servidor (`2034800.00`), lo que el campo
+     * emitió, o un importe ya formateado. Ver `amountToNumeric`.
+     */
     value: string;
+    /** Siempre un decimal en texto con punto, `2034800.5`, o vacío. */
     onChange: (value: string) => void;
     placeholder?: string;
     required?: boolean;
     disabled?: boolean;
+    readOnly?: boolean;
+    /** Solo donde un importe puede ser negativo. Por defecto, no. */
+    allowNegative?: boolean;
     className?: string;
     /**
      * Dónde se muestra el importe en letras.
@@ -40,28 +54,38 @@ type Props = {
 /**
  * Campo de importe.
  *
- * Guarda lo que el usuario tipea tal cual mientras escribe, y recién al
- * salir del campo lo normaliza a `1.204.500,00`. Formatear en cada tecla
- * pelea con el cursor —hay que recalcular dónde quedó el punto de
- * inserción después de cada agrupación— y es la causa habitual de que un
- * operador termine cargando un cero de más.
+ * Agrupa los miles mientras se escribe —`2.034.800,00`— y guarda el decimal
+ * con punto —`2034800.00`—: la presentación y el dato no se mezclan. El
+ * motor es `react-number-format`, que recalcula dónde queda el cursor
+ * después de cada agrupación; formatear a mano en cada tecla perdía el
+ * cursor, y era la causa habitual de que un operador terminara cargando un
+ * cero de más.
  *
- * El eco en letras hace el trabajo que el formateo no hace: «10.000.000»
- * y «100.000.000» obligan a contar grupos de tres, que es exactamente el
- * acto en el que se falla; «diez millones» y «cien millones» no se parecen
- * en nada.
+ * El punto —del teclado común o del numérico— escribe la coma decimal: es
+ * la tecla que el operador tiene a mano, y la librería lo tomaría como
+ * separador de miles. Por lo mismo, el pegado no pasa por la librería (ver
+ * `amountFromPaste`).
  *
- * El valor viaja siempre como texto: en ningún punto de la pantalla un
- * importe se convierte a `number`.
+ * El eco en letras hace lo que el agrupado no alcanza: «10.000.000» y
+ * «100.000.000» obligan a contar grupos de tres, que es exactamente el acto
+ * en el que se falla; «diez millones» y «cien millones» no se parecen en
+ * nada.
+ *
+ * El valor viaja siempre como texto: se lee `values.value`, nunca
+ * `floatValue`.
  */
 export default function AmountInput({
     value,
     onChange,
     className,
     words,
+    allowNegative = false,
     ...props
 }: Props) {
     const [enfocado, setEnfocado] = useState(false);
+    // La moneda de la pantalla, como `Money`: en la apertura en dólares el
+    // campo no puede decir «$».
+    const dolares = useMoneda() === 'USD';
     const tooltipId = useId();
     const letras = amountInWords(value);
     const describedBy = [
@@ -77,32 +101,76 @@ export default function AmountInput({
                 aria-hidden="true"
                 className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 font-mono text-sm text-muted-foreground"
             >
-                $
+                {dolares ? 'US$' : '$'}
             </span>
-            <input
+            <NumericFormat
                 {...props}
-                type="text"
+                value={amountToNumeric(value)}
+                valueIsNumericString
+                thousandSeparator="."
+                decimalSeparator=","
+                allowedDecimalSeparators={[',']}
+                decimalScale={2}
+                allowNegative={allowNegative}
                 inputMode="decimal"
                 autoComplete="off"
-                value={value}
                 aria-describedby={describedBy || undefined}
-                onChange={(e) => onChange(e.target.value)}
+                onValueChange={(valores, origen) => {
+                    // Solo lo que hizo el operador: el valor que llega por
+                    // prop ya es el de la pantalla, y devolverlo la
+                    // re-renderizaría en bucle.
+                    if (origen.source === 'event') {
+                        onChange(valores.value);
+                    }
+                }}
+                onKeyDown={(e) => {
+                    if (e.key !== '.' && e.key !== 'Decimal') {
+                        return;
+                    }
+
+                    /*
+                     * El punto se escribe como la coma decimal. Con el punto
+                     * como separador de miles, la librería lo descarta y
+                     * junta las cifras: `1500.25` quedaba en ciento
+                     * cincuenta mil veinticinco, sin aviso. Se inserta la
+                     * coma como si se la hubiera tecleado, así la librería
+                     * decide lo de siempre —si ya hay decimales, dónde queda
+                     * el cursor— en vez de que el valor llegue por prop y el
+                     * cursor quede antes de la coma.
+                     */
+                    e.preventDefault();
+                    document.execCommand('insertText', false, ',');
+                }}
+                onPaste={(e) => {
+                    const pegado = amountFromPaste(
+                        e.clipboardData.getData('text'),
+                    );
+
+                    if (pegado === null) {
+                        return;
+                    }
+
+                    e.preventDefault();
+                    onChange(allowNegative ? pegado : pegado.replace(/^-/, ''));
+                }}
                 onFocus={() => setEnfocado(true)}
                 onBlur={() => {
                     setEnfocado(false);
 
-                    // Al salir del campo ya no hay cursor que respetar, así
-                    // que es el momento seguro para agrupar.
-                    const normalizado = parseAmount(value);
+                    // Al salir, los centavos completos: `2034800.5` pasa a
+                    // `2034800.50` y se ve `2.034.800,50`.
+                    const completo = amountOnBlur(value);
 
-                    if (normalizado !== '') {
-                        onChange(money(normalizado, { symbol: false }));
+                    if (completo !== value) {
+                        onChange(completo);
                     }
                 }}
                 className={cn(
-                    'h-9 w-full rounded-md border bg-card py-1 pr-2.5 pl-6 text-right font-mono text-sm tabular-nums shadow-xs outline-none max-sm:min-h-11',
+                    'h-9 w-full rounded-md border bg-card py-1 pr-2.5 text-right font-mono text-sm tabular-nums shadow-xs outline-none max-sm:min-h-11',
+                    dolares ? 'pl-10' : 'pl-6',
                     'placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring',
                     'aria-invalid:border-destructive aria-invalid:ring-destructive/30',
+                    'read-only:bg-muted/50 read-only:text-muted-foreground',
                     className,
                 )}
             />

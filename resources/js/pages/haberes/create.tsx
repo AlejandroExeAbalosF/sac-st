@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowRight, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import AmountInput from '@/components/amount-input';
 import CollapsibleSection from '@/components/collapsible-section';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -339,22 +340,21 @@ export default function CrearExpediente({ empleadores, existente }: Props) {
                                             (opcional)
                                         </span>
                                     </Label>
-                                    <Input
-                                        id="declaredTotalAmount"
-                                        className="mt-1 text-right font-mono tabular-nums"
-                                        value={datos.declaredTotalAmount}
-                                        onChange={(e) =>
-                                            actualizar({
-                                                declaredTotalAmount:
-                                                    e.target.value,
-                                            })
-                                        }
-                                        placeholder="0,00"
-                                        inputMode="decimal"
-                                        aria-invalid={Boolean(
-                                            errors.declaredTotalAmount,
-                                        )}
-                                    />
+                                    <div className="mt-1">
+                                        <AmountInput
+                                            id="declaredTotalAmount"
+                                            value={datos.declaredTotalAmount}
+                                            onChange={(valor) =>
+                                                actualizar({
+                                                    declaredTotalAmount: valor,
+                                                })
+                                            }
+                                            placeholder="0,00"
+                                            aria-invalid={Boolean(
+                                                errors.declaredTotalAmount,
+                                            )}
+                                        />
+                                    </div>
                                     {errors.declaredTotalAmount ? (
                                         <p className="mt-1 text-xs text-destructive-strong">
                                             {errors.declaredTotalAmount}

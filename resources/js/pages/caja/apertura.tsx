@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { BookOpen } from 'lucide-react';
 import { useMemo } from 'react';
+import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
 import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -428,43 +429,43 @@ export default function CajaApertura({
                                                                 </span>
                                                             )}
                                                     </Label>
-                                                    <Input
-                                                        id={cuenta.code}
-                                                        inputMode="decimal"
-                                                        placeholder="0.00"
-                                                        readOnly={
-                                                            cuenta.code ===
-                                                            EFECTIVO
-                                                        }
-                                                        disabled={
-                                                            cuenta.code ===
-                                                                bankAccountCode &&
-                                                            sinCuentaEnLaMoneda
-                                                        }
-                                                        className="w-44 text-right font-mono tabular-nums read-only:bg-muted/50 read-only:text-muted-foreground"
-                                                        value={
-                                                            cuenta.code ===
-                                                            EFECTIVO
-                                                                ? contado
-                                                                : (form.data
-                                                                      .balances[
-                                                                      cuenta
-                                                                          .code
-                                                                  ] ?? '')
-                                                        }
-                                                        onChange={(e) =>
-                                                            form.setData(
-                                                                'balances',
-                                                                {
-                                                                    ...form.data
-                                                                        .balances,
-                                                                    [cuenta.code]:
-                                                                        e.target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
+                                                    <div className="w-44">
+                                                        <AmountInput
+                                                            id={cuenta.code}
+                                                            placeholder="0,00"
+                                                            readOnly={
+                                                                cuenta.code ===
+                                                                EFECTIVO
+                                                            }
+                                                            disabled={
+                                                                cuenta.code ===
+                                                                    bankAccountCode &&
+                                                                sinCuentaEnLaMoneda
+                                                            }
+                                                            value={
+                                                                cuenta.code ===
+                                                                EFECTIVO
+                                                                    ? contado
+                                                                    : (form.data
+                                                                          .balances[
+                                                                          cuenta
+                                                                              .code
+                                                                      ] ?? '')
+                                                            }
+                                                            onChange={(valor) =>
+                                                                form.setData(
+                                                                    'balances',
+                                                                    {
+                                                                        ...form
+                                                                            .data
+                                                                            .balances,
+                                                                        [cuenta.code]:
+                                                                            valor,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
                                                 </div>
                                                 {/*
                                                  * El error de un importe va debajo de

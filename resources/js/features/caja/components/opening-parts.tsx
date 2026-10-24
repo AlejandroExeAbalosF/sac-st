@@ -1,4 +1,5 @@
 import { CheckCircle2, Plus, Trash2, TriangleAlert } from 'lucide-react';
+import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
@@ -275,7 +276,7 @@ export function CarteraDeCheques({
                         />
                         <Campo
                             etiqueta="Importe"
-                            alineado
+                            importe
                             valor={cheque.amount}
                             error={clave(indice, 'amount')}
                             onChange={(v) => editar(indice, 'amount', v)}
@@ -338,27 +339,34 @@ function Campo({
     error,
     onChange,
     tipo = 'text',
-    alineado = false,
+    importe = false,
 }: {
     etiqueta: string;
     valor: string;
     error?: string;
     onChange: (valor: string) => void;
     tipo?: string;
-    alineado?: boolean;
+    importe?: boolean;
 }) {
     return (
         <div className="grid gap-1">
             <Label className="text-xs font-normal text-muted-foreground">
                 {etiqueta}
             </Label>
-            <Input
-                type={tipo}
-                inputMode={alineado ? 'decimal' : undefined}
-                className={alineado ? 'text-right font-mono tabular-nums' : ''}
-                value={valor}
-                onChange={(e) => onChange(e.target.value)}
-            />
+            {importe ? (
+                <AmountInput
+                    value={valor}
+                    onChange={onChange}
+                    aria-label={etiqueta}
+                    aria-invalid={Boolean(error)}
+                />
+            ) : (
+                <Input
+                    type={tipo}
+                    value={valor}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            )}
             <InputError message={error} />
         </div>
     );

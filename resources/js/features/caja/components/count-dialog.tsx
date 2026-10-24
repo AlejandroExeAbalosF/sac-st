@@ -489,13 +489,14 @@ export default function DialogoConteo({
 
                         <Input
                             id="uncountedAmount"
-                            inputMode="decimal"
-                            placeholder="0.00"
                             readOnly
                             className="bg-muted/50 text-right font-mono text-muted-foreground tabular-nums"
-                            value={
-                                recuento === null ? arrastreDelLibro : '0.00'
-                            }
+                            value={money(
+                                recuento === null
+                                    ? parseAmount(arrastreDelLibro) || '0.00'
+                                    : '0.00',
+                                { symbol: false },
+                            )}
                         />
 
                         {recuento !== null && (

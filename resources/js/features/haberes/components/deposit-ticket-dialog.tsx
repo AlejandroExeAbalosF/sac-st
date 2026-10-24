@@ -1,6 +1,7 @@
 import { Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, FileUp, Link2, Pencil, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
@@ -249,12 +250,11 @@ function Formulario({
 
                 <div className="space-y-1.5">
                     <Label htmlFor="amount">Importe</Label>
-                    <Input
+                    <AmountInput
                         id="amount"
-                        inputMode="decimal"
                         value={form.data.amount}
-                        onChange={(e) => form.setData('amount', e.target.value)}
-                        className="font-mono tabular-nums"
+                        onChange={(valor) => form.setData('amount', valor)}
+                        aria-invalid={Boolean(form.errors.amount)}
                     />
                     <InputError message={form.errors.amount} />
                 </div>

@@ -1,6 +1,7 @@
 import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2, Search, Undo2 } from 'lucide-react';
 import { useState } from 'react';
+import AmountInput from '@/components/amount-input';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { date, dateTime, money } from '@/lib/format';
+import { compareAmounts, date, dateTime, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { allocate, reverse, show } from '@/routes/recepciones';
 
@@ -332,10 +333,11 @@ function CuotaCandidata({
     sinAsignar: string;
     idempotencyKey: string;
 }) {
-    const propuesto = Math.min(
-        Number(cuota.remaining),
-        Number(sinAsignar),
-    ).toFixed(2);
+    const [importe, setImporte] = useState(
+        compareAmounts(cuota.remaining, sinAsignar) <= 0
+            ? cuota.remaining
+            : sinAsignar,
+    );
 
     const medioIncompatible =
         cuota.fixedMedium !== null && cuota.fixedMedium !== medio;
@@ -416,13 +418,19 @@ function CuotaCandidata({
                                 <Label htmlFor={`amount-${cuota.id}`}>
                                     Importe a asignar
                                 </Label>
-                                <Input
-                                    id={`amount-${cuota.id}`}
+                                <input
+                                    type="hidden"
                                     name="amount"
-                                    defaultValue={propuesto}
-                                    inputMode="decimal"
-                                    className="w-44 font-mono tabular-nums"
+                                    value={importe}
                                 />
+                                <div className="w-44">
+                                    <AmountInput
+                                        id={`amount-${cuota.id}`}
+                                        value={importe}
+                                        onChange={setImporte}
+                                        aria-invalid={Boolean(errors.amount)}
+                                    />
+                                </div>
                             </div>
 
                             <Button type="submit" disabled={processing}>

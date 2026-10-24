@@ -8,6 +8,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -398,12 +399,14 @@ function FormularioDeApertura({
                                         Sale de los billetes contados abajo.
                                     </span>
                                 </Label>
-                                <Input
-                                    readOnly
-                                    aria-label="Efectivo"
-                                    className="w-44 bg-muted/50 text-right font-mono text-muted-foreground tabular-nums"
-                                    value={contado}
-                                />
+                                <div className="w-44">
+                                    <AmountInput
+                                        readOnly
+                                        aria-label="Efectivo"
+                                        value={contado}
+                                        onChange={() => undefined}
+                                    />
+                                </div>
                             </div>
                             <div className="flex items-center gap-4 border-b px-4 py-2.5">
                                 <Label
@@ -416,19 +419,21 @@ function FormularioDeApertura({
                                         depositar.
                                     </span>
                                 </Label>
-                                <Input
-                                    id={CHEQUES}
-                                    inputMode="decimal"
-                                    placeholder="0.00"
-                                    className="w-44 text-right font-mono tabular-nums"
-                                    value={form.data.balances[CHEQUES] ?? ''}
-                                    onChange={(e) =>
-                                        form.setData('balances', {
-                                            ...form.data.balances,
-                                            [CHEQUES]: e.target.value,
-                                        })
-                                    }
-                                />
+                                <div className="w-44">
+                                    <AmountInput
+                                        id={CHEQUES}
+                                        placeholder="0,00"
+                                        value={
+                                            form.data.balances[CHEQUES] ?? ''
+                                        }
+                                        onChange={(valor) =>
+                                            form.setData('balances', {
+                                                ...form.data.balances,
+                                                [CHEQUES]: valor,
+                                            })
+                                        }
+                                    />
+                                </div>
                             </div>
                             <div className="flex items-baseline justify-between bg-muted/40 px-4 py-3">
                                 <p className="text-sm font-medium">
