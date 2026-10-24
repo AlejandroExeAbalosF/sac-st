@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -80,9 +81,8 @@ export function RejectChequeDialog({
         >
             <div>
                 <Label htmlFor="rechazo-fecha">Rechazado el</Label>
-                <Input
+                <DateInput
                     id="rechazo-fecha"
-                    type="date"
                     className="mt-1"
                     max={businessToday()}
                     value={data.rejectedOn}
@@ -190,9 +190,8 @@ export function ReplaceChequeDialog({
                         (opcional)
                     </span>
                 </Label>
-                <Input
+                <DateInput
                     id="reemplazo-emision"
-                    type="date"
                     className="mt-1"
                     value={data.chequeIssueDate}
                     onChange={(e) => setData('chequeIssueDate', e.target.value)}
@@ -259,9 +258,8 @@ export function CompleteRejectionDialog({
                         <Label htmlFor="rechazo-aviso">
                             Se avisó a la empresa el
                         </Label>
-                        <Input
+                        <DateInput
                             id="rechazo-aviso"
-                            type="date"
                             className="mt-1"
                             max={businessToday()}
                             value={data.companyNotifiedOn}

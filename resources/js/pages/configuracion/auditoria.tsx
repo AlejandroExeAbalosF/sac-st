@@ -1,12 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { FileSpreadsheet, ScrollText } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import type { PaginationData } from '@/components/pagination-footer';
 import PaginationFooter from '@/components/pagination-footer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -302,9 +302,8 @@ export default function Auditoria({
                             <Label htmlFor="desde" className="text-xs">
                                 Desde
                             </Label>
-                            <Input
+                            <DateInput
                                 id="desde"
-                                type="date"
                                 value={borrador.desde ?? ''}
                                 onChange={(e) =>
                                     setBorrador((previo) => ({
@@ -323,9 +322,8 @@ export default function Auditoria({
                             <Label htmlFor="hasta" className="text-xs">
                                 Hasta
                             </Label>
-                            <Input
+                            <DateInput
                                 id="hasta"
-                                type="date"
                                 value={borrador.hasta ?? ''}
                                 onChange={(e) =>
                                     setBorrador((previo) => ({

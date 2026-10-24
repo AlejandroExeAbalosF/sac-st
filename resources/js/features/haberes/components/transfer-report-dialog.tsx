@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { Megaphone } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -104,9 +105,8 @@ export default function TransferReportDialog({
                         <Label htmlFor={`informe-fecha-${cuota.id}`}>
                             Fecha del informe
                         </Label>
-                        <Input
+                        <DateInput
                             id={`informe-fecha-${cuota.id}`}
-                            type="date"
                             max={hoy}
                             value={form.data.reportedAt}
                             onChange={(e) =>

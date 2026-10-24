@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { Archive, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
@@ -252,9 +253,8 @@ export default function LegacySettlementDialog({
                                 <Label htmlFor={`pagado-${cuota.id}`}>
                                     Cuándo se le pagó
                                 </Label>
-                                <Input
+                                <DateInput
                                     id={`pagado-${cuota.id}`}
-                                    type="date"
                                     max={hoy}
                                     value={form.data.paidOn}
                                     onChange={(e) =>
@@ -540,9 +540,8 @@ function Papel({
                 </div>
                 <div className="grid gap-1.5">
                     <Label htmlFor={`${id}-fecha`}>Fecha</Label>
-                    <Input
+                    <DateInput
                         id={`${id}-fecha`}
-                        type="date"
                         max={hoy}
                         value={fecha}
                         onChange={(e) => onFecha(e.target.value)}

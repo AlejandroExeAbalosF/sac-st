@@ -1,5 +1,6 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { FileSpreadsheet, RefreshCw, TriangleAlert } from 'lucide-react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +11,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -400,9 +400,8 @@ export function DialogoCierre({
                                 ? 'Un día del mes a cerrar'
                                 : 'Día a cerrar'}
                         </Label>
-                        <Input
+                        <DateInput
                             id="date"
-                            type="date"
                             max={hoy}
                             value={form.data.date}
                             onChange={(e) =>

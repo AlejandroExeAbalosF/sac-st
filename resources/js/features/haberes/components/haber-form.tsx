@@ -3,6 +3,7 @@ import { LoaderCircle } from 'lucide-react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import CollapsibleSection from '@/components/collapsible-section';
+import DateInput from '@/components/date-input';
 import PersonPicker from '@/components/person-picker';
 import type {
     PersonBankAccountOption,
@@ -327,9 +328,8 @@ export default function HaberForm({
                 <div className="grid gap-6 sm:grid-cols-2">
                     <div>
                         <Label htmlFor="legalDate">Fecha del acuerdo</Label>
-                        <Input
+                        <DateInput
                             id="legalDate"
-                            type="date"
                             className="mt-1"
                             value={datos.legalDate}
                             onChange={(e) =>

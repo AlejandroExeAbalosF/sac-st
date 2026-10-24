@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -235,9 +236,8 @@ export default function AppealDialog({
                             <Label htmlFor="recurso-presentado">
                                 Presentado el
                             </Label>
-                            <Input
+                            <DateInput
                                 id="recurso-presentado"
-                                type="date"
                                 className="mt-1"
                                 max={hoy}
                                 value={data.presentedOn}
@@ -253,9 +253,8 @@ export default function AppealDialog({
                         <Label htmlFor="recurso-pagado">
                             Depositado el (según el comprobante)
                         </Label>
-                        <Input
+                        <DateInput
                             id="recurso-pagado"
-                            type="date"
                             className="mt-1"
                             max={hoy}
                             value={data.declaredPaidOn}

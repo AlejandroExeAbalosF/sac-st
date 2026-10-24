@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
@@ -345,9 +346,8 @@ export default function DialogoConteo({
                              */}
                             {fechaEditable ? (
                                 <>
-                                    <Input
+                                    <DateInput
                                         id="countedOn"
-                                        type="date"
                                         max={hoy}
                                         value={form.data.countedOn}
                                         onChange={(e) =>

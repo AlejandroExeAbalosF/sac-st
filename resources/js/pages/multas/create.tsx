@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import PageHeader from '@/components/page-header';
 import PersonPicker from '@/components/person-picker';
 import { Button } from '@/components/ui/button';
@@ -311,9 +312,8 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                         <Label htmlFor="resolutionDate">
                                             Fecha de la resolución
                                         </Label>
-                                        <Input
+                                        <DateInput
                                             id="resolutionDate"
-                                            type="date"
                                             className="mt-1"
                                             value={data.resolution.issuedOn}
                                             onChange={(e) =>
@@ -445,9 +445,8 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                                 (opcional)
                                             </span>
                                         </Label>
-                                        <Input
+                                        <DateInput
                                             id={`acta-fecha-${i}`}
-                                            type="date"
                                             className="mt-1"
                                             value={acta.issuedOn}
                                             onChange={(e) =>
@@ -558,9 +557,8 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                     <Label htmlFor="registeredOn">
                                         Fecha de registro
                                     </Label>
-                                    <Input
+                                    <DateInput
                                         id="registeredOn"
-                                        type="date"
                                         className="mt-1"
                                         value={data.registeredOn}
                                         onChange={(e) =>

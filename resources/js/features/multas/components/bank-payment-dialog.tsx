@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -227,9 +228,8 @@ export default function BankPaymentDialog({
                                 <Label htmlFor="banco-presentado">
                                     Presentado el
                                 </Label>
-                                <Input
+                                <DateInput
                                     id="banco-presentado"
-                                    type="date"
                                     className="mt-1"
                                     max={hoy}
                                     value={data.presentedOn}
@@ -245,9 +245,8 @@ export default function BankPaymentDialog({
                             <Label htmlFor="banco-pagado">
                                 Pagado el (según el comprobante)
                             </Label>
-                            <Input
+                            <DateInput
                                 id="banco-pagado"
-                                type="date"
                                 className="mt-1"
                                 max={hoy}
                                 value={data.declaredPaidOn}

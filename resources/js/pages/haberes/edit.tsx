@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Lock } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import PageHeader from '@/components/page-header';
 import PersonPicker from '@/components/person-picker';
 import type { PersonOption } from '@/components/person-picker';
@@ -109,9 +110,8 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
 
                             <div className="sm:col-span-6 lg:col-span-3">
                                 <Label htmlFor="receivedDate">Recibido</Label>
-                                <Input
+                                <DateInput
                                     id="receivedDate"
-                                    type="date"
                                     className="mt-1"
                                     value={data.receivedDate}
                                     onChange={(e) =>

@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -353,9 +353,8 @@ function FormularioDeApertura({
 
                     <div className="grid gap-2">
                         <Label htmlFor="date">Fecha de la apertura</Label>
-                        <Input
+                        <DateInput
                             id="date"
-                            type="date"
                             max={businessToday()}
                             value={form.data.date}
                             onChange={(e) =>

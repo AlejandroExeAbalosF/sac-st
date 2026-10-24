@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, FileUp, Link2, Pencil, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
@@ -219,9 +220,8 @@ function Formulario({
             <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                     <Label htmlFor="depositedAt">Fecha del depósito</Label>
-                    <Input
+                    <DateInput
                         id="depositedAt"
-                        type="date"
                         value={form.data.depositedAt}
                         onChange={(e) =>
                             form.setData('depositedAt', e.target.value)

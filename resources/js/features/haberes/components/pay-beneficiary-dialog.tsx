@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { HandCoins, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -232,9 +233,8 @@ export default function PayBeneficiaryDialog({
                                         <Label htmlFor={`entrega-${cuota.id}`}>
                                             Fecha de la entrega
                                         </Label>
-                                        <Input
+                                        <DateInput
                                             id={`entrega-${cuota.id}`}
-                                            type="date"
                                             /*
                                              * Entre el alta de la cuota y
                                              * hoy. El servidor valida lo

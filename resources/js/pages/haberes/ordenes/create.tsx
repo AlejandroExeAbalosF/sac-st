@@ -1,6 +1,7 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { BadgeCheck, Eye, FileSignature, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -485,9 +486,8 @@ export default function OrdenCreate({
                                 >
                                     Fecha de ingreso · «FECHA INI.»
                                 </Label>
-                                <Input
+                                <DateInput
                                     id="fecha-ini"
-                                    type="date"
                                     value={datos.data.custodyStartDate}
                                     onChange={(e) =>
                                         datos.setData(

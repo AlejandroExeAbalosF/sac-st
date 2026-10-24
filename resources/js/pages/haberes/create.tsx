@@ -3,6 +3,7 @@ import { ArrowRight, LoaderCircle, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import CollapsibleSection from '@/components/collapsible-section';
+import DateInput from '@/components/date-input';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import PersonPicker from '@/components/person-picker';
@@ -219,9 +220,8 @@ export default function CrearExpediente({ empleadores, existente }: Props) {
                             <Label htmlFor="receivedDate">
                                 Fecha de recepción
                             </Label>
-                            <Input
+                            <DateInput
                                 id="receivedDate"
-                                type="date"
                                 className="mt-1"
                                 value={datos.receivedDate}
                                 onChange={(e) =>

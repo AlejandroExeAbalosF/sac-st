@@ -1,6 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { History, MonitorSmartphone } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import FormError from '@/components/form-error';
 import PageHeader from '@/components/page-header';
 import type { PaginationData } from '@/components/pagination-footer';
@@ -254,9 +255,8 @@ export default function Accesos({
                             <Label htmlFor="desde" className="text-xs">
                                 Desde
                             </Label>
-                            <Input
+                            <DateInput
                                 id="desde"
-                                type="date"
                                 value={borrador.desde ?? ''}
                                 onChange={(e) =>
                                     setBorrador((previo) => ({
@@ -274,9 +274,8 @@ export default function Accesos({
                             <Label htmlFor="hasta" className="text-xs">
                                 Hasta
                             </Label>
-                            <Input
+                            <DateInput
                                 id="hasta"
-                                type="date"
                                 value={borrador.hasta ?? ''}
                                 onChange={(e) =>
                                     setBorrador((previo) => ({

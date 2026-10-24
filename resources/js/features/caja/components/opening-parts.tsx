@@ -1,5 +1,6 @@
 import { CheckCircle2, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import { Button } from '@/components/ui/button';
@@ -359,6 +360,12 @@ function Campo({
                     onChange={onChange}
                     aria-label={etiqueta}
                     aria-invalid={Boolean(error)}
+                />
+            ) : tipo === 'date' ? (
+                <DateInput
+                    aria-label={etiqueta}
+                    value={valor}
+                    onChange={(e) => onChange(e.target.value)}
                 />
             ) : (
                 <Input

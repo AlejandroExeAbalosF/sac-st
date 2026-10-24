@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -178,9 +179,8 @@ export default function CollectPaymentDialog({
                             <Label htmlFor="cobro-cheque-fecha">
                                 Fecha del cheque
                             </Label>
-                            <Input
+                            <DateInput
                                 id="cobro-cheque-fecha"
-                                type="date"
                                 className="mt-1"
                                 value={data.cheque.issueDate}
                                 onChange={(e) =>
@@ -238,9 +238,8 @@ export default function CollectPaymentDialog({
             <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                     <Label htmlFor="cobro-fecha">Fecha del cobro</Label>
-                    <Input
+                    <DateInput
                         id="cobro-fecha"
-                        type="date"
                         className="mt-1"
                         max={hoy}
                         value={data.receivedOn}

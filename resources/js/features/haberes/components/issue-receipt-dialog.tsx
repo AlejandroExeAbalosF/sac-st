@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { FileText, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -255,9 +256,8 @@ export default function IssueReceiptDialog({
                                         <Label htmlFor={`fecha-${cuota.id}`}>
                                             Fecha del pago
                                         </Label>
-                                        <Input
+                                        <DateInput
                                             id={`fecha-${cuota.id}`}
-                                            type="date"
                                             /*
                                              * Entre el alta de la cuota y
                                              * hoy. El servidor valida lo

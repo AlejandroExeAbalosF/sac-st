@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, PiggyBank } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
@@ -511,9 +512,8 @@ export default function LegacyFundsDialog({
                                                     opcional
                                                 </span>
                                             </Label>
-                                            <Input
+                                            <DateInput
                                                 id={`cheque-nuevo-fecha-${cuota.id}`}
-                                                type="date"
                                                 max={hoy}
                                                 value={
                                                     form.data.chequeNuevo
@@ -598,9 +598,8 @@ export default function LegacyFundsDialog({
                                     >
                                         Fecha
                                     </Label>
-                                    <Input
+                                    <DateInput
                                         id={`apartar-fecha-${cuota.id}`}
-                                        type="date"
                                         max={hoy}
                                         value={form.data.incomeDate}
                                         onChange={(e) =>

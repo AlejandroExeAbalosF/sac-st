@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowRight, TriangleAlert } from 'lucide-react';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -233,9 +234,8 @@ export default function DepositoCreate({
                                 <Label htmlFor="depositedAt">
                                     Fecha del depósito
                                 </Label>
-                                <Input
+                                <DateInput
                                     id="depositedAt"
-                                    type="date"
                                     max={hoy}
                                     autoFocus
                                     value={form.data.depositedAt}

@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -159,9 +160,8 @@ export default function AdjustDebtDialog({
                         <Label htmlFor="ajuste-doc-fecha">
                             Fecha de la resolución
                         </Label>
-                        <Input
+                        <DateInput
                             id="ajuste-doc-fecha"
-                            type="date"
                             className="mt-1"
                             value={data.document.issuedOn}
                             onChange={(e) =>
@@ -179,9 +179,8 @@ export default function AdjustDebtDialog({
 
             <div>
                 <Label htmlFor="ajuste-fecha">Fecha del ajuste</Label>
-                <Input
+                <DateInput
                     id="ajuste-fecha"
-                    type="date"
                     className="mt-1 max-w-48"
                     value={data.effectiveOn}
                     onChange={(e) => setData('effectiveOn', e.target.value)}

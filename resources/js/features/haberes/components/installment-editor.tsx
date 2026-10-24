@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -277,9 +278,8 @@ export default function InstallmentEditor({
                     <Label htmlFor={`cuota-${numero}-due-date`}>
                         Vencimiento
                     </Label>
-                    <Input
+                    <DateInput
                         id={`cuota-${numero}-due-date`}
-                        type="date"
                         className="mt-1 h-11 sm:h-9"
                         value={form.data.dueDate}
                         onChange={(event) =>

@@ -2,12 +2,12 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { BookOpen } from 'lucide-react';
 import { useMemo } from 'react';
 import AmountInput from '@/components/amount-input';
+import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -328,9 +328,8 @@ export default function CajaApertura({
                                 <Label htmlFor="date">
                                     Fecha de la apertura
                                 </Label>
-                                <Input
+                                <DateInput
                                     id="date"
-                                    type="date"
                                     max={hoy}
                                     value={form.data.date}
                                     onChange={(e) =>

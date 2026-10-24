@@ -8,10 +8,10 @@ import {
     Scale,
 } from 'lucide-react';
 import { useState } from 'react';
+import DateInput from '@/components/date-input';
 import Money, { EnMoneda } from '@/components/money';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { esAnteriorALaApertura } from '@/features/caja/apertura';
 import ChequeInventoryDialog from '@/features/caja/components/cheque-inventory-dialog';
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
@@ -192,8 +192,7 @@ export default function CajaIndex({
                                 >
                                     <ChevronLeft className="size-4" />
                                 </Button>
-                                <Input
-                                    type="date"
+                                <DateInput
                                     value={selected.date}
                                     max={hoy}
                                     onChange={(e) =>
