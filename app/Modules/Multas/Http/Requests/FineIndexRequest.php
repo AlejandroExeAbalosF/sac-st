@@ -46,13 +46,13 @@ final class FineIndexRequest extends FormRequest
     }
 
     /**
-     * Por qué fila se pregunta: el expediente, salvo que se pidan las multas.
+     * Por qué fila se pregunta: la multa, salvo que se pidan los expedientes.
      *
      * @return 'expedientes'|'multas'
      */
     public function view(): string
     {
-        return $this->validated('vista') === 'multas' ? 'multas' : 'expedientes';
+        return $this->validated('vista') === 'expedientes' ? 'expedientes' : 'multas';
     }
 
     /**

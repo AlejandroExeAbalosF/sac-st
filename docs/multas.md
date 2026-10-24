@@ -62,21 +62,21 @@ conoce. El test de fronteras lo exige.
 ### Expedientes y multas · `/multas/expedientes`
 
 Dos lecturas del mismo material, como el listado de Haberes: la pestaña
-**Expedientes**, que es la que abre, y la pestaña **Multas** (`?vista=multas`).
-Comparten el buscador, los filtros y la paginación.
+**Multas**, que es la que abre, y la pestaña **Expedientes**
+(`?vista=expedientes`). Comparten el buscador, los filtros y la paginación.
 
 Busca por lo que trae quien viene a pagar: número de expediente («169607/24»
 encuentra «169607/2024-0»), de resolución, de acta, o la carátula. Filtra por
 deuda (con o sin) y por año de registro.
 
+- **Multas**: una fila por multa, con el importe vigente, el saldo y la situación:
+  pendiente, con pagos parciales, cancelada o sin efecto, y si tiene excedente.
 - **Expedientes**: una fila por expediente, con las carátulas de sus multas,
   cuántas tiene y cuántas deben, el importe vigente y el saldo sumados —uno por
   moneda: pesos y dólares no se suman en una cifra— y si debe o no. Un expediente
   aparece si **alguna** de sus multas coincide con la búsqueda o se registró en el
   año pedido; en cambio, «sin deuda» quiere decir que **ninguna** de sus multas
   debe.
-- **Multas**: una fila por multa, con el importe vigente, el saldo y la situación:
-  pendiente, con pagos parciales, cancelada o sin efecto, y si tiene excedente.
 
 **Exportar a Excel**, solo en la pestaña Multas, baja lo que está filtrado,
 entero y sin paginar: una fila por multa con expediente, carátula, persona, documentos de origen, fecha de registro,

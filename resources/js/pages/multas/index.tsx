@@ -79,7 +79,9 @@ export default function MultasIndex({
             index().url,
             {
                 ...consulta(siguiente),
-                ...(otraVista === 'multas' ? { vista: 'multas' } : {}),
+                ...(otraVista === 'expedientes'
+                    ? { vista: 'expedientes' }
+                    : {}),
             },
             { preserveState: true, replace: true },
         );
@@ -147,16 +149,16 @@ export default function MultasIndex({
                     className="-mt-2 flex gap-1 border-b"
                 >
                     <ListViewTab
-                        active={!porMulta}
-                        onClick={() => consultar({ vista: 'expedientes' })}
-                    >
-                        Expedientes
-                    </ListViewTab>
-                    <ListViewTab
                         active={porMulta}
                         onClick={() => consultar({ vista: 'multas' })}
                     >
                         Multas
+                    </ListViewTab>
+                    <ListViewTab
+                        active={!porMulta}
+                        onClick={() => consultar({ vista: 'expedientes' })}
+                    >
+                        Expedientes
                     </ListViewTab>
                 </nav>
 

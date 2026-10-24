@@ -146,7 +146,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
                 ->assertInertia(fn (Assert $page) => $page->has('multas', 1));
 
             $this->actingAs($operador)
-                ->get(route('multas.index', ['q' => $termino]))
+                ->get(route('multas.index', ['q' => $termino, 'vista' => 'expedientes']))
                 ->assertInertia(fn (Assert $page) => $page->has('expedientes', 1));
         }
 
@@ -159,7 +159,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('multas', 0));
     }
 
-    public function test_the_list_opens_by_case_and_adds_up_its_fines(): void
+    public function test_the_list_opens_by_fine_and_the_case_view_adds_them_up(): void
     {
         $this->dosMultasEnUnExpediente();
         $this->actingAs($this->operador())->post(route('multas.store'), [
@@ -174,6 +174,13 @@ class CuentaCorrienteDeMultasTest extends TestCase
             ->get(route('multas.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/index')
+                ->where('vista', 'multas')
+                ->has('expedientes', 0)
+                ->has('multas', 3));
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.index', ['vista' => 'expedientes']))
+            ->assertInertia(fn (Assert $page) => $page
                 ->where('vista', 'expedientes')
                 ->has('multas', 0)
                 ->has('expedientes', 2)
@@ -183,13 +190,6 @@ class CuentaCorrienteDeMultasTest extends TestCase
                 ->where('expedientes.1.finesCount', 2)
                 ->where('expedientes.1.finesWithDebt', 2)
                 ->where('expedientes.1.totals', [['currency' => 'ARS', 'obligation' => '2800000.00', 'debt' => '2800000.00']]));
-
-        $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.index', ['vista' => 'multas']))
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('vista', 'multas')
-                ->has('expedientes', 0)
-                ->has('multas', 3));
     }
 
     /**
@@ -206,11 +206,11 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $consulta = $this->operador('consulta');
 
         $this->actingAs($consulta)
-            ->get(route('multas.index', ['estado' => 'sin-deuda']))
+            ->get(route('multas.index', ['estado' => 'sin-deuda', 'vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page->has('expedientes', 0));
 
         $this->actingAs($consulta)
-            ->get(route('multas.index', ['estado' => 'con-deuda']))
+            ->get(route('multas.index', ['estado' => 'con-deuda', 'vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 1)
                 ->where('expedientes.0.finesWithDebt', 1)
@@ -227,7 +227,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $this->dosMultasEnUnExpediente();
 
         $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.index', ['q' => 'distribuidora']))
+            ->get(route('multas.index', ['q' => 'distribuidora', 'vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 1)
                 ->where('expedientes.0.finesCount', 2));
@@ -265,7 +265,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         }
 
         $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.index'))
+            ->get(route('multas.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.0.captions', ['IMPORTADA SRL'])
                 ->where('expedientes.0.totals', [
