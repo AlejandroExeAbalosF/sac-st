@@ -7,6 +7,7 @@ import QueueCard from '@/features/inicio/components/queue-card';
 import QuickActions from '@/features/inicio/components/quick-actions';
 import RecentAccessList from '@/features/inicio/components/recent-access';
 import RecentMovements from '@/features/inicio/components/recent-movements';
+import SetupChecklist from '@/features/inicio/components/setup-checklist';
 import {
     BlockUnavailable,
     CashBoxSummarySkeleton,
@@ -28,6 +29,8 @@ type Props = {
         verExpedientes: boolean;
     };
     recentAccess: App.Modules.Shared.Data.RecentAccessData[];
+    /** Mientras falte algo para operar; `null` cuando ya está todo. */
+    setup: App.Modules.Shared.Data.SetupStepData[] | null;
 
     /*
      * Diferidas. Llegan `undefined` en la primera respuesta y por eso son
@@ -54,6 +57,7 @@ export default function Inicio({
     operationalDate,
     can,
     recentAccess,
+    setup,
     queues,
     cashDay,
     cashBoxes,
@@ -69,6 +73,8 @@ export default function Inicio({
                     eyebrow={`Fecha operativa · ${date(operationalDate)} · Caja Haberes`}
                     description="Lo que espera que alguien haga algo, en el orden del circuito."
                 />
+
+                {setup && <SetupChecklist steps={setup} />}
 
                 <GlobalSearch disabled={!can.verExpedientes} />
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
@@ -28,6 +29,7 @@ use App\Modules\Ledger\Support\CashMonthsPendingClosing;
 use App\Modules\Ledger\Support\RecentMovements;
 use App\Modules\Shared\Data\CashBoxSummaryData;
 use App\Modules\Shared\Data\RecentAccessData;
+use App\Modules\Shared\Data\SetupStepData;
 use App\Modules\Shared\Data\WorkQueueData;
 use App\Modules\Shared\Enums\QueueTone;
 use App\Modules\Shared\Models\CashBox;
@@ -109,6 +111,13 @@ final class InicioController extends Controller
                 'importarExtracto' => $user->can('banco.extractos.importar'),
             ],
 
+            /*
+             * Sin diferir: son cuatro consultas de existencia, y mientras
+             * falte algo es lo primero que hay que ver. `null` cuando ya
+             * está todo hecho.
+             */
+            'setup' => $this->setup($user),
+
             'recentAccess' => $user
                 ->loginEvents()
                 ->limit(5)
@@ -145,6 +154,73 @@ final class InicioController extends Controller
                 rescue: true,
             ),
         ]);
+    }
+
+    /**
+     * La puesta en marcha: las cuentas del organismo y la apertura de cada
+     * caja, en ese orden.
+     *
+     * Las cuentas van primero porque la apertura las usa: la de Multas
+     * elige con qué cuenta opera y no se puede hacer sin una en pesos, y la
+     * de Haberes declara en cuál está el saldo del banco. Los dólares de
+     * Haberes son opcionales: no toda caja los guarda, y su apertura se
+     * hace desde Caja el día que hagan falta.
+     *
+     * Cada paso lleva a su pantalla solo si quien mira puede hacerlo. Un
+     * operador ve la lista igual: le dice por qué el sistema todavía no
+     * deja operar y a quién esperar.
+     *
+     * @return list<SetupStepData>|null
+     */
+    private function setup(User $user): ?array
+    {
+        $cuentas = BankAccount::query()->where('is_active', true);
+        $hayCuentas = (clone $cuentas)->exists();
+        $hayCuentaEnPesos = $cuentas->where('currency', Currency::Ars->value)->exists();
+
+        $haberes = (int) $this->cashBox()->id;
+        $multas = (int) CashBox::query()->active()->where('code', CashBox::MULTAS)->valueOrFail('id');
+
+        $pasos = [
+            new SetupStepData(
+                key: 'cuentas',
+                title: 'Cargar las cuentas bancarias',
+                description: 'Las cuentas del organismo donde se acreditan los depósitos. Las aperturas de las cajas las usan.',
+                done: $hayCuentas,
+                href: $user->can('banco.cuentas.gestionar') ? route('banco.cuentas.index', absolute: false) : null,
+            ),
+            new SetupStepData(
+                key: 'apertura_haberes',
+                title: 'Abrir la Caja de Haberes',
+                description: 'El efectivo, los cheques y el saldo del banco con que arranca la caja, en pesos.',
+                done: $this->abrir->existingFor($haberes, Currency::Ars) !== null,
+                href: $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', absolute: false) : null,
+            ),
+            new SetupStepData(
+                key: 'apertura_multas',
+                title: 'Abrir la Caja de Multas',
+                description: 'El efectivo y los cheques con que arranca la caja, y la cuenta en pesos con la que opera.',
+                done: $this->abrir->existingFor($multas, Currency::Ars) !== null,
+                href: $hayCuentaEnPesos && $user->can('multas.caja.abrir') ? route('multas.caja.index', absolute: false) : null,
+                blockedBy: $hayCuentaEnPesos ? null : 'Necesita una cuenta bancaria en pesos.',
+            ),
+            new SetupStepData(
+                key: 'apertura_haberes_usd',
+                title: 'Abrir la Caja de Haberes en dólares',
+                description: 'Solo si la caja guarda dólares. Se puede hacer más adelante.',
+                done: $this->abrir->existingFor($haberes, Currency::Usd) !== null,
+                optional: true,
+                href: $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', ['moneda' => 'usd'], absolute: false) : null,
+            ),
+        ];
+
+        foreach ($pasos as $paso) {
+            if (! $paso->done && ! $paso->optional) {
+                return $pasos;
+            }
+        }
+
+        return null;
     }
 
     /**

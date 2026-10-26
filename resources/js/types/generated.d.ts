@@ -1265,6 +1265,15 @@ declare namespace App {
                     lockedReason: string | null;
                     usersCount: number;
                 };
+                export type SetupStepData = {
+                    key: string;
+                    title: string;
+                    description: string;
+                    done: boolean;
+                    optional: boolean;
+                    href: string | null;
+                    blockedBy: string | null;
+                };
                 export type UserListItemData = {
                     id: number;
                     name: string;

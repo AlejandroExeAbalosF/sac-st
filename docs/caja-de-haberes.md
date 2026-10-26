@@ -60,6 +60,13 @@ muestran en ese libro un panel que lleva a la apertura —o dice que se la pidan
 un administrador—, y una operación que choca desde otra pantalla abre un diálogo
 con lo mismo.
 
+**Inicio muestra la puesta en marcha** mientras falte algo para operar: primero
+las cuentas bancarias del organismo, después la apertura de Haberes en pesos y
+la de Multas, que no se puede hacer sin una cuenta en pesos. La de dólares figura
+como opcional y no la retiene. La lista sale del estado de los datos, no de quién
+entra: la ve cualquier usuario, cada paso lleva a su pantalla solo si quien mira
+tiene el permiso, y desaparece cuando el último paso obligatorio está hecho.
+
 La apertura se guarda como hecho propio en `cash_book_openings`: caja, moneda,
 fecha, quién la declaró y el total. Sus asientos —el principal y uno por cheque
 detallado— suman ese total, y la base lo controla. No se edita ni se rehace.
