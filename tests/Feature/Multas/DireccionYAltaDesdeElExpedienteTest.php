@@ -27,21 +27,21 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
     {
         $expediente = $this->expediente('169607/24-0');
 
-        expect(route('multas.expedientes.show', $expediente->routeParameters(), absolute: false))
+        expect(route('multas.expedientes.show', $expediente, absolute: false))
             ->toBe("/multas/expedientes/{$expediente->id}/169607-2024-0");
 
         $this->actingAs($this->operador())
-            ->get(route('multas.expedientes.show', $expediente->routeParameters()))
+            ->get(route('multas.expedientes.show', $expediente))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expediente.id', $expediente->id)
-                ->where('expediente.routeNumber', '169607-2024-0'));
+                ->where('expediente.routeKey', "{$expediente->id}/169607-2024-0"));
     }
 
     public function test_el_id_solo_o_un_numero_equivocado_llevan_a_la_direccion_actual(): void
     {
         $expediente = $this->expediente('169607/24-0');
-        $actual = route('multas.expedientes.show', $expediente->routeParameters());
+        $actual = route('multas.expedientes.show', $expediente);
         $this->actingAs($this->operador());
 
         $this->get("/multas/expedientes/{$expediente->id}")->assertRedirect($actual);
@@ -67,7 +67,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
     public function test_una_direccion_guardada_sobrevive_a_la_correccion_del_numero(): void
     {
         $expediente = $this->expediente('169607/24-0');
-        $vieja = route('multas.expedientes.show', $expediente->routeParameters());
+        $vieja = route('multas.expedientes.show', $expediente);
 
         app(ReviseFineIdentifiers::class)->handle(
             $expediente,
@@ -80,7 +80,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
 
         $this->actingAs($this->operador())
             ->get($vieja)
-            ->assertRedirect(route('multas.expedientes.show', ['fineCase' => $expediente->id, 'numero' => '169607-2024-1']));
+            ->assertRedirect(url("/multas/expedientes/{$expediente->id}/169607-2024-1"));
     }
 
     public function test_un_expediente_importado_sin_numero_va_solo_con_su_id(): void
@@ -91,7 +91,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
         $expediente = FineCase::query()->findOrFail($id);
 
         expect($expediente->routeNumber())->toBeNull()
-            ->and($expediente->routeParameters())->toBe(['fineCase' => $id]);
+            ->and($expediente->getRouteKey())->toBe((string) $id);
 
         $this->actingAs($this->operador())
             ->get("/multas/expedientes/{$id}")
@@ -103,7 +103,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
         $expediente = $this->expediente('169607/24-0');
 
         $this->actingAs($this->operador())
-            ->get(route('multas.expedientes.multas.create.numerada', $expediente->routeParameters()))
+            ->get(route('multas.expedientes.multas.create', $expediente))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/create')
@@ -129,7 +129,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
         $this->actingAs($this->operador());
 
         $this->get("/multas/expedientes/{$expediente->id}/agregar-multa")
-            ->assertRedirect(route('multas.expedientes.multas.create.numerada', $expediente->routeParameters()));
+            ->assertRedirect(route('multas.expedientes.multas.create', $expediente));
 
         $id = DB::table('fine_cases')->insertGetId([
             'original_text' => 'EXPTE. SIN NÚMERO', 'provenance' => 'import',
@@ -178,7 +178,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
         $expediente = $this->expediente('169607/24-0');
 
         $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.expedientes.multas.create.numerada', $expediente->routeParameters()))
+            ->get(route('multas.expedientes.multas.create', $expediente))
             ->assertForbidden();
     }
 

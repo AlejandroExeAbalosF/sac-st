@@ -148,15 +148,8 @@ final class FineController extends Controller
      * cambia, y el alta lo identifica por id —un expediente importado puede
      * no tener el número normalizado que el campo pediría—.
      */
-    public function createForCase(Request $request, FineCase $fineCase): Response|RedirectResponse
+    public function createForCase(FineCase $fineCase): Response
     {
-        // Como la ficha: la dirección se acomoda a la actual, con el número de hoy.
-        if ($request->route('numero') !== $fineCase->routeNumber()) {
-            return $fineCase->routeNumber() === null
-                ? to_route('multas.expedientes.multas.create', $fineCase->routeParameters())
-                : to_route('multas.expedientes.multas.create.numerada', $fineCase->routeParameters());
-        }
-
         return Inertia::render('multas/create', [
             'existente' => FineCaseData::fromModel($fineCase->load('documents')),
             'similares' => [],

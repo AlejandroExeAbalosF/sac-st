@@ -47,7 +47,7 @@ final class HaberSubject extends BaseAuditSubjectResolver
     public function describe(array $ids, ?User $viewer): array
     {
         $haberes = Haber::query()
-            ->with(['expediente:id,display_number', 'beneficiary:id,name'])
+            ->with(['expediente:id,display_number,canonical_number', 'beneficiary:id,name'])
             ->whereIn('id', $ids)
             ->get(['id', 'expediente_id', 'haber_number', 'beneficiary_id']);
 

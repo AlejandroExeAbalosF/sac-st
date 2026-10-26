@@ -137,11 +137,10 @@ redirige a la dirección actual: una dirección guardada sigue andando. Un exped
 importado sin número normalizado va solo con su id. Un número suelto en la barra
 no es una dirección: para buscar por número está el buscador.
 
-No sigue la forma de Haberes (`125958-2026-7`, el id pegado al número) a
-propósito: allá el número tiene un solo guion, pero acá el sufijo también lleva
-guion, y `169607-2024-75` no decía si 75 era el sufijo o el id. Los enlaces de las
-pantallas reciben el número del servidor (`routeNumber`) y llegan directo a la
-dirección actual.
+Es el mismo patrón que Haberes (`app/Support/Routing`). El id va en su propio
+tramo porque el sufijo también lleva guion: pegado al número, `169607-2024-75` no
+decía si 75 era el sufijo o el id. Los enlaces de las pantallas reciben la clave
+armada por el servidor (`routeKey`) y llegan directo a la dirección actual.
 
 **Agregar multa** abre el mismo formulario de Nueva multa con el expediente fijo:
 el número se muestra pero no se escribe, no se ofrecen observaciones ni archivo del

@@ -57,7 +57,7 @@ final class ExpedienteSubject extends BaseAuditSubjectResolver
     {
         $descripciones = [];
 
-        foreach (Expediente::query()->whereIn('id', $ids)->get(['id', 'display_number']) as $expediente) {
+        foreach (Expediente::query()->whereIn('id', $ids)->get(['id', 'display_number', 'canonical_number']) as $expediente) {
             $descripciones[$expediente->id] = new AuditSubjectDescription(
                 $this->links->expedienteLabel($expediente),
                 $this->links->expedienteUrl($expediente, $viewer),

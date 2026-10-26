@@ -65,7 +65,7 @@ final class FineDocumentSubject extends BaseAuditSubjectResolver
             $descripciones[$documento->id] = new AuditSubjectDescription(
                 $documento->label(),
                 $expediente !== null && $this->can($viewer, 'multas.ver')
-                    ? route('multas.expedientes.show', $expediente->routeParameters())
+                    ? route('multas.expedientes.show', $expediente)
                     : null,
             );
         }

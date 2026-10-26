@@ -143,7 +143,7 @@ export default function CrearHaber({
                     expedienteId={expediente.id}
                     beneficiarios={beneficiarios}
                     etiquetas={etiquetas}
-                    volverA={show(expediente.id).url}
+                    volverA={show(expediente.routeKey).url}
                 />
             </div>
         </>

@@ -205,7 +205,7 @@ export default function CrearExpediente({ empleadores, existente }: Props) {
                                 </p>
 
                                 <Button asChild className="mt-3" size="sm">
-                                    <Link href={show(existente.id)}>
+                                    <Link href={show(existente.routeKey)}>
                                         Abrir el expediente
                                         <ArrowRight
                                             className="size-4"

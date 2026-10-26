@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureAccountIsUsable;
 use App\Http\Middleware\ForcePasswordChange;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RedirectToCurrentRouteKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Ledger\Exceptions\CashBookNotOpenedException;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
@@ -71,6 +72,11 @@ return Application::configure(basePath: dirname(__DIR__))
              * middleware se ocupa de dejar pasar al invitado.
              */
             ForcePasswordChange::class,
+            /*
+             * La dirección de un expediente con el número de hoy: resuelve
+             * por el id y, si el número falta o quedó viejo, redirige.
+             */
+            RedirectToCurrentRouteKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -32,9 +32,19 @@ El expediente agrupa los derechos de los beneficiarios. Cada haber reconoce un i
 y lo distribuye en cuotas; puede haber cuotas previstas todavía sin cargar. La suma
 de las cuotas no anuladas no puede superar el importe reconocido del haber.
 
-El listado está en `/haberes/expedientes`. La ficha utiliza la clave de ruta del
-expediente, y cada haber se identifica por su número **dentro de ese expediente**,
-no por su id global: `/haberes/expedientes/{expediente}/haber/{haber}`.
+El listado está en `/haberes/expedientes`. La ficha va por el id y el número
+completo de SiCE con guiones: `/haberes/expedientes/75/0030064-125957-2026-0`. **El
+id identifica; el número solo describe.** Si falta o quedó viejo, la pantalla
+redirige a la dirección actual; un número suelto en la barra no es una dirección.
+No va la forma corta `125957/2026`: no dice la instancia y no es única. Es el mismo
+patrón que Multas, implementado una sola vez en `app/Support/Routing`
+(`ReadableRouteKey`, y la redirección en `RedirectToCurrentRouteKey`), y lo usan
+todas las pantallas que cuelgan del expediente: editar, historial, alta de haber,
+ficha del haber —`/haberes/expedientes/75/0030064-125957-2026-0/haber/2`— y su
+historial.
+
+Cada haber se identifica por su número **dentro de ese expediente**, no por su id
+global ni por el nombre del beneficiario.
 
 El número del expediente se carga completo (`0030064-125957/2026-0`), corto
 (`125957/2026`, que es la instancia 0) o corto con la instancia al final

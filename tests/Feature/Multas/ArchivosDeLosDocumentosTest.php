@@ -51,7 +51,7 @@ class ArchivosDeLosDocumentosTest extends TestCase
 
         expect(AuditEvent::query()->where('action', 'documento-multa.adjunto-agregado')->count())->toBe(2);
 
-        $this->get(route('multas.expedientes.show', $multa->fineCase->routeParameters()))
+        $this->get(route('multas.expedientes.show', $multa->fineCase))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('adjuntos', 1)
                 ->has("adjuntosDeDocumentos.{$resolucion->id}", 1)
@@ -138,10 +138,10 @@ class ArchivosDeLosDocumentosTest extends TestCase
             ->assertForbidden();
 
         $this->actingAs($this->operador())
-            ->from(route('multas.expedientes.show', $expediente->routeParameters()))
+            ->from(route('multas.expedientes.show', $expediente))
             ->post(route('multas.documentos.adjuntos.store', $acta), ['file' => UploadedFile::fake()->image('acta.jpg'), 'title' => 'Foja 2'])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.expedientes.show', $expediente->routeParameters()));
+            ->assertRedirect(route('multas.expedientes.show', $expediente));
 
         $adjunto = Attachment::query()->sole();
         expect($adjunto->subject_type)->toBe(AttachmentSubject::FineDocument)

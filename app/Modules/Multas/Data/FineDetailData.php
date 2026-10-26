@@ -26,8 +26,8 @@ final class FineDetailData extends Data
     public function __construct(
         public int $id,
         public int $caseId,
-        /** El número del expediente en la dirección; `null` si no está normalizado. */
-        public ?string $caseRouteNumber,
+        /** La dirección del expediente, `12/169607-2024-0`: la arma el servidor. */
+        public string $caseRouteKey,
         public string $caseLabel,
         public string $caseOriginalText,
         public string $caption,
@@ -88,7 +88,7 @@ final class FineDetailData extends Data
         return new self(
             id: $multa->id,
             caseId: $multa->fine_case_id,
-            caseRouteNumber: $multa->fineCase->routeNumber(),
+            caseRouteKey: $multa->fineCase->getRouteKey(),
             caseLabel: $multa->fineCase->label(),
             caseOriginalText: $multa->fineCase->original_text,
             caption: $multa->caption,

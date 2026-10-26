@@ -242,6 +242,12 @@ final class Haber extends Model
      * haber cuelgan de él. No es una decisión de diseño de URL: es lo que
      * impide que `route('haberes.haber.cancel', $haber)` arme una
      * dirección que apunte a otro haber.
+     *
+     * Tampoco va el nombre del beneficiario. Un nombre en la barra de
+     * direcciones se copia a un correo, a un ticket o a un chat, y queda en
+     * el registro de cada servidor por el que pasa: es dato personal saliendo
+     * del sistema sin que nadie lo haya decidido. El número del expediente es
+     * el identificador de un trámite; el nombre de quien cobra, no.
      */
     public function getRouteKey(): string
     {

@@ -11,7 +11,6 @@ import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { addFineRoute, caseRoute } from '@/features/multas/case-route';
 import {
     AttachFileDialog,
     AttachmentList,
@@ -28,7 +27,9 @@ import {
 } from '@/features/multas/labels';
 import { show } from '@/routes/multas';
 import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
+import { show as showCase } from '@/routes/multas/expedientes';
 import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
+import { create as addFine } from '@/routes/multas/expedientes/multas';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
@@ -104,12 +105,7 @@ export default function ExpedienteDeMultas({
                             )}
                             {can.register && (
                                 <Button asChild>
-                                    <Link
-                                        href={addFineRoute(
-                                            expediente.id,
-                                            expediente.routeNumber,
-                                        )}
-                                    >
+                                    <Link href={addFine(expediente.routeKey)}>
                                         <Plus
                                             className="size-4"
                                             aria-hidden="true"
@@ -135,10 +131,7 @@ export default function ExpedienteDeMultas({
                                 <span key={otro.id}>
                                     {i > 0 && ', '}
                                     <Link
-                                        href={caseRoute(
-                                            otro.id,
-                                            otro.routeNumber,
-                                        )}
+                                        href={showCase(otro.routeKey)}
                                         className="font-mono underline"
                                     >
                                         {otro.label}

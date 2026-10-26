@@ -603,26 +603,8 @@ final class HaberController extends Controller
      * Detalle de un haber, con su plan de cuotas y el expediente que lo
      * enmarca. El porqué del diseño, en la página `haberes/haber-show`.
      */
-    public function show(Request $request, Expediente $expediente, Haber $haber): Response|RedirectResponse
+    public function show(Request $request, Expediente $expediente, Haber $haber): Response
     {
-        /*
-         * La dirección se acomoda a la forma con número, igual que la del
-         * expediente: los enlaces de adentro se arman con el id porque los
-         * helpers tipados del front no conocen la clave de ruta del modelo.
-         *
-         * El haber sigue por id y no por el nombre del beneficiario. Un
-         * nombre en la barra de direcciones se copia a un correo, a un
-         * ticket o a un chat, y queda en el registro de cada servidor por
-         * el que pasa: es dato personal saliendo del sistema sin que nadie
-         * lo haya decidido. El número del expediente es el identificador de
-         * un trámite; el nombre de quien cobra, no.
-         */
-        $clave = $request->route()?->originalParameters()['expediente'] ?? null;
-
-        if (is_string($clave) && $clave !== $expediente->getRouteKey()) {
-            return to_route('haberes.haber.show', [$expediente, $haber]);
-        }
-
         /*
          * El domicilio y el teléfono de las dos partes viajan acá aunque
          * la ficha del haber no los muestre: los pide el formulario de la
@@ -681,6 +663,7 @@ final class HaberController extends Controller
             ),
             'expediente' => [
                 'id' => $expediente->id,
+                'routeKey' => $expediente->getRouteKey(),
                 'displayNumber' => $expediente->display_number,
                 'canonicalNumber' => $expediente->canonical_number,
                 'subject' => $expediente->subject,

@@ -58,7 +58,7 @@ final class DepositTicketSubject extends BaseAuditSubjectResolver
     public function describe(array $ids, ?User $viewer): array
     {
         $tickets = DepositTicket::query()
-            ->with('expediente:id,display_number')
+            ->with('expediente:id,display_number,canonical_number')
             ->whereIn('id', $ids)
             ->get(['id', 'expediente_id', 'operation_number']);
 

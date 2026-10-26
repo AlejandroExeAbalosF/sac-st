@@ -131,7 +131,7 @@ export default function MostrarExpediente({
                                         kind: 'history',
                                         subject: 'expediente',
                                         url: historialDeExpediente(
-                                            expediente.id,
+                                            expediente.routeKey,
                                         ).url,
                                         label: `del expediente ${expediente.displayNumber}`,
                                     })
@@ -145,7 +145,7 @@ export default function MostrarExpediente({
                             </Button>
                             {canEdit && !anulado && (
                                 <Button variant="outline" asChild>
-                                    <Link href={edit(expediente.id)}>
+                                    <Link href={edit(expediente.routeKey)}>
                                         <Pencil
                                             className="size-4"
                                             aria-hidden="true"
@@ -339,7 +339,7 @@ export default function MostrarExpediente({
                         </p>
                         {!anulado && (
                             <Button className="mt-4" asChild>
-                                <Link href={haberCreate(expediente.id)}>
+                                <Link href={haberCreate(expediente.routeKey)}>
                                     <Plus
                                         className="size-4"
                                         aria-hidden="true"
@@ -356,7 +356,11 @@ export default function MostrarExpediente({
                             acciones={
                                 !anulado && (
                                     <Button size="sm" asChild>
-                                        <Link href={haberCreate(expediente.id)}>
+                                        <Link
+                                            href={haberCreate(
+                                                expediente.routeKey,
+                                            )}
+                                        >
                                             <Plus
                                                 className="size-4"
                                                 aria-hidden="true"

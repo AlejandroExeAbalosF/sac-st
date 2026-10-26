@@ -182,7 +182,7 @@ export default function ExpedienteRow({
                                     asChild
                                     aria-label={`Ver el expediente ${expediente.displayNumber}`}
                                 >
-                                    <Link href={show(expediente.id)}>
+                                    <Link href={show(expediente.routeKey)}>
                                         <Eye
                                             className="size-4"
                                             aria-hidden="true"
@@ -283,7 +283,7 @@ export function ExpedienteCard({ expediente }: { expediente: Expediente }) {
                             ` · recibido ${date(expediente.receivedDate)}`}
                     </span>
                     <Button asChild variant="ghost" size="sm" className="h-10">
-                        <Link href={show(expediente.id)}>
+                        <Link href={show(expediente.routeKey)}>
                             <Eye className="size-4" aria-hidden="true" />
                             Ver detalle
                         </Link>

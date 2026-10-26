@@ -24,10 +24,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { caseRoute } from '@/features/multas/case-route';
 import { ACT_TYPE } from '@/features/multas/labels';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
+import { show as showCase } from '@/routes/multas/expedientes';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type ActType = App.Modules.Multas.Enums.FineActType;
@@ -258,10 +258,7 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
                                  * el aviso entero lleva a su ficha.
                                  */
                                 <Link
-                                    href={caseRoute(
-                                        existente.id,
-                                        existente.routeNumber,
-                                    )}
+                                    href={showCase(existente.routeKey)}
                                     className="group flex gap-2 self-start rounded-md border border-info-strong/30 bg-info-soft p-3 text-xs text-info-strong hover:border-info-strong/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-7"
                                 >
                                     <FolderOpen
@@ -764,10 +761,7 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
                                 <Link
                                     href={
                                         fijo && existente
-                                            ? caseRoute(
-                                                  existente.id,
-                                                  existente.routeNumber,
-                                              )
+                                            ? showCase(existente.routeKey)
                                             : index()
                                     }
                                 >

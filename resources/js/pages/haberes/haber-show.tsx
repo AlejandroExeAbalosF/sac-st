@@ -37,6 +37,7 @@ type Props = {
     extras: App.Modules.Haberes.Data.HaberExtraData;
     expediente: {
         id: number;
+        routeKey: string;
         displayNumber: string;
         canonicalNumber: string | null;
         subject: string | null;
@@ -228,7 +229,7 @@ export default function MostrarHaber({
                                         kind: 'history',
                                         subject: 'haber',
                                         url: historialDeHaber([
-                                            expediente.id,
+                                            expediente.routeKey,
                                             haber.haberNumber,
                                         ]).url,
                                         label: `del haber de ${beneficiario.name}`,
@@ -398,7 +399,7 @@ export default function MostrarHaber({
                             </dt>
                             <dd className="mt-0.5 font-mono">
                                 <Link
-                                    href={show(expediente.id)}
+                                    href={show(expediente.routeKey)}
                                     className="underline underline-offset-2 hover:text-primary"
                                 >
                                     {expediente.canonicalNumber ??

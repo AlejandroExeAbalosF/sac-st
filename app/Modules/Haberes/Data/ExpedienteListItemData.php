@@ -29,6 +29,8 @@ final class ExpedienteListItemData extends Data
 {
     public function __construct(
         public int $id,
+        /** La dirección del expediente, `75/0030064-125957-2026-0`: la arma el servidor. */
+        public string $routeKey,
         /** Forma corta de uso diario: `125957/2026`. */
         public string $displayNumber,
         /** Número completo de SiCE: `0030064-125957/2026-0`. */
@@ -147,6 +149,7 @@ final class ExpedienteListItemData extends Data
 
         return new self(
             id: $expediente->id,
+            routeKey: $expediente->getRouteKey(),
             displayNumber: $expediente->display_number,
             canonicalNumber: $expediente->canonical_number ?? $expediente->display_number,
             subject: $expediente->subject,

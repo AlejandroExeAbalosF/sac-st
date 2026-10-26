@@ -15,6 +15,7 @@ import { show, update } from '@/routes/expedientes';
 
 type Expediente = {
     id: number;
+    routeKey: string;
     displayNumber: string;
     canonicalNumber: string | null;
     subject: string | null;
@@ -265,7 +266,9 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                 asChild
                                 disabled={processing}
                             >
-                                <Link href={show(expediente.id)}>Cancelar</Link>
+                                <Link href={show(expediente.routeKey)}>
+                                    Cancelar
+                                </Link>
                             </Button>
                             <Button type="submit" disabled={processing}>
                                 {processing ? 'Guardando…' : 'Guardar cambios'}

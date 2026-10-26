@@ -299,23 +299,8 @@ final class ExpedienteController extends Controller
         return to_route('expedientes.show', $expediente);
     }
 
-    public function show(Request $request, Expediente $expediente): Response|RedirectResponse
+    public function show(Request $request, Expediente $expediente): Response
     {
-        /*
-         * La dirección se acomoda sola a la forma con número.
-         *
-         * Los enlaces de adentro del sistema se arman con el id: los
-         * helpers tipados del front no conocen la clave de ruta del
-         * modelo. En vez de repetir esa clave en cada DTO, la pantalla que
-         * de verdad se lee y se comparte redirige a su dirección buena, y
-         * lo mismo vale para quien tipeó solo «125958-2026».
-         */
-        $clave = $request->route()?->originalParameters()['expediente'] ?? null;
-
-        if (is_string($clave) && $clave !== $expediente->getRouteKey()) {
-            return to_route('expedientes.show', $expediente);
-        }
-
         $expediente->load([
             'employer:id,name',
             // Solo la pantalla de detalle muestra quién lo cargó.
@@ -393,6 +378,7 @@ final class ExpedienteController extends Controller
         return Inertia::render('haberes/edit', [
             'expediente' => [
                 'id' => $expediente->id,
+                'routeKey' => $expediente->getRouteKey(),
                 'displayNumber' => $expediente->display_number,
                 'canonicalNumber' => $expediente->canonical_number,
                 'subject' => $expediente->subject,

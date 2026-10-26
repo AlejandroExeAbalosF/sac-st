@@ -20,6 +20,7 @@ use App\Modules\Haberes\Http\Controllers\PaymentOrderController;
 use App\Modules\Haberes\Http\Controllers\PayoutQueueController;
 use App\Modules\Haberes\Http\Controllers\ReceiptPanelController;
 use App\Modules\Shared\Http\Controllers\PersonBankAccountController;
+use App\Support\Routing\ReadableRoute;
 use Illuminate\Routing\RedirectController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,11 +35,12 @@ use Illuminate\Support\Facades\Route;
 | financia nada— pero es lo que permite encontrar el movimiento después.
 */
 /*
- * El expediente se identifica en la URL con su número y su id —«125958-2026-7»—,
- * así que el parámetro deja de ser solo dígitos. El patrón sigue dejando afuera
- * a `nuevo`, que comparte lugar con él en la ruta de alta.
+ * El expediente va en la dirección con su id y su número completo
+ * —`75/0030064-125957-2026-0`—: el id identifica y el número describe (ver
+ * `ReadableRouteKey`). El patrón deja afuera a `nuevo`, que comparte lugar
+ * con él en la ruta de alta.
  */
-Route::pattern('expediente', '[0-9]+(?:-[0-9]+)*');
+Route::pattern('expediente', ReadableRoute::PATTERN);
 
 Route::middleware(['auth', 'verified'])->prefix('depositos')->name('depositos.')->group(function (): void {
     Route::middleware('can:depositos.ver')->group(function (): void {

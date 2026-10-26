@@ -32,7 +32,7 @@ final class InstallmentLinks
         }
 
         return BeneficiaryInstallment::query()
-            ->with(['haber:id,expediente_id,haber_number,beneficiary_id', 'haber.expediente:id,display_number'])
+            ->with(['haber:id,expediente_id,haber_number,beneficiary_id', 'haber.expediente:id,display_number,canonical_number'])
             ->whereIn('id', array_values(array_unique($ids)))
             ->get(['id', 'haber_id', 'installment_number'])
             ->keyBy('id')

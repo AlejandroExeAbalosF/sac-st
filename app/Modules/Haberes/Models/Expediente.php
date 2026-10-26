@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
 use App\Modules\Shared\Models\Person;
 use App\Support\Database\Like;
+use App\Support\Routing\ReadableRouteKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +41,8 @@ use Illuminate\Support\Str;
  */
 final class Expediente extends Model
 {
+    use ReadableRouteKey;
+
     protected $table = 'expedientes';
 
     protected $fillable = [
@@ -149,57 +152,14 @@ final class Expediente extends Model
     }
 
     /**
-     * Lo que el expediente muestra en la barra de direcciones.
-     *
-     * `125958-2026-7`: el número que el área lee en el papel, y el id
-     * atrás. La barra del número no puede ir en una URL —codificada, más de
-     * un servidor la rechaza— así que va como guion.
-     *
-     * **El id no es decoración.** `display_number` no es único: dos
-     * expedientes de organismos distintos pueden compartir Num/Período, y
-     * hacerlo único sería prohibir un dato que puede ser legítimo. Con el id
-     * al final la dirección nunca es ambigua y no hace falta esa regla.
+     * El número en la dirección: el completo de SiCE con guiones,
+     * `0030064-125957-2026-0`. No la forma corta: `125957/2026` no dice la
+     * instancia y no es única. `null` si el expediente no tiene número
+     * canónico; entonces va solo con el id. Ver `ReadableRouteKey`.
      */
-    public function getRouteKey(): string
+    public function routeNumber(): ?string
     {
-        return str_replace('/', '-', $this->display_number).'-'.$this->getKey();
-    }
-
-    /**
-     * Resuelve la dirección de vuelta al expediente.
-     *
-     * Tres formas, de la más precisa a la más humana:
-     *
-     * - `125958-2026-7` — la que arma el sistema; manda el id del final.
-     * - `7` — solo el id, como eran las direcciones antes.
-     * - `125958-2026` — la que alguien tipea mirando el papel. Solo resuelve
-     *   si no hay dos: si las hubiera, contestar cualquiera sería peor que
-     *   no contestar.
-     */
-    public function resolveRouteBinding($value, $field = null): ?static
-    {
-        $valor = (string) $value;
-
-        if (preg_match('/^\d+$/', $valor) === 1) {
-            return $this->newQuery()->find($valor);
-        }
-
-        // El número tiene exactamente un separador, así que tres partes
-        // significan que la última es el id.
-        if (preg_match('/^(\d+)-(\d{4})-(\d+)$/', $valor, $partes) === 1) {
-            return $this->newQuery()->find($partes[3]);
-        }
-
-        if (preg_match('/^(\d+)-(\d{4})$/', $valor, $partes) === 1) {
-            $coincidencias = $this->newQuery()
-                ->where('display_number', $partes[1].'/'.$partes[2])
-                ->limit(2)
-                ->get();
-
-            return $coincidencias->count() === 1 ? $coincidencias->first() : null;
-        }
-
-        return null;
+        return $this->canonical_number === null ? null : str_replace('/', '-', $this->canonical_number);
     }
 
     /**

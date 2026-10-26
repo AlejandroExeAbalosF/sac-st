@@ -18,8 +18,8 @@ final class FineCaseData extends Data
 {
     public function __construct(
         public int $id,
-        /** El número en la dirección (`169607-2024-0`); `null` si no está normalizado. */
-        public ?string $routeNumber,
+        /** La dirección del expediente, `12/169607-2024-0`: la arma el servidor. */
+        public string $routeKey,
         public string $label,
         public string $originalText,
         public ?int $number,
@@ -33,7 +33,7 @@ final class FineCaseData extends Data
          * Expedientes con el mismo número y año y otro sufijo. No se
          * fusionan (P03): se avisan para que alguien decida.
          *
-         * @var list<array{id: int, routeNumber: string|null, label: string}>
+         * @var list<array{id: int, routeKey: string, label: string}>
          */
         public array $similar,
     ) {}
@@ -53,7 +53,7 @@ final class FineCaseData extends Data
 
         return new self(
             id: $expediente->id,
-            routeNumber: $expediente->routeNumber(),
+            routeKey: $expediente->getRouteKey(),
             label: $expediente->label(),
             originalText: $expediente->original_text,
             number: $expediente->number,
@@ -66,7 +66,7 @@ final class FineCaseData extends Data
                 ->map(fn (FineDocument $documento): FineDocumentData => FineDocumentData::fromModel($documento))
                 ->all()),
             similar: array_values($similares
-                ->map(fn (FineCase $otro): array => ['id' => $otro->id, 'routeNumber' => $otro->routeNumber(), 'label' => $otro->label()])
+                ->map(fn (FineCase $otro): array => ['id' => $otro->id, 'routeKey' => $otro->getRouteKey(), 'label' => $otro->label()])
                 ->all()),
         );
     }

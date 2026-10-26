@@ -28,7 +28,7 @@ final class FineAttachmentController extends Controller
 
         Toast::success('Archivo agregado al expediente.');
 
-        return to_route('multas.expedientes.show', $fineCase->routeParameters());
+        return to_route('multas.expedientes.show', $fineCase);
     }
 
     /**

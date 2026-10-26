@@ -20,6 +20,7 @@ use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
 use App\Modules\Multas\Http\Controllers\FineMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
 use App\Modules\Multas\Http\Controllers\FinePaymentQueueController;
+use App\Support\Routing\ReadableRoute;
 use Illuminate\Routing\RedirectController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,12 @@ use Illuminate\Support\Facades\Route;
 | corregir uno que ya tenía valor exige `multas.ajustar`, y eso lo decide
 | `ReviseFineIdentifiers`, que es quien sabe qué cambió.
 */
+/*
+ * El expediente va en la dirección con su id y su número —`12/169607-2024-0`—:
+ * el id identifica y el número describe (ver `ReadableRouteKey`).
+ */
+Route::pattern('fineCase', ReadableRoute::PATTERN);
+
 /*
  * `/multas` era el listado y ahora vive en `/multas/expedientes`, como en
  * Haberes. Redirige en vez de quedar muerta: sin esto respondía 405 y no 404,
@@ -52,19 +59,9 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.registrar')->group(function (): void {
         // Antes de `{fine}`: una ruta literal delante de una con parámetro.
         Route::get('nueva', [FineController::class, 'create'])->name('create');
-        /*
-         * La multa que se agrega desde la ficha: el expediente ya está
-         * elegido. Como la ficha, lleva el número después del id; sin él
-         * —un enlace armado solo con el id, o un expediente importado sin
-         * número— la pantalla se acomoda a la dirección actual.
-         */
+        // La multa que se agrega desde la ficha: el expediente ya está elegido.
         Route::get('expedientes/{fineCase}/agregar-multa', [FineController::class, 'createForCase'])
-            ->whereNumber('fineCase')
             ->name('expedientes.multas.create');
-        Route::get('expedientes/{fineCase}/{numero}/agregar-multa', [FineController::class, 'createForCase'])
-            ->whereNumber('fineCase')
-            ->where('numero', FineCaseController::NUMERO_EN_LA_DIRECCION)
-            ->name('expedientes.multas.create.numerada');
         Route::post('/', [FineController::class, 'store'])->name('store');
 
         Route::post('{fine}/documentos', [FineDocumentController::class, 'store'])->whereNumber('fine')->name('documentos.store');
@@ -74,12 +71,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
             ->name('antecedentes.credito.store');
 
         Route::post('expedientes/{fineCase}/documentos', [FineCaseController::class, 'storeDocument'])
-            ->whereNumber('fineCase')
             ->name('expedientes.documentos.store');
 
         // Adjuntar es parte de cargar: el papel aparece después (M11).
         Route::post('expedientes/{fineCase}/adjuntos', [FineAttachmentController::class, 'storeForCase'])
-            ->whereNumber('fineCase')
             ->name('expedientes.adjuntos.store');
         Route::post('documentos/{fineDocument}/adjuntos', [FineAttachmentController::class, 'storeForDocument'])
             ->whereNumber('fineDocument')
@@ -99,7 +94,6 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.ver')->group(function (): void {
         Route::post('{fine}/revisiones', [FineController::class, 'revise'])->whereNumber('fine')->name('revisiones.store');
         Route::post('expedientes/{fineCase}/revisiones', [FineCaseController::class, 'revise'])
-            ->whereNumber('fineCase')
             ->name('expedientes.revisiones.store');
         Route::post('documentos/{fineDocument}/revisiones', [FineDocumentController::class, 'revise'])
             ->whereNumber('fineDocument')
@@ -196,11 +190,7 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');
         Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
-        // `/multas/expedientes/75/169607-2024-0`: manda el id; el número describe.
-        Route::get('expedientes/{fineCase}/{numero?}', [FineCaseController::class, 'show'])
-            ->whereNumber('fineCase')
-            ->where('numero', FineCaseController::NUMERO_EN_LA_DIRECCION)
-            ->name('expedientes.show');
+        Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');
     });
 });
