@@ -127,7 +127,7 @@ class AdjuntosYExporteDeMultasTest extends TestCase
             'object_key' => "x-{$sujeto}", 'sha256' => str_repeat('a', 64),
         ];
 
-        foreach (['fine_case', 'fine', 'fine_historical_movement', 'fine_payment'] as $sujeto) {
+        foreach (['fine_case', 'fine_document', 'fine', 'fine_historical_movement', 'fine_payment'] as $sujeto) {
             DB::table('attachments')->insert($fila($sujeto));
         }
 

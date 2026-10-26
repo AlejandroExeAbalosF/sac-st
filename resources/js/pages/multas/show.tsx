@@ -68,6 +68,8 @@ type Props = {
     multa: Multa;
     documentosDelExpediente: Documento[];
     adjuntosDelExpediente: Adjunto[];
+    /** La foto de cada resolución y de cada acta de la multa, por id del documento. */
+    adjuntosDeDocumentos: Record<number, Adjunto[] | undefined>;
     /** Llegan solo al buscar un crédito, con una recarga parcial. */
     creditosDelBanco?: Credito[];
     /** Los créditos libres posteriores a la apertura; llegan al buscar. */
@@ -128,6 +130,7 @@ export default function MultaShow({
     multa,
     documentosDelExpediente,
     adjuntosDelExpediente,
+    adjuntosDeDocumentos,
     creditosDelBanco,
     creditosDisponibles,
     recurso,
@@ -326,13 +329,26 @@ export default function MultaShow({
                                         />
                                     ))}
                                 </span>
+                                {(adjuntosDeDocumentos[documento.id] ?? [])
+                                    .length > 0 && (
+                                    <div className="basis-full pt-1">
+                                        <AttachmentList
+                                            adjuntos={
+                                                adjuntosDeDocumentos[
+                                                    documento.id
+                                                ] ?? []
+                                            }
+                                            canView={can.viewAttachments}
+                                        />
+                                    </div>
+                                )}
                             </li>
                         ))}
                     </ul>
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
-                    <Encabezado titulo="Archivos">
+                    <Encabezado titulo="Archivos de la multa">
                         {can.register && (
                             <Button
                                 size="sm"
@@ -340,7 +356,7 @@ export default function MultaShow({
                                 onClick={() => setDialogo({ tipo: 'adjuntar' })}
                             >
                                 <Paperclip aria-hidden="true" />
-                                Adjuntar archivo
+                                Adjuntar a la multa
                             </Button>
                         )}
                     </Encabezado>
@@ -348,8 +364,7 @@ export default function MultaShow({
                         {multa.attachments.length === 0 &&
                         adjuntosDelExpediente.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                Sin archivos. Las fotos de la resolución y de
-                                las actas van en el expediente.
+                                Sin archivos de la multa ni del expediente.
                             </p>
                         ) : (
                             <>

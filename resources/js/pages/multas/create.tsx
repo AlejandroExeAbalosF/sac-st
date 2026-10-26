@@ -3,6 +3,7 @@ import { Plus, Trash2, TriangleAlert } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import PageHeader from '@/components/page-header';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import PersonPicker from '@/components/person-picker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,7 +25,12 @@ import { show as showCase } from '@/routes/multas/expedientes';
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type ActType = App.Modules.Multas.Enums.FineActType;
 
-type NuevaActa = { actType: ActType; text: string; issuedOn: string };
+type NuevaActa = {
+    actType: ActType;
+    text: string;
+    issuedOn: string;
+    file: File | null;
+};
 
 type Props = {
     /** El expediente con ese número exacto, si ya está cargado. */
@@ -45,13 +51,20 @@ function FieldError({ message }: { message?: string }) {
  * Toda multa se origina en una resolución y sus actas, de un expediente. Si
  * el expediente ya está cargado, la multa se le agrega y se ofrecen sus
  * documentos: así un acta compartida por dos multas no se carga dos veces.
+ *
+ * Cada papel puede traer su foto o su PDF, en su propio bloque y opcional:
+ * el del expediente va al expediente; el de la resolución y el de cada acta
+ * nueva, a ese documento. Las actas ya cargadas reciben el suyo desde la
+ * ficha del expediente.
  */
 export default function NuevaMulta({ existente, similares }: Props) {
     const { data, setData, post, transform, processing, errors } = useForm<{
         caseNumber: string;
         caseNotes: string;
+        caseFile: File | null;
         resolutionId: number | null;
         resolution: { text: string; issuedOn: string };
+        resolutionFile: File | null;
         actIds: number[];
         acts: NuevaActa[];
         caption: string;
@@ -61,8 +74,10 @@ export default function NuevaMulta({ existente, similares }: Props) {
     }>({
         caseNumber: existente?.originalText ?? '',
         caseNotes: '',
+        caseFile: null,
         resolutionId: null,
         resolution: { text: '', issuedOn: '' },
+        resolutionFile: null,
         actIds: [],
         acts: [],
         caption: '',
@@ -105,7 +120,14 @@ export default function NuevaMulta({ existente, similares }: Props) {
                 ? { resolutionId: datos.resolutionId }
                 : { resolution: datos.resolution }),
             actIds: datos.actIds,
-            acts: datos.acts,
+            // Un archivo que no se eligió no viaja: sin él, la carga es la de siempre.
+            acts: datos.acts.map(({ file, ...acta }) =>
+                file === null ? acta : { ...acta, file },
+            ),
+            ...(datos.caseFile !== null && { caseFile: datos.caseFile }),
+            ...(datos.resolutionFile !== null && {
+                resolutionFile: datos.resolutionFile,
+            }),
             caption: datos.caption,
             personId: datos.personId,
             registeredOn: datos.registeredOn,
@@ -225,6 +247,18 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                     />
                                 </div>
                             )}
+
+                            <div className="sm:col-span-12 lg:col-span-7">
+                                <PaperPhotoDropzone
+                                    id="caseFile"
+                                    label="Archivo del expediente"
+                                    foto={data.caseFile}
+                                    onElegir={(archivo) =>
+                                        setData('caseFile', archivo)
+                                    }
+                                    error={errores.caseFile}
+                                />
+                            </div>
                         </div>
                     </section>
 
@@ -334,6 +368,18 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                     </div>
                                 </div>
                             )}
+
+                            <div className="lg:max-w-[58%]">
+                                <PaperPhotoDropzone
+                                    id="resolutionFile"
+                                    label="Archivo de la resolución"
+                                    foto={data.resolutionFile}
+                                    onElegir={(archivo) =>
+                                        setData('resolutionFile', archivo)
+                                    }
+                                    error={errores.resolutionFile}
+                                />
+                            </div>
 
                             {actas.length > 0 && (
                                 <fieldset>
@@ -479,6 +525,19 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                             <Trash2 aria-hidden="true" />
                                         </Button>
                                     </div>
+                                    <div className="sm:col-span-11">
+                                        <PaperPhotoDropzone
+                                            id={`acta-archivo-${i}`}
+                                            label="Archivo del acta"
+                                            foto={acta.file}
+                                            onElegir={(archivo) =>
+                                                cambiarActa(i, {
+                                                    file: archivo,
+                                                })
+                                            }
+                                            error={errores[`acts.${i}.file`]}
+                                        />
+                                    </div>
                                 </div>
                             ))}
 
@@ -494,6 +553,7 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                                 actType: 'HYS',
                                                 text: '',
                                                 issuedOn: '',
+                                                file: null,
                                             },
                                         ])
                                     }

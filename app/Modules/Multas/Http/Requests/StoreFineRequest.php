@@ -7,6 +7,7 @@ namespace App\Modules\Multas\Http\Requests;
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Support\BusinessDate;
+use App\Support\Validation\ScannedDocument;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -14,7 +15,7 @@ use Illuminate\Validation\Validator;
  * Alta de una multa con su expediente, su resolución y sus actas.
  *
  * Los documentos pueden ser del expediente ya cargado (por id) o nuevos (por
- * texto). Lo que exige la base —número y año de una resolución manual, tipo
+ * texto), y cada papel puede traer su foto o su PDF. Lo que exige la base —número y año de una resolución manual, tipo
  * de un acta— lo dice `AttachFineDocument` con el mensaje legible.
  */
 final class StoreFineRequest extends FormRequest
@@ -42,6 +43,11 @@ final class StoreFineRequest extends FormRequest
             'acts.*.text' => ['required', 'string', 'max:120'],
             'acts.*.issuedOn' => ['nullable', new PartialDateRule],
 
+            // El archivo de cada papel, opcional (M11): se completa cuando aparece.
+            'caseFile' => ScannedDocument::rules(required: false),
+            'resolutionFile' => ScannedDocument::rules(required: false),
+            'acts.*.file' => ScannedDocument::rules(required: false),
+
             'caption' => ['required', 'string', 'max:300'],
             'personId' => ['nullable', 'integer', 'exists:people,id'],
             'registeredOn' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
@@ -66,6 +72,21 @@ final class StoreFineRequest extends FormRequest
             'personId' => 'persona',
             'registeredOn' => 'fecha de registro',
             'amount' => 'importe',
+            'caseFile' => 'archivo del expediente',
+            'resolutionFile' => 'archivo de la resolución',
+            'acts.*.file' => 'archivo del acta',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            ...ScannedDocument::messages('caseFile', 'El archivo del expediente'),
+            ...ScannedDocument::messages('resolutionFile', 'El archivo de la resolución'),
+            ...ScannedDocument::messages('acts.*.file', 'El archivo del acta'),
         ];
     }
 

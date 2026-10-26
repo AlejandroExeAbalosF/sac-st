@@ -16,9 +16,13 @@ use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Models\Attachment;
 use App\Support\Money\Decimal;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Da de alta una multa a mano, con todo lo que trae el papel.
@@ -32,6 +36,11 @@ use Illuminate\Validation\ValidationException;
  * La fecha del importe original es la de la resolución: es la que dispone
  * la deuda. La fecha de registro es otra cosa —el día en que se anotó en la
  * cuenta corriente— y define el período de origen (M08).
+ *
+ * Cada papel puede traer su archivo, opcional (M11): el del expediente va
+ * al expediente; el de la resolución y el de cada acta nueva, a ese
+ * documento. Se guardan en el mismo acto: si algo falla no queda una multa
+ * a medias ni un archivo suelto en el disco.
  */
 final class RegisterFine
 {
@@ -39,6 +48,8 @@ final class RegisterFine
         private readonly CreateFineCase $crearExpediente,
         private readonly AttachFineDocument $registrarDocumento,
         private readonly RecordAuditEvent $auditar,
+        private readonly AttachFineFile $adjuntar,
+        private readonly StoreAttachment $archivos,
     ) {}
 
     /**
@@ -59,7 +70,36 @@ final class RegisterFine
         $caratula = trim((string) $datos['caption']);
         $registro = (string) $datos['registeredOn'];
 
-        return DB::transaction(function () use ($datos, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId): Fine {
+        /** @var list<Attachment> $guardados */
+        $guardados = [];
+
+        try {
+            return $this->registrar($datos, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, $guardados);
+        } catch (Throwable $exception) {
+            // Las filas volvieron atrás: los archivos ya escritos quedarían huérfanos.
+            foreach ($guardados as $adjunto) {
+                $this->archivos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $datos
+     * @param  list<Attachment>  $guardados  los archivos escritos, para borrarlos si el acto vuelve atrás
+     */
+    private function registrar(
+        array $datos,
+        FineCaseNumber $numero,
+        string $numeroDeExpediente,
+        string $importe,
+        string $caratula,
+        string $registro,
+        ?int $actorId,
+        array &$guardados,
+    ): Fine {
+        return DB::transaction(function () use ($datos, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, &$guardados): Fine {
             $expediente = CreateFineCase::existing($numero)
                 ?? $this->crearExpediente->handle($numeroDeExpediente, isset($datos['caseNotes']) ? (string) $datos['caseNotes'] : null, $actorId);
 
@@ -112,8 +152,39 @@ final class RegisterFine
                 actorId: $actorId,
             );
 
+            $this->adjuntarArchivos($expediente, $resolucion, $actas, $datos, $actorId, $guardados);
+
             return $multa;
         });
+    }
+
+    /**
+     * El archivo de cada papel, al dueño que le corresponde.
+     *
+     * @param  array<string, mixed>  $datos
+     * @param  list<FineDocument>  $actas  las elegidas del expediente primero, las nuevas después
+     * @param  list<Attachment>  $guardados
+     */
+    private function adjuntarArchivos(
+        FineCase $expediente,
+        FineDocument $resolucion,
+        array $actas,
+        array $datos,
+        ?int $actorId,
+        array &$guardados,
+    ): void {
+        $nuevas = array_slice($actas, count((array) ($datos['actIds'] ?? [])));
+        $pares = [[$expediente, $datos['caseFile'] ?? null], [$resolucion, $datos['resolutionFile'] ?? null]];
+
+        foreach (array_values((array) ($datos['acts'] ?? [])) as $indice => $acta) {
+            $pares[] = [$nuevas[$indice], ((array) $acta)['file'] ?? null];
+        }
+
+        foreach ($pares as [$duenio, $archivo]) {
+            if ($archivo instanceof UploadedFile) {
+                $guardados[] = $this->adjuntar->handle($duenio, $archivo, null, $actorId);
+            }
+        }
     }
 
     /**

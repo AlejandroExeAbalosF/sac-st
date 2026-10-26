@@ -130,6 +130,12 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
             ),
             new AuditActionDefinition(
+                'documento-multa.adjunto-agregado',
+                'Se adjuntó el archivo de un documento de multa',
+                'Multas',
+                metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.adjunto-agregado',
                 'Se adjuntó un archivo a la multa',
                 'Multas',

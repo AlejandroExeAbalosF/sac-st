@@ -68,6 +68,9 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('expedientes/{fineCase}/adjuntos', [FineAttachmentController::class, 'storeForCase'])
             ->whereNumber('fineCase')
             ->name('expedientes.adjuntos.store');
+        Route::post('documentos/{fineDocument}/adjuntos', [FineAttachmentController::class, 'storeForDocument'])
+            ->whereNumber('fineDocument')
+            ->name('documentos.adjuntos.store');
         Route::post('{fine}/adjuntos', [FineAttachmentController::class, 'storeForFine'])->whereNumber('fine')->name('adjuntos.store');
         Route::post('antecedentes/{movement}/adjuntos', [FineAttachmentController::class, 'storeForMovement'])
             ->whereNumber('movement')

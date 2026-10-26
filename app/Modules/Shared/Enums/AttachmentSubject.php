@@ -33,8 +33,11 @@ enum AttachmentSubject: string
     /** Un papel del sistema anterior: recibo u Orden de Pago de talonario. */
     case LegacyDocument = 'legacy_document';
 
-    /** Un papel del expediente de Multas: la resolución, el acta. */
+    /** Un papel del expediente de Multas sin documento propio. */
     case FineCase = 'fine_case';
+
+    /** La resolución o el acta misma: su foto o su PDF. */
+    case FineDocument = 'fine_document';
 
     /** Lo que respalda una multa en particular. */
     case Fine = 'fine';
@@ -62,6 +65,7 @@ enum AttachmentSubject: string
             self::PeriodClosing => 'Planilla de caja',
             self::LegacyDocument => 'Papel del sistema anterior',
             self::FineCase => 'Expediente de multa',
+            self::FineDocument => 'Documento de multa',
             self::Fine => 'Multa',
             self::FineHistoricalMovement => 'Pago anterior de una multa',
             self::FinePayment => 'Pago de una multa',

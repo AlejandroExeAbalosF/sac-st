@@ -109,10 +109,11 @@ saldo y estado. Abajo:
 
 - **Datos**, con la carátula y el expediente tal como vinieron.
 - **Documentos**, con el papel que cumple cada uno: origen, modificación,
-  ratificación o respaldo. Vincular una ratificación no mueve la obligación.
+  ratificación o respaldo, y debajo de cada uno su archivo. Vincular una
+  ratificación no mueve la obligación.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
-- **Archivos**: los de la multa y, debajo, los del expediente.
+- **Archivos de la multa**: los de la multa y, debajo, los del expediente.
 - **Pagos**: los del sistema, con su medio, su estado, su recibo, si fue el
   cancelatorio, si se presentó en término, su comprobante y, si sobró, cuánto
   quedó de excedente. Desde acá se cobra en caja, se informa, corrige o verifica
@@ -128,8 +129,9 @@ ficha, donde se verifica, se corrige o se descarta.
 
 ### Expediente · `/multas/expedientes/{id}`
 
-Sus documentos —se pueden cargar antes que la multa—, sus archivos y las multas que
-originó.
+Arriba, los **archivos del expediente**: la carátula u otro papel suelto. Después,
+sus documentos —se pueden cargar antes que la multa—, cada uno con su archivo y su
+botón para adjuntarlo, y las multas que originó.
 
 ---
 
@@ -139,11 +141,22 @@ originó.
 
 La foto o el PDF de un papel se adjunta a quien es dueño de ese papel:
 
-- **Expediente**: la resolución, las actas, cualquier papel del expediente. Lo
-  muestran todas sus multas.
+- **Documento**: la foto o el PDF de una resolución o de un acta va en ese
+  documento. Como el documento se comparte, lo ven cada expediente y cada
+  multa que lo usan, debajo del documento, sin duplicarse.
+- **Expediente**: un papel del expediente que no es la resolución ni un acta
+  —la carátula, una nota—. Lo muestran todas sus multas. Lo que se subió acá
+  antes de que cada documento tuviera su archivo queda donde está: un adjunto
+  no se mueve.
 - **Multa**: lo que respalda esa multa en particular.
 - **Pago anterior**: su comprobante —recibo, boleta, planilla—, que ayuda a
   validarlo.
+
+**Nueva multa** ofrece un archivo opcional en cada bloque: el del expediente, el
+de la resolución —nueva o ya cargada— y el de cada acta nueva. Las actas que
+el expediente ya tenía reciben el suyo desde la ficha del expediente. Todo entra
+en el mismo acto que la multa: si algo falla no queda la multa a medias ni un
+archivo suelto en el disco.
 
 No se pide adjuntar nada para cargar: se completa cuando aparece el papel. Se
 adjunta con el permiso de cargar (`multas.registrar`) y se abre con el de ver

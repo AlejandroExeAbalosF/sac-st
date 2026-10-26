@@ -45,8 +45,10 @@ final class FineCaseController extends Controller
         return Inertia::render('multas/expediente', [
             'expediente' => FineCaseData::fromModel($fineCase),
             'multas' => $multas->map(fn (Fine $multa): FineListItemData => FineListItemData::fromModel($multa))->values(),
-            // Las fotos de la resolución y de las actas: el expediente es dueño de esos papeles.
+            // Los papeles del expediente sin documento propio, y lo subido antes de que cada documento tuviera el suyo.
             'adjuntos' => $adjuntos->for(AttachmentSubject::FineCase, [$fineCase->id])[$fineCase->id] ?? [],
+            // La foto de cada resolución y de cada acta, por id del documento.
+            'adjuntosDeDocumentos' => $adjuntos->for(AttachmentSubject::FineDocument, array_values($fineCase->documents->modelKeys())),
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,

@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Actions;
 
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Actions\RecordAuditEvent;
@@ -17,12 +18,13 @@ use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Adjunta un archivo a un expediente, a una multa o a un pago anterior.
+ * Adjunta un archivo a un documento, un expediente, una multa o un pago.
  *
- * La foto de la resolución o del acta va en el expediente, que es dueño de
- * esos papeles; lo que respalda una multa en particular, en la multa; el
- * comprobante de un pago anterior, en el antecedente. No se pide adjuntar
- * nada para cargar (M11): se completa cuando aparece el papel.
+ * La foto de la resolución o del acta va en ese documento, que se comparte
+ * entre expedientes y multas; un papel del expediente sin documento propio,
+ * en el expediente; lo que respalda una multa en particular, en la multa;
+ * el comprobante de un pago anterior, en el antecedente. No se pide
+ * adjuntar nada para cargar (M11): se completa cuando aparece el papel.
  *
  * El archivo entra por `StoreAttachment`, como todos: disco privado,
  * validado por contenido, fotos normalizadas y huella del archivo guardado.
@@ -36,7 +38,7 @@ final class AttachFineFile
     ) {}
 
     public function handle(
-        FineCase|Fine|FineHistoricalMovement|FinePayment $sujeto,
+        FineDocument|FineCase|Fine|FineHistoricalMovement|FinePayment $sujeto,
         UploadedFile $archivo,
         ?string $title,
         ?int $actorId,
@@ -49,6 +51,7 @@ final class AttachFineFile
                 $adjunto = $this->adjuntos->handle(
                     file: $archivo,
                     subject: match (true) {
+                        $sujeto instanceof FineDocument => AttachmentSubject::FineDocument,
                         $sujeto instanceof FineCase => AttachmentSubject::FineCase,
                         $sujeto instanceof Fine => AttachmentSubject::Fine,
                         $sujeto instanceof FinePayment => AttachmentSubject::FinePayment,
@@ -56,6 +59,7 @@ final class AttachFineFile
                     },
                     subjectId: (int) $sujeto->getKey(),
                     documentType: match (true) {
+                        $sujeto instanceof FineDocument => 'fine_document_paper',
                         $sujeto instanceof FineCase => 'fine_case_paper',
                         $sujeto instanceof Fine => 'fine_support',
                         $sujeto instanceof FinePayment => 'fine_payment_evidence',
@@ -68,6 +72,7 @@ final class AttachFineFile
                 // Los pagos se auditan sobre su multa: es donde se leen.
                 $this->auditar->handle(
                     match (true) {
+                        $sujeto instanceof FineDocument => 'documento-multa.adjunto-agregado',
                         $sujeto instanceof FineCase => 'expediente-multa.adjunto-agregado',
                         $sujeto instanceof Fine => 'multa.adjunto-agregado',
                         $sujeto instanceof FinePayment => 'multa.comprobante-de-pago-agregado',

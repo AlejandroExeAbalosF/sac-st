@@ -9,14 +9,15 @@ use App\Modules\Multas\Actions\AttachFineFile;
 use App\Modules\Multas\Http\Requests\StoreFineAttachmentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
 
 /**
- * Los archivos de Multas: papeles del expediente, respaldos de la multa y
- * comprobantes de pagos anteriores. Se ven por la puerta común de
+ * Los archivos de Multas: resoluciones y actas, papeles del expediente,
+ * respaldos de la multa y comprobantes de pagos anteriores. Se ven por la puerta común de
  * adjuntos (`adjuntos.preview`), que comprueba permisos.
  */
 final class FineAttachmentController extends Controller
@@ -28,6 +29,20 @@ final class FineAttachmentController extends Controller
         Toast::success('Archivo agregado al expediente.');
 
         return to_route('multas.expedientes.show', $fineCase);
+    }
+
+    /**
+     * El archivo de una resolución o de un acta. El documento se comparte
+     * entre expedientes y multas, así que se vuelve a la pantalla desde la
+     * que se adjuntó.
+     */
+    public function storeForDocument(StoreFineAttachmentRequest $request, FineDocument $fineDocument, AttachFineFile $adjuntar): RedirectResponse
+    {
+        $adjuntar->handle($fineDocument, $this->archivo($request), $request->validated('title'), $request->user()?->id);
+
+        Toast::success('Archivo agregado al documento.');
+
+        return back();
     }
 
     public function storeForFine(StoreFineAttachmentRequest $request, Fine $fine, AttachFineFile $adjuntar): RedirectResponse

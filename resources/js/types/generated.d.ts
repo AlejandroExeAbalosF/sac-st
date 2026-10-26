@@ -1318,6 +1318,7 @@ declare namespace App {
                     | 'period_closing'
                     | 'legacy_document'
                     | 'fine_case'
+                    | 'fine_document'
                     | 'fine'
                     | 'fine_historical_movement'
                     | 'fine_payment'

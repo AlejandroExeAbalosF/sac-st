@@ -26,6 +26,7 @@ import {
     partialDate,
 } from '@/features/multas/labels';
 import { create, show } from '@/routes/multas';
+import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
 
@@ -38,6 +39,8 @@ type Props = {
     expediente: Expediente;
     multas: Multa[];
     adjuntos: Adjunto[];
+    /** La foto de cada resolución y de cada acta, por id del documento. */
+    adjuntosDeDocumentos: Record<number, Adjunto[] | undefined>;
     can: { register: boolean; adjust: boolean; viewAttachments: boolean };
 };
 
@@ -45,6 +48,7 @@ type Dialogo =
     | { tipo: 'documento' }
     | { tipo: 'expediente' }
     | { tipo: 'adjuntar' }
+    | { tipo: 'adjuntar-documento'; documento: Documento }
     | { tipo: 'corregir-documento'; documento: Documento };
 
 /**
@@ -57,6 +61,7 @@ export default function ExpedienteDeMultas({
     expediente,
     multas,
     adjuntos,
+    adjuntosDeDocumentos,
     can,
 }: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -152,6 +157,37 @@ export default function ExpedienteDeMultas({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
+                        <h2 className="text-sm font-semibold">
+                            Archivos del expediente
+                        </h2>
+                        {can.register && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
+                            >
+                                <Paperclip aria-hidden="true" />
+                                Adjuntar al expediente
+                            </Button>
+                        )}
+                    </div>
+                    <div className="px-5 py-3">
+                        {adjuntos.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Sin archivos. Acá va la carátula u otro papel
+                                del expediente.
+                            </p>
+                        ) : (
+                            <AttachmentList
+                                adjuntos={adjuntos}
+                                canView={can.viewAttachments}
+                            />
+                        )}
+                    </div>
+                </section>
+
+                <section className="rounded-lg border bg-card shadow-raised">
+                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
                         <h2 className="text-sm font-semibold">Documentos</h2>
                         {can.register && (
                             <Button
@@ -192,54 +228,54 @@ export default function ExpedienteDeMultas({
                                             documento.issuedPrecision,
                                         )}
                                     </span>
-                                    {(can.register || can.adjust) && (
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="ml-auto"
-                                            onClick={() =>
-                                                setDialogo({
-                                                    tipo: 'corregir-documento',
-                                                    documento,
-                                                })
-                                            }
-                                        >
-                                            Corregir
-                                        </Button>
+                                    <span className="ml-auto flex gap-1">
+                                        {can.register && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setDialogo({
+                                                        tipo: 'adjuntar-documento',
+                                                        documento,
+                                                    })
+                                                }
+                                            >
+                                                <Paperclip aria-hidden="true" />
+                                                Adjuntar
+                                            </Button>
+                                        )}
+                                        {(can.register || can.adjust) && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setDialogo({
+                                                        tipo: 'corregir-documento',
+                                                        documento,
+                                                    })
+                                                }
+                                            >
+                                                Corregir
+                                            </Button>
+                                        )}
+                                    </span>
+                                    {(adjuntosDeDocumentos[documento.id] ?? [])
+                                        .length > 0 && (
+                                        <div className="basis-full pt-1">
+                                            <AttachmentList
+                                                adjuntos={
+                                                    adjuntosDeDocumentos[
+                                                        documento.id
+                                                    ] ?? []
+                                                }
+                                                canView={can.viewAttachments}
+                                            />
+                                        </div>
                                     )}
                                 </li>
                             ))}
                         </ul>
                     )}
-                </section>
-
-                <section className="rounded-lg border bg-card shadow-raised">
-                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                        <h2 className="text-sm font-semibold">Archivos</h2>
-                        {can.register && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
-                            >
-                                <Paperclip aria-hidden="true" />
-                                Adjuntar archivo
-                            </Button>
-                        )}
-                    </div>
-                    <div className="px-5 py-3">
-                        {adjuntos.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Sin archivos. Se agregan cuando aparece el
-                                papel: no hace falta para cargar.
-                            </p>
-                        ) : (
-                            <AttachmentList
-                                adjuntos={adjuntos}
-                                canView={can.viewAttachments}
-                            />
-                        )}
-                    </div>
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
@@ -297,7 +333,15 @@ export default function ExpedienteDeMultas({
                 <AttachFileDialog
                     url={attachToCase(expediente.id).url}
                     title="Adjuntar un archivo al expediente"
-                    description="La foto o el PDF de la resolución, de un acta o de otro papel del expediente. Lo ven todas sus multas."
+                    description="La foto o el PDF de un papel del expediente que no es la resolución ni un acta: esos van en su documento. Lo ven todas sus multas."
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'adjuntar-documento' && (
+                <AttachFileDialog
+                    url={attachToDocument(dialogo.documento.id).url}
+                    title={`Adjuntar el archivo de ${dialogo.documento.label}`}
+                    description="La foto o el PDF de este papel. Queda en el documento, y lo ve cada multa y cada expediente que lo usa."
                     onClose={cerrar}
                 />
             )}

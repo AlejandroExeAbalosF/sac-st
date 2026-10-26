@@ -193,8 +193,10 @@ final class FineController extends Controller
                 ->sortBy('id')
                 ->map(fn (FineDocument $documento): FineDocumentData => FineDocumentData::fromModel($documento))
                 ->values(),
-            // La resolución y las actas son del expediente; la multa las muestra igual.
+            // Los papeles del expediente sin documento propio; la multa los muestra igual.
             'adjuntosDelExpediente' => $adjuntos->for(AttachmentSubject::FineCase, [$fine->fine_case_id])[$fine->fine_case_id] ?? [],
+            // La foto de cada resolución y de cada acta de la multa, por id del documento.
+            'adjuntosDeDocumentos' => $adjuntos->for(AttachmentSubject::FineDocument, array_values($fine->documents->modelKeys())),
             /*
              * Los créditos viejos de la cuenta de Multas, para respaldar un
              * pago anterior. Se piden con una recarga parcial al buscar.
