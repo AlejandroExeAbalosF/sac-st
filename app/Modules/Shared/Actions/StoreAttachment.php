@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Throwable;
 
 /**
  * Guarda un archivo y lo deja registrado.
@@ -110,6 +111,29 @@ final class StoreAttachment
             throw new RuntimeException('No se pudo guardar el archivo.');
         }
 
+        try {
+            return $this->record($file, $objectKey, $hash, $subject, $subjectId, $documentType, $userId, $title, $source, $confidentiality, $templateVersion);
+        } catch (Throwable $exception) {
+            // La fila no entró —un CHECK, un trigger—: el archivo ya escrito quedaría huérfano.
+            Storage::disk(self::DISK)->delete($objectKey);
+
+            throw $exception;
+        }
+    }
+
+    private function record(
+        UploadedFile $file,
+        string $objectKey,
+        string $hash,
+        AttachmentSubject $subject,
+        int $subjectId,
+        string $documentType,
+        ?int $userId,
+        ?string $title,
+        AttachmentSource $source,
+        Confidentiality $confidentiality,
+        ?string $templateVersion,
+    ): Attachment {
         return Attachment::query()->create([
             'subject_type' => $subject,
             'subject_id' => $subjectId,
