@@ -57,6 +57,17 @@ class DireccionDelExpedienteTest extends TestCase
             ->assertRedirect(route('expedientes.edit', $expediente));
     }
 
+    public function test_la_consulta_no_cambia_el_expediente_al_redirigir(): void
+    {
+        $este = $this->expediente('0030064-222222/2026-0');
+        $otro = $this->expediente('0030064-333333/2026-0');
+
+        // Una clave de la consulta con el nombre del parámetro no pisa a la ruta: viaja como consulta.
+        $this->actingAs($this->operador())
+            ->get("/haberes/expedientes/{$este->id}?expediente={$otro->id}&pestana=cuotas")
+            ->assertRedirect(route('expedientes.show', $este)."?expediente={$otro->id}&pestana=cuotas");
+    }
+
     public function test_las_pantallas_que_cuelgan_del_expediente_llevan_el_numero(): void
     {
         $expediente = $this->expediente('0030064-222222/2026-0');

@@ -102,6 +102,16 @@ class DireccionDeLaMultaTest extends TestCase
             ->assertRedirect(route('multas.show', $multa->showParameters()));
     }
 
+    public function test_la_consulta_no_cambia_el_expediente_ni_la_multa_al_redirigir(): void
+    {
+        $multa = $this->multa('169607/24-0');
+        $otra = $this->multa('120276/25');
+
+        $this->actingAs($this->operador())
+            ->get("/multas/expedientes/{$multa->fine_case_id}/multa/1?fineCase={$otra->fine_case_id}&fine=7")
+            ->assertRedirect(route('multas.show', $multa->showParameters())."?fineCase={$otra->fine_case_id}&fine=7");
+    }
+
     public function test_la_lista_enlaza_directo_a_la_ficha(): void
     {
         $multa = $this->multa('169607/24-0');

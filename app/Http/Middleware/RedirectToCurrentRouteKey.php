@@ -8,6 +8,7 @@ use App\Support\Routing\ReadableRouteKey;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -37,7 +38,15 @@ final class RedirectToCurrentRouteKey
             }
 
             if ($ruta->originalParameter($nombre) !== $valor->getRouteKey()) {
-                return redirect()->route($ruta->getName(), [...$ruta->parameters(), ...$request->query()]);
+                /*
+                 * La dirección sale solo de los parámetros de la ruta, y la
+                 * consulta se agrega después, entera. Mezclados, una consulta
+                 * con el nombre de un parámetro —`?expediente=76`— lo pisaba
+                 * y la redirección llevaba a otro expediente.
+                 */
+                $consulta = Arr::query($request->query());
+
+                return redirect()->to(route($ruta->getName(), $ruta->parameters()).($consulta === '' ? '' : '?'.$consulta));
             }
         }
 
