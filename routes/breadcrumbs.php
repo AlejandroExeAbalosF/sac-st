@@ -350,6 +350,14 @@ Breadcrumbs::for('multas.expedientes.show', fn (FineCase $fineCase): array => [
     Crumb::make('Expte. '.$fineCase->label()),
 ]);
 
+Breadcrumbs::for('multas.expedientes.multas.create', fn (FineCase $fineCase): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Expte. '.$fineCase->label(), route('multas.expedientes.show', $fineCase->routeParameters())),
+    Crumb::make('Agregar multa'),
+]);
+
+Breadcrumbs::alias('multas.expedientes.multas.create.numerada', 'multas.expedientes.multas.create');
+
 /*
  * La multa cuelga de su expediente: es el «volver» natural, y es donde están
  * las otras multas del mismo trámite.
@@ -359,7 +367,7 @@ Breadcrumbs::for('multas.show', function (Fine $fine): array {
 
     return [
         Crumb::make('Multas', route('multas.index')),
-        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fine_case_id)),
+        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fineCase->routeParameters())),
         Crumb::make($fine->caption),
     ];
 });
@@ -371,7 +379,7 @@ Breadcrumbs::for('multas.pagos.deposito.create', function (FinePayment $payment)
 
     return [
         Crumb::make('Multas', route('multas.index')),
-        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fine_case_id)),
+        Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fineCase->routeParameters())),
         Crumb::make($fine->caption, route('multas.show', $fine)),
         Crumb::make('Depósito en el banco'),
     ];

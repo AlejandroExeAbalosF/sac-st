@@ -52,6 +52,19 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.registrar')->group(function (): void {
         // Antes de `{fine}`: una ruta literal delante de una con parámetro.
         Route::get('nueva', [FineController::class, 'create'])->name('create');
+        /*
+         * La multa que se agrega desde la ficha: el expediente ya está
+         * elegido. Como la ficha, lleva el número después del id; sin él
+         * —un enlace armado solo con el id, o un expediente importado sin
+         * número— la pantalla se acomoda a la dirección actual.
+         */
+        Route::get('expedientes/{fineCase}/agregar-multa', [FineController::class, 'createForCase'])
+            ->whereNumber('fineCase')
+            ->name('expedientes.multas.create');
+        Route::get('expedientes/{fineCase}/{numero}/agregar-multa', [FineController::class, 'createForCase'])
+            ->whereNumber('fineCase')
+            ->where('numero', FineCaseController::NUMERO_EN_LA_DIRECCION)
+            ->name('expedientes.multas.create.numerada');
         Route::post('/', [FineController::class, 'store'])->name('store');
 
         Route::post('{fine}/documentos', [FineDocumentController::class, 'store'])->whereNumber('fine')->name('documentos.store');
@@ -183,7 +196,11 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');
         Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
-        Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->whereNumber('fineCase')->name('expedientes.show');
+        // `/multas/expedientes/75/169607-2024-0`: manda el id; el número describe.
+        Route::get('expedientes/{fineCase}/{numero?}', [FineCaseController::class, 'show'])
+            ->whereNumber('fineCase')
+            ->where('numero', FineCaseController::NUMERO_EN_LA_DIRECCION)
+            ->name('expedientes.show');
         Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');
     });
 });

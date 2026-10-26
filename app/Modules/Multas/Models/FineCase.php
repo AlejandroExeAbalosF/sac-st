@@ -67,6 +67,43 @@ final class FineCase extends Model
     }
 
     /**
+     * El número en la dirección: `169607-2024-0`, con guiones porque la barra
+     * no puede ir en una URL.
+     *
+     * Es solo descriptivo. La dirección es `/multas/expedientes/75/169607-2024-0`
+     * y el expediente lo identifica el id, que va en su propio tramo: el
+     * sufijo también lleva guion, y con el id pegado al número
+     * —`169607-2024-75`— no había forma de saber si 75 era el sufijo o el id.
+     * Si el número se corrige, una dirección vieja sigue llevando al mismo
+     * expediente y se acomoda a la actual.
+     *
+     * `null` para un expediente importado sin número normalizado: su texto
+     * original puede traer cualquier cosa, y va solo con el id.
+     */
+    public function routeNumber(): ?string
+    {
+        if ($this->number === null || $this->year === null) {
+            return null;
+        }
+
+        return str_replace('/', '-', $this->label());
+    }
+
+    /**
+     * Los parámetros de la dirección actual del expediente.
+     *
+     * @return array{fineCase: int, numero?: string}
+     */
+    public function routeParameters(): array
+    {
+        $numero = $this->routeNumber();
+
+        return $numero === null
+            ? ['fineCase' => (int) $this->id]
+            : ['fineCase' => (int) $this->id, 'numero' => $numero];
+    }
+
+    /**
      * @return HasMany<Fine, $this>
      */
     public function fines(): HasMany

@@ -48,7 +48,8 @@ conoce. El test de fronteras lo exige.
 | Expedientes y multas | `/multas/expedientes` | `multas.ver` |
 | Nueva multa | `/multas/nueva` | `multas.registrar` |
 | Ficha de la multa | `/multas/{id}` | `multas.ver` |
-| Expediente | `/multas/expedientes/{id}` | `multas.ver` |
+| Expediente | `/multas/expedientes/{id}/{número}` | `multas.ver` |
+| Agregar multa al expediente | `/multas/expedientes/{id}/{número}/agregar-multa` | `multas.registrar` |
 | Exportar las multas | `/multas/exportar` | `multas.ver` |
 | Caja de Multas | `/multas/caja` | `multas.ver`; abrirla, `multas.caja.abrir` |
 | Caja del día | `/multas/caja/dia` | `multas.caja.ver` |
@@ -90,9 +91,9 @@ repite ni saltea filas ni mezcla momentos, y quien corrige no espera.
 
 Una multa se carga con todo lo que trae el papel:
 
-- **Expediente.** Al escribir el número se pregunta si ya está cargado. Si está, la
-  multa se le agrega y se ofrecen sus documentos —un acta compartida por dos
-  multas se carga una vez—. Si hay otro con el mismo número y año y distinto
+- **Expediente.** Al escribir el número se pregunta si ya está cargado. Si está,
+  un aviso al lado del campo lo dice y lleva a su ficha; la multa se le agrega y
+  se ofrecen sus documentos —un acta compartida por dos multas se carga una vez—. Si hay otro con el mismo número y año y distinto
   sufijo, se avisa: no se fusionan solos.
 - **Resolución.** Una del expediente o una nueva, con su fecha: es la fecha del
   importe original.
@@ -127,7 +128,25 @@ La cola de quien concilia (`multas.verificar-pagos`): los pagos informados por e
 banco que esperan su crédito, del más viejo al más nuevo. Cada fila lleva a la
 ficha, donde se verifica, se corrige o se descarta.
 
-### Expediente · `/multas/expedientes/{id}`
+### Expediente · `/multas/expedientes/{id}/{número}`
+
+La dirección lleva el id y, en otro tramo, el número del papel con guiones:
+`/multas/expedientes/75/169607-2024-0`. **El id identifica; el número solo
+describe.** Si falta, o quedó viejo porque el número se corrigió, la pantalla
+redirige a la dirección actual: una dirección guardada sigue andando. Un expediente
+importado sin número normalizado va solo con su id. Un número suelto en la barra
+no es una dirección: para buscar por número está el buscador.
+
+No sigue la forma de Haberes (`125958-2026-7`, el id pegado al número) a
+propósito: allá el número tiene un solo guion, pero acá el sufijo también lleva
+guion, y `169607-2024-75` no decía si 75 era el sufijo o el id. Los enlaces de las
+pantallas reciben el número del servidor (`routeNumber`) y llegan directo a la
+dirección actual.
+
+**Agregar multa** abre el mismo formulario de Nueva multa con el expediente fijo:
+el número se muestra pero no se escribe, no se ofrecen observaciones ni archivo del
+expediente, y el alta lo identifica por id —así funciona también con un expediente
+importado sin número—.
 
 Arriba, los **archivos del expediente**: la carátula u otro papel suelto. Después,
 sus documentos —se pueden cargar antes que la multa—, cada uno con su archivo y su

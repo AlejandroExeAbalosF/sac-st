@@ -28,7 +28,9 @@ final class StoreFineRequest extends FormRequest
         $hoy = BusinessDate::today()->toDateString();
 
         return [
-            'caseNumber' => ['required', 'string', 'max:60'],
+            // Desde la ficha del expediente llega el id; desde Nueva multa, el número.
+            'fineCaseId' => ['nullable', 'integer', 'exists:fine_cases,id'],
+            'caseNumber' => ['required_without:fineCaseId', 'nullable', 'string', 'max:60'],
             'caseNotes' => ['nullable', 'string', 'max:500'],
 
             'resolutionId' => ['nullable', 'integer'],
@@ -62,6 +64,7 @@ final class StoreFineRequest extends FormRequest
     {
         return [
             'caseNumber' => 'número de expediente',
+            'fineCaseId' => 'expediente',
             'resolutionId' => 'resolución',
             'resolution.text' => 'resolución',
             'resolution.issuedOn' => 'fecha de la resolución',
@@ -98,6 +101,10 @@ final class StoreFineRequest extends FormRequest
         return [
             function (Validator $validator): void {
                 $numero = (string) $this->input('caseNumber');
+
+                if ($this->filled('fineCaseId')) {
+                    return;
+                }
 
                 if ($numero !== '' && ! FineCaseNumber::isValid($numero)) {
                     $validator->errors()->add(

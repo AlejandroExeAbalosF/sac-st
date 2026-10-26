@@ -16,10 +16,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { caseRoute } from '@/features/multas/case-route';
 import { DEBT_STATUS, partialDate } from '@/features/multas/labels';
 import { isNonZero } from '@/lib/format';
 import { create, exportar, index, show } from '@/routes/multas';
-import { show as showCase } from '@/routes/multas/expedientes';
 
 type Multa = App.Modules.Multas.Data.FineListItemData;
 type Expediente = App.Modules.Multas.Data.FineCaseListItemData;
@@ -320,7 +320,10 @@ function TablaDeExpedientes({ expedientes }: { expedientes: Expediente[] }) {
                     >
                         <td className="px-3 py-2.5 font-mono text-sm whitespace-nowrap">
                             <Link
-                                href={showCase(expediente.id)}
+                                href={caseRoute(
+                                    expediente.id,
+                                    expediente.routeNumber,
+                                )}
                                 className="hover:underline"
                             >
                                 {expediente.label}
@@ -443,7 +446,10 @@ function TablaDeMultas({ multas }: { multas: Multa[] }) {
                     >
                         <td className="px-3 py-2.5 font-mono text-sm whitespace-nowrap">
                             <Link
-                                href={showCase(multa.caseId)}
+                                href={caseRoute(
+                                    multa.caseId,
+                                    multa.caseRouteNumber,
+                                )}
                                 className="hover:underline"
                             >
                                 {multa.caseLabel}

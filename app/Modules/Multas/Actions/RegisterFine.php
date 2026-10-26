@@ -57,10 +57,12 @@ final class RegisterFine
      */
     public function handle(array $datos, ?int $actorId): Fine
     {
-        $numeroDeExpediente = (string) $datos['caseNumber'];
+        // Desde la ficha del expediente llega su id: el expediente ya está elegido.
+        $casoId = isset($datos['fineCaseId']) ? (int) $datos['fineCaseId'] : null;
+        $numeroDeExpediente = (string) ($datos['caseNumber'] ?? '');
         $numero = FineCaseNumber::parse($numeroDeExpediente);
 
-        if ($numero === null) {
+        if ($casoId === null && $numero === null) {
             throw ValidationException::withMessages([
                 'caseNumber' => 'El número de expediente se escribe como en el papel: 169607/24-0 o 120276/25.',
             ]);
@@ -74,7 +76,7 @@ final class RegisterFine
         $guardados = [];
 
         try {
-            return $this->registrar($datos, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, $guardados);
+            return $this->registrar($datos, $casoId, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, $guardados);
         } catch (Throwable $exception) {
             // Las filas volvieron atrás: los archivos ya escritos quedarían huérfanos.
             foreach ($guardados as $adjunto) {
@@ -91,7 +93,8 @@ final class RegisterFine
      */
     private function registrar(
         array $datos,
-        FineCaseNumber $numero,
+        ?int $casoId,
+        ?FineCaseNumber $numero,
         string $numeroDeExpediente,
         string $importe,
         string $caratula,
@@ -99,9 +102,12 @@ final class RegisterFine
         ?int $actorId,
         array &$guardados,
     ): Fine {
-        return DB::transaction(function () use ($datos, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, &$guardados): Fine {
-            $expediente = CreateFineCase::existing($numero)
-                ?? $this->crearExpediente->handle($numeroDeExpediente, isset($datos['caseNotes']) ? (string) $datos['caseNotes'] : null, $actorId);
+        return DB::transaction(function () use ($datos, $casoId, $numero, $numeroDeExpediente, $importe, $caratula, $registro, $actorId, &$guardados): Fine {
+            $expediente = match (true) {
+                $casoId !== null => FineCase::query()->findOrFail($casoId),
+                default => CreateFineCase::existing($numero)
+                    ?? $this->crearExpediente->handle($numeroDeExpediente, isset($datos['caseNotes']) ? (string) $datos['caseNotes'] : null, $actorId),
+            };
 
             $resolucion = $this->resolucion($expediente, $datos, $actorId);
             $actas = $this->actas($expediente, $datos, $actorId);

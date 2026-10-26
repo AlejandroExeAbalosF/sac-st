@@ -39,7 +39,7 @@ class AdjuntosYExporteDeMultasTest extends TestCase
                 'title' => 'Resolución N°0649/26',
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.expedientes.show', $multa->fine_case_id));
+            ->assertRedirect(route('multas.expedientes.show', $multa->fineCase->routeParameters()));
 
         $adjunto = Attachment::query()->sole();
         expect($adjunto->subject_type)->toBe(AttachmentSubject::FineCase)
@@ -53,7 +53,7 @@ class AdjuntosYExporteDeMultasTest extends TestCase
 
         $consulta = $this->operador('consulta');
         $this->actingAs($consulta)
-            ->get(route('multas.expedientes.show', $multa->fine_case_id))
+            ->get(route('multas.expedientes.show', $multa->fineCase->routeParameters()))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('adjuntos', 1)
                 ->where('adjuntos.0.title', 'Resolución N°0649/26')

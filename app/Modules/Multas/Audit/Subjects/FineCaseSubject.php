@@ -38,7 +38,7 @@ final class FineCaseSubject extends BaseAuditSubjectResolver
         foreach (FineCase::query()->whereIn('id', $ids)->get(['id', 'original_text', 'number', 'year', 'suffix']) as $expediente) {
             $descripciones[$expediente->id] = new AuditSubjectDescription(
                 'Expediente '.$expediente->label(),
-                $this->can($viewer, 'multas.ver') ? route('multas.expedientes.show', $expediente->id) : null,
+                $this->can($viewer, 'multas.ver') ? route('multas.expedientes.show', $expediente->routeParameters()) : null,
             );
         }
 

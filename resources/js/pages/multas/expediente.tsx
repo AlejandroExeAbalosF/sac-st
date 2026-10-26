@@ -11,6 +11,7 @@ import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { addFineRoute, caseRoute } from '@/features/multas/case-route';
 import {
     AttachFileDialog,
     AttachmentList,
@@ -25,9 +26,8 @@ import {
     DOCUMENT_KIND,
     partialDate,
 } from '@/features/multas/labels';
-import { create, show } from '@/routes/multas';
+import { show } from '@/routes/multas';
 import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
-import { show as showCase } from '@/routes/multas/expedientes';
 import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
@@ -105,17 +105,16 @@ export default function ExpedienteDeMultas({
                             {can.register && (
                                 <Button asChild>
                                     <Link
-                                        href={create({
-                                            query: {
-                                                expediente: expediente.label,
-                                            },
-                                        })}
+                                        href={addFineRoute(
+                                            expediente.id,
+                                            expediente.routeNumber,
+                                        )}
                                     >
                                         <Plus
                                             className="size-4"
                                             aria-hidden="true"
                                         />
-                                        Nueva multa
+                                        Agregar multa
                                     </Link>
                                 </Button>
                             )}
@@ -136,7 +135,10 @@ export default function ExpedienteDeMultas({
                                 <span key={otro.id}>
                                     {i > 0 && ', '}
                                     <Link
-                                        href={showCase(otro.id)}
+                                        href={caseRoute(
+                                            otro.id,
+                                            otro.routeNumber,
+                                        )}
                                         className="font-mono underline"
                                     >
                                         {otro.label}

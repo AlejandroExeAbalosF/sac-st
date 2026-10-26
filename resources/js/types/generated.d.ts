@@ -934,6 +934,7 @@ declare namespace App {
                 };
                 export type FineCaseData = {
                     id: number;
+                    routeNumber: string | null;
                     label: string;
                     originalText: string;
                     number: number | null;
@@ -944,11 +945,13 @@ declare namespace App {
                     documents: App.Modules.Multas.Data.FineDocumentData[];
                     similar: {
                         id: number;
+                        routeNumber: string | null;
                         label: string;
                     }[];
                 };
                 export type FineCaseListItemData = {
                     id: number;
+                    routeNumber: string | null;
                     label: string;
                     captions: string[];
                     personNames: string[];
@@ -1030,6 +1033,7 @@ declare namespace App {
                 export type FineDetailData = {
                     id: number;
                     caseId: number;
+                    caseRouteNumber: string | null;
                     caseLabel: string;
                     caseOriginalText: string;
                     caption: string;
@@ -1082,6 +1086,7 @@ declare namespace App {
                 export type FineListItemData = {
                     id: number;
                     caseId: number;
+                    caseRouteNumber: string | null;
                     caseLabel: string;
                     caption: string;
                     personName: string | null;

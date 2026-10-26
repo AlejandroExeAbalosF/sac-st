@@ -30,8 +30,25 @@ use Inertia\Response;
  */
 final class FineCaseController extends Controller
 {
-    public function show(Request $request, FineCase $fineCase, FineAttachments $adjuntos): Response
+    /**
+     * Cómo luce el número en la dirección: `169607-2024-0`, `120276-2025`.
+     *
+     * Solo para que una palabra como `agregar-multa` no se tome por número.
+     * El número no identifica nada: lo que se resuelve es el id.
+     */
+    public const NUMERO_EN_LA_DIRECCION = '\\d+-\\d{4}(-[0-9A-Za-z]+)?';
+
+    public function show(Request $request, FineCase $fineCase, FineAttachments $adjuntos): Response|RedirectResponse
     {
+        /*
+         * La dirección se acomoda sola a la actual: un enlace armado solo con
+         * el id, o uno guardado antes de corregir el número, llega igual al
+         * expediente y la barra muestra su número de hoy.
+         */
+        if ($request->route('numero') !== $fineCase->routeNumber()) {
+            return to_route('multas.expedientes.show', $fineCase->routeParameters());
+        }
+
         $fineCase->load('documents');
 
         $multas = Fine::query()
@@ -75,7 +92,7 @@ final class FineCaseController extends Controller
 
         Toast::success('Documento agregado al expediente.');
 
-        return to_route('multas.expedientes.show', $fineCase);
+        return to_route('multas.expedientes.show', $fineCase->routeParameters());
     }
 
     /**
@@ -108,6 +125,6 @@ final class FineCaseController extends Controller
 
         Toast::success($revision === null ? 'No había nada que cambiar.' : 'Datos del expediente actualizados.');
 
-        return to_route('multas.expedientes.show', $fineCase);
+        return to_route('multas.expedientes.show', $fineCase->routeParameters());
     }
 }

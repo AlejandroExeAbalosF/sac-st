@@ -16,6 +16,7 @@ import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { caseRoute } from '@/features/multas/case-route';
 import AdjustDebtDialog from '@/features/multas/components/adjust-debt-dialog';
 import AppealDialog from '@/features/multas/components/appeal-dialog';
 import {
@@ -51,7 +52,6 @@ import { store as attachToFine } from '@/routes/multas/adjuntos';
 import { reverse } from '@/routes/multas/ajustes';
 import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
 import { store as reviseMovementDate } from '@/routes/multas/antecedentes/revisiones';
-import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
 import { discard } from '@/routes/multas/pagos';
 import { store as attachToPayment } from '@/routes/multas/pagos/adjuntos';
@@ -160,7 +160,10 @@ export default function MultaShow({
                     title={multa.caption}
                     eyebrow={
                         <Link
-                            href={showCase(multa.caseId)}
+                            href={caseRoute(
+                                multa.caseId,
+                                multa.caseRouteNumber,
+                            )}
                             className="hover:underline"
                         >
                             Multa · Expte.{' '}

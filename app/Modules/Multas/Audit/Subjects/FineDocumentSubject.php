@@ -53,7 +53,7 @@ final class FineDocumentSubject extends BaseAuditSubjectResolver
     public function describe(array $ids, ?User $viewer): array
     {
         $documentos = FineDocument::query()
-            ->with('cases:fine_cases.id')
+            ->with('cases:fine_cases.id,fine_cases.original_text,fine_cases.number,fine_cases.year,fine_cases.suffix')
             ->whereIn('id', $ids)
             ->get(['id', 'kind', 'act_type', 'number', 'year', 'original_text']);
 
@@ -65,7 +65,7 @@ final class FineDocumentSubject extends BaseAuditSubjectResolver
             $descripciones[$documento->id] = new AuditSubjectDescription(
                 $documento->label(),
                 $expediente !== null && $this->can($viewer, 'multas.ver')
-                    ? route('multas.expedientes.show', $expediente->id)
+                    ? route('multas.expedientes.show', $expediente->routeParameters())
                     : null,
             );
         }

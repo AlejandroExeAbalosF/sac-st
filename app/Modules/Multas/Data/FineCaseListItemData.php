@@ -19,6 +19,8 @@ final class FineCaseListItemData extends Data
 {
     public function __construct(
         public int $id,
+        /** El número en la dirección; `null` si no está normalizado. */
+        public ?string $routeNumber,
         public string $label,
         /**
          * Las carátulas de sus multas, sin repetir. Casi siempre es una: las
@@ -70,6 +72,7 @@ final class FineCaseListItemData extends Data
 
         return new self(
             id: $expediente->id,
+            routeNumber: $expediente->routeNumber(),
             label: $expediente->label(),
             captions: self::distintos($multas->map(fn (Fine $multa): string => $multa->caption)->all()),
             personNames: self::distintos($multas->map(fn (Fine $multa): ?string => $multa->person?->name)->all()),

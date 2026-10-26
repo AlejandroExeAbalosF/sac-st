@@ -24,10 +24,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { caseRoute } from '@/features/multas/case-route';
 import { ACT_TYPE } from '@/features/multas/labels';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
-import { show as showCase } from '@/routes/multas/expedientes';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type ActType = App.Modules.Multas.Enums.FineActType;
@@ -44,6 +44,11 @@ type Props = {
     existente: Expediente | null;
     /** Otros con el mismo número y año y distinto sufijo (P03). */
     similares: { id: number; label: string }[];
+    /**
+     * Se entró desde la ficha del expediente: el expediente no se escribe
+     * ni se cambia, y el alta lo identifica por id.
+     */
+    fijo: boolean;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -64,7 +69,7 @@ function FieldError({ message }: { message?: string }) {
  * nueva, a ese documento. Las actas ya cargadas reciben el suyo desde la
  * ficha del expediente.
  */
-export default function NuevaMulta({ existente, similares }: Props) {
+export default function NuevaMulta({ existente, similares, fijo }: Props) {
     const { data, setData, post, transform, processing, errors } = useForm<{
         caseNumber: string;
         caseNotes: string;
@@ -110,7 +115,7 @@ export default function NuevaMulta({ existente, similares }: Props) {
     const consultarExpediente = () => {
         const numero = data.caseNumber.trim();
 
-        if (numero === consultado.current) {
+        if (fijo || numero === consultado.current) {
             return;
         }
 
@@ -141,8 +146,13 @@ export default function NuevaMulta({ existente, similares }: Props) {
         e.preventDefault();
 
         transform((datos) => ({
-            caseNumber: datos.caseNumber,
-            caseNotes: datos.caseNotes === '' ? null : datos.caseNotes,
+            ...(fijo && existente
+                ? { fineCaseId: existente.id }
+                : {
+                      caseNumber: datos.caseNumber,
+                      caseNotes:
+                          datos.caseNotes === '' ? null : datos.caseNotes,
+                  }),
             ...(datos.resolutionId !== null
                 ? { resolutionId: datos.resolutionId }
                 : { resolution: datos.resolution }),
@@ -174,13 +184,17 @@ export default function NuevaMulta({ existente, similares }: Props) {
 
     return (
         <>
-            <Head title="Nueva multa" />
+            <Head title={fijo ? 'Agregar multa' : 'Nueva multa'} />
 
             <div className="flex flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
-                    title="Nueva multa"
+                    title={fijo ? 'Agregar multa' : 'Nueva multa'}
                     eyebrow="Multas"
-                    description="Cargá la multa tal como la trae la resolución."
+                    description={
+                        fijo
+                            ? 'Agregá al expediente la multa tal como la trae la resolución.'
+                            : 'Cargá la multa tal como la trae la resolución.'
+                    }
                 />
 
                 <form onSubmit={enviar} className="grid gap-6">
@@ -191,20 +205,43 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                 <Label htmlFor="caseNumber">
                                     Número de expediente
                                 </Label>
-                                <Input
-                                    id="caseNumber"
-                                    className="mt-1 font-mono"
-                                    value={data.caseNumber}
-                                    onChange={(e) =>
-                                        setData('caseNumber', e.target.value)
+                                {fijo && existente ? (
+                                    /*
+                                     * Desde la ficha el expediente ya está
+                                     * elegido: se muestra, no se escribe.
+                                     */
+                                    <Input
+                                        id="caseNumber"
+                                        className="mt-1 bg-muted/50 font-mono text-muted-foreground"
+                                        value={existente.label}
+                                        readOnly
+                                        aria-readonly="true"
+                                    />
+                                ) : (
+                                    <Input
+                                        id="caseNumber"
+                                        className="mt-1 font-mono"
+                                        value={data.caseNumber}
+                                        onChange={(e) =>
+                                            setData(
+                                                'caseNumber',
+                                                e.target.value,
+                                            )
+                                        }
+                                        onBlur={consultarExpediente}
+                                        placeholder="169607/24-0"
+                                        maxLength={60}
+                                        autoFocus
+                                        aria-invalid={Boolean(
+                                            errors.caseNumber,
+                                        )}
+                                    />
+                                )}
+                                <FieldError
+                                    message={
+                                        errors.caseNumber ?? errores.fineCaseId
                                     }
-                                    onBlur={consultarExpediente}
-                                    placeholder="169607/24-0"
-                                    maxLength={60}
-                                    autoFocus
-                                    aria-invalid={Boolean(errors.caseNumber)}
                                 />
-                                <FieldError message={errors.caseNumber} />
                                 {!existente && (
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         Como en el papel. Si no está cargado, se
@@ -213,7 +250,7 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                 )}
                             </div>
 
-                            {existente && (
+                            {existente && !fijo && (
                                 /*
                                  * Un expediente ya cargado no es un error: la
                                  * multa se le agrega. Pero conviene mirarlo
@@ -221,7 +258,10 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                  * el aviso entero lleva a su ficha.
                                  */
                                 <Link
-                                    href={showCase(existente.id)}
+                                    href={caseRoute(
+                                        existente.id,
+                                        existente.routeNumber,
+                                    )}
                                     className="group flex gap-2 self-start rounded-md border border-info-strong/30 bg-info-soft p-3 text-xs text-info-strong hover:border-info-strong/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-7"
                                 >
                                     <FolderOpen
@@ -302,17 +342,20 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                 </div>
                             )}
 
-                            <div className="sm:col-span-12 lg:col-span-7">
-                                <PaperPhotoDropzone
-                                    id="caseFile"
-                                    label="Archivo del expediente"
-                                    foto={data.caseFile}
-                                    onElegir={(archivo) =>
-                                        setData('caseFile', archivo)
-                                    }
-                                    error={errores.caseFile}
-                                />
-                            </div>
+                            {/* Desde la ficha, el archivo del expediente se adjunta en la ficha. */}
+                            {!fijo && (
+                                <div className="sm:col-span-12 lg:col-span-7">
+                                    <PaperPhotoDropzone
+                                        id="caseFile"
+                                        label="Archivo del expediente"
+                                        foto={data.caseFile}
+                                        onElegir={(archivo) =>
+                                            setData('caseFile', archivo)
+                                        }
+                                        error={errores.caseFile}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </section>
 
@@ -718,10 +761,25 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                 asChild
                                 disabled={processing}
                             >
-                                <Link href={index()}>Cancelar</Link>
+                                <Link
+                                    href={
+                                        fijo && existente
+                                            ? caseRoute(
+                                                  existente.id,
+                                                  existente.routeNumber,
+                                              )
+                                            : index()
+                                    }
+                                >
+                                    Cancelar
+                                </Link>
                             </Button>
                             <Button type="submit" disabled={processing}>
-                                {processing ? 'Guardando…' : 'Registrar multa'}
+                                {processing
+                                    ? 'Guardando…'
+                                    : fijo
+                                      ? 'Agregar multa'
+                                      : 'Registrar multa'}
                             </Button>
                         </div>
                     </section>

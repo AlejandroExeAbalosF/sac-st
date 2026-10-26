@@ -23,6 +23,8 @@ final class FineListItemData extends Data
     public function __construct(
         public int $id,
         public int $caseId,
+        /** El número del expediente en la dirección; `null` si no está normalizado. */
+        public ?string $caseRouteNumber,
         public string $caseLabel,
         public string $caption,
         public ?string $personName,
@@ -42,6 +44,7 @@ final class FineListItemData extends Data
         return new self(
             id: $multa->id,
             caseId: $multa->fine_case_id,
+            caseRouteNumber: $multa->fineCase->routeNumber(),
             caseLabel: $multa->fineCase->label(),
             caption: $multa->caption,
             personName: $multa->person?->name,
