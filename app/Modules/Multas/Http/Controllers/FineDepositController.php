@@ -14,6 +14,7 @@ use App\Modules\Multas\Actions\ConfirmFineDeposit;
 use App\Modules\Multas\Actions\DepositFineCollection;
 use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Http\Requests\DepositFineCollectionRequest;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineDeposits;
@@ -96,7 +97,7 @@ final class FineDepositController extends Controller
 
         return $request->input('desde') === 'caja'
             ? to_route('multas.caja.index')
-            : to_route('multas.show', $payment->fine_id);
+            : to_route('multas.show', Fine::showParametersFor($payment->fine_id));
     }
 
     public function candidates(Request $request, CashToBankTransfer $transfer, CashDepositCreditOptions $opciones): JsonResponse

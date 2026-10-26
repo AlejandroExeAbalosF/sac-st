@@ -4,7 +4,6 @@ import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { APPEAL_KIND, PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { date, dateTime } from '@/lib/format';
-import { show } from '@/routes/multas';
 
 type Pendiente = App.Modules.Multas.Data.FinePendingPaymentData;
 
@@ -53,7 +52,7 @@ export default function PagosPorVerificar({
                                     className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-3 text-sm"
                                 >
                                     <Link
-                                        href={show(fila.fineId)}
+                                        href={fila.fineHref}
                                         className="font-medium hover:underline"
                                     >
                                         {fila.fineCaption}

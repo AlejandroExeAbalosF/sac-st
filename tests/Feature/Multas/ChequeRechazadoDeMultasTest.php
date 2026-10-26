@@ -93,7 +93,7 @@ class ChequeRechazadoDeMultasTest extends TestCase
             ->and(ChequeRejection::query()->latest('id')->firstOrFail()->fund_receipt_id)->toBe($reemplazo->id)
             ->and($this->saldo($multa, 'pending_regularization'))->toBe('20000.00');
 
-        $this->get(route('multas.show', $multa))->assertInertia(fn (Assert $page) => $page
+        $this->get(route('multas.show', $multa->showParameters()))->assertInertia(fn (Assert $page) => $page
             ->where('multa.balance.pendingRegularization', '20000.00')
             ->where('multa.payments.0.deposit.place', 'rejected')
             ->has('multa.payments.0.deposit.rejections', 2)

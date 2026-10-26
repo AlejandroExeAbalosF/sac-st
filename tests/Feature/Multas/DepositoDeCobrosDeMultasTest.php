@@ -93,7 +93,7 @@ class DepositoDeCobrosDeMultasTest extends TestCase
             ->and(AuditEvent::query()->where('action', 'multa.cobro-depositado')->count())->toBe(1)
             ->and(AuditEvent::query()->where('action', 'multa.deposito-acreditado')->count())->toBe(1);
 
-        $this->get(route('multas.show', $multa))->assertInertia(fn (Assert $page) => $page
+        $this->get(route('multas.show', $multa->showParameters()))->assertInertia(fn (Assert $page) => $page
             ->where('multa.payments.0.deposit.place', 'in_bank')
             ->where('multa.payments.0.deposit.creditedOn', BusinessDate::today()->toDateString())
             ->where('multa.payments.0.deposit.ticket.title', 'Ticket del depósito'));
@@ -126,7 +126,7 @@ class DepositoDeCobrosDeMultasTest extends TestCase
             ->post(route('multas.pagos.deposito.store', $pago), $this->ticket())
             ->assertSessionHasNoErrors();
 
-        $this->get(route('multas.show', $multa))->assertInertia(fn (Assert $page) => $page
+        $this->get(route('multas.show', $multa->showParameters()))->assertInertia(fn (Assert $page) => $page
             ->where('multa.payments.0.deposit.place', 'in_transit')
             ->where('multa.payments.0.deposit.cancelled.0.transferId', $traslado->id)
             ->where('multa.payments.0.deposit.cancelled.0.reason', 'Se cargó el depósito de otro cheque'));

@@ -56,7 +56,7 @@ final class FineDebtController extends Controller
 
         Toast::success('Ajuste registrado.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     public function reverse(ReasonRequest $request, FineDebtEntry $entry, ReverseFineDebtEntry $revertir): RedirectResponse
@@ -65,7 +65,7 @@ final class FineDebtController extends Controller
 
         Toast::success('Ajuste revertido.');
 
-        return to_route('multas.show', $entry->fine_id);
+        return to_route('multas.show', Fine::showParametersFor($entry->fine_id));
     }
 
     /**
@@ -89,6 +89,6 @@ final class FineDebtController extends Controller
 
         Toast::success($revision === null ? 'No había nada que cambiar.' : 'Fecha del movimiento actualizada.');
 
-        return to_route('multas.show', $entry->fine_id);
+        return to_route('multas.show', Fine::showParametersFor($entry->fine_id));
     }
 }

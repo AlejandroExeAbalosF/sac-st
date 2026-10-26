@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { date, isNonZero } from '@/lib/format';
-import { show as fichaDeMulta } from '@/routes/multas';
 import { cheques as chequesEnCustodia } from '@/routes/multas/caja';
 
 type Cartera = App.Modules.Multas.Data.FineChequeInventoryData;
@@ -188,9 +187,9 @@ function FilaDeCheque({
                     ` · librador declarado: ${cheque.declaredDrawer}`}
             </p>
 
-            {cheque.fineId !== null && abreMulta ? (
+            {cheque.fineHref !== null && abreMulta ? (
                 <Link
-                    href={fichaDeMulta(cheque.fineId).url}
+                    href={cheque.fineHref}
                     className="flex items-center justify-between gap-3 rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-muted"
                 >
                     {multa}

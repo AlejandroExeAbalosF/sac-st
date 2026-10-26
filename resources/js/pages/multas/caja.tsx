@@ -44,7 +44,6 @@ import UnidentifiedCredits from '@/features/multas/components/unidentified-credi
 import { PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { businessToday, date, isNonZero } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
-import { show as verMulta } from '@/routes/multas';
 import {
     calendario as calendarioDeMultas,
     dia as diaDeMultas,
@@ -610,7 +609,7 @@ function Cobros({
                         >
                             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                                 <Link
-                                    href={verMulta(fila.fineId)}
+                                    href={fila.fineHref}
                                     className="font-medium hover:underline"
                                 >
                                     {fila.fineCaption}

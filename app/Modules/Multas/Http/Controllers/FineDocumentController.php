@@ -54,7 +54,7 @@ final class FineDocumentController extends Controller
 
         Toast::success('Documento vinculado a la multa.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     /**

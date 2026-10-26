@@ -47,7 +47,7 @@ conoce. El test de fronteras lo exige.
 | --- | --- | --- |
 | Expedientes y multas | `/multas/expedientes` | `multas.ver` |
 | Nueva multa | `/multas/nueva` | `multas.registrar` |
-| Ficha de la multa | `/multas/{id}` | `multas.ver` |
+| Ficha de la multa | `/multas/expedientes/{id}/{número}/multa/{n}` | `multas.ver` |
 | Expediente | `/multas/expedientes/{id}/{número}` | `multas.ver` |
 | Agregar multa al expediente | `/multas/expedientes/{id}/{número}/agregar-multa` | `multas.registrar` |
 | Exportar las multas | `/multas/exportar` | `multas.ver` |
@@ -103,7 +103,15 @@ Una multa se carga con todo lo que trae el papel:
   alcanza para identificar al sancionado y es la que va a llevar el recibo. El mes
   de la fecha de registro es el período de origen de la multa.
 
-### Ficha · `/multas/{id}`
+### Ficha · `/multas/expedientes/{id}/{número}/multa/{n}`
+
+La multa cuelga de su expediente y va por su número dentro de él:
+`/multas/expedientes/12/169607-2024-0/multa/2` es «la multa 2 del 169607». No va
+el id global, que no le dice nada a nadie, ni la carátula, que puede ser el nombre
+de una persona: igual que el haber en Haberes. El número lo pone la base al
+insertar —también en la importación del Excel— y no cambia. Las acciones sobre la
+multa (cobrar, adjuntar, ajustar) siguen por su id: no se leen ni se comparten. Los
+enlaces de las pantallas reciben la dirección armada por el servidor.
 
 Arriba, el saldo: importe vigente, pagado (separando lo anterior al sistema),
 saldo y estado. Abajo:

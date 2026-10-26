@@ -59,7 +59,7 @@ class AdjuntosYExporteDeMultasTest extends TestCase
                 ->where('adjuntos.0.title', 'Resolución N°0649/26')
                 ->where('adjuntos.0.viewable', true));
         $this->actingAs($consulta)
-            ->get(route('multas.show', $multa))
+            ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('multa.attachments', 0)
                 ->has('adjuntosDelExpediente', 1));
@@ -77,14 +77,14 @@ class AdjuntosYExporteDeMultasTest extends TestCase
         $this->actingAs($operador)
             ->post(route('multas.adjuntos.store', $multa), ['file' => UploadedFile::fake()->create('nota.pdf', 20, 'application/pdf')])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.show', $multa));
+            ->assertRedirect(route('multas.show', $multa->showParameters()));
         $this->actingAs($operador)
             ->post(route('multas.antecedentes.adjuntos.store', $antecedente), ['file' => UploadedFile::fake()->image('recibo.png')])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.show', $multa));
+            ->assertRedirect(route('multas.show', $multa->showParameters()));
 
         $this->actingAs($operador)
-            ->get(route('multas.show', $multa))
+            ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('multa.attachments', 1)
                 ->has('multa.historicalMovements.0.attachments', 1)

@@ -9,6 +9,7 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Support\Money\Decimal;
 use Illuminate\Contracts\Auth\Access\Authorizable;
@@ -86,11 +87,20 @@ final class FineCashBoxModule implements CashBoxModule
             return [];
         }
 
-        return FinePaymentReceipt::query()
+        $multaPorRecibo = FinePaymentReceipt::query()
             ->join('fine_payments', 'fine_payments.id', '=', 'fine_payment_receipts.fine_payment_id')
             ->whereIn('fine_payment_receipts.receipt_id', $receiptIds)
-            ->pluck('fine_payments.fine_id', 'fine_payment_receipts.receipt_id')
-            ->map(fn (mixed $multa): string => route('multas.show', ['fine' => (int) $multa], absolute: false))
+            ->pluck('fine_payments.fine_id', 'fine_payment_receipts.receipt_id');
+
+        // La ficha cuelga del expediente: se traen las multas con el suyo, de una vez.
+        $multas = Fine::query()
+            ->with('fineCase')
+            ->whereIn('id', $multaPorRecibo->unique()->values()->all())
+            ->get()
+            ->keyBy('id');
+
+        return $multaPorRecibo
+            ->map(fn (mixed $multa): string => route('multas.show', $multas[(int) $multa]->showParameters(), absolute: false))
             ->all();
     }
 

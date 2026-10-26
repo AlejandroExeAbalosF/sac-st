@@ -22,6 +22,8 @@ final class FineListItemData extends Data
 {
     public function __construct(
         public int $id,
+        /** La ficha de la multa, armada por el servidor: cuelga de su expediente. */
+        public string $href,
         public int $caseId,
         /** La dirección del expediente, `12/169607-2024-0`: la arma el servidor. */
         public string $caseRouteKey,
@@ -43,6 +45,7 @@ final class FineListItemData extends Data
     {
         return new self(
             id: $multa->id,
+            href: route('multas.show', $multa->showParameters(), absolute: false),
             caseId: $multa->fine_case_id,
             caseRouteKey: $multa->fineCase->getRouteKey(),
             caseLabel: $multa->fineCase->label(),

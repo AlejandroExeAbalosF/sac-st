@@ -60,14 +60,14 @@ final class FineSubject extends BaseAuditSubjectResolver
         $multas = Fine::query()
             ->with('fineCase:id,original_text,number,year,suffix')
             ->whereIn('id', $ids)
-            ->get(['id', 'fine_case_id', 'caption']);
+            ->get(['id', 'fine_case_id', 'fine_number', 'caption']);
 
         $descripciones = [];
 
         foreach ($multas as $multa) {
             $descripciones[$multa->id] = new AuditSubjectDescription(
                 "Multa · Expte. {$multa->fineCase->label()} · {$multa->caption}",
-                $this->can($viewer, 'multas.ver') ? route('multas.show', $multa->id) : null,
+                $this->can($viewer, 'multas.ver') ? route('multas.show', $multa->showParameters()) : null,
             );
         }
 

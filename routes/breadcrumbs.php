@@ -378,7 +378,7 @@ Breadcrumbs::for('multas.pagos.deposito.create', function (FinePayment $payment)
     return [
         Crumb::make('Multas', route('multas.index')),
         Crumb::make('Expte. '.$fine->fineCase->label(), route('multas.expedientes.show', $fine->fineCase)),
-        Crumb::make($fine->caption, route('multas.show', $fine)),
+        Crumb::make($fine->caption, route('multas.show', $fine->showParameters())),
         Crumb::make('Depósito en el banco'),
     ];
 });

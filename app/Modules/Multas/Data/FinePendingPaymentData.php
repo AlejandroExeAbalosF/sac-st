@@ -17,6 +17,8 @@ final class FinePendingPaymentData extends Data
 {
     public function __construct(
         public int $fineId,
+        /** La ficha de la multa, armada por el servidor: cuelga de su expediente. */
+        public string $fineHref,
         public string $fineCaption,
         public string $caseLabel,
         public FinePaymentData $payment,
@@ -27,6 +29,7 @@ final class FinePendingPaymentData extends Data
     {
         return new self(
             fineId: $pago->fine_id,
+            fineHref: route('multas.show', $pago->fine->showParameters(), absolute: false),
             fineCaption: $pago->fine->caption,
             caseLabel: $pago->fine->fineCase->label(),
             payment: FinePaymentData::fromModel($pago, deposito: $deposito),

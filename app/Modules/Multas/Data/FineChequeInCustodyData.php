@@ -27,6 +27,8 @@ final class FineChequeInCustodyData extends Data
         public FundReceiptOrigin $origin,
         /** La multa que paga, por la raíz de su cadena; nula si es de la apertura y no se aplicó. */
         public ?int $fineId,
+        /** La ficha de esa multa, armada por el servidor; nula como `fineId`. */
+        public ?string $fineHref,
         public ?string $caseLabel,
         public ?string $caption,
         /** Lo que declaró la apertura, si es de la apertura. */

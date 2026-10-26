@@ -191,7 +191,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->name('expedientes.show');
-        Route::get('{fine}', [FineController::class, 'show'])->whereNumber('fine')->name('show');
+        // La multa cuelga de su expediente y va por su número dentro de él (ver `Fine::showParameters`).
+        Route::get('expedientes/{fineCase}/multa/{fine:fine_number}', [FineController::class, 'show'])
+            ->whereNumber('fine')
+            ->name('show');
     });
 });
 

@@ -13,6 +13,7 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Modules\Multas\Data\FineChequeInCustodyData;
 use App\Modules\Multas\Data\FineChequeInventoryData;
+use App\Modules\Multas\Models\Fine;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,14 @@ final class FineChequeInventory
 
         $multas = $this->multasDe(array_map(static fn (FundReceipt $cheque): int => $cheque->id, $cheques->all()));
 
+        // La ficha cuelga del expediente: las multas se traen con el suyo, de una vez.
+        $fichas = Fine::query()
+            ->with('fineCase')
+            ->whereIn('id', array_values(array_unique(array_map(static fn (object $fila): int => (int) $fila->fine_id, $multas))))
+            ->get()
+            ->mapWithKeys(fn (Fine $multa): array => [$multa->id => route('multas.show', $multa->showParameters(), absolute: false)])
+            ->all();
+
         $lista = [];
         $detallado = '0.00';
 
@@ -63,6 +72,7 @@ final class FineChequeInventory
                 receivedDate: $cheque->received_date->toDateString(),
                 origin: $cheque->origin,
                 fineId: $multa === null ? null : (int) $multa->fine_id,
+                fineHref: $multa === null ? null : ($fichas[(int) $multa->fine_id] ?? null),
                 caseLabel: $multa?->case_label,
                 caption: $multa?->caption,
                 declaredExpediente: $cheque->expediente_number_snapshot,

@@ -51,7 +51,7 @@ final class FineAttachmentController extends Controller
 
         Toast::success('Archivo agregado a la multa.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     public function storeForMovement(
@@ -63,7 +63,7 @@ final class FineAttachmentController extends Controller
 
         Toast::success('Comprobante agregado al pago anterior.');
 
-        return to_route('multas.show', $movement->fine_id);
+        return to_route('multas.show', Fine::showParametersFor($movement->fine_id));
     }
 
     private function archivo(StoreFineAttachmentRequest $request): UploadedFile

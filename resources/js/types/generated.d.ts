@@ -975,6 +975,7 @@ declare namespace App {
                     receivedDate: string;
                     origin: App.Modules.Ledger.Enums.FundReceiptOrigin;
                     fineId: number | null;
+                    fineHref: string | null;
                     caseLabel: string | null;
                     caption: string | null;
                     declaredExpediente: string | null;
@@ -1086,6 +1087,7 @@ declare namespace App {
                 };
                 export type FineListItemData = {
                     id: number;
+                    href: string;
                     caseId: number;
                     caseRouteKey: string;
                     caseLabel: string;
@@ -1131,6 +1133,7 @@ declare namespace App {
                 };
                 export type FinePendingPaymentData = {
                     fineId: number;
+                    fineHref: string;
                     fineCaption: string;
                     caseLabel: string;
                     payment: App.Modules.Multas.Data.FinePaymentData;

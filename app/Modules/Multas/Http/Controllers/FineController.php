@@ -169,10 +169,14 @@ final class FineController extends Controller
 
         Toast::success('Multa registrada.');
 
-        return to_route('multas.show', $multa);
+        return to_route('multas.show', $multa->showParameters());
     }
 
-    public function show(Request $request, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos): Response
+    /**
+     * El expediente va en la firma aunque no se use: la ruta lo trae antes que
+     * la multa, y es el que acota la búsqueda de la multa por su número.
+     */
+    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos): Response
     {
         $fine->load([
             'fineCase',
@@ -298,7 +302,7 @@ final class FineController extends Controller
 
         Toast::success($revision === null ? 'No había nada que cambiar.' : 'Datos de la multa actualizados.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     /**

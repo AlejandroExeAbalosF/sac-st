@@ -25,7 +25,6 @@ import {
     DOCUMENT_KIND,
     partialDate,
 } from '@/features/multas/labels';
-import { show } from '@/routes/multas';
 import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
@@ -293,7 +292,7 @@ export default function ExpedienteDeMultas({
                                         className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm"
                                     >
                                         <Link
-                                            href={show(multa.id)}
+                                            href={multa.href}
                                             className="font-medium hover:underline"
                                         >
                                             {multa.caption}

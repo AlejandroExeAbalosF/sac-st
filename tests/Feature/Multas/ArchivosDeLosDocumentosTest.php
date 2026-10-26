@@ -57,7 +57,7 @@ class ArchivosDeLosDocumentosTest extends TestCase
                 ->has("adjuntosDeDocumentos.{$resolucion->id}", 1)
                 ->has("adjuntosDeDocumentos.{$actaHys->id}", 1));
 
-        $this->get(route('multas.show', $multa))
+        $this->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page
                 ->where("adjuntosDeDocumentos.{$actaHys->id}.0.originalFilename", 'acta-hys.webp'));
     }

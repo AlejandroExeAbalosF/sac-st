@@ -111,14 +111,14 @@ class CajaDeMultasTest extends TestCase
 
         // Los créditos no viajan con la ficha: llegan al buscar.
         $version = $this->actingAs($this->operador())
-            ->get(route('multas.show', ['fine' => $multa, 'credito' => '280.000,00']))
+            ->get(route('multas.show', [...$multa->showParameters(), 'credito' => '280.000,00']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('can.linkBankCredit', true)
                 ->missing('creditosDelBanco'))
             ->viewData('page')['version'];
 
         $this->actingAs($this->operador())
-            ->get(route('multas.show', ['fine' => $multa, 'credito' => '280.000,00']), [
+            ->get(route('multas.show', [...$multa->showParameters(), 'credito' => '280.000,00']), [
                 'X-Inertia' => 'true',
                 'X-Inertia-Partial-Component' => 'multas/show',
                 'X-Inertia-Partial-Data' => 'creditosDelBanco',
@@ -133,7 +133,7 @@ class CajaDeMultasTest extends TestCase
                 'evidence' => 'Nota de la empresa con el comprobante',
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.show', $multa));
+            ->assertRedirect(route('multas.show', $multa->showParameters()));
 
         $antecedente = FineHistoricalMovement::query()->sole();
         expect($antecedente->amount)->toBe('280000.00')
@@ -253,7 +253,7 @@ class CajaDeMultasTest extends TestCase
         $credito = $this->movimiento($cuenta, '2026-05-20', '500.00');
 
         $this->actingAs($this->operador())
-            ->get(route('multas.show', $multa))
+            ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page->where('can.linkBankCredit', false));
 
         $this->actingAs($this->operador())

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { DEBT_STATUS, partialDate } from '@/features/multas/labels';
 import { isNonZero } from '@/lib/format';
-import { create, exportar, index, show } from '@/routes/multas';
+import { create, exportar, index } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
 
 type Multa = App.Modules.Multas.Data.FineListItemData;
@@ -451,7 +451,7 @@ function TablaDeMultas({ multas }: { multas: Multa[] }) {
                         </td>
                         <td className="py-2.5 pr-5 text-sm">
                             <Link
-                                href={show(multa.id)}
+                                href={multa.href}
                                 className="font-medium hover:underline"
                             >
                                 {multa.caption}

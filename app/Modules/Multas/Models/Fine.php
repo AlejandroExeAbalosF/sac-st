@@ -29,6 +29,7 @@ use Illuminate\Support\Str;
  *
  * @property int $id
  * @property int $fine_case_id
+ * @property int $fine_number El orden dentro del expediente; lo pone la base al insertar.
  * @property int|null $person_id
  * @property string $caption_original
  * @property string $caption
@@ -60,11 +61,52 @@ final class Fine extends Model
     ];
 
     /**
+     * La ficha de la multa: `/multas/expedientes/12/169607-2024-0/multa/2`.
+     *
+     * Cuelga de su expediente y va por su número dentro de él, no por el id
+     * global ni por la carátula, que puede ser el nombre de una persona. Las
+     * acciones sobre la multa siguen por el id: no se leen ni se comparten.
+     *
+     * @return array{fineCase: FineCase, fine: self}
+     */
+    public function showParameters(): array
+    {
+        return ['fineCase' => $this->fineCase, 'fine' => $this];
+    }
+
+    /**
+     * Lo mismo cuando solo se tiene el id: un ajuste, un pago o un
+     * antecedente saben de qué multa son, pero no la traen cargada.
+     *
+     * @return array{fineCase: FineCase, fine: self}
+     */
+    public static function showParametersFor(int $id): array
+    {
+        return self::query()->with('fineCase')->findOrFail($id)->showParameters();
+    }
+
+    /**
+     * El número lo pone la base al insertar (`fines_assign_number`), y
+     * Eloquent no relee lo que asigna un trigger: sin esto, la multa recién
+     * creada no sabría su número y no podría armar su dirección.
+     */
+    protected static function booted(): void
+    {
+        self::created(function (Fine $multa): void {
+            if (! array_key_exists('fine_number', $multa->getAttributes())) {
+                $multa->setAttribute('fine_number', (int) self::query()->whereKey($multa->id)->value('fine_number'));
+                $multa->syncOriginalAttribute('fine_number');
+            }
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
+            'fine_number' => 'integer',
             'registered_on' => 'date',
             'registered_precision' => DatePrecision::class,
             'provenance' => FineProvenance::class,

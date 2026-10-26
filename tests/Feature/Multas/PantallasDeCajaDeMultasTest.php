@@ -88,7 +88,7 @@ class PantallasDeCajaDeMultasTest extends TestCase
                 ->where('selected.cashBoxCode', CashBox::MULTAS)
                 ->where('selected.cashBoxId', $this->multas())
                 ->where('book.income.0.cash', '5000.00')
-                ->where('bookLinks.'.$this->reciboDe($multa), "/multas/{$multa->id}")
+                ->where('bookLinks.'.$this->reciboDe($multa), route('multas.show', $multa->showParameters(), absolute: false))
                 ->where('can.close', true)
                 ->where('can.open', false));
 
@@ -197,7 +197,7 @@ class PantallasDeCajaDeMultasTest extends TestCase
         $this->cerrar($contador, '2026-06-30', 'monthly');
 
         $this->actingAs($this->operador())
-            ->from("/multas/{$multa->id}")
+            ->from(route('multas.show', $multa->showParameters()))
             ->post(route('multas.cobros.store', $multa), [
                 'medium' => 'cash', 'amount' => '1000.00', 'receivedOn' => '2026-06-20',
                 'talonarioNumber' => '18467', 'idempotencyKey' => (string) Str::uuid(),
@@ -209,12 +209,12 @@ class PantallasDeCajaDeMultasTest extends TestCase
 
         $this->actingAs($soloHaberes)
             ->withSession(['closedPeriod' => ['cashBoxCode' => CashBox::MULTAS, 'periodType' => 'Mensual', 'from' => '2026-06-01', 'to' => '2026-06-30', 'attemptedOn' => '2026-06-20', 'message' => 'Cerrado']])
-            ->get("/multas/{$multa->id}")
+            ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page->where('flash.closedPeriod.canSeeClosings', false));
 
         $this->actingAs($this->operador('consulta'))
             ->withSession(['closedPeriod' => ['cashBoxCode' => CashBox::MULTAS, 'periodType' => 'Mensual', 'from' => '2026-06-01', 'to' => '2026-06-30', 'attemptedOn' => '2026-06-20', 'message' => 'Cerrado']])
-            ->get("/multas/{$multa->id}")
+            ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page->where('flash.closedPeriod.canSeeClosings', true));
     }
 
@@ -279,7 +279,7 @@ class PantallasDeCajaDeMultasTest extends TestCase
             ->assertJsonPath('cheques.0.caption', 'CRISTOMAX S.A.S')
             ->assertJsonPath('canOpenFines', false);
 
-        $this->actingAs($soloCaja)->get("/multas/{$multa->id}")->assertForbidden();
+        $this->actingAs($soloCaja)->get(route('multas.show', $multa->showParameters()))->assertForbidden();
 
         $this->actingAs($this->operador('consulta'))
             ->getJson('/multas/caja/cheques-en-custodia')

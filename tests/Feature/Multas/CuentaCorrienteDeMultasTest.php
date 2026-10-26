@@ -123,7 +123,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $consulta = $this->operador('consulta');
 
         $this->actingAs($consulta)->get(route('multas.index'))->assertOk();
-        $this->actingAs($consulta)->get(route('multas.show', $multa))
+        $this->actingAs($consulta)->get(route('multas.show', $multa->showParameters()))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/show')
@@ -598,7 +598,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
             ->post(route('multas.movimientos.revisiones.store', $constitucion), [
                 'date' => '2024-03', 'expected' => ['date' => ''],
             ])
-            ->assertRedirect(route('multas.show', $multa))
+            ->assertRedirect(route('multas.show', $multa->showParameters()))
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 

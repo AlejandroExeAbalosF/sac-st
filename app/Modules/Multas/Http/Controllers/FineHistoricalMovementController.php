@@ -40,7 +40,7 @@ final class FineHistoricalMovementController extends Controller
 
         Toast::success('Antecedente registrado.', 'Cuenta en el saldo cuando alguien con permiso de ajustar lo valide.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     /**
@@ -61,7 +61,7 @@ final class FineHistoricalMovementController extends Controller
 
         Toast::success('Pago anterior registrado con su crédito del banco.', 'Cuenta en el saldo cuando alguien con permiso de ajustar lo valide.');
 
-        return to_route('multas.show', $fine);
+        return to_route('multas.show', $fine->showParameters());
     }
 
     public function review(
@@ -75,7 +75,7 @@ final class FineHistoricalMovementController extends Controller
 
         Toast::success($resultado === HistoricalMovementStatus::Validated ? 'Antecedente validado.' : 'Antecedente descartado.');
 
-        return to_route('multas.show', $movement->fine_id);
+        return to_route('multas.show', Fine::showParametersFor($movement->fine_id));
     }
 
     /**
@@ -108,6 +108,6 @@ final class FineHistoricalMovementController extends Controller
 
         Toast::success($revision === null ? 'No había nada que cambiar.' : 'Fecha del antecedente actualizada.');
 
-        return to_route('multas.show', $movement->fine_id);
+        return to_route('multas.show', Fine::showParametersFor($movement->fine_id));
     }
 }
