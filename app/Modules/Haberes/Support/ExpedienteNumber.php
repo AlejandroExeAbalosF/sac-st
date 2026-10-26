@@ -19,6 +19,11 @@ namespace App\Modules\Haberes\Support;
  * que aparece escrito en los recibos es simplemente Num/Período: la forma
  * corta de uso diario.
  *
+ * Se aceptan tres formas: la completa, la corta —que es la instancia 0— y
+ * la corta con la instancia al final, `125957/2026-1`, como se escribe un
+ * expediente de Multas. Sin esa tercera, otra instancia que no fuera la 0
+ * solo podía cargarse escribiendo el número completo.
+ *
  * Esta clase es la autoridad sobre el formato. El front descompone el
  * número mientras se escribe solo para dar respuesta inmediata; lo que
  * vale es lo que se valida acá.
@@ -27,7 +32,7 @@ final class ExpedienteNumber
 {
     private const COMPLETO = '/^(\d{3})(\d{4})-(\d{1,6})\/(\d{4})-(\d{1,2})$/';
 
-    private const CORTO = '/^(\d{1,6})\/(\d{4})$/';
+    private const CORTO = '/^(\d{1,6})\/(\d{4})(?:-(\d{1,2}))?$/';
 
     public function __construct(
         public readonly string $canonical,
@@ -40,8 +45,9 @@ final class ExpedienteNumber
     ) {}
 
     /**
-     * Acepta el número completo o el corto. Con el corto se completa el
-     * prefijo de la Secretaría, que es constante.
+     * Acepta el número completo o el corto, con o sin instancia. Con el corto
+     * se completa el prefijo de la Secretaría, que es constante, y sin
+     * instancia es la 0.
      */
     public static function parse(string $raw, string $defaultPrefix = '0030064'): ?self
     {
@@ -63,14 +69,16 @@ final class ExpedienteNumber
             $cds = substr($defaultPrefix, 0, 3);
             $iud = substr($defaultPrefix, 3, 4);
 
+            $instancia = ($m[3] ?? '') === '' ? '0' : $m[3];
+
             return new self(
-                canonical: sprintf('%s%s-%s/%s-0', $cds, $iud, str_pad($m[1], 6, '0', STR_PAD_LEFT), $m[2]),
+                canonical: sprintf('%s%s-%s/%s-%s', $cds, $iud, str_pad($m[1], 6, '0', STR_PAD_LEFT), $m[2], $instancia),
                 display: $m[1].'/'.$m[2],
                 cds: $cds,
                 iud: $iud,
                 number: $m[1],
                 period: $m[2],
-                instance: '0',
+                instance: $instancia,
             );
         }
 

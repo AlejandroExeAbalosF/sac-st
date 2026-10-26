@@ -75,7 +75,7 @@ final class StoreExpedienteRequest extends FormRequest
         if ($number !== '' && ! ExpedienteNumber::isValid($number)) {
             $validator->errors()->add(
                 'number',
-                'El número no tiene el formato de SiCE. Se espera 0030064-125957/2026-0 o la forma corta 125957/2026.',
+                'El número no tiene el formato de SiCE. Se espera 0030064-125957/2026-0, 125957/2026-1 o la forma corta 125957/2026.',
             );
         }
     }

@@ -3,7 +3,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const COMPLETO = /^(\d{3})(\d{4})-(\d{1,6})\/(\d{4})-(\d{1,2})$/;
-const CORTO = /^(\d{1,6})\/(\d{4})$/;
+// La corta, con la instancia opcional al final: `125957/2026` o `125957/2026-1`.
+const CORTO = /^(\d{1,6})\/(\d{4})(?:-(\d{1,2}))?$/;
 
 /** En qué punto de la verificación está el número que se está escribiendo. */
 export type EstadoNumero = 'vacio' | 'verificando' | 'disponible' | 'existente';
@@ -40,7 +41,7 @@ export function descomponer(raw: string) {
             iud: '0064',
             numero: corto[1],
             periodo: corto[2],
-            instancia: '0',
+            instancia: corto[3] ?? '0',
             corto: `${corto[1]}/${corto[2]}`,
         };
     }
@@ -136,7 +137,9 @@ export default function ExpedienteNumberField({
                                 0030064-125957/2026-0
                             </span>{' '}
                             o corto{' '}
-                            <span className="font-mono">125957/2026</span>.
+                            <span className="font-mono">125957/2026</span>, con
+                            la instancia al final si no es 0:{' '}
+                            <span className="font-mono">125957/2026-1</span>.
                         </p>
                     ))}
             </div>

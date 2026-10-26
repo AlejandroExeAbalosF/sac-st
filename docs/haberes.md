@@ -36,6 +36,10 @@ El listado está en `/haberes/expedientes`. La ficha utiliza la clave de ruta de
 expediente, y cada haber se identifica por su número **dentro de ese expediente**,
 no por su id global: `/haberes/expedientes/{expediente}/haber/{haber}`.
 
+El número del expediente se carga completo (`0030064-125957/2026-0`), corto
+(`125957/2026`, que es la instancia 0) o corto con la instancia al final
+(`125957/2026-1`). Con la forma corta se completa el prefijo de la Secretaría.
+
 La etiqueta de gestión describe la situación administrativa. Si tiene
 `blocks_payment`, retiene el egreso; no impide recibir fondos. El medio previsto de
 la cuota es informativo: una vez financiada manda el medio real de sus recepciones.
