@@ -1,5 +1,12 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Plus, Trash2, TriangleAlert } from 'lucide-react';
+import {
+    ArrowRight,
+    FolderOpen,
+    Plus,
+    Trash2,
+    TriangleAlert,
+} from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import PageHeader from '@/components/page-header';
@@ -93,14 +100,25 @@ export default function NuevaMulta({ existente, similares }: Props) {
     const actas = existente?.documents.filter((d) => d.kind === 'act') ?? [];
 
     /*
-     * Al terminar de escribir el número se pregunta si el expediente existe,
-     * con una recarga parcial: no hace falta una API aparte para una
-     * pregunta que el controlador ya sabe contestar.
+     * Mientras se escribe el número se pregunta si el expediente existe, con
+     * una recarga parcial: no hace falta una API aparte para una pregunta que
+     * el controlador ya sabe contestar. Se pregunta al dejar de tipear y al
+     * salir del campo, una sola vez por número.
      */
-    const consultarExpediente = () =>
+    const consultado = useRef(data.caseNumber);
+
+    const consultarExpediente = () => {
+        const numero = data.caseNumber.trim();
+
+        if (numero === consultado.current) {
+            return;
+        }
+
+        consultado.current = numero;
+
         router.reload({
             only: ['existente', 'similares'],
-            data: { expediente: data.caseNumber },
+            data: { expediente: numero },
             onSuccess: () => {
                 setData((actual) => ({
                     ...actual,
@@ -109,6 +127,15 @@ export default function NuevaMulta({ existente, similares }: Props) {
                 }));
             },
         });
+    };
+
+    useEffect(() => {
+        const espera = window.setTimeout(consultarExpediente, 500);
+
+        return () => window.clearTimeout(espera);
+        // Solo el número dispara la consulta; la función cambia en cada render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.caseNumber]);
 
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -178,23 +205,50 @@ export default function NuevaMulta({ existente, similares }: Props) {
                                     aria-invalid={Boolean(errors.caseNumber)}
                                 />
                                 <FieldError message={errors.caseNumber} />
-                                {existente ? (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Ya está cargado: la multa se le agrega.{' '}
-                                        <Link
-                                            href={showCase(existente.id)}
-                                            className="underline"
-                                        >
-                                            Ver el expediente
-                                        </Link>
-                                    </p>
-                                ) : (
+                                {!existente && (
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         Como en el papel. Si no está cargado, se
                                         crea con la multa.
                                     </p>
                                 )}
                             </div>
+
+                            {existente && (
+                                /*
+                                 * Un expediente ya cargado no es un error: la
+                                 * multa se le agrega. Pero conviene mirarlo
+                                 * antes —qué multas tiene, qué documentos—, y
+                                 * el aviso entero lleva a su ficha.
+                                 */
+                                <Link
+                                    href={showCase(existente.id)}
+                                    className="group flex gap-2 self-start rounded-md border border-info-strong/30 bg-info-soft p-3 text-xs text-info-strong hover:border-info-strong/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-7"
+                                >
+                                    <FolderOpen
+                                        className="size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    <span className="grid flex-1 gap-0.5">
+                                        <span className="font-semibold">
+                                            El expediente{' '}
+                                            <span className="font-mono">
+                                                {existente.label}
+                                            </span>{' '}
+                                            ya está cargado
+                                        </span>
+                                        <span>
+                                            La multa se le va a agregar, y abajo
+                                            podés usar su resolución y sus
+                                            actas. Hacé clic para ver el
+                                            expediente.
+                                        </span>
+                                    </span>
+                                    <ArrowRight
+                                        className="size-4 shrink-0 self-center transition-transform group-hover:translate-x-0.5"
+                                        aria-hidden="true"
+                                    />
+                                </Link>
+                            )}
 
                             {similares.length > 0 && (
                                 <div className="flex gap-2 rounded-md border border-warning-strong/30 bg-warning-soft p-3 text-xs text-warning-strong sm:col-span-7">
