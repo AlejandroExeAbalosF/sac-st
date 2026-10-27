@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Actions;
 
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
@@ -11,6 +12,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +20,9 @@ use Illuminate\Validation\ValidationException;
  * Anula el registro de que una cuota se pagó fuera del circuito.
  *
  * Es la salida para un error de carga: la cuota vuelve a quedar pendiente
- * y sus papeles quedan anulados, con motivo. Nada se borra.
+ * y sus papeles quedan anulados. Nada se borra. El motivo es del pago; sus
+ * papeles caen con «Se anuló el pago que respaldaba», porque la lista de un
+ * papel suelto es otra y el motivo de fondo ya está en el pago.
  *
  * **Es documental**, como el registro: no hay asiento que deshacer.
  *
@@ -30,16 +34,8 @@ final class VoidLegacySettlement
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
     /** @throws ValidationException */
-    public function handle(BeneficiaryInstallment $installment, string $reason, ?int $actorId = null): LegacySettlement
+    public function handle(BeneficiaryInstallment $installment, Reason $motivo, ?int $actorId = null): LegacySettlement
     {
-        $motivo = trim($reason);
-
-        if (mb_strlen($motivo) < 5) {
-            throw ValidationException::withMessages([
-                'reason' => 'El motivo tiene que explicar algo: un par de palabras no alcanzan.',
-            ]);
-        }
-
         return DB::transaction(function () use ($installment, $motivo, $actorId): LegacySettlement {
             $expedienteId = (int) Haber::query()->whereKey($installment->haber_id)->valueOrFail('expediente_id');
 
@@ -59,26 +55,32 @@ final class VoidLegacySettlement
                 ]);
             }
 
-            $anulacion = [
-                'voided_at' => now(),
-                'voided_by' => $actorId,
-                'void_reason' => $motivo,
-            ];
+            $ahora = now();
 
             LegacyDocument::query()
                 ->current()
                 ->where('legacy_settlement_id', $registro->id)
                 ->get()
-                ->each(fn (LegacyDocument $documento) => $documento->forceFill($anulacion)->save());
+                ->each(fn (LegacyDocument $documento) => $documento->forceFill([
+                    'voided_at' => $ahora,
+                    'voided_by' => $actorId,
+                    'void_reason_code' => HaberesReasonCode::SettlementVoided,
+                    'void_reason' => null,
+                ])->save());
 
-            $registro->forceFill($anulacion)->save();
+            $registro->forceFill([
+                'voided_at' => $ahora,
+                'voided_by' => $actorId,
+                'void_reason_code' => $motivo->code,
+                'void_reason' => $motivo->detail,
+            ])->save();
             $cuota->forceFill(['workflow_status' => InstallmentWorkflowStatus::Active])->save();
 
             $this->auditar->handle('cuota.pago-fuera-del-circuito-anulado', $cuota, before: [
                 'amount' => $registro->amount,
                 'paid_on' => $registro->paid_on->toDateString(),
                 'payment_medium' => $registro->payment_medium->value,
-            ], metadata: ['reason' => $motivo], actorId: $actorId);
+            ], metadata: $motivo->auditMetadata(), actorId: $actorId);
 
             return $registro;
         });

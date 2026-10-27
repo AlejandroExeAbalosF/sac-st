@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
+use App\Modules\Haberes\Enums\HaberesReasonAct;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
+use LogicException;
 
 /**
- * Anular el registro de un pago fuera del circuito.
+ * Anulación de un registro del sistema anterior: el pago fuera del circuito
+ * o el recibo de papel de una cuota.
  *
- * Deja la cuota pendiente otra vez, así que el motivo es lo que va a
- * explicar, el día que alguien pregunte, por qué una cuota que figuraba
- * pagada volvió a estar por pagar.
+ * Cada uno con su lista de motivos; el detalle es opcional, salvo con «Otro».
+ * El registro no se borra: queda anulado con su motivo.
  */
 final class VoidLegacySettlementRequest extends FormRequest
 {
@@ -20,9 +23,15 @@ final class VoidLegacySettlementRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'reason' => ['required', 'string', 'min:10', 'max:500'],
-        ];
+        return Reason::rules($this->act());
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ['reasonCode' => 'motivo', 'reason' => 'detalle'];
     }
 
     /**
@@ -30,14 +39,19 @@ final class VoidLegacySettlementRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'reason.required' => 'Escribí el motivo.',
-            'reason.min' => 'El motivo tiene que explicar qué pasó: es lo único que va a quedar para entenderlo después.',
-        ];
+        return Reason::messages();
     }
 
-    protected function prepareForValidation(): void
+    public function reason(): Reason
     {
-        $this->merge(['reason' => trim((string) $this->input('reason'))]);
+        return Reason::fromValidated($this->validated(), $this->act())
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
+    }
+
+    public function act(): HaberesReasonAct
+    {
+        return $this->routeIs('*legacy-funds.void-paper')
+            ? HaberesReasonAct::LegacyDocumentVoid
+            : HaberesReasonAct::LegacySettlementVoid;
     }
 }

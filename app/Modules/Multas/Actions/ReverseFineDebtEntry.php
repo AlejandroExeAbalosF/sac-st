@@ -82,7 +82,7 @@ final class ReverseFineDebtEntry
                 metadata: [
                     'tipo' => $ajuste->kind->label(),
                     'amount' => $ajuste->amount,
-                    'reason' => $reason->describe(),
+                    ...$reason->auditMetadata(),
                 ],
                 actorId: $actorId,
             );

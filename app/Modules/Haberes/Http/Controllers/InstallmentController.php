@@ -12,14 +12,17 @@ use App\Modules\Haberes\Actions\UnlockInstallmentEdit;
 use App\Modules\Haberes\Actions\UpdateInstallment;
 use App\Modules\Haberes\Actions\VoidCashCollection;
 use App\Modules\Haberes\Data\SaveInstallmentData;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Http\Requests\SaveInstallmentRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use LogicException;
 
 final class InstallmentController extends Controller
 {
@@ -163,14 +166,16 @@ final class InstallmentController extends Controller
         BeneficiaryInstallment $installment,
         UnlockInstallmentEdit $habilitar,
     ): RedirectResponse {
-        $validado = $request->validate([
-            'reason' => ['required', 'string', 'min:10', 'max:300'],
-        ], [
-            'reason.required' => 'Hay que registrar el caso antes de corregir una cuota en circulación.',
-            'reason.min' => 'El motivo tiene que explicar el caso: un par de palabras no alcanzan.',
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::InstallmentUnlock, max: 300),
+            ['reasonCode.required' => 'Hay que registrar el caso antes de corregir una cuota en circulación.'] + Reason::messages(),
+        );
 
-        $habilitar->handle($installment, (string) $validado['reason'], $request->user()?->id);
+        $habilitar->handle(
+            $installment,
+            Reason::fromValidated($validado, HaberesReasonAct::InstallmentUnlock) ?? throw new LogicException('El motivo ya se validó.'),
+            $request->user()?->id,
+        );
 
         return back()->with(
             'status',

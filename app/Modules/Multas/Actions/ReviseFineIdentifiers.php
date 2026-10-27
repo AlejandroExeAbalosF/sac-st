@@ -155,6 +155,7 @@ final class ReviseFineIdentifiers
                 after: $nuevos,
                 metadata: array_filter([
                     'reason' => $motivo?->describe(),
+                    'motivo_codigo' => $motivo?->code->value,
                     'movimiento' => $sujeto instanceof FineDebtEntry ? $sujeto->kind->label() : null,
                     'antecedente' => $sujeto instanceof FineHistoricalMovement ? $sujeto->kind->label() : null,
                 ]),

@@ -58,8 +58,8 @@ class MotivosDeMultasTest extends TestCase
         $reversion = FineDebtEntry::query()->where('kind', 'reversal')->sole();
         expect($reversion->reason_code)->toBe(FineReasonCode::DataEntryError)
             ->and($reversion->reason)->toBe('El importe tenía un cero de más')
-            ->and(AuditEvent::query()->where('action', 'multa.ajuste-revertido')->sole()->metadata['reason'])
-            ->toBe('Error de carga: El importe tenía un cero de más');
+            ->and(AuditEvent::query()->where('action', 'multa.ajuste-revertido')->sole()->metadata)
+            ->toMatchArray(['reason' => 'Error de carga: El importe tenía un cero de más', 'motivo_codigo' => 'data_entry_error']);
 
         $this->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page

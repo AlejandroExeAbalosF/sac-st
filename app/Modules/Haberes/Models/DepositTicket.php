@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, string>|null $match_signals
  * @property int|null $matched_by
  * @property CarbonInterface|null $matched_at
+ * @property HaberesReasonCode|null $discarded_reason_code
  * @property string|null $discarded_reason
  */
 final class DepositTicket extends Model
@@ -55,6 +57,7 @@ final class DepositTicket extends Model
         'match_signals',
         'matched_by',
         'matched_at',
+        'discarded_reason_code',
         'discarded_reason',
         'created_by',
     ];
@@ -117,6 +120,7 @@ final class DepositTicket extends Model
     protected function casts(): array
     {
         return [
+            'discarded_reason_code' => HaberesReasonCode::class,
             'deposit_kind' => DepositKind::class,
             'status' => DepositTicketStatus::class,
             'deposited_at' => 'date',

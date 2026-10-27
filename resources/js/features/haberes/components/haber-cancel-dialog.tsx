@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -8,8 +9,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     cancel as cancelHaber,
     reactivate as reactivateHaber,
@@ -33,6 +32,7 @@ export default function HaberCancelDialog({
     onClose: () => void;
 }) {
     const { data, setData, patch, processing, errors } = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
         reason: '',
     });
 
@@ -62,29 +62,21 @@ export default function HaberCancelDialog({
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="grid gap-4">
-                    <div>
-                        <Label htmlFor={`motivo-${haber.id}`}>Motivo</Label>
-                        <Textarea
-                            id={`motivo-${haber.id}`}
-                            value={data.reason}
-                            onChange={(e) => setData('reason', e.target.value)}
-                            className="mt-1"
-                            rows={3}
-                            maxLength={500}
-                            autoFocus
-                            aria-invalid={Boolean(errors.reason)}
-                            placeholder={
-                                esReactivacion
-                                    ? 'Por qué vuelve a estar vigente.'
-                                    : 'Qué pasó.'
-                            }
-                        />
-                        {errors.reason && (
-                            <p className="mt-1 text-xs text-destructive-strong">
-                                {errors.reason}
-                            </p>
-                        )}
-                    </div>
+                    <ReasonFields
+                        act={esReactivacion ? 'reactivation' : 'cancellation'}
+                        code={data.reasonCode}
+                        detail={data.reason}
+                        onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                        onDetailChange={(detalle) => setData('reason', detalle)}
+                        codeError={errors.reasonCode}
+                        detailError={errors.reason}
+                        idPrefix={`motivo-${haber.id}`}
+                        detailPlaceholder={
+                            esReactivacion
+                                ? 'Por qué vuelve a estar vigente.'
+                                : 'Qué pasó.'
+                        }
+                    />
 
                     <DialogFooter>
                         <Button

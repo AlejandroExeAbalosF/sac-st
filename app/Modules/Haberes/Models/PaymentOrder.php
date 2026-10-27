@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Models;
 
 use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Enums\ReceiptNumberSource;
 use App\Modules\Shared\Models\DocumentSeries;
@@ -72,6 +73,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int|null $created_by
  * @property int|null $voided_by
  * @property CarbonInterface|null $voided_at
+ * @property HaberesReasonCode|null $rejection_or_void_reason_code
  * @property string|null $rejection_or_void_reason
  * @property string|null $notes
  */
@@ -119,6 +121,7 @@ final class PaymentOrder extends Model
         'created_by',
         'voided_by',
         'voided_at',
+        'rejection_or_void_reason_code',
         'rejection_or_void_reason',
         'notes',
     ];
@@ -257,6 +260,7 @@ final class PaymentOrder extends Model
     protected function casts(): array
     {
         return [
+            'rejection_or_void_reason_code' => HaberesReasonCode::class,
             'status' => PaymentOrderStatus::class,
             'income_receipt_number_source' => ReceiptNumberSource::class,
             'amount' => 'decimal:2',

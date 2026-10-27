@@ -52,7 +52,7 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$deMas->expediente, $deMas]), [
-                'reason' => 'Cargado por error: el acta no incluye a este beneficiario.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error: el acta no incluye a este beneficiario.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -71,7 +71,7 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ]);
 
         $datos = ExpedienteListItemData::fromModel(
@@ -89,7 +89,7 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Anulado durante la revisión del cierre mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado durante la revisión del cierre mensual.',
             ]);
 
         $this->assertSame(
@@ -114,12 +114,12 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Anulado durante la revisión del cierre mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado durante la revisión del cierre mensual.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.reactivate', [$haber->expediente, $haber]), [
-                'reason' => 'La anulación fue un error: el haber sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el haber sigue vigente.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -144,14 +144,14 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Anulado durante la revisión del cierre mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado durante la revisión del cierre mensual.',
             ]);
 
         $this->assertNull($haber->refresh()->block_reason);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.reactivate', [$haber->expediente, $haber]), [
-                'reason' => 'La anulación fue un error: el haber sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el haber sigue vigente.',
             ]);
 
         $haber->refresh();
@@ -166,19 +166,19 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), ['reason' => 'error'])
-            ->assertSessionHasErrors('reason');
+            ->assertSessionHasErrors('reasonCode');
 
         $motivo = 'Cargado por error: el acta no incluye a este beneficiario.';
 
         $this->actingAs($this->operador('contador'))
-            ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), ['reason' => $motivo]);
+            ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), ['reasonCode' => 'data_entry_error', 'reason' => $motivo]);
 
         $evento = AuditEvent::query()
             ->forSubject('Haber', $haber->id)
             ->where('action', 'haber.anulado')
             ->firstOrFail();
 
-        $this->assertSame($motivo, $evento->metadata['motivo']);
+        $this->assertSame('Error de carga: '.$motivo, $evento->metadata['motivo']);
         $this->assertSame('96000.00', $evento->metadata['importe']);
     }
 
@@ -194,12 +194,12 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.reactivate', [$haber->expediente, $haber]), [
-                'reason' => 'La anulación fue un error: el haber sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el haber sigue vigente.',
             ])
             ->assertSessionHasErrors('reason');
     }
@@ -210,12 +210,12 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ])
             ->assertSessionHasErrors('reason');
     }
@@ -226,7 +226,7 @@ class AnularHaberTest extends TestCase
 
         $this->actingAs($this->operador('administrativo'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ])
             ->assertForbidden();
 

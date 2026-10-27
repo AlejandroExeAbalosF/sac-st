@@ -83,7 +83,7 @@ class NumeroDelHaberTest extends TestCase
 
         $this->actingAs($operador)
             ->patch(route('haberes.haber.cancel', [$expediente, $cargado]), [
-                'reason' => 'Cargado por error.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error.',
             ])
             ->assertSessionHasNoErrors();
 

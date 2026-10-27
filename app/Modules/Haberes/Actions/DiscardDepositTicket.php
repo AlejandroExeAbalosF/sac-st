@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Actions;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use RuntimeException;
 
 /**
@@ -28,7 +29,7 @@ final class DiscardDepositTicket
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(DepositTicket $ticket, string $reason, int $userId): DepositTicket
+    public function handle(DepositTicket $ticket, Reason $motivo, int $userId): DepositTicket
     {
         if ($ticket->status === DepositTicketStatus::Matched) {
             throw new RuntimeException(
@@ -42,7 +43,8 @@ final class DiscardDepositTicket
 
         $ticket->forceFill([
             'status' => DepositTicketStatus::Discarded,
-            'discarded_reason' => mb_substr(trim($reason), 0, 300),
+            'discarded_reason_code' => $motivo->code,
+            'discarded_reason' => $motivo->detail,
         ])->save();
 
         $this->auditar->handle(
@@ -51,9 +53,9 @@ final class DiscardDepositTicket
             before: ['status' => DepositTicketStatus::Waiting->value],
             after: [
                 'status' => DepositTicketStatus::Discarded->value,
-                'discarded_reason' => $ticket->discarded_reason,
+                'discarded_reason' => $motivo->describe(),
             ],
-            metadata: ['usuario' => $userId],
+            metadata: ['usuario' => $userId, 'motivo_codigo' => $motivo->code->value],
             actorId: $userId,
         );
 
@@ -67,10 +69,13 @@ final class DiscardDepositTicket
             throw new RuntimeException('El ticket no está descartado.');
         }
 
-        $motivo = $ticket->discarded_reason;
+        // Devolverlo a la cola borra el motivo de la fila: queda en la auditoría, con el código.
+        $motivo = Reason::text($ticket->discarded_reason_code, $ticket->discarded_reason);
+        $codigo = $ticket->discarded_reason_code?->value;
 
         $ticket->forceFill([
             'status' => DepositTicketStatus::Waiting,
+            'discarded_reason_code' => null,
             'discarded_reason' => null,
         ])->save();
 
@@ -78,7 +83,7 @@ final class DiscardDepositTicket
             'ticket.reabierto',
             $ticket,
             before: ['discarded_reason' => $motivo],
-            metadata: ['usuario' => $userId],
+            metadata: array_filter(['usuario' => $userId, 'motivo_codigo' => $codigo], fn (mixed $valor): bool => $valor !== null),
             actorId: $userId,
         );
 

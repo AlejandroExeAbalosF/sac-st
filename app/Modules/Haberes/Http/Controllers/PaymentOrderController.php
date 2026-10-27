@@ -13,6 +13,7 @@ use App\Modules\Haberes\Actions\VoidPaymentOrder;
 use App\Modules\Haberes\Data\InstallmentOrderStateData;
 use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Data\PaymentOrderContextData;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Http\Requests\CompletePaymentOrderDataRequest;
 use App\Modules\Haberes\Http\Requests\EditPaymentOrderDetailsRequest;
 use App\Modules\Haberes\Http\Requests\IssuePaymentOrderRequest;
@@ -24,10 +25,12 @@ use App\Modules\Haberes\Pdf\PaymentOrderPdf;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderObservation;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -189,14 +192,16 @@ final class PaymentOrderController extends Controller
         PaymentOrder $order,
         VoidPaymentOrder $anular,
     ): RedirectResponse {
-        $validado = $request->validate([
-            'reason' => ['required', 'string', 'min:5', 'max:300'],
-        ], [
-            'reason.required' => 'Hay que decir por qué se anula la Orden.',
-            'reason.min' => 'El motivo tiene que explicar algo: un par de palabras no alcanzan.',
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::PaymentOrderVoid, max: 300),
+            Reason::messages(),
+        );
 
-        $anular->handle($order, (string) $validado['reason'], $request->user()?->id);
+        $anular->handle(
+            $order,
+            Reason::fromValidated($validado, HaberesReasonAct::PaymentOrderVoid) ?? throw new LogicException('El motivo ya se validó.'),
+            $request->user()?->id,
+        );
 
         return back()->with(
             'status',

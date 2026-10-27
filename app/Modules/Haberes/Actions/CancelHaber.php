@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +30,7 @@ final class CancelHaber
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Haber $haber, string $motivo): Haber
+    public function handle(Haber $haber, Reason $motivo): Haber
     {
         return DB::transaction(function () use ($haber, $motivo): Haber {
             $bloqueado = Haber::query()->lockForUpdate()->findOrFail($haber->id);
@@ -89,7 +90,7 @@ final class CancelHaber
                 ],
                 after: ['workflow_status' => HaberWorkflowStatus::Cancelled->value],
                 metadata: [
-                    'motivo' => $motivo,
+                    ...$motivo->auditMetadata('motivo'),
                     'expediente_id' => $bloqueado->expediente_id,
                     'beneficiario' => $bloqueado->beneficiary->name,
                     'importe' => $bloqueado->assigned_amount,

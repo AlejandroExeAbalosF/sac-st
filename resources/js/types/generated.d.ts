@@ -655,6 +655,31 @@ declare namespace App {
                     'active' | 'suspended' | 'closed' | 'cancelled';
                 export type HaberWorkflowStatus =
                     'active' | 'suspended' | 'blocked' | 'cancelled' | 'closed';
+                export type HaberesReasonAct =
+                    | 'cancellation'
+                    | 'reactivation'
+                    | 'payment_order_void'
+                    | 'installment_unlock'
+                    | 'legacy_settlement_void'
+                    | 'legacy_document_void'
+                    | 'deposit_ticket_discard';
+                export type HaberesReasonCode =
+                    | 'data_entry_error'
+                    | 'duplicate'
+                    | 'case_archived'
+                    | 'cancelled_by_mistake'
+                    | 'case_reopened'
+                    | 'wrong_beneficiary_data'
+                    | 'wrong_amount'
+                    | 'wrong_installment'
+                    | 'saf_observation'
+                    | 'resolution_changed'
+                    | 'mistyped_number'
+                    | 'deposit_not_made'
+                    | 'wrong_receipt'
+                    | 'wrong_expediente'
+                    | 'settlement_voided'
+                    | 'other';
                 export type InstallmentStage =
                     | 'cancelled'
                     | 'blocked'

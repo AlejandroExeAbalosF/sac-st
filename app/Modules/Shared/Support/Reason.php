@@ -108,6 +108,19 @@ final readonly class Reason
         return $opciones;
     }
 
+    /**
+     * El motivo en la metadata de un evento: la descripción para leerlo y el
+     * código para contarlo. El código queda en la auditoría aunque la fila
+     * lo borre después —al cerrar una ventana, al devolver algo a la cola—,
+     * y el historial no lo muestra: solo muestra la metadata declarada.
+     *
+     * @return array<string, string|int>
+     */
+    public function auditMetadata(string $textKey = 'reason'): array
+    {
+        return [$textKey => $this->describe(), 'motivo_codigo' => $this->code->value];
+    }
+
     /** Cómo se lee en la ficha y en la auditoría. */
     public function describe(): string
     {

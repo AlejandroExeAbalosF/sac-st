@@ -11,6 +11,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Models\AuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -26,7 +27,7 @@ final class ReactivateHaber
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Haber $haber, string $motivo): Haber
+    public function handle(Haber $haber, Reason $motivo): Haber
     {
         return DB::transaction(function () use ($haber, $motivo): Haber {
             $bloqueado = Haber::query()->lockForUpdate()->findOrFail($haber->id);
@@ -65,7 +66,7 @@ final class ReactivateHaber
                 before: ['workflow_status' => HaberWorkflowStatus::Cancelled->value],
                 after: ['workflow_status' => $estadoPrevio],
                 metadata: [
-                    'motivo' => $motivo,
+                    ...$motivo->auditMetadata('motivo'),
                     'expediente_id' => $bloqueado->expediente_id,
                     // Si el evento de anulación no está, todo vuelve activo
                     // y hay que poder saber que se restauró a ciegas.

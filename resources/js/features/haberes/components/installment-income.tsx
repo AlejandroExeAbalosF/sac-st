@@ -15,6 +15,7 @@ import {
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -24,8 +25,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
 import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
 import { date, money } from '@/lib/format';
@@ -286,7 +285,10 @@ function AnularPapelDialog({
     numero: string;
     onCerrar: () => void;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+    });
 
     return (
         <Dialog open onOpenChange={(v) => !v && onCerrar()}>
@@ -310,21 +312,21 @@ function AnularPapelDialog({
                     }}
                     className="mt-2 space-y-4"
                 >
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-papel-${cuotaId}`}>
-                            Qué estaba mal
-                        </Label>
-                        <Textarea
-                            id={`motivo-papel-${cuotaId}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="El número del talonario estaba mal tipeado: es 0072190."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="legacy_document_void"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-papel-${cuotaId}`}
+                        detailPlaceholder="El número del talonario estaba mal tipeado: es 0072190."
+                    />
                     <DialogFooter className="gap-2">
                         <Button
                             type="button"

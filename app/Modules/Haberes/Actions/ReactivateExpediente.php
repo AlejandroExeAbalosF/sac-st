@@ -10,6 +10,7 @@ use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Models\AuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +31,7 @@ final class ReactivateExpediente
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Expediente $expediente, string $motivo): Expediente
+    public function handle(Expediente $expediente, Reason $motivo): Expediente
     {
         return DB::transaction(function () use ($expediente, $motivo): Expediente {
             $bloqueado = Expediente::query()->lockForUpdate()->findOrFail($expediente->id);
@@ -59,7 +60,7 @@ final class ReactivateExpediente
                 before: ['status' => ExpedienteStatus::Cancelled->value],
                 after: ['status' => $estadoPrevio],
                 metadata: [
-                    'motivo' => $motivo,
+                    ...$motivo->auditMetadata('motivo'),
                     // Si el evento de anulación no está —datos migrados de
                     // otro sistema, por ejemplo— todo vuelve activo y hay
                     // que poder saber que se restauró a ciegas.

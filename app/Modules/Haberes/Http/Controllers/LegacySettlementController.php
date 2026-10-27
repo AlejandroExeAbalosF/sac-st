@@ -55,7 +55,7 @@ final class LegacySettlementController extends Controller
     ): RedirectResponse {
         $anular->handle(
             installment: $installment,
-            reason: (string) $request->validated('reason'),
+            motivo: $request->reason(),
             actorId: $request->user()?->id,
         );
 

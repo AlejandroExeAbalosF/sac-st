@@ -9,6 +9,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\InstallmentEditLock;
 use App\Modules\Haberes\Support\MissingOrderField;
 use App\Modules\Haberes\Support\PaymentOrderReadiness;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -117,7 +118,7 @@ final class InstallmentOrderStateData extends Data
             incomeReceiptTalonarioNumber: $recibo?->talonarioNumber(),
             incomeReceiptPrintsTalonario: $recibo?->printsTalonario() ?? false,
             editLocked: $traba && $installment->edit_unlocked_at === null,
-            editUnlockReason: $traba ? $installment->edit_unlock_reason : null,
+            editUnlockReason: $traba ? Reason::text($installment->edit_unlock_reason_code, $installment->edit_unlock_reason) : null,
         );
     }
 }

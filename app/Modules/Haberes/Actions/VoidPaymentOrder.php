@@ -8,6 +8,7 @@ use App\Modules\Haberes\Enums\PaseStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -44,16 +45,8 @@ final class VoidPaymentOrder
     /**
      * @throws ValidationException
      */
-    public function handle(PaymentOrder $order, string $reason, ?int $actorId = null): PaymentOrder
+    public function handle(PaymentOrder $order, Reason $motivo, ?int $actorId = null): PaymentOrder
     {
-        $motivo = trim($reason);
-
-        if ($motivo === '') {
-            throw ValidationException::withMessages([
-                'reason' => 'Hay que decir por qué se anula la Orden.',
-            ]);
-        }
-
         /*
          * Quién anula no es opcional. La base lo exige —igual que en los
          * recibos— y el motivo es el mismo: un documento dado de baja sin
@@ -73,7 +66,8 @@ final class VoidPaymentOrder
                 'status' => PaymentOrderStatus::Voided,
                 'voided_by' => $actorId,
                 'voided_at' => now(),
-                'rejection_or_void_reason' => $motivo,
+                'rejection_or_void_reason_code' => $motivo->code,
+                'rejection_or_void_reason' => $motivo->detail,
             ])->save();
 
             $order->loadMissing('pase');
@@ -83,8 +77,8 @@ final class VoidPaymentOrder
         $this->auditar->handle('orden-de-pago.anulada', $order, after: [
             'formatted_number' => $order->formatted_number,
             'beneficiary_installment_id' => $order->beneficiary_installment_id,
-            'reason' => $motivo,
-        ], actorId: $actorId);
+            'reason' => $motivo->describe(),
+        ], metadata: ['motivo_codigo' => $motivo->code->value], actorId: $actorId);
 
         return $order;
     }

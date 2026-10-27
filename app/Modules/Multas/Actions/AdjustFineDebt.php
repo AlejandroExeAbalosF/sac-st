@@ -125,7 +125,7 @@ final class AdjustFineDebt
                     'tipo' => $tipo->label(),
                     'amount' => $importe,
                     'resolucion' => $respaldo->label(),
-                    'reason' => $reason->describe(),
+                    ...$reason->auditMetadata(),
                 ],
                 actorId: $actorId,
             );

@@ -804,6 +804,7 @@ class InicioTest extends TestCase
             'amount' => '72000.00',
             'deposit_kind' => 'cash_deposit',
             'status' => $estado,
+            'discarded_reason_code' => $estado === DepositTicketStatus::Discarded ? 'deposit_not_made' : null,
             'discarded_reason' => $estado === DepositTicketStatus::Discarded
                 ? 'El empleador avisó que el depósito nunca se hizo.'
                 : null,

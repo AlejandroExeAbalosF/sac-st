@@ -37,7 +37,7 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado con el número equivocado, corresponde al 120327/2019.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado con el número equivocado, corresponde al 120327/2019.',
             ])
             ->assertRedirect(route('expedientes.index'));
 
@@ -71,7 +71,7 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Duplicado del expediente 101205/2026, se anula este.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Duplicado del expediente 101205/2026, se anula este.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -83,11 +83,12 @@ class AnularExpedienteTest extends TestCase
         $expediente = $this->expediente('77420/2024');
 
         $this->actingAs($this->operador('contador'))
-            ->patch(route('expedientes.cancel', $expediente), ['reason' => ''])
-            ->assertSessionHasErrors('reason');
+            ->patch(route('expedientes.cancel', $expediente), ['reason' => 'Sin elegir el motivo'])
+            ->assertSessionHasErrors('reasonCode');
 
+        // Con «Otro», el detalle es el motivo.
         $this->actingAs($this->operador('contador'))
-            ->patch(route('expedientes.cancel', $expediente), ['reason' => 'error'])
+            ->patch(route('expedientes.cancel', $expediente), ['reasonCode' => 'other', 'reason' => ''])
             ->assertSessionHasErrors('reason');
 
         $this->assertSame('active', $expediente->refresh()->status->value);
@@ -99,14 +100,15 @@ class AnularExpedienteTest extends TestCase
         $motivo = 'Se cargó dos veces la misma carátula; queda vigente el 77421/2024.';
 
         $this->actingAs($this->operador('contador'))
-            ->patch(route('expedientes.cancel', $expediente), ['reason' => $motivo]);
+            ->patch(route('expedientes.cancel', $expediente), ['reasonCode' => 'data_entry_error', 'reason' => $motivo]);
 
         $evento = AuditEvent::query()
             ->forSubject('Expediente', $expediente->id)
             ->where('action', 'expediente.anulado')
             ->firstOrFail();
 
-        $this->assertSame($motivo, $evento->metadata['motivo']);
+        $this->assertSame('Error de carga: '.$motivo, $evento->metadata['motivo']);
+        $this->assertSame('data_entry_error', $evento->metadata['motivo_codigo']);
         $this->assertSame('active', $evento->old_values['status']);
         $this->assertSame('cancelled', $evento->new_values['status']);
     }
@@ -117,12 +119,12 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ])
             ->assertSessionHasErrors('reason');
     }
@@ -133,7 +135,7 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('administrativo'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ])
             ->assertForbidden();
 
@@ -146,7 +148,7 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado por error durante la capacitación.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado por error durante la capacitación.',
             ]);
 
         $this->actingAs($this->operador())
@@ -190,12 +192,12 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.reactivate', $expediente), [
-                'reason' => 'La anulación fue un error: el expediente sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el expediente sigue vigente.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -213,14 +215,14 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->assertNull($expediente->haberes()->value('block_reason'));
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.reactivate', $expediente), [
-                'reason' => 'La anulación fue un error: el expediente sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el expediente sigue vigente.',
             ]);
 
         // `value()` devuelve el enum, no la cadena: el modelo lo castea.
@@ -239,12 +241,12 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.reactivate', $expediente), [
-                'reason' => 'La anulación fue un error: el expediente estaba bien cerrado.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el expediente estaba bien cerrado.',
             ]);
 
         $this->assertSame('closed', $expediente->refresh()->status->value);
@@ -256,26 +258,26 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.reactivate', $expediente), ['reason' => 'ups'])
-            ->assertSessionHasErrors('reason');
+            ->assertSessionHasErrors('reasonCode');
 
         $this->assertSame('cancelled', $expediente->refresh()->status->value);
 
         $motivo = 'Se anuló el expediente equivocado; este sigue vigente.';
 
         $this->actingAs($this->operador('contador'))
-            ->patch(route('expedientes.reactivate', $expediente), ['reason' => $motivo]);
+            ->patch(route('expedientes.reactivate', $expediente), ['reasonCode' => 'cancelled_by_mistake', 'reason' => $motivo]);
 
         $evento = AuditEvent::query()
             ->forSubject('Expediente', $expediente->id)
             ->where('action', 'expediente.reactivado')
             ->firstOrFail();
 
-        $this->assertSame($motivo, $evento->metadata['motivo']);
+        $this->assertSame('Se anuló por error: '.$motivo, $evento->metadata['motivo']);
         $this->assertTrue($evento->metadata['estados_restaurados']);
     }
 
@@ -283,7 +285,7 @@ class AnularExpedienteTest extends TestCase
     {
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.reactivate', $this->expediente('77420/2024')), [
-                'reason' => 'La anulación fue un error: el expediente sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el expediente sigue vigente.',
             ])
             ->assertSessionHasErrors('reason');
     }
@@ -294,12 +296,12 @@ class AnularExpedienteTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Anulado por error durante la revisión mensual.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Anulado por error durante la revisión mensual.',
             ]);
 
         $this->actingAs($this->operador('administrativo'))
             ->patch(route('expedientes.reactivate', $expediente), [
-                'reason' => 'La anulación fue un error: el expediente sigue vigente.',
+                'reasonCode' => 'cancelled_by_mistake', 'reason' => 'La anulación fue un error: el expediente sigue vigente.',
             ])
             ->assertForbidden();
     }

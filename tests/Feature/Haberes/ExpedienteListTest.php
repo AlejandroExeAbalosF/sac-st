@@ -220,7 +220,7 @@ class ExpedienteListTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
-                'reason' => 'Cargado sobre el expediente equivocado.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'Cargado sobre el expediente equivocado.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -262,7 +262,7 @@ class ExpedienteListTest extends TestCase
 
         $this->actingAs($contador)
             ->patch(route('haberes.haber.cancel', [$expediente, $haber]), [
-                'reason' => 'El acta no lo reconocía; se cargó de más.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'El acta no lo reconocía; se cargó de más.',
             ])
             ->assertSessionHasNoErrors();
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Configuracion;
 
 use App\Modules\Haberes\Actions\VoidPaymentOrder;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Pdf\PaymentOrderPdf;
 use App\Modules\Shared\Actions\ConfigureDocumentNumbering;
@@ -12,6 +13,7 @@ use App\Modules\Shared\Enums\DocumentType;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Pdf\ExpenseReceiptPdf;
 use App\Modules\Shared\Pdf\IncomeReceiptPdf;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -104,7 +106,7 @@ class NumeracionExtremosTest extends TestCase
     {
         $document = $this->fixture->emit($type, $this->fixture->prepare($type));
         if ($document instanceof PaymentOrder) {
-            app(VoidPaymentOrder::class)->handle($document, 'Corrección del comprobante.', $this->fixture->actorId);
+            app(VoidPaymentOrder::class)->handle($document, new Reason(HaberesReasonCode::WrongAmount, 'Corrección del comprobante.'), $this->fixture->actorId);
         } else {
             // Anulación del papel; no se revierte el hecho monetario para probar la numeración.
             $document->forceFill(['status' => 'voided', 'voided_by' => $this->fixture->actorId, 'voided_at' => now(), 'void_reason' => 'Corrección del comprobante.'])->save();

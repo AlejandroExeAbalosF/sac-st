@@ -125,7 +125,8 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   lo que se corrigió. **Base** y **Action:** `ReportFineBankPayment`,
   `RegisterFineAppeal`.
 - En la ficha y en la auditoría el motivo se lee junto: «Error de carga: el
-  importe tenía un cero de más».
+  importe tenía un cero de más». El evento de auditoría guarda además el código
+  en `motivo_codigo`, para agrupar; el historial no lo muestra.
 - Las listas no salen del relevamiento: son un punto de partida para ajustar con
   el área. El rechazo de un cheque y la cancelación de un depósito siguen con
   texto libre: guardan su motivo en tablas que también usa Haberes.

@@ -14,12 +14,14 @@ use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\VoidCashCollection;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -147,7 +149,7 @@ class GuardasDelCircuitoTest extends TestCase
 
         $this->expectExceptionMessageMatches('/dinero imputado/u');
 
-        app(CancelHaber::class)->handle($cuota->haber, 'Se cargó por error.');
+        app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
     }
 
     /** Ni un expediente. */
@@ -157,7 +159,7 @@ class GuardasDelCircuitoTest extends TestCase
 
         $this->expectExceptionMessageMatches('/dinero imputado/u');
 
-        app(CancelExpediente::class)->handle($cuota->haber->expediente, 'Se cargó por error.');
+        app(CancelExpediente::class)->handle($cuota->haber->expediente, new Reason(HaberesReasonCode::DataEntryError));
     }
 
     /** Liberada la plata, el haber se anula sin problema. */
@@ -173,7 +175,7 @@ class GuardasDelCircuitoTest extends TestCase
             actorId: $this->operador()->id,
         );
 
-        $anulado = app(CancelHaber::class)->handle($cuota->haber, 'Se cargó por error.');
+        $anulado = app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
 
         $this->assertSame('cancelled', $anulado->workflow_status->value);
     }

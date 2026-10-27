@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Actions;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\InstallmentEditLock;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -35,19 +36,9 @@ final class UnlockInstallmentEdit
      */
     public function handle(
         BeneficiaryInstallment $installment,
-        string $reason,
+        Reason $motivo,
         ?int $actorId = null,
     ): BeneficiaryInstallment {
-        $motivo = trim($reason);
-
-        if (mb_strlen($motivo) < 10) {
-            throw ValidationException::withMessages([
-                'reason' => 'El motivo tiene que explicar el caso: un par de palabras no alcanzan '
-                    .'para entender, dentro de un año, por qué se corrigió una cuota que ya estaba '
-                    .'en manos del organismo.',
-            ]);
-        }
-
         $orden = $this->traba->lockingOrder($installment);
 
         if ($orden === null) {
@@ -59,16 +50,17 @@ final class UnlockInstallmentEdit
         DB::transaction(function () use ($installment, $motivo, $actorId): void {
             $installment->forceFill([
                 'edit_unlocked_at' => now(),
-                'edit_unlock_reason' => $motivo,
+                'edit_unlock_reason_code' => $motivo->code,
+                'edit_unlock_reason' => $motivo->detail,
                 'edit_unlocked_by' => $actorId,
             ])->save();
         });
 
         $this->auditar->handle('cuota.edicion-habilitada', $installment, after: [
-            'reason' => $motivo,
+            'reason' => $motivo->describe(),
             'payment_order_id' => $orden->id,
             'payment_order_number' => $orden->formatted_number,
-        ], actorId: $actorId);
+        ], metadata: ['motivo_codigo' => $motivo->code->value], actorId: $actorId);
 
         return $installment;
     }

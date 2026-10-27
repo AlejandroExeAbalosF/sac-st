@@ -13,6 +13,7 @@ use App\Modules\Haberes\Data\ExpedienteExtraData;
 use App\Modules\Haberes\Data\ExpedienteListItemData;
 use App\Modules\Haberes\Data\HaberRowData;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Http\Requests\CancelExpedienteRequest;
 use App\Modules\Haberes\Http\Requests\ReactivateExpedienteRequest;
@@ -340,6 +341,8 @@ final class ExpedienteController extends Controller
         );
 
         return Inertia::render('haberes/show', [
+            // Las listas de motivos de cada acto: la pantalla no las repite.
+            'motivos' => HaberesReasonAct::options(),
             'expediente' => ExpedienteListItemData::fromModel(
                 expediente: $expediente,
                 ticketReceipts: $enlaces->receipts($cuotaIds),
@@ -418,7 +421,7 @@ final class ExpedienteController extends Controller
         Expediente $expediente,
         CancelExpediente $anular,
     ): RedirectResponse {
-        $anular->handle($expediente, (string) $request->validated('reason'));
+        $anular->handle($expediente, $request->reason());
 
         return to_route('expedientes.index')->with(
             'status',
@@ -438,7 +441,7 @@ final class ExpedienteController extends Controller
         Expediente $expediente,
         ReactivateExpediente $reactivar,
     ): RedirectResponse {
-        $reactivar->handle($expediente, (string) $request->validated('reason'));
+        $reactivar->handle($expediente, $request->reason());
 
         return back()->with(
             'status',

@@ -24,6 +24,7 @@ use App\Modules\Haberes\Data\InstallmentReceiptData;
 use App\Modules\Haberes\Data\InstallmentTransferData;
 use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\ExpectedMedium;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Http\Requests\CancelHaberRequest;
 use App\Modules\Haberes\Http\Requests\StoreHaberRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
@@ -643,6 +644,8 @@ final class HaberController extends Controller
         $puedeRegistrarHistorico = request()->user()?->can('expedientes.registrar-historico') ?? false;
 
         return Inertia::render('haberes/haber-show', [
+            // Las listas de motivos de cada acto: la pantalla no las repite.
+            'motivos' => HaberesReasonAct::options(),
             'haber' => HaberListItemData::fromModel(
                 haber: $haber,
                 funded: app(InstallmentFunding::class)->allocatedForMany($cuotaIds),
@@ -860,7 +863,7 @@ final class HaberController extends Controller
         Haber $haber,
         CancelHaber $anular,
     ): RedirectResponse {
-        $anular->handle($haber, (string) $request->validated('reason'));
+        $anular->handle($haber, $request->reason());
 
         return back()->with(
             'status',
@@ -874,7 +877,7 @@ final class HaberController extends Controller
         Haber $haber,
         ReactivateHaber $reactivar,
     ): RedirectResponse {
-        $reactivar->handle($haber, (string) $request->validated('reason'));
+        $reactivar->handle($haber, $request->reason());
 
         return back()->with(
             'status',

@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Support\InstallmentEditLock;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -102,7 +103,9 @@ final class UpdateInstallment
              * explica esta corrección en particular, y tiene que quedar en
              * el mismo evento que el antes y el después.
              */
-            $motivoDeLaVentana = $lockedInstallment->edit_unlock_reason;
+            // La ventana se cierra al guardar: su motivo, con el código, queda en la auditoría.
+            $motivoDeLaVentana = Reason::text($lockedInstallment->edit_unlock_reason_code, $lockedInstallment->edit_unlock_reason);
+            $codigoDeLaVentana = $lockedInstallment->edit_unlock_reason_code?->value;
 
             $lockedInstallment->fill([
                 'expected_amount' => $data->amount,
@@ -119,6 +122,7 @@ final class UpdateInstallment
                  * convertiría en un permiso permanente, y no lo es.
                  */
                 'edit_unlocked_at' => null,
+                'edit_unlock_reason_code' => null,
                 'edit_unlock_reason' => null,
                 'edit_unlocked_by' => null,
             ])->save();
@@ -140,6 +144,7 @@ final class UpdateInstallment
                         'installment_number' => $lockedInstallment->installment_number,
                         'payment_order_number' => $trabada?->formatted_number,
                         'unlock_reason' => $motivoDeLaVentana,
+                        'motivo_codigo' => $codigoDeLaVentana,
                     ], fn (mixed $valor): bool => $valor !== null),
                 );
             }

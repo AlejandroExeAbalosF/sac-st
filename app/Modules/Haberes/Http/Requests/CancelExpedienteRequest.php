@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
+use App\Modules\Haberes\Enums\HaberesReasonAct;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
+use LogicException;
 
 /**
  * Anulación de un expediente.
  *
- * El motivo es obligatorio y con un mínimo que descarta el «error» de una
- * palabra: es lo único que va a quedar para explicar, dentro de dos años,
- * por qué ese expediente figura anulado.
+ * El motivo se elige de la lista y el detalle es opcional, salvo con «Otro».
+ * Es lo único que va a quedar para entender, dentro de dos años, por qué el
+ * expediente figura anulado: queda en la auditoría, con su código.
  */
 final class CancelExpedienteRequest extends FormRequest
 {
@@ -20,9 +23,7 @@ final class CancelExpedienteRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'reason' => ['required', 'string', 'min:10', 'max:500'],
-        ];
+        return Reason::rules($this->act());
     }
 
     /**
@@ -30,7 +31,7 @@ final class CancelExpedienteRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return ['reason' => 'motivo'];
+        return ['reasonCode' => 'motivo', 'reason' => 'detalle'];
     }
 
     /**
@@ -38,16 +39,17 @@ final class CancelExpedienteRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'reason.required' => 'Escribí el motivo de la anulación.',
-            'reason.min' => 'El motivo tiene que explicar qué pasó: es lo único que va a quedar para entenderlo después.',
-        ];
+        return Reason::messages();
     }
 
-    protected function prepareForValidation(): void
+    public function reason(): Reason
     {
-        $this->merge([
-            'reason' => trim((string) $this->input('reason')),
-        ]);
+        return Reason::fromValidated($this->validated(), $this->act())
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
+    }
+
+    public function act(): HaberesReasonAct
+    {
+        return HaberesReasonAct::Cancellation;
     }
 }

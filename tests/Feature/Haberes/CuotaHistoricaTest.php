@@ -6,6 +6,8 @@ namespace Tests\Feature\Haberes;
 
 use App\Modules\Haberes\Actions\CancelHaber;
 use App\Modules\Haberes\Actions\RecordLegacySettlement;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
@@ -20,7 +22,9 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -429,7 +433,7 @@ class CuotaHistoricaTest extends TestCase
         $this->registrar($cuota);
 
         try {
-            app(CancelHaber::class)->handle($cuota->haber, 'El expediente se cargó dos veces por error.');
+            app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::Duplicate, 'El expediente se cargó dos veces por error.'));
             $this->fail('Se anuló un haber con una cuota pagada fuera del circuito.');
         } catch (ValidationException $e) {
             $this->assertSame(
@@ -454,11 +458,11 @@ class CuotaHistoricaTest extends TestCase
         $this->registrar($cuota);
 
         $this->actingAs($this->operador('administrativo'))
-            ->post($this->url($cuota).'/anular', ['reason' => 'Se cargó en la cuota equivocada.'])
+            ->post($this->url($cuota).'/anular', ['reasonCode' => 'wrong_installment', 'reason' => 'Se cargó en la cuota equivocada.'])
             ->assertForbidden();
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->url($cuota).'/anular', ['reason' => 'Se cargó en la cuota equivocada.'])
+            ->post($this->url($cuota).'/anular', ['reasonCode' => 'wrong_installment', 'reason' => 'Se cargó en la cuota equivocada.'])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(InstallmentWorkflowStatus::Active, $cuota->refresh()->workflow_status);
@@ -469,6 +473,56 @@ class CuotaHistoricaTest extends TestCase
         // Anulado, el mismo papel se puede volver a cargar bien.
         $this->registrar($cuota->refresh());
         $this->assertSame(InstallmentWorkflowStatus::LegacySettled, $cuota->refresh()->workflow_status);
+    }
+
+    /**
+     * Cada motivo de la lista anula el pago, y sus papeles caen con «Se anuló
+     * el pago que respaldaba»: la lista de un papel suelto es otra, y repetir
+     * el motivo del pago la violaba.
+     */
+    public function test_cada_motivo_de_la_lista_anula_el_pago_y_sus_papeles(): void
+    {
+        $this->abrirLibros();
+        $contador = $this->operador('contador');
+
+        foreach (HaberesReasonAct::LegacySettlementVoid->codes() as $i => $codigo) {
+            $cuota = $this->cuota((150 + $i).'/2024', '85000.00');
+            $registro = $this->registrar($cuota);
+
+            $this->actingAs($contador)
+                ->post($this->url($cuota).'/anular', ['reasonCode' => $codigo->value, 'reason' => 'Detalle del caso.'])
+                ->assertSessionHasNoErrors();
+
+            $this->assertSame($codigo, $registro->refresh()->void_reason_code, $codigo->value);
+            $this->assertSame('Detalle del caso.', $registro->void_reason);
+            $this->assertSame(
+                [HaberesReasonCode::SettlementVoided->value],
+                LegacyDocument::query()->where('legacy_settlement_id', $registro->id)->pluck('void_reason_code')
+                    ->map(fn (HaberesReasonCode $papel): string => $papel->value)->unique()->values()->all(),
+                $codigo->value,
+            );
+            $this->assertSame(
+                $codigo->value,
+                AuditEvent::query()->where('action', 'cuota.pago-fuera-del-circuito-anulado')->latest('id')->firstOrFail()->metadata['motivo_codigo'],
+            );
+        }
+    }
+
+    /** La base no deja usar el código del arrastre en un papel que no es de un pago. */
+    public function test_el_codigo_del_arrastre_es_solo_de_un_papel_de_un_pago(): void
+    {
+        $this->abrirLibros();
+        $cuota = $this->cuota('160/2024', '85000.00');
+        $registro = $this->registrar($cuota);
+        $papel = (array) DB::table('legacy_documents')->where('legacy_settlement_id', $registro->id)->first();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('legacy_documents_void_check');
+
+        DB::table('legacy_documents')->insert([
+            ...array_diff_key($papel, array_flip(['id', 'legacy_settlement_id', 'voided_at', 'voided_by', 'void_reason', 'void_reason_code'])),
+            'voided_at' => now(), 'voided_by' => $this->operador('contador')->id, 'void_reason_code' => 'settlement_voided',
+        ]);
     }
 
     public function test_un_registro_no_se_borra_ni_se_edita(): void

@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
+import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -203,6 +204,7 @@ export default function DepositoSearch({
                 descripcion="Es afirmar que ese depósito no va a aparecer nunca: el ticket estaba mal, se anuló, o se cargó por error. El comprobante se conserva con su motivo."
                 accion={discard(ticket.id).url}
                 metodo="patch"
+                lista="deposit_ticket_discard"
                 onClose={() => setDescartando(false)}
             />
 
@@ -551,6 +553,7 @@ function DialogoMotivo({
     descripcion,
     accion,
     metodo,
+    lista,
     onClose,
 }: {
     abierto: boolean;
@@ -558,9 +561,14 @@ function DialogoMotivo({
     descripcion: string;
     accion: string;
     metodo: 'patch' | 'post';
+    /** El acto, si el motivo se elige de una lista. Sin él, es texto libre. */
+    lista?: App.Modules.Haberes.Enums.HaberesReasonAct;
     onClose: () => void;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+    });
 
     const enviar = (event: React.FormEvent) => {
         event.preventDefault();
@@ -581,17 +589,37 @@ function DialogoMotivo({
                         <DialogDescription>{descripcion}</DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid gap-2 py-4">
-                        <Label htmlFor="reason">Motivo</Label>
-                        <Input
-                            id="reason"
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    {lista !== undefined ? (
+                        <div className="py-4">
+                            <ReasonFields
+                                act={lista}
+                                code={form.data.reasonCode}
+                                detail={form.data.reason}
+                                onCodeChange={(codigo) =>
+                                    form.setData('reasonCode', codigo)
+                                }
+                                onDetailChange={(detalle) =>
+                                    form.setData('reason', detalle)
+                                }
+                                codeError={form.errors.reasonCode}
+                                detailError={form.errors.reason}
+                                idPrefix="motivo-comprobante"
+                                maxLength={300}
+                            />
+                        </div>
+                    ) : (
+                        <div className="grid gap-2 py-4">
+                            <Label htmlFor="reason">Motivo</Label>
+                            <Input
+                                id="reason"
+                                value={form.data.reason}
+                                onChange={(e) =>
+                                    form.setData('reason', e.target.value)
+                                }
+                            />
+                            <InputError message={form.errors.reason} />
+                        </div>
+                    )}
 
                     <DialogFooter>
                         <Button

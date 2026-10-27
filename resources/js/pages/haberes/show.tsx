@@ -12,6 +12,7 @@ import CollapsibleSection from '@/components/collapsible-section';
 import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
+import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,8 +23,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import HaberList from '@/features/haberes/components/haber-list';
 import type { EtiquetaOption } from '@/features/haberes/types';
@@ -415,6 +414,7 @@ function DialogoDeBaja({
     reactivar?: boolean;
 }) {
     const { data, setData, patch, processing, errors } = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
         reason: '',
     });
 
@@ -452,29 +452,21 @@ function DialogoDeBaja({
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="grid gap-4">
-                    <div>
-                        <Label htmlFor="reason">Motivo</Label>
-                        <Textarea
-                            id="reason"
-                            value={data.reason}
-                            onChange={(e) => setData('reason', e.target.value)}
-                            className="mt-1"
-                            rows={3}
-                            maxLength={500}
-                            autoFocus
-                            aria-invalid={Boolean(errors.reason)}
-                            placeholder={
-                                esReactivacion
-                                    ? 'Por qué vuelve a estar vigente. Por ejemplo: se anuló el expediente equivocado.'
-                                    : 'Qué pasó.'
-                            }
-                        />
-                        {errors.reason && (
-                            <p className="mt-1 text-xs text-destructive-strong">
-                                {errors.reason}
-                            </p>
-                        )}
-                    </div>
+                    <ReasonFields
+                        act={esReactivacion ? 'reactivation' : 'cancellation'}
+                        code={data.reasonCode}
+                        detail={data.reason}
+                        onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                        onDetailChange={(detalle) => setData('reason', detalle)}
+                        codeError={errors.reasonCode}
+                        detailError={errors.reason}
+                        idPrefix="baja-expediente"
+                        detailPlaceholder={
+                            esReactivacion
+                                ? 'Por qué vuelve a estar vigente.'
+                                : 'Qué pasó.'
+                        }
+                    />
 
                     <DialogFooter>
                         <Button

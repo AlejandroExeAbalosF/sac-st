@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -40,16 +41,8 @@ final class VoidLegacyIncomeDocument
     ) {}
 
     /** @throws ValidationException */
-    public function handle(BeneficiaryInstallment $installment, string $reason, ?int $actorId = null): LegacyDocument
+    public function handle(BeneficiaryInstallment $installment, Reason $motivo, ?int $actorId = null): LegacyDocument
     {
-        $motivo = trim($reason);
-
-        if (mb_strlen($motivo) < 10) {
-            throw ValidationException::withMessages([
-                'reason' => 'El motivo tiene que explicar qué estaba mal en el papel.',
-            ]);
-        }
-
         return DB::transaction(function () use ($installment, $motivo, $actorId): LegacyDocument {
             $expedienteId = (int) Haber::query()->whereKey($installment->haber_id)->valueOrFail('expediente_id');
 
@@ -91,14 +84,15 @@ final class VoidLegacyIncomeDocument
             $papel->forceFill([
                 'voided_at' => now(),
                 'voided_by' => $actorId,
-                'void_reason' => $motivo,
+                'void_reason_code' => $motivo->code,
+                'void_reason' => $motivo->detail,
             ])->save();
 
             $this->auditar->handle('cuota.recibo-de-papel-anulado', $cuota, before: [
                 'number' => $papel->number,
                 'issued_on' => $papel->issued_on->toDateString(),
                 'amount' => $papel->amount,
-            ], metadata: ['reason' => $motivo], actorId: $actorId);
+            ], metadata: $motivo->auditMetadata(), actorId: $actorId);
 
             return $papel;
         });

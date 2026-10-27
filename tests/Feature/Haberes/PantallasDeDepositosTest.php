@@ -9,11 +9,13 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -269,7 +271,7 @@ class PantallasDeDepositosTest extends TestCase
         $ticket = $this->ticket();
 
         $this->actingAs($this->operador('administrativo'))
-            ->patch(route('depositos.discard', $ticket), ['reason' => 'El depósito se anuló'])
+            ->patch(route('depositos.discard', $ticket), ['reasonCode' => 'deposit_not_made', 'reason' => 'El depósito se anuló'])
             ->assertForbidden();
     }
 
@@ -279,7 +281,7 @@ class PantallasDeDepositosTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('depositos.discard', $ticket), [
-                'reason' => 'El empleador anuló el depósito',
+                'reasonCode' => 'deposit_not_made', 'reason' => 'El empleador anuló el depósito',
             ])
             ->assertRedirect();
 
@@ -287,9 +289,30 @@ class PantallasDeDepositosTest extends TestCase
 
         $this->assertSame(DepositTicketStatus::Discarded, $ticket->status);
         $this->assertSame('El empleador anuló el depósito', $ticket->discarded_reason);
+        $this->assertSame(HaberesReasonCode::DepositNotMade, $ticket->discarded_reason_code);
         // Sigue existiendo: que el expediente haya traído un papel que no
         // valía también es información.
         $this->assertSame(1, DepositTicket::query()->count());
+    }
+
+    /** Devolverlo a la cola borra el motivo de la fila; la auditoría conserva el código. */
+    public function test_reabrir_conserva_el_codigo_del_descarte_en_la_auditoria(): void
+    {
+        $ticket = $this->ticket();
+        $contador = $this->operador('contador');
+
+        $this->actingAs($contador)
+            ->patch(route('depositos.discard', $ticket), ['reasonCode' => 'wrong_expediente'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('wrong_expediente', AuditEvent::query()->where('action', 'ticket.descartado')->sole()->metadata['motivo_codigo']);
+
+        $this->patch(route('depositos.reopen', $ticket))->assertSessionHasNoErrors();
+
+        $this->assertNull($ticket->refresh()->discarded_reason_code);
+        $reabierto = AuditEvent::query()->where('action', 'ticket.reabierto')->sole();
+        $this->assertSame('wrong_expediente', $reabierto->metadata['motivo_codigo']);
+        $this->assertSame('Era de otro expediente', $reabierto->old_values['discarded_reason']);
     }
 
     public function test_descartar_exige_un_motivo(): void
@@ -297,8 +320,8 @@ class PantallasDeDepositosTest extends TestCase
         $ticket = $this->ticket();
 
         $this->actingAs($this->operador('contador'))
-            ->patch(route('depositos.discard', $ticket), ['reason' => ''])
-            ->assertSessionHasErrors('reason');
+            ->patch(route('depositos.discard', $ticket), ['reason' => 'Sin elegir el motivo'])
+            ->assertSessionHasErrors('reasonCode');
     }
 
     /*

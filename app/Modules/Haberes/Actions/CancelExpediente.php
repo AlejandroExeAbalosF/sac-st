@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -34,7 +35,7 @@ final class CancelExpediente
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Expediente $expediente, string $motivo): Expediente
+    public function handle(Expediente $expediente, Reason $motivo): Expediente
     {
         return DB::transaction(function () use ($expediente, $motivo): Expediente {
             $bloqueado = Expediente::query()->lockForUpdate()->findOrFail($expediente->id);
@@ -114,7 +115,7 @@ final class CancelExpediente
                 before: ['status' => $estadoAnterior->value],
                 after: ['status' => ExpedienteStatus::Cancelled->value],
                 metadata: [
-                    'motivo' => $motivo,
+                    ...$motivo->auditMetadata('motivo'),
                     'haberes' => $haberes,
                     'cuotas' => $cuotas,
                 ],

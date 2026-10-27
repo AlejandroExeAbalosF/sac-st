@@ -18,6 +18,7 @@ use App\Modules\Haberes\Data\DepositTicketData;
 use App\Modules\Haberes\Data\TicketCandidateData;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Http\Requests\SaveDepositTicketRequest;
 use App\Modules\Haberes\Http\Requests\UpdateDepositTicketRequest;
@@ -28,6 +29,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Pdf\PendingDepositSheet;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\TicketCandidate;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Pdf\Worksheet;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -35,6 +37,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
@@ -263,6 +266,8 @@ final class DepositTicketController extends Controller
         $verTodos = $request->boolean('todos');
 
         return Inertia::render('haberes/depositos/search', [
+            // Las listas de motivos de cada acto: la pantalla no las repite.
+            'motivos' => HaberesReasonAct::options(),
             'ticket' => DepositTicketData::fromModel($ticket),
             'candidates' => array_map(
                 fn (TicketCandidate $c): TicketCandidateData => TicketCandidateData::fromCandidate($c),
@@ -320,12 +325,14 @@ final class DepositTicketController extends Controller
 
     public function discard(Request $request, DepositTicket $ticket, DiscardDepositTicket $descartar): RedirectResponse
     {
-        $validado = $request->validate([
-            'reason' => ['required', 'string', 'min:5', 'max:300'],
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::DepositTicketDiscard, max: 300),
+            Reason::messages(),
+        );
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::DepositTicketDiscard) ?? throw new LogicException('El motivo ya se validó.');
 
         try {
-            $descartar->handle($ticket, $validado['reason'], (int) $request->user()?->id);
+            $descartar->handle($ticket, $motivo, (int) $request->user()?->id);
         } catch (RuntimeException $e) {
             return $this->backWithError($e);
         }

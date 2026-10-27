@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
+use App\Modules\Haberes\Enums\HaberesReasonAct;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
+use LogicException;
 
 /**
  * Reactivación de un expediente anulado.
  *
- * Pide motivo por el mismo criterio que la anulación: dentro de dos años,
- * un expediente que figura anulado y después activo necesita explicar las
- * dos cosas, no solo la primera.
+ * El motivo se elige de la lista y el detalle es opcional, salvo con «Otro»:
+ * explica por qué vuelve a estar vigente.
  */
 final class ReactivateExpedienteRequest extends FormRequest
 {
@@ -20,9 +22,7 @@ final class ReactivateExpedienteRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'reason' => ['required', 'string', 'min:10', 'max:500'],
-        ];
+        return Reason::rules($this->act());
     }
 
     /**
@@ -30,7 +30,7 @@ final class ReactivateExpedienteRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return ['reason' => 'motivo'];
+        return ['reasonCode' => 'motivo', 'reason' => 'detalle'];
     }
 
     /**
@@ -38,14 +38,17 @@ final class ReactivateExpedienteRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'reason.required' => 'Escribí el motivo de la reactivación.',
-            'reason.min' => 'El motivo tiene que explicar por qué vuelve a estar vigente.',
-        ];
+        return Reason::messages();
     }
 
-    protected function prepareForValidation(): void
+    public function reason(): Reason
     {
-        $this->merge(['reason' => trim((string) $this->input('reason'))]);
+        return Reason::fromValidated($this->validated(), $this->act())
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
+    }
+
+    public function act(): HaberesReasonAct
+    {
+        return HaberesReasonAct::Reactivation;
     }
 }

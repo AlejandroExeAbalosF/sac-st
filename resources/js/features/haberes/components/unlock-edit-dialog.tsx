@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { KeyRound } from 'lucide-react';
-import InputError from '@/components/input-error';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -10,8 +10,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { unlockEdit as habilitar } from '@/routes/haberes/installments';
 
 /**
@@ -39,7 +37,10 @@ export default function UnlockEditDialog({
     abierto: boolean;
     onCerrar: () => void;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+    });
 
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,21 +72,22 @@ export default function UnlockEditDialog({
                         en el historial.
                     </div>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-editar-${cuotaId}`}>
-                            Qué pasó, y por qué hay que corregir
-                        </Label>
-                        <Textarea
-                            id={`motivo-editar-${cuotaId}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="El expediente volvió del SAF observado: el concepto de la cuota no coincide con el de la resolución a fs. 24."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="installment_unlock"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-editar-${cuotaId}`}
+                        maxLength={300}
+                        detailPlaceholder="El expediente volvió del SAF observado: el concepto de la cuota no coincide con el de la resolución a fs. 24."
+                    />
 
                     <DialogFooter className="gap-2">
                         <Button

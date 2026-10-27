@@ -89,6 +89,7 @@ final class ReviewFineHistoricalMovement
                     'amount' => $fila->amount,
                     'respaldo' => $fila->evidence_text,
                     'reason' => Reason::text($codigo, $fila->review_note),
+                    'motivo_codigo' => $codigo?->value,
                 ]),
                 actorId: $actorId,
             );

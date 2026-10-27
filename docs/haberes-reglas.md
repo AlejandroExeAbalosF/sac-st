@@ -358,6 +358,53 @@ Evidencia: [esquema](../database/migrations/2026_10_01_020000_allow_allocating_l
 [SetAsideLegacyFunds](../app/Modules/Ledger/Actions/SetAsideLegacyFunds.php) y
 [fondos anteriores](../tests/Feature/Haberes/FondosAnterioresTest.php).
 
+<a id="motivos"></a>
+
+## Motivos
+
+Los actos de Haberes que anulan, reactivan o habilitan algo ya cargado piden un
+**motivo de una lista** y guardan su código; el texto es un **detalle opcional**,
+salvo con «Otro». La lista de cada acto es `HaberesReasonAct`; el valor
+«motivo + detalle», sus reglas y su lectura son `Reason`, de Shared, el mismo que
+usa Multas ([Multas](multas-reglas.md#motivos)).
+
+| Acto | Dónde queda el motivo | Garantía |
+|---|---|---|
+| Anular o reactivar un expediente o un haber | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
+| Anular una Orden de Pago | `payment_orders.rejection_or_void_reason_code` | CHECK `payment_orders_void_check` |
+| Habilitar la edición de una cuota trabada | `beneficiary_installments.edit_unlock_reason_code` | CHECK `beneficiary_installments_edit_unlock_check` |
+| Anular un pago fuera del circuito | `legacy_settlements.void_reason_code` | CHECK `legacy_settlements_void_check` |
+| Anular un recibo de papel | `legacy_documents.void_reason_code` | CHECK `legacy_documents_void_check` |
+| Descartar un comprobante de depósito | `deposit_tickets.discarded_reason_code` | CHECK `deposit_tickets_discarded_check` |
+
+- Cada columna acepta solo los códigos de su acto, y hay código exactamente
+  cuando la fila registró el acto: Orden anulada o rechazada, ventana abierta,
+  registro anulado, comprobante descartado. **Base.**
+- Con «Otro» el detalle es obligatorio, y un detalle no es solo espacios.
+  **Base** y **Form Request:** `Reason::rules()`.
+- Cerrar la ventana de edición o devolver un comprobante a la cola borra el
+  código junto con el detalle de la fila; antes, el evento de auditoría guarda
+  los dos. **Action:** `UpdateInstallment`, `DiscardDepositTicket::reopen`.
+- Todo evento de auditoría de un acto con motivo guarda el código en
+  `motivo_codigo`, además de la descripción. El historial no lo muestra: sirve
+  para agrupar. **Action:** `Reason::auditMetadata()`.
+- Anular un pago fuera del circuito anula también sus papeles. El motivo es del
+  pago; cada papel cae con «Se anuló el pago que respaldaba», que la pantalla no
+  ofrece y la base admite solo en un papel de un pago. **Base:** CHECK
+  `legacy_documents_void_check`. **Action:** `VoidLegacySettlement`.
+- En pantalla y en la auditoría el motivo se lee junto: «Observación del SAF: el
+  concepto no coincide con la resolución a fs. 24». Con «Otro» se lee solo el
+  detalle.
+- Anular y reactivar un expediente o un haber no tienen columna: el motivo y su
+  código quedan en la auditoría y la validación es solo del Form Request.
+- Las listas no salen del relevamiento: son un punto de partida para ajustar con
+  el área. Desvincular un comprobante de su movimiento sigue con texto libre.
+
+Evidencia: [migración](../database/migrations/2026_10_27_030000_add_reason_codes_to_haberes.php),
+[listas](../app/Modules/Haberes/Enums/HaberesReasonAct.php),
+[motivo](../app/Modules/Shared/Support/Reason.php) y
+[cobertura](../tests/Feature/Haberes/MotivosDeHaberesTest.php).
+
 <a id="mantenimiento"></a>
 
 ## Cómo mantener esta referencia

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Models;
 
 use App\Modules\Haberes\Enums\ExpectedMedium;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Ledger\Enums\Currency;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property ExpectedMedium $expected_medium Obligatorio desde 09/2026: una cuota sin medio no dice por dónde se paga.
  * @property string|null $notes
  * @property Carbon|null $edit_unlocked_at
+ * @property HaberesReasonCode|null $edit_unlock_reason_code
  * @property string|null $edit_unlock_reason
  * @property int|null $edit_unlocked_by
  * @property-read HaberManagementLabel|null $managementLabel
@@ -47,6 +49,7 @@ final class BeneficiaryInstallment extends Model
         'block_reason',
         'notes',
         'edit_unlocked_at',
+        'edit_unlock_reason_code',
         'edit_unlock_reason',
         'edit_unlocked_by',
     ];
@@ -135,6 +138,7 @@ final class BeneficiaryInstallment extends Model
     protected function casts(): array
     {
         return [
+            'edit_unlock_reason_code' => HaberesReasonCode::class,
             'workflow_status' => InstallmentWorkflowStatus::class,
             'expected_medium' => ExpectedMedium::class,
             'expected_amount' => 'decimal:2',

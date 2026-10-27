@@ -82,7 +82,7 @@ final class RevokeFineDocumentLink
             $this->auditar->handle(
                 'multa.documento-desvinculado',
                 $multa,
-                metadata: ['documento' => $documento->label(), 'papel' => $papel->label(), 'reason' => $reason->describe()],
+                metadata: ['documento' => $documento->label(), 'papel' => $papel->label(), ...$reason->auditMetadata()],
                 actorId: $actorId,
             );
         });

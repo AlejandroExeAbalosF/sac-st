@@ -1,8 +1,8 @@
 import { useForm } from '@inertiajs/react';
 import { Ban, ImageIcon } from 'lucide-react';
 import { useState } from 'react';
-import InputError from '@/components/input-error';
 import Money from '@/components/money';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -12,8 +12,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { date } from '@/lib/format';
 import { preview } from '@/routes/adjuntos';
 import { voidMethod as anularPagoAnterior } from '@/routes/haberes/installments/legacy-settlement';
@@ -159,7 +157,10 @@ function AnularDialog({
     numero: number;
     onCerrar: () => void;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+    });
 
     return (
         <Dialog open onOpenChange={(v) => !v && onCerrar()}>
@@ -184,21 +185,21 @@ function AnularDialog({
                     }}
                     className="mt-2 space-y-4"
                 >
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-pago-anterior-${cuotaId}`}>
-                            Qué estaba mal
-                        </Label>
-                        <Textarea
-                            id={`motivo-pago-anterior-${cuotaId}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="Se cargó en la cuota 2 y el recibo es de la cuota 1."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="legacy_settlement_void"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-pago-anterior-${cuotaId}`}
+                        detailPlaceholder="Se cargó en la cuota 2 y el recibo es de la cuota 1."
+                    />
 
                     <DialogFooter className="gap-2">
                         <Button

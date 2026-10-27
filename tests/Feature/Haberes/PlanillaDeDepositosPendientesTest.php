@@ -176,6 +176,7 @@ class PlanillaDeDepositosPendientesTest extends TestCase
             'status' => $estado,
             // Descartar exige motivo: un comprobante caído sin explicación no
             // se puede retomar, y la base no lo deja pasar.
+            'discarded_reason_code' => $estado === DepositTicketStatus::Discarded ? 'deposit_not_made' : null,
             'discarded_reason' => $estado === DepositTicketStatus::Discarded
                 ? 'El depósito se anuló.'
                 : null,

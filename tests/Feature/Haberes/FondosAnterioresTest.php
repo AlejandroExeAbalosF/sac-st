@@ -11,6 +11,7 @@ use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\VoidLegacyIncomeDocument;
 use App\Modules\Haberes\Enums\ExpectedMedium;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
@@ -36,6 +37,7 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Ledger\Support\UndetailedCheques;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -370,7 +372,7 @@ class FondosAnterioresTest extends TestCase
         $this->apartar($cuota, PaymentMedium::Cash);
 
         try {
-            app(VoidLegacyIncomeDocument::class)->handle($cuota, 'El número del talonario estaba mal tipeado.');
+            app(VoidLegacyIncomeDocument::class)->handle($cuota, new Reason(HaberesReasonCode::MistypedNumber));
             $this->fail('Se anuló un papel que respalda plata apartada.');
         } catch (ValidationException $e) {
             $this->assertStringContainsString('primero hay que quitar la reserva', $e->errors()['reason'][0]);
@@ -379,7 +381,7 @@ class FondosAnterioresTest extends TestCase
         app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-236', 'El papel estaba mal cargado.');
 
         $this->actingAs($this->operador('contador'))
-            ->post("/haberes/cuotas/{$cuota->id}/recibo-de-papel/anular", ['reason' => 'El número del talonario estaba mal tipeado.'])
+            ->post("/haberes/cuotas/{$cuota->id}/recibo-de-papel/anular", ['reasonCode' => 'mistyped_number', 'reason' => 'Es el 0072190.'])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(0, LegacyDocument::query()->current()->count());

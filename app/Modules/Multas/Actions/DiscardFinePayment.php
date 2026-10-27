@@ -50,7 +50,7 @@ final class DiscardFinePayment
             $this->auditar->handle('multa.pago-descartado', $multa, metadata: [
                 'medio' => $pago->medium->label(),
                 'amount' => $pago->amount,
-                'reason' => $motivo->describe(),
+                ...$motivo->auditMetadata(),
             ], actorId: $actorId);
 
             return $pago;

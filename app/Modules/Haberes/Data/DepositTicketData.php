@@ -9,6 +9,7 @@ use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -72,7 +73,7 @@ final class DepositTicketData extends Data
             bankTransactionId: $ticket->bank_transaction_id,
             matchSignals: $ticket->match_signals,
             matchedAt: $ticket->matched_at?->toIso8601String(),
-            discardedReason: $ticket->discarded_reason,
+            discardedReason: Reason::text($ticket->discarded_reason_code, $ticket->discarded_reason),
             /*
              * La última foto, no la primera. Corregir un ticket puede
              * traer una foto mejor —la anterior salió borrosa— y como

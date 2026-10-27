@@ -1,6 +1,7 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { Ban } from 'lucide-react';
 import InputError from '@/components/input-error';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -10,8 +11,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { voidMethod as anularOrden } from '@/routes/ordenes';
 
 type Orden = App.Modules.Haberes.Data.PaymentOrderSummaryData;
@@ -44,7 +43,10 @@ export default function VoidOrderDialog({
     abierto: boolean;
     onCerrar: () => void;
 }) {
-    const form = useForm({ reason: '' });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+    });
 
     const { errors } = usePage().props as unknown as {
         errors?: Record<string, string>;
@@ -99,21 +101,22 @@ export default function VoidOrderDialog({
                         </ul>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-orden-${orden.id}`}>
-                            Por qué se anula
-                        </Label>
-                        <Textarea
-                            id={`motivo-orden-${orden.id}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="El CBU impreso es el de otra cuenta del trabajador; el expediente informa el correcto a fs. 19."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="payment_order_void"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-orden-${orden.id}`}
+                        maxLength={300}
+                        detailPlaceholder="El CBU impreso es el de otra cuenta del trabajador; el expediente informa el correcto a fs. 19."
+                    />
 
                     <InputError message={errors?.orderId} />
 

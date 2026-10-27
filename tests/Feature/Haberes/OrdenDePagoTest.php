@@ -21,6 +21,7 @@ use App\Modules\Haberes\Actions\UpdateInstallment;
 use App\Modules\Haberes\Actions\VoidPaymentOrder;
 use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Data\SaveInstallmentData;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\PaseStatus;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
@@ -35,7 +36,9 @@ use App\Modules\Haberes\Pdf\PaymentOrderPdf;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderReadiness;
 use App\Modules\Haberes\Support\PaymentOrderSources;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
@@ -501,7 +504,7 @@ class OrdenDePagoTest extends TestCase
     {
         $orden = app(IssuePaymentOrder::class)->handle($this->cuotaLista(), $this->eleccion());
 
-        app(VoidPaymentOrder::class)->handle($orden, 'El CBU es de otra cuenta.', $this->operador()->id);
+        app(VoidPaymentOrder::class)->handle($orden, new Reason(HaberesReasonCode::WrongBeneficiaryData, 'El CBU es de otra cuenta.'), $this->operador()->id);
 
         $this->expectException(ValidationException::class);
         app(EditPaymentOrderDetails::class)->handle($orden->refresh(), [
@@ -752,7 +755,7 @@ class OrdenDePagoTest extends TestCase
 
         app(VoidPaymentOrder::class)->handle(
             $orden,
-            'El CBU impreso es el de otra cuenta.',
+            new Reason(HaberesReasonCode::WrongBeneficiaryData, 'El CBU impreso es el de otra cuenta.'),
             $this->operador()->id,
         );
 
@@ -772,7 +775,7 @@ class OrdenDePagoTest extends TestCase
 
         app(VoidPaymentOrder::class)->handle(
             $primera,
-            'Se imprimió con el domicilio viejo.',
+            new Reason(HaberesReasonCode::WrongBeneficiaryData, 'Se imprimió con el domicilio viejo.'),
             $this->operador()->id,
         );
 
@@ -1131,7 +1134,7 @@ class OrdenDePagoTest extends TestCase
 
         app(UnlockInstallmentEdit::class)->handle(
             $cuota->refresh(),
-            'El expediente volvió del SAF observado: el concepto no coincide con la resolución a fs. 24.',
+            new Reason(HaberesReasonCode::SafObservation, 'El concepto no coincide con la resolución a fs. 24.'),
         );
 
         $this->assertNotNull($cuota->refresh()->edit_unlocked_at);
@@ -1143,6 +1146,12 @@ class OrdenDePagoTest extends TestCase
 
         $this->assertSame('Diferencias salariales — corregido', $cuota->description);
         $this->assertNull($cuota->edit_unlocked_at, 'La ventana tenía que cerrarse al guardar.');
+        $this->assertNull($cuota->edit_unlock_reason_code);
+
+        // La fila borra el motivo al cerrar la ventana; la auditoría conserva el código.
+        $corregida = AuditEvent::query()->where('action', 'cuota.corregida')->latest('id')->firstOrFail();
+        $this->assertSame('saf_observation', $corregida->metadata['motivo_codigo']);
+        $this->assertSame('Observación del SAF: El concepto no coincide con la resolución a fs. 24.', $corregida->metadata['unlock_reason']);
     }
 
     /** Sin Orden en circulación no hay nada que destrabar. */
@@ -1152,7 +1161,7 @@ class OrdenDePagoTest extends TestCase
 
         app(UnlockInstallmentEdit::class)->handle(
             $this->cuotaLista(),
-            'Un motivo suficientemente largo para pasar la validación.',
+            new Reason(HaberesReasonCode::DataEntryError),
         );
     }
 

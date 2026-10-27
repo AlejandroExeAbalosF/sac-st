@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Data;
 
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\PaymentOrder;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -61,7 +62,7 @@ final class PaymentOrderSummaryData extends Data
             incomeReceiptNumber: $order->income_receipt_number_snapshot,
             notes: $order->notes,
             pase: $order->pase === null ? null : PaseSummaryData::fromModel($order->pase),
-            voidReason: $order->rejection_or_void_reason,
+            voidReason: Reason::text($order->rejection_or_void_reason_code, $order->rejection_or_void_reason),
             voidedAt: $order->voided_at === null ? null : BusinessDate::fromInstant($order->voided_at)->toDateString(),
         );
     }

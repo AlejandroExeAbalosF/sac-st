@@ -29,6 +29,7 @@ use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentTerms;
@@ -52,6 +53,7 @@ use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Actions\VerifyPersonBankAccount;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
+use App\Modules\Shared\Support\Reason;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\SplitsPersonName;
 use Illuminate\Database\Seeder;
@@ -561,7 +563,7 @@ class OperacionDemoSeeder extends Seeder
 
             app(DiscardDepositTicket::class)->handle(
                 $descartado,
-                'El comprobante era de otro expediente: lo trajo el empleador equivocado.',
+                new Reason(HaberesReasonCode::WrongExpediente, 'Lo trajo el empleador equivocado.'),
                 $this->contadora->id,
             );
         });
@@ -632,7 +634,7 @@ class OperacionDemoSeeder extends Seeder
 
         app(CancelExpediente::class)->handle(
             $anulado,
-            'Duplicado: el mismo reclamo ya había entrado como EXP-4260/2026.',
+            new Reason(HaberesReasonCode::Duplicate, 'El mismo reclamo ya había entrado como EXP-4260/2026.'),
         );
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Models;
 
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use Carbon\CarbonInterface;
@@ -32,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonInterface $recorded_at
  * @property CarbonInterface|null $voided_at
  * @property int|null $voided_by
+ * @property HaberesReasonCode|null $void_reason_code
  * @property string|null $void_reason
  */
 final class LegacyDocument extends Model
@@ -52,6 +54,7 @@ final class LegacyDocument extends Model
         'recorded_at',
         'voided_at',
         'voided_by',
+        'void_reason_code',
         'void_reason',
     ];
 
@@ -80,6 +83,7 @@ final class LegacyDocument extends Model
     protected function casts(): array
     {
         return [
+            'void_reason_code' => HaberesReasonCode::class,
             'kind' => LegacyDocumentKind::class,
             'issued_on' => 'date',
             'amount' => 'decimal:2',

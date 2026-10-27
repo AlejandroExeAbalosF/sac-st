@@ -103,7 +103,7 @@ class HistorialDeExpedienteYHaberTest extends TestCase
 
         $this->actingAs($contador)
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [
-                'reason' => 'El acta no lo reconocía; se cargó de más.',
+                'reasonCode' => 'data_entry_error', 'reason' => 'El acta no lo reconocía; se cargó de más.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -115,7 +115,7 @@ class HistorialDeExpedienteYHaberTest extends TestCase
             ->assertJsonFragment([
                 'field' => 'Motivo',
                 'before' => null,
-                'after' => 'El acta no lo reconocía; se cargó de más.',
+                'after' => 'Error de carga: El acta no lo reconocía; se cargó de más.',
             ]);
     }
 
