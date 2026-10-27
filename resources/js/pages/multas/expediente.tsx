@@ -143,6 +143,37 @@ export default function ExpedienteDeMultas({
                     </p>
                 )}
 
+                <section className="rounded-lg border bg-card shadow-raised">
+                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
+                        <h2 className="text-sm font-semibold">
+                            Archivos del expediente
+                        </h2>
+                        {can.register && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
+                            >
+                                <Paperclip aria-hidden="true" />
+                                Adjuntar al expediente
+                            </Button>
+                        )}
+                    </div>
+                    <div className="px-5 py-3">
+                        {adjuntos.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                Sin archivos. Acá va la carátula u otro papel
+                                del expediente.
+                            </p>
+                        ) : (
+                            <AttachmentList
+                                adjuntos={adjuntos}
+                                canView={can.viewAttachments}
+                            />
+                        )}
+                    </div>
+                </section>
+
                 <section
                     className="space-y-4"
                     aria-labelledby="documentos-y-multas"
@@ -200,37 +231,6 @@ export default function ExpedienteDeMultas({
                             })
                         }
                     />
-                </section>
-
-                <section className="rounded-lg border bg-card shadow-raised">
-                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                        <h2 className="text-sm font-semibold">
-                            Archivos del expediente
-                        </h2>
-                        {can.register && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDialogo({ tipo: 'adjuntar' })}
-                            >
-                                <Paperclip aria-hidden="true" />
-                                Adjuntar al expediente
-                            </Button>
-                        )}
-                    </div>
-                    <div className="px-5 py-3">
-                        {adjuntos.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Sin archivos. Acá va la carátula u otro papel
-                                del expediente.
-                            </p>
-                        ) : (
-                            <AttachmentList
-                                adjuntos={adjuntos}
-                                canView={can.viewAttachments}
-                            />
-                        )}
-                    </div>
                 </section>
             </div>
 
