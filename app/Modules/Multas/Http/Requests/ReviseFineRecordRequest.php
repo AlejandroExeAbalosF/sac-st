@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Http\Requests;
 
+use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\TwoDigitYear;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -45,7 +47,8 @@ final class ReviseFineRecordRequest extends FormRequest
         $campos = $this->camposDeLaRuta();
 
         $reglas = [
-            'reason' => ['nullable', 'string', 'max:500'],
+            // Completar no pide motivo; corregir, sí: lo decide el Action.
+            ...FineReason::rules(FineReasonAct::Correction, required: false),
             'expected' => ['required', 'array'],
         ];
 
@@ -68,7 +71,8 @@ final class ReviseFineRecordRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'reason' => 'motivo',
+            'reasonCode' => 'motivo',
+            'reason' => 'detalle',
             'number' => 'número',
             'year' => 'año',
             'suffix' => 'sufijo',

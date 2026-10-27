@@ -205,18 +205,18 @@ class CajaDeMultasTest extends TestCase
         // La fecha no se revisa, ni por pantalla ni en la base.
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.antecedentes.revisiones.store', $antecedente), [
-                'date' => '2026-06-06', 'reason' => 'Fecha mal leída', 'expected' => ['date' => '2026-06-05'],
+                'date' => '2026-06-06', 'reasonCode' => 'misread_paper', 'reason' => 'Fecha mal leída', 'expected' => ['date' => '2026-06-05'],
             ])
             ->assertSessionHasErrors('date');
         $this->rechaza('es la del banco', fn () => DB::table('fine_identifier_revisions')->insert([
-            'fine_historical_movement_id' => $antecedente->id, 'kind' => 'correction', 'reason' => 'x',
+            'fine_historical_movement_id' => $antecedente->id, 'kind' => 'correction', 'reason_code' => 'other', 'reason' => 'x',
             'old_values' => json_encode(['occurred_on' => '2026-06-05', 'occurred_precision' => 'day']),
             'new_values' => json_encode(['occurred_on' => '2026-06-06', 'occurred_precision' => 'day']),
         ]));
 
         // Descartado, el crédito queda libre para el pago correcto.
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.antecedentes.review', $antecedente), ['status' => 'rejected', 'note' => 'Era de otra multa'])
+            ->post(route('multas.antecedentes.review', $antecedente), ['status' => 'rejected', 'reasonCode' => 'wrong_fine', 'note' => 'Era de otra multa'])
             ->assertSessionHasNoErrors();
         $this->actingAs($this->operador())
             ->post(route('multas.antecedentes.credito.store', $multa), ['bankTransactionId' => $credito->id, 'evidence' => 'Ahora sí'])

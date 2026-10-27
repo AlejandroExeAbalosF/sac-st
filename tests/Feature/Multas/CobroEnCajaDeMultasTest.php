@@ -316,7 +316,7 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->rechaza('falta reclasificar', function () use ($multa): void {
             $original = (array) DB::table('fine_debt_entries')->where('fine_id', $multa->id)->first();
             unset($original['id']);
-            DB::table('fine_debt_entries')->insert([...$original, 'kind' => 'reduction', 'amount' => '600000.00', 'reason' => 'Directo']);
+            DB::table('fine_debt_entries')->insert([...$original, 'kind' => 'reduction', 'amount' => '600000.00', 'reason_code' => 'other', 'reason' => 'Directo']);
         });
     }
 
@@ -480,6 +480,7 @@ class CobroEnCajaDeMultasTest extends TestCase
         return [
             'kind' => $tipo, 'amount' => $importe, 'effectiveOn' => '2026-06-01',
             'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
+            'reasonCode' => 'appeal_admitted',
             'reason' => 'Recurso jerárquico parcialmente admitido',
         ];
     }

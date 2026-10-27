@@ -13,6 +13,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\Money\Decimal;
@@ -48,7 +49,7 @@ final class AdjustFineDebt
         string $amount,
         CarbonImmutable $effectiveOn,
         FineDocument|NewDocument $documento,
-        string $reason,
+        FineReason $reason,
         ?int $actorId,
     ): FineDebtEntry {
         if (! in_array($tipo, [FineDebtEntryKind::Increase, FineDebtEntryKind::Reduction], true)) {
@@ -107,7 +108,8 @@ final class AdjustFineDebt
                 'effective_on' => $effectiveOn->toDateString(),
                 'effective_precision' => DatePrecision::Day,
                 'fine_document_id' => $respaldo->id,
-                'reason' => trim($reason),
+                'reason_code' => $reason->code,
+                'reason' => $reason->detail,
                 'provenance' => FineProvenance::Manual,
                 'created_by' => $actorId,
             ]);
@@ -123,7 +125,7 @@ final class AdjustFineDebt
                     'tipo' => $tipo->label(),
                     'amount' => $importe,
                     'resolucion' => $respaldo->label(),
-                    'reason' => $ajuste->reason,
+                    'reason' => $reason->describe(),
                 ],
                 actorId: $actorId,
             );

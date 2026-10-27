@@ -38,7 +38,7 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   viaje con su precisión, y que una `completion` solo llene vacíos o precise una
   fecha dentro del mismo mes. Fecha y precisión se juzgan como un par: pasar de
   un día a «solo el mes» es corregir aunque el día no cambie. Una `correction`
-  exige motivo. **Base.**
+  exige motivo de la lista; una `completion` no lleva. **Base.**
 - El valor anterior es **el que vio el formulario** (`expected`), no el que hay al
   recibirlo. Solo entran en la revisión los campos que el operador cambió respecto
   de lo que veía: un campo que no tocó no pisa lo que otro corrigió mientras tanto,
@@ -100,6 +100,34 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 - El tipo de un documento y el texto del papel no se corrigen: un acta cargada
   como resolución es otro documento, y se corrige desvinculándolo y vinculando el
   correcto. **Base:** `fine_identity_guard`.
+
+<a id="motivos"></a>
+
+## Motivos
+
+- Los actos que deshacen o corrigen algo ya cargado piden un **motivo de una
+  lista** y guardan su código; el texto es un **detalle opcional**, salvo con
+  «Otro». Son: ajustar la obligación, revertir un ajuste, descartar un pago,
+  desvincular un documento, corregir un dato y descartar un pago anterior.
+  **Base:** columnas `*_reason_code` con CHECK por tabla. **Action:** el motivo
+  llega como `FineReason`; la lista de cada acto es `FineReasonAct`.
+- Cada acto acepta solo los códigos de su lista. **Base:** el CHECK de cada
+  columna repite la lista; en `fine_debt_entries` depende del tipo de
+  movimiento. **Form Request:** `FineReason::rules()`.
+- Hay motivo exactamente cuando el acto lo pide: un movimiento que no es el
+  importe original, un pago descartado, un vínculo anulado, una revisión que
+  corrige y un pago anterior descartado. Completar un dato no lleva motivo.
+  **Base.**
+- Un detalle, si está, no es solo espacios. **Base.**
+- El pago reemplazado por su corrección queda con el código «Reemplazado por su
+  corrección», que pone el sistema y no se ofrece en la pantalla; el detalle es
+  lo que se corrigió. **Base** y **Action:** `ReportFineBankPayment`,
+  `RegisterFineAppeal`.
+- En la ficha y en la auditoría el motivo se lee junto: «Error de carga: el
+  importe tenía un cero de más».
+- Las listas no salen del relevamiento: son un punto de partida para ajustar con
+  el área. El rechazo de un cheque y la cancelación de un depósito siguen con
+  texto libre: guardan su motivo en tablas que también usa Haberes.
 
 <a id="obligacion"></a>
 
@@ -452,7 +480,8 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 
 ## Corrección de un informado
 
-- Solo un pago `reported` se corrige: se descarta con «Corregido: motivo» y el nuevo
+- Solo un pago `reported` se corrige: se descarta como «Reemplazado por su
+  corrección», con lo que se corrigió como detalle, y el nuevo
   apunta a él (`replaces_fine_payment_id`, único). **Base:** `fine_payments_guard`
   exige que el reemplazado esté descartado, sea de la misma multa y del mismo tipo
   (recurso o no). **Action:** `ReportFineBankPayment` y `RegisterFineAppeal`.

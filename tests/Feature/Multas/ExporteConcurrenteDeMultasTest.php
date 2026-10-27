@@ -89,12 +89,12 @@ class ExporteConcurrenteDeMultasTest extends TestCase
 
         // B deja de coincidir con la búsqueda y le bajan la deuda.
         $this->otra()->table('fine_identifier_revisions')->insert([
-            'fine_id' => $b, 'kind' => 'correction', 'reason' => 'Carátula mal leída',
+            'fine_id' => $b, 'kind' => 'correction', 'reason_code' => 'misread_paper', 'reason' => 'Carátula mal leída',
             'old_values' => json_encode(['caption' => 'CRISTOMAX B']),
             'new_values' => json_encode(['caption' => 'OTRA EMPRESA']),
         ]);
         $this->otra()->table('fine_debt_entries')->insert([
-            'fine_id' => $b, 'kind' => 'reduction', 'amount' => '400.00', 'reason' => 'Recurso admitido',
+            'fine_id' => $b, 'kind' => 'reduction', 'amount' => '400.00', 'reason_code' => 'appeal_admitted', 'reason' => 'Recurso admitido',
             'fine_document_id' => $this->resolucionDe($b), 'effective_on' => '2026-06-01', 'effective_precision' => 'day',
         ]);
 
@@ -142,7 +142,7 @@ class ExporteConcurrenteDeMultasTest extends TestCase
     private function corregirFecha(int $multa, string $antes, string $despues): void
     {
         $this->otra()->table('fine_identifier_revisions')->insert([
-            'fine_id' => $multa, 'kind' => 'correction', 'reason' => 'Fecha mal leída',
+            'fine_id' => $multa, 'kind' => 'correction', 'reason_code' => 'misread_paper', 'reason' => 'Fecha mal leída',
             'old_values' => json_encode(['registered_on' => $antes, 'registered_precision' => 'day']),
             'new_values' => json_encode(['registered_on' => $despues, 'registered_precision' => 'day']),
         ]);

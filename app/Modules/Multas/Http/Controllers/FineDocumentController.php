@@ -15,6 +15,7 @@ use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
 use App\Support\Ui\Toast;
@@ -69,7 +70,7 @@ final class FineDocumentController extends Controller
      */
     public function revoke(ReasonRequest $request, Fine $fine, FineDocument $fineDocument, FineDocumentRole $role, RevokeFineDocumentLink $desvincular): RedirectResponse
     {
-        $desvincular->handle($fine, $fineDocument, $role, (string) $request->validated('reason'), $request->user()?->id);
+        $desvincular->handle($fine, $fineDocument, $role, $request->reason(), $request->user()?->id);
 
         Toast::success('Documento desvinculado de la multa.');
 
@@ -109,7 +110,7 @@ final class FineDocumentController extends Controller
             $fineDocument,
             $cambios,
             $esperados,
-            $request->validated('reason'),
+            FineReason::fromValidated($request->validated()),
             $request->canCorrect(),
             $request->user()?->id,
         );

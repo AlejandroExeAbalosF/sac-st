@@ -9,6 +9,7 @@ use App\Modules\Multas\Actions\RecordFineBankCreditPayment;
 use App\Modules\Multas\Actions\RecordFineHistoricalMovement;
 use App\Modules\Multas\Actions\ReviewFineHistoricalMovement;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Http\Requests\ReviewHistoricalMovementRequest;
@@ -17,6 +18,7 @@ use App\Modules\Multas\Http\Requests\StoreFineBankCreditPaymentRequest;
 use App\Modules\Multas\Http\Requests\StoreHistoricalMovementRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\PartialDate;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
@@ -71,7 +73,15 @@ final class FineHistoricalMovementController extends Controller
     ): RedirectResponse {
         $resultado = HistoricalMovementStatus::from((string) $request->validated('status'));
 
-        $revisar->handle($movement, $resultado, $request->validated('note'), $request->user()?->id);
+        $codigo = $request->validated('reasonCode');
+
+        $revisar->handle(
+            $movement,
+            $resultado,
+            $request->validated('note'),
+            $request->user()?->id,
+            $codigo === null ? null : FineReasonCode::from((string) $codigo),
+        );
 
         Toast::success($resultado === HistoricalMovementStatus::Validated ? 'Antecedente validado.' : 'Antecedente descartado.');
 
@@ -101,7 +111,7 @@ final class FineHistoricalMovementController extends Controller
             $movement,
             ['occurred_on' => $fecha->date, 'occurred_precision' => $fecha->precision->value],
             ['occurred_on' => $fechaVista->date, 'occurred_precision' => $fechaVista->precision->value],
-            $request->validated('reason'),
+            FineReason::fromValidated($request->validated()),
             $request->canCorrect(),
             $request->user()?->id,
         );

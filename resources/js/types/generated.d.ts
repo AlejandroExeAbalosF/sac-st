@@ -1179,6 +1179,26 @@ declare namespace App {
                 export type FinePaymentStatus =
                     'reported' | 'applied' | 'discarded';
                 export type FineProvenance = 'manual' | 'import';
+                export type FineReasonAct =
+                    | 'adjustment'
+                    | 'reversal'
+                    | 'payment_discard'
+                    | 'link_revocation'
+                    | 'correction'
+                    | 'historical_rejection';
+                export type FineReasonCode =
+                    | 'data_entry_error'
+                    | 'duplicate'
+                    | 'wrong_fine'
+                    | 'wrong_document'
+                    | 'misread_paper'
+                    | 'appeal_admitted'
+                    | 'court_ruling'
+                    | 'resolution_correction'
+                    | 'not_credited'
+                    | 'no_evidence'
+                    | 'replaced_by_correction'
+                    | 'other';
                 export type FineRevisionKind = 'completion' | 'correction';
                 export type FineTimeliness =
                     'on_time' | 'late' | 'undetermined';

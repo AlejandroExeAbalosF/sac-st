@@ -10,10 +10,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday, parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/ajustes';
 
@@ -41,6 +41,7 @@ export default function AdjustDebtDialog({
         effectiveOn: businessToday(),
         documentId: null as number | null,
         document: { text: '', issuedOn: '' },
+        reasonCode: '' as App.Modules.Multas.Enums.FineReasonCode | '',
         reason: '',
     });
 
@@ -54,6 +55,7 @@ export default function AdjustDebtDialog({
             ...(datos.documentId !== null
                 ? { documentId: datos.documentId }
                 : { document: datos.document }),
+            reasonCode: datos.reasonCode,
             reason: datos.reason,
         }));
 
@@ -189,20 +191,17 @@ export default function AdjustDebtDialog({
                 <FieldError message={errors.effectiveOn} />
             </div>
 
-            <div>
-                <Label htmlFor="ajuste-motivo">Motivo</Label>
-                <Textarea
-                    id="ajuste-motivo"
-                    className="mt-1"
-                    rows={2}
-                    maxLength={500}
-                    value={data.reason}
-                    onChange={(e) => setData('reason', e.target.value)}
-                    placeholder="Qué dispone la resolución."
-                    aria-invalid={Boolean(errors.reason)}
-                />
-                <FieldError message={errors.reason} />
-            </div>
+            <ReasonFields
+                act="adjustment"
+                code={data.reasonCode}
+                detail={data.reason}
+                onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                onDetailChange={(detalle) => setData('reason', detalle)}
+                codeError={errors.reasonCode}
+                detailError={errors.reason}
+                idPrefix="ajuste-motivo"
+                detailPlaceholder="Qué dispone la resolución."
+            />
         </FormDialog>
     );
 }

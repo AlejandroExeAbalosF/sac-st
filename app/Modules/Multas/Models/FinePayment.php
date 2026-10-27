@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\PresentationPrecision;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -42,6 +43,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $external_receipt_reference
  * @property int|null $discarded_by
  * @property Carbon|null $discarded_at
+ * @property FineReasonCode|null $discard_reason_code
  * @property string|null $discard_reason
  * @property int|null $replaces_fine_payment_id El informado que este corrige.
  * @property string $idempotency_key
@@ -76,6 +78,7 @@ final class FinePayment extends Model
         'external_receipt_reference',
         'discarded_by',
         'discarded_at',
+        'discard_reason_code',
         'discard_reason',
         'replaces_fine_payment_id',
         'idempotency_key',
@@ -89,6 +92,7 @@ final class FinePayment extends Model
     {
         return [
             'medium' => FinePaymentMedium::class,
+            'discard_reason_code' => FineReasonCode::class,
             'judicial_origin' => 'boolean',
             'status' => FinePaymentStatus::class,
             'amount' => 'decimal:2',

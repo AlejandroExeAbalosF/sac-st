@@ -11,6 +11,7 @@ use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Models\FineIdentifierRevision;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -75,7 +76,7 @@ final class ReviseFineIdentifiers
         FineCase|FineDocument|Fine|FineDebtEntry|FineHistoricalMovement $sujeto,
         array $cambios,
         array $esperados,
-        ?string $reason,
+        ?FineReason $reason,
         bool $puedeCorregir,
         ?int $actorId,
     ): ?FineIdentifierRevision {
@@ -109,17 +110,21 @@ final class ReviseFineIdentifiers
                     throw new AuthorizationException('Corregir un dato ya cargado requiere el permiso de ajustar multas.');
                 }
 
-                if (trim((string) $reason) === '') {
-                    throw ValidationException::withMessages(['reason' => 'Corregir un dato ya cargado requiere decir por qué.']);
+                if ($reason === null) {
+                    throw ValidationException::withMessages(['reasonCode' => 'Corregir un dato ya cargado requiere elegir el motivo.']);
                 }
             }
+
+            // Completar no lleva motivo aunque el formulario mande uno.
+            $motivo = $tipo === FineRevisionKind::Correction ? $reason : null;
 
             $revision = FineIdentifierRevision::query()->create([
                 $this->columnaDelSujeto($sujeto) => $sujeto->getKey(),
                 'kind' => $tipo,
                 'old_values' => $anteriores,
                 'new_values' => $nuevos,
-                'reason' => $tipo === FineRevisionKind::Correction ? trim((string) $reason) : null,
+                'reason_code' => $motivo?->code,
+                'reason' => $motivo?->detail,
                 'created_by' => $actorId,
             ]);
 
@@ -149,7 +154,7 @@ final class ReviseFineIdentifiers
                 before: $anteriores,
                 after: $nuevos,
                 metadata: array_filter([
-                    'reason' => $tipo === FineRevisionKind::Correction ? $revision->reason : null,
+                    'reason' => $motivo?->describe(),
                     'movimiento' => $sujeto instanceof FineDebtEntry ? $sujeto->kind->label() : null,
                     'antecedente' => $sujeto instanceof FineHistoricalMovement ? $sujeto->kind->label() : null,
                 ]),

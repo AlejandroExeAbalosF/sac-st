@@ -18,6 +18,7 @@ use App\Modules\Multas\Data\FineDocumentData;
 use App\Modules\Multas\Data\FineListItemData;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\FineIndexRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineRequest;
@@ -32,6 +33,7 @@ use App\Modules\Multas\Support\FineCaseListQuery;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Multas\Support\FineListQuery;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
@@ -291,6 +293,8 @@ final class FineController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'position']) : [],
             'cobroKey' => 'multa-cobro:'.$fine->id.':'.Str::ulid(),
+            // Las listas de motivos de cada acto: la pantalla no las repite.
+            'motivos' => FineReasonAct::options(),
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 // Cobrar exige la caja abierta en la moneda de la multa.
@@ -335,7 +339,7 @@ final class FineController extends Controller
                 'registered_on' => $fechaVista->date,
                 'registered_precision' => $fechaVista->precision->value,
             ],
-            $request->validated('reason'),
+            FineReason::fromValidated($request->validated()),
             $request->canCorrect(),
             $request->user()?->id,
         );

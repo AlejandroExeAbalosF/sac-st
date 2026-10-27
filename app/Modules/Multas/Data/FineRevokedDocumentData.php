@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Data;
 
 use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineReason;
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -33,14 +34,14 @@ final class FineRevokedDocumentData extends Data
      */
     public static function fromModel(FineDocument $documento, array $nombres): self
     {
-        /** @var object{role: string, revoked_at: string, revoked_by: int|null, revocation_reason: string} $vinculo */
+        /** @var object{role: string, revoked_at: string, revoked_by: int|null, revocation_reason_code: string, revocation_reason: string|null} $vinculo */
         $vinculo = $documento->getRelationValue('pivot');
 
         return new self(
             documentId: $documento->id,
             label: $documento->label(),
             role: FineDocumentRole::from($vinculo->role),
-            reason: $vinculo->revocation_reason,
+            reason: FineReason::stored($vinculo->revocation_reason_code, $vinculo->revocation_reason),
             revokedAt: Carbon::parse($vinculo->revoked_at)->toIso8601String(),
             revokedByName: $vinculo->revoked_by === null ? null : ($nombres[$vinculo->revoked_by] ?? null),
         );

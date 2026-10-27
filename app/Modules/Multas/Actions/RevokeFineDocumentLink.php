@@ -9,6 +9,7 @@ use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +30,7 @@ final class RevokeFineDocumentLink
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Fine $multa, FineDocument $documento, FineDocumentRole $papel, string $reason, ?int $actorId): void
+    public function handle(Fine $multa, FineDocument $documento, FineDocumentRole $papel, FineReason $reason, ?int $actorId): void
     {
         DB::transaction(function () use ($multa, $documento, $papel, $reason, $actorId): void {
             // Como el ajuste: dos actos simultáneos sobre la multa no se cruzan.
@@ -74,13 +75,14 @@ final class RevokeFineDocumentLink
             DB::table('fine_document_links')->where('id', $vinculo)->update([
                 'revoked_at' => now(),
                 'revoked_by' => $actorId,
-                'revocation_reason' => trim($reason),
+                'revocation_reason_code' => $reason->code->value,
+                'revocation_reason' => $reason->detail,
             ]);
 
             $this->auditar->handle(
                 'multa.documento-desvinculado',
                 $multa,
-                metadata: ['documento' => $documento->label(), 'papel' => $papel->label(), 'reason' => trim($reason)],
+                metadata: ['documento' => $documento->label(), 'papel' => $papel->label(), 'reason' => $reason->describe()],
                 actorId: $actorId,
             );
         });

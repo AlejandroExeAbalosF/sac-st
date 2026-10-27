@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\FineDebtEntryKind;
 use App\Modules\Multas\Enums\FineProvenance;
+use App\Modules\Multas\Enums\FineReasonCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $effective_on
  * @property DatePrecision $effective_precision
  * @property int|null $fine_document_id
+ * @property FineReasonCode|null $reason_code
  * @property string|null $reason
  * @property int|null $reversal_of_id
  * @property FineProvenance $provenance
@@ -48,6 +50,7 @@ final class FineDebtEntry extends Model
         'effective_on',
         'effective_precision',
         'fine_document_id',
+        'reason_code',
         'reason',
         'reversal_of_id',
         'provenance',
@@ -61,6 +64,7 @@ final class FineDebtEntry extends Model
     {
         return [
             'kind' => FineDebtEntryKind::class,
+            'reason_code' => FineReasonCode::class,
             'amount' => 'decimal:2',
             'effective_on' => 'date',
             'effective_precision' => DatePrecision::class,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Models;
 
 use App\Models\User;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\FineRevisionKind;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property FineRevisionKind $kind
  * @property array<string, mixed> $old_values
  * @property array<string, mixed> $new_values
+ * @property FineReasonCode|null $reason_code
  * @property string|null $reason
  * @property int|null $created_by
  * @property Carbon|null $created_at
@@ -46,6 +48,7 @@ final class FineIdentifierRevision extends Model
         'kind',
         'old_values',
         'new_values',
+        'reason_code',
         'reason',
         'created_by',
     ];
@@ -57,6 +60,7 @@ final class FineIdentifierRevision extends Model
     {
         return [
             'kind' => FineRevisionKind::class,
+            'reason_code' => FineReasonCode::class,
             'old_values' => 'array',
             'new_values' => 'array',
         ];

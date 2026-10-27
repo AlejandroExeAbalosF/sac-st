@@ -4,10 +4,10 @@ import PersonPicker from '@/components/person-picker';
 import type { PersonOption } from '@/components/person-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday } from '@/lib/format';
 import { store } from '@/routes/multas/revisiones';
 
@@ -31,6 +31,7 @@ export default function ReviseFineDialog({
         caption: multa.caption,
         personId: multa.personId,
         registeredOn: multa.registeredOn,
+        reasonCode: '' as App.Modules.Multas.Enums.FineReasonCode | '',
         reason: '',
         /*
          * Lo que mostraba el formulario al abrirse. El servidor compara
@@ -120,24 +121,17 @@ export default function ReviseFineDialog({
                 <FieldError message={errors.registeredOn} />
             </div>
 
-            <div>
-                <Label htmlFor="revision-motivo">
-                    Motivo
-                    <span className="ml-1 font-normal text-muted-foreground">
-                        (si corregís un dato ya cargado)
-                    </span>
-                </Label>
-                <Textarea
-                    id="revision-motivo"
-                    className="mt-1"
-                    rows={2}
-                    maxLength={500}
-                    value={data.reason}
-                    onChange={(e) => setData('reason', e.target.value)}
-                    aria-invalid={Boolean(errors.reason)}
-                />
-                <FieldError message={errors.reason} />
-            </div>
+            <ReasonFields
+                act="correction"
+                code={data.reasonCode}
+                detail={data.reason}
+                onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                onDetailChange={(detalle) => setData('reason', detalle)}
+                codeError={errors.reasonCode}
+                detailError={errors.reason}
+                idPrefix="revision-motivo"
+                hint="si corregís un dato ya cargado"
+            />
         </FormDialog>
     );
 }

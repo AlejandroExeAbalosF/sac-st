@@ -1127,6 +1127,7 @@ export default function MultaShow({
             )}
             {dialogo?.tipo === 'descartar-pago' && (
                 <ReasonDialog
+                    act="payment_discard"
                     title="Descartar el pago informado"
                     description="Nunca redujo el saldo ni tuvo recibo: queda a la vista como descartado, con el motivo."
                     url={discard(dialogo.pago.id).url}
@@ -1185,6 +1186,7 @@ export default function MultaShow({
             )}
             {dialogo?.tipo === 'revertir' && (
                 <ReasonDialog
+                    act="reversal"
                     title={`Revertir el ${DEBT_KIND[dialogo.movimiento.kind].toLowerCase()}`}
                     description="Deshace el ajuste entero, por el mismo importe. El ajuste queda a la vista marcado como revertido. Si solo una parte estaba mal, registrá otro ajuste."
                     url={reverse(dialogo.movimiento.id).url}
@@ -1208,6 +1210,7 @@ export default function MultaShow({
             )}
             {dialogo?.tipo === 'desvincular' && (
                 <ReasonDialog
+                    act="link_revocation"
                     title={`Desvincular ${dialogo.documento.label}`}
                     description={`Anula el vínculo como ${DOCUMENT_ROLE[dialogo.papel].toLowerCase()}. El documento sigue en el expediente y el vínculo queda a la vista como desvinculado, con el motivo.`}
                     url={

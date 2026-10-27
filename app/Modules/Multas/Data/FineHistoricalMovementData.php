@@ -9,6 +9,7 @@ use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\PartialDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -57,7 +58,7 @@ final class FineHistoricalMovementData extends Data
             occurredPrecision: $antecedente->occurred_precision,
             evidence: $antecedente->evidence_text,
             status: $antecedente->status,
-            reviewNote: $antecedente->review_note,
+            reviewNote: FineReason::text($antecedente->review_reason_code, $antecedente->review_note),
             reviewedByName: $revisor instanceof User ? $revisor->name : null,
             reviewedAt: $antecedente->reviewed_at?->toIso8601String(),
             createdByName: $autor instanceof User ? $autor->name : null,

@@ -10,6 +10,7 @@ use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
@@ -33,7 +34,7 @@ final class ReverseFineDebtEntry
         private readonly RecordAuditEvent $auditar,
     ) {}
 
-    public function handle(FineDebtEntry $ajuste, string $reason, ?int $actorId): FineDebtEntry
+    public function handle(FineDebtEntry $ajuste, FineReason $reason, ?int $actorId): FineDebtEntry
     {
         return DB::transaction(function () use ($ajuste, $reason, $actorId): FineDebtEntry {
             $multa = Fine::query()->whereKey($ajuste->fine_id)->lockForUpdate()->firstOrFail();
@@ -64,7 +65,8 @@ final class ReverseFineDebtEntry
                 'amount' => $ajuste->amount,
                 'effective_on' => BusinessDate::today()->toDateString(),
                 'effective_precision' => DatePrecision::Day,
-                'reason' => trim($reason),
+                'reason_code' => $reason->code,
+                'reason' => $reason->detail,
                 'reversal_of_id' => $ajuste->id,
                 'provenance' => FineProvenance::Manual,
                 'created_by' => $actorId,
@@ -80,7 +82,7 @@ final class ReverseFineDebtEntry
                 metadata: [
                     'tipo' => $ajuste->kind->label(),
                     'amount' => $ajuste->amount,
-                    'reason' => $reversion->reason,
+                    'reason' => $reason->describe(),
                 ],
                 actorId: $actorId,
             );

@@ -11,6 +11,7 @@ use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineReason;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -109,7 +110,7 @@ final class FinePaymentData extends Data
             appealRequiredAmount: $pago->appeal_required_amount,
             externalReceiptReference: $pago->external_receipt_reference,
             appealDiffers: $pago->appeal_required_amount !== null && ! Decimal::equals($pago->amount, $pago->appeal_required_amount),
-            discardReason: $pago->discard_reason,
+            discardReason: FineReason::text($pago->discard_reason_code, $pago->discard_reason),
             replacesPaymentId: $pago->replaces_fine_payment_id,
             attachments: $adjuntos,
             deposit: $deposito,

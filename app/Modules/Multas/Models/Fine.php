@@ -209,7 +209,7 @@ final class Fine extends Model
     public function revokedDocuments(): BelongsToMany
     {
         return $this->belongsToMany(FineDocument::class, 'fine_document_links')
-            ->withPivot('role', 'revoked_at', 'revoked_by', 'revocation_reason')
+            ->withPivot('role', 'revoked_at', 'revoked_by', 'revocation_reason_code', 'revocation_reason')
             ->wherePivotNotNull('revoked_at');
     }
 

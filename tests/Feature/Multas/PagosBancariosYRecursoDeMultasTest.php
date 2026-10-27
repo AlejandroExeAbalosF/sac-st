@@ -19,11 +19,13 @@ use App\Modules\Multas\Data\FinePaymentData;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineBankCredits;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
@@ -165,15 +167,16 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $pago = $this->informar($multa, '5000.00');
 
         $this->actingAs($this->operador())
-            ->post(route('multas.pagos.discard', $pago), ['reason' => 'Es de otra multa'])
+            ->post(route('multas.pagos.discard', $pago), ['reasonCode' => 'wrong_fine', 'reason' => 'Es de otra multa'])
             ->assertForbidden();
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.pagos.discard', $pago), ['reason' => 'Es de otra multa'])
+            ->post(route('multas.pagos.discard', $pago), ['reasonCode' => 'wrong_fine', 'reason' => 'Es de otra multa'])
             ->assertSessionHasNoErrors();
 
         expect($pago->refresh()->status)->toBe(FinePaymentStatus::Discarded)
-            ->and($pago->discard_reason)->toBe('Es de otra multa');
+            ->and($pago->discard_reason)->toBe('Es de otra multa')
+            ->and($pago->discard_reason_code)->toBe(FineReasonCode::WrongFine);
     }
 
     public function test_who_can_report_verify_and_see_the_queue(): void
@@ -258,7 +261,8 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $corregido = FinePayment::query()->latest('id')->firstOrFail();
 
         expect($anterior->refresh()->status)->toBe(FinePaymentStatus::Discarded)
-            ->and($anterior->discard_reason)->toBe('Corregido: Faltaba un cero en el importe')
+            ->and($anterior->discard_reason_code)->toBe(FineReasonCode::ReplacedByCorrection)
+            ->and($anterior->discard_reason)->toBe('Faltaba un cero en el importe')
             ->and($corregido->status)->toBe(FinePaymentStatus::Reported)
             ->and($corregido->amount)->toBe('300000.00')
             ->and($corregido->replaces_fine_payment_id)->toBe($anterior->id)
@@ -355,7 +359,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
     public function test_the_database_keeps_the_presentation_of_a_correction(): void
     {
         $multa = $this->escenario();
-        $descartado = app(DiscardFinePayment::class)->handle($this->informar($multa, '1000.00'), 'Cargado de más', $this->quienAbre());
+        $descartado = app(DiscardFinePayment::class)->handle($this->informar($multa, '1000.00'), new FineReason(FineReasonCode::Duplicate), $this->quienAbre());
         $fila = [
             ...$this->filaInformada($multa),
             'replaces_fine_payment_id' => $descartado->id,
@@ -444,7 +448,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $intento = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '28000.00');
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.pagos.discard', $intento), ['reason' => 'El recibo externo era de otra multa'])
+            ->post(route('multas.pagos.discard', $intento), ['reasonCode' => 'wrong_fine', 'reason' => 'El recibo externo era de otra multa'])
             ->assertSessionHasNoErrors();
 
         expect($this->recurrir($multa, FinePaymentMedium::Cash, '280000.00')->status)->toBe(FinePaymentStatus::Applied);

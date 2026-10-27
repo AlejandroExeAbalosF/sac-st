@@ -222,7 +222,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
         DB::table('fine_identifier_revisions')->insert([
             'fine_case_id' => $caso, 'kind' => 'correction',
             'old_values' => json_encode(['number' => 17]), 'new_values' => json_encode(['number' => 71]),
-            'reason' => 'El número estaba invertido',
+            'reason_code' => 'data_entry_error', 'reason' => 'El número estaba invertido',
         ]);
 
         $fila = DB::table('fine_cases')->find($caso);
@@ -237,7 +237,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
         $this->rechaza('cambio desde que se abrio el formulario', fn () => DB::table('fine_identifier_revisions')->insert([
             'fine_case_id' => $caso, 'kind' => 'correction',
             'old_values' => json_encode(['number' => 99]), 'new_values' => json_encode(['number' => 81]),
-            'reason' => 'Otro operador',
+            'reason_code' => 'other', 'reason' => 'Otro operador',
         ]));
     }
 
@@ -294,7 +294,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
         $multa = $this->multaCompleta($caso, '1000.00', importada: true);
 
         $this->rechaza('junto con su precision', fn () => DB::table('fine_identifier_revisions')->insert([
-            'fine_id' => $multa, 'kind' => 'correction', 'reason' => 'x',
+            'fine_id' => $multa, 'kind' => 'correction', 'reason_code' => 'other', 'reason' => 'x',
             'old_values' => json_encode(['registered_on' => '2026-05-01']),
             'new_values' => json_encode(['registered_on' => '2026-06-01']),
         ]));
@@ -335,7 +335,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
             ->update(['status' => 'validated', 'reviewed_at' => now(), 'amount' => '3000.00']));
 
         DB::table('fine_historical_movements')->where('id', $id)
-            ->update(['status' => 'rejected', 'reviewed_at' => now(), 'review_note' => 'Es de otra multa']);
+            ->update(['status' => 'rejected', 'reviewed_at' => now(), 'review_reason_code' => 'wrong_fine', 'review_note' => 'Es de otra multa']);
 
         $this->rechaza('ya se reviso', fn () => DB::table('fine_historical_movements')->where('id', $id)
             ->update(['status' => 'validated']));
@@ -413,7 +413,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
         $constitucion = (int) DB::table('fine_debt_entries')->where('fine_id', $multa)->value('id');
 
         $this->rechaza('no se revisan', fn () => DB::table('fine_identifier_revisions')->insert([
-            'fine_debt_entry_id' => $constitucion, 'kind' => 'correction', 'reason' => 'x',
+            'fine_debt_entry_id' => $constitucion, 'kind' => 'correction', 'reason_code' => 'other', 'reason' => 'x',
             'old_values' => json_encode(['amount' => 1000]), 'new_values' => json_encode(['amount' => 1]),
         ]));
 
@@ -421,7 +421,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
             ->where('id', $constitucion)->update(['effective_on' => '2026-05-08']));
 
         DB::table('fine_identifier_revisions')->insert([
-            'fine_debt_entry_id' => $constitucion, 'kind' => 'correction', 'reason' => 'Fecha mal leída',
+            'fine_debt_entry_id' => $constitucion, 'kind' => 'correction', 'reason_code' => 'misread_paper', 'reason' => 'Fecha mal leída',
             'old_values' => json_encode(['effective_on' => '2026-05-07', 'effective_precision' => 'day']),
             'new_values' => json_encode(['effective_on' => '2026-05-08', 'effective_precision' => 'day']),
         ]);
@@ -522,6 +522,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
     {
         return DB::table('fine_debt_entries')->insertGetId([
             'fine_id' => $multa, 'kind' => $tipo, 'amount' => $importe, 'reason' => $motivo,
+            'reason_code' => $motivo === null ? null : 'other',
             'reversal_of_id' => $revierte, 'effective_on' => '2026-06-01', 'effective_precision' => 'day',
         ]);
     }

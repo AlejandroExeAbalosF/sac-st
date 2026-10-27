@@ -99,7 +99,7 @@ final class FineBankPaymentController extends Controller
 
     public function discard(ReasonRequest $request, FinePayment $payment, DiscardFinePayment $descartar): RedirectResponse
     {
-        $descartar->handle($payment, (string) $request->validated('reason'), $request->user()?->id);
+        $descartar->handle($payment, $request->reason(), $request->user()?->id);
 
         Toast::success('Pago descartado.');
 

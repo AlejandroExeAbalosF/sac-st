@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\FineProvenance;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property HistoricalMovementStatus $status
  * @property int|null $reviewed_by
  * @property Carbon|null $reviewed_at
+ * @property FineReasonCode|null $review_reason_code
  * @property string|null $review_note
  * @property FineProvenance $provenance
  * @property int|null $created_by
@@ -56,6 +58,7 @@ final class FineHistoricalMovement extends Model
         'status',
         'reviewed_by',
         'reviewed_at',
+        'review_reason_code',
         'review_note',
         'provenance',
         'created_by',
@@ -68,6 +71,7 @@ final class FineHistoricalMovement extends Model
     {
         return [
             'kind' => HistoricalMovementKind::class,
+            'review_reason_code' => FineReasonCode::class,
             'amount' => 'decimal:2',
             'occurred_on' => 'date',
             'occurred_precision' => DatePrecision::class,

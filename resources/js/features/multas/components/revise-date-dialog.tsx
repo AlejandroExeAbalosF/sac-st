@@ -1,10 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import PartialDateInput from '@/components/partial-date-input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday } from '@/lib/format';
 
 /**
@@ -29,6 +29,7 @@ export default function ReviseDateDialog({
 }) {
     const { data, setData, post, processing, errors } = useForm({
         date: value,
+        reasonCode: '' as App.Modules.Multas.Enums.FineReasonCode | '',
         reason: '',
         // Lo que mostraba el formulario al abrirse: no se pisa lo ajeno.
         expected: { date: value },
@@ -63,24 +64,17 @@ export default function ReviseDateDialog({
                 <FieldError message={errors.date} />
             </div>
 
-            <div>
-                <Label htmlFor="revision-fecha-motivo">
-                    Motivo
-                    <span className="ml-1 font-normal text-muted-foreground">
-                        (si corregís una fecha ya cargada)
-                    </span>
-                </Label>
-                <Textarea
-                    id="revision-fecha-motivo"
-                    className="mt-1"
-                    rows={2}
-                    maxLength={500}
-                    value={data.reason}
-                    onChange={(e) => setData('reason', e.target.value)}
-                    aria-invalid={Boolean(errors.reason)}
-                />
-                <FieldError message={errors.reason} />
-            </div>
+            <ReasonFields
+                act="correction"
+                code={data.reasonCode}
+                detail={data.reason}
+                onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                onDetailChange={(detalle) => setData('reason', detalle)}
+                codeError={errors.reasonCode}
+                detailError={errors.reason}
+                idPrefix="revision-fecha-motivo"
+                hint="si corregís una fecha ya cargada"
+            />
         </FormDialog>
     );
 }

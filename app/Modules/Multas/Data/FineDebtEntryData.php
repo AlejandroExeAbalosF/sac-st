@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\FineDebtEntryKind;
 use App\Modules\Multas\Models\FineDebtEntry;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\PartialDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -48,7 +49,7 @@ final class FineDebtEntryData extends Data
             effectiveOn: PartialDate::fromStored($movimiento->effective_on?->toDateString(), $movimiento->effective_precision)->toInput(),
             effectivePrecision: $movimiento->effective_precision,
             documentLabel: $movimiento->document?->label(),
-            reason: $movimiento->reason,
+            reason: FineReason::text($movimiento->reason_code, $movimiento->reason),
             reversalOfId: $movimiento->reversal_of_id,
             reversedById: $movimiento->reversedBy?->id,
             createdByName: $autor instanceof User ? $autor->name : null,

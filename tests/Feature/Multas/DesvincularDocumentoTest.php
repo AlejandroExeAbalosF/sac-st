@@ -32,14 +32,14 @@ class DesvincularDocumentoTest extends TestCase
         $acta = $this->acta($multa);
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->anular($multa, $acta, 'origin'), ['reason' => 'El acta es de otra empresa'])
+            ->post($this->anular($multa, $acta, 'origin'), ['reasonCode' => 'wrong_document', 'reason' => 'El acta es de otra empresa'])
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('multas.show', $multa->showParameters()));
 
         expect($multa->documents()->whereKey($acta->id)->exists())->toBeFalse()
             ->and($multa->fineCase->documents()->whereKey($acta->id)->exists())->toBeTrue()
             ->and(AuditEvent::query()->where('action', 'multa.documento-desvinculado')->sole()->metadata)
-            ->toMatchArray(['papel' => 'Origen', 'reason' => 'El acta es de otra empresa']);
+            ->toMatchArray(['papel' => 'Origen', 'reason' => 'Documento equivocado: El acta es de otra empresa']);
 
         $this->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page
@@ -47,7 +47,7 @@ class DesvincularDocumentoTest extends TestCase
                 ->has('multa.revokedDocuments', 1)
                 ->where('multa.revokedDocuments.0.documentId', $acta->id)
                 ->where('multa.revokedDocuments.0.role', 'origin')
-                ->where('multa.revokedDocuments.0.reason', 'El acta es de otra empresa')
+                ->where('multa.revokedDocuments.0.reason', 'Documento equivocado: El acta es de otra empresa')
                 ->whereNot('multa.revokedDocuments.0.revokedByName', null));
     }
 
@@ -57,12 +57,18 @@ class DesvincularDocumentoTest extends TestCase
         $acta = $this->acta($multa);
 
         $this->actingAs($this->operador())
-            ->post($this->anular($multa, $acta, 'origin'), ['reason' => 'El acta es de otra empresa'])
+            ->post($this->anular($multa, $acta, 'origin'), ['reasonCode' => 'wrong_document', 'reason' => 'El acta es de otra empresa'])
             ->assertForbidden();
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->anular($multa, $acta, 'origin'), ['reason' => ''])
+            ->post($this->anular($multa, $acta, 'origin'), ['reason' => 'Sin elegir'])
+            ->assertSessionHasErrors('reasonCode');
+
+        $this->post($this->anular($multa, $acta, 'origin'), ['reasonCode' => 'other', 'reason' => ''])
             ->assertSessionHasErrors('reason');
+
+        $this->post($this->anular($multa, $acta, 'origin'), ['reasonCode' => 'misread_paper'])
+            ->assertSessionHasErrors('reasonCode');
 
         expect($multa->documents()->whereKey($acta->id)->exists())->toBeTrue();
     }
@@ -73,7 +79,7 @@ class DesvincularDocumentoTest extends TestCase
         $resolucion = $this->resolucionDeOrigen($multa);
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->anular($multa, $resolucion, 'origin'), ['reason' => 'Se cargó la que no era'])
+            ->post($this->anular($multa, $resolucion, 'origin'), ['reasonCode' => 'wrong_document', 'reason' => 'Se cargó la que no era'])
             ->assertSessionHasErrors(['reason' => 'Es el documento del importe original de la multa: no se desvincula. Si se leyó mal, corregí su número o su fecha.']);
 
         $this->expectException(QueryException::class);
@@ -82,7 +88,7 @@ class DesvincularDocumentoTest extends TestCase
         DB::table('fine_document_links')
             ->where('fine_id', $multa->id)
             ->where('fine_document_id', $resolucion->id)
-            ->update(['revoked_at' => now(), 'revocation_reason' => 'Directo en la base']);
+            ->update(['revoked_at' => now(), 'revocation_reason_code' => 'other', 'revocation_reason' => 'Directo en la base']);
     }
 
     public function test_el_respaldo_de_un_ajuste_se_desvincula_solo_despues_de_revertirlo(): void
@@ -96,20 +102,21 @@ class DesvincularDocumentoTest extends TestCase
                 'amount' => '400000.00',
                 'effectiveOn' => '2026-06-01',
                 'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
+                'reasonCode' => 'appeal_admitted',
                 'reason' => 'Recurso jerárquico parcialmente admitido',
             ])
             ->assertSessionHasNoErrors();
 
         $respaldo = FineDocument::query()->where('original_text', 'N°0900/26')->sole();
 
-        $this->post($this->anular($multa, $respaldo, 'modification'), ['reason' => 'No correspondía'])
+        $this->post($this->anular($multa, $respaldo, 'modification'), ['reasonCode' => 'data_entry_error'])
             ->assertSessionHasErrors(['reason' => 'Respalda una reducción vigente de la obligación: revertí esa reducción antes de desvincularlo.']);
 
         $ajuste = FineDebtEntry::query()->where('fine_id', $multa->id)->where('kind', 'reduction')->sole();
-        $this->post(route('multas.ajustes.reverse', $ajuste), ['reason' => 'Se cargó en la multa equivocada'])
+        $this->post(route('multas.ajustes.reverse', $ajuste), ['reasonCode' => 'wrong_fine', 'reason' => 'Se cargó en la multa equivocada'])
             ->assertSessionHasNoErrors();
 
-        $this->post($this->anular($multa, $respaldo, 'modification'), ['reason' => 'No correspondía'])
+        $this->post($this->anular($multa, $respaldo, 'modification'), ['reasonCode' => 'data_entry_error'])
             ->assertSessionHasNoErrors();
     }
 
@@ -119,7 +126,7 @@ class DesvincularDocumentoTest extends TestCase
         $acta = $this->acta($multa);
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->anular($multa, $acta, 'origin'), ['reason' => 'Se desvinculó por error'])
+            ->post($this->anular($multa, $acta, 'origin'), ['reasonCode' => 'data_entry_error', 'reason' => 'Se desvinculó por error'])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($this->operador())
@@ -151,7 +158,7 @@ class DesvincularDocumentoTest extends TestCase
         $importada = Fine::query()->findOrFail($multaId);
 
         $this->actingAs($this->operador('contador'))
-            ->post($this->anular($importada, $equivocada, 'origin'), ['reason' => 'La resolución era de otro expediente'])
+            ->post($this->anular($importada, $equivocada, 'origin'), ['reasonCode' => 'wrong_document', 'reason' => 'La resolución era de otro expediente'])
             ->assertSessionHasNoErrors();
 
         $this->actingAs($this->operador())
@@ -172,8 +179,10 @@ class DesvincularDocumentoTest extends TestCase
         $this->rechaza('solo se anula', fn () => $vinculo()->update(['role' => 'support']));
         $this->rechaza('no se borra', fn () => $vinculo()->delete());
         $this->rechaza('fine_document_links_revocation_check', fn () => $vinculo()->update(['revoked_at' => now()]));
+        $this->rechaza('fine_document_links_revocation_check', fn () => $vinculo()->update(['revoked_at' => now(), 'revocation_reason_code' => 'other']));
+        $this->rechaza('fine_document_links_revocation_check', fn () => $vinculo()->update(['revoked_at' => now(), 'revocation_reason_code' => 'appeal_admitted']));
 
-        $vinculo()->update(['revoked_at' => now(), 'revocation_reason' => 'Era de otra empresa']);
+        $vinculo()->update(['revoked_at' => now(), 'revocation_reason_code' => 'wrong_document']);
 
         $this->rechaza('ya esta anulado', fn () => $vinculo()->update(['revocation_reason' => 'Otro motivo']));
     }
@@ -186,7 +195,7 @@ class DesvincularDocumentoTest extends TestCase
         DB::table('fine_document_links')
             ->where('fine_id', $multa->id)
             ->where('fine_document_id', $acta->id)
-            ->update(['revoked_at' => now(), 'revocation_reason' => 'Era de otra empresa']);
+            ->update(['revoked_at' => now(), 'revocation_reason_code' => 'wrong_document']);
 
         $this->rechaza('tiene el vinculo con la multa anulado', fn () => DB::table('fine_debt_entries')->insert([
             'fine_id' => $multa->id, 'kind' => 'increase', 'amount' => '5.00', 'fine_document_id' => $acta->id,

@@ -9,13 +9,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import DocumentFields, {
     EMPTY_DOCUMENT,
 } from '@/features/multas/components/document-fields';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import ReasonFields from '@/features/multas/components/reason-fields';
 import { ACT_TYPE } from '@/features/multas/labels';
 import { businessToday } from '@/lib/format';
 import { store as storeRevisionDeDocumento } from '@/routes/multas/documentos/revisiones';
@@ -25,6 +25,7 @@ import { store as storeRevisionDeExpediente } from '@/routes/multas/expedientes/
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
 type ActType = App.Modules.Multas.Enums.FineActType;
+type Codigo = App.Modules.Multas.Enums.FineReasonCode;
 
 /**
  * Agrega una resolución, un acta u otro papel al expediente. Se puede
@@ -80,6 +81,7 @@ export function ReviseCaseDialog({
         number: expediente.number?.toString() ?? '',
         year: expediente.year?.toString() ?? '',
         suffix: expediente.suffix ?? '',
+        reasonCode: '' as Codigo | '',
         reason: '',
         /*
          * Lo que mostraba el formulario al abrirse. El servidor compara
@@ -153,9 +155,12 @@ export function ReviseCaseDialog({
                 </div>
             </div>
             <MotivoDeCorreccion
-                value={data.reason}
-                onChange={(reason) => setData('reason', reason)}
-                error={errors.reason}
+                code={data.reasonCode}
+                detail={data.reason}
+                onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                onDetailChange={(detalle) => setData('reason', detalle)}
+                codeError={errors.reasonCode}
+                detailError={errors.reason}
             />
         </FormDialog>
     );
@@ -177,6 +182,7 @@ export function ReviseDocumentDialog({
         number: documento.number?.toString() ?? '',
         year: documento.year?.toString() ?? '',
         issuedOn: documento.issuedOn,
+        reasonCode: '' as Codigo | '',
         reason: '',
         /*
          * Lo que mostraba el formulario al abrirse. El servidor compara
@@ -279,41 +285,29 @@ export function ReviseDocumentDialog({
                 </div>
             </div>
             <MotivoDeCorreccion
-                value={data.reason}
-                onChange={(reason) => setData('reason', reason)}
-                error={errors.reason}
+                code={data.reasonCode}
+                detail={data.reason}
+                onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                onDetailChange={(detalle) => setData('reason', detalle)}
+                codeError={errors.reasonCode}
+                detailError={errors.reason}
             />
         </FormDialog>
     );
 }
 
-function MotivoDeCorreccion({
-    value,
-    onChange,
-    error,
-}: {
-    value: string;
-    onChange: (value: string) => void;
-    error?: string;
-}) {
+function MotivoDeCorreccion(
+    props: Omit<
+        React.ComponentProps<typeof ReasonFields>,
+        'act' | 'idPrefix' | 'hint'
+    >,
+) {
     return (
-        <div>
-            <Label htmlFor="correccion-motivo">
-                Motivo
-                <span className="ml-1 font-normal text-muted-foreground">
-                    (si corregís un dato ya cargado)
-                </span>
-            </Label>
-            <Textarea
-                id="correccion-motivo"
-                className="mt-1"
-                rows={2}
-                maxLength={500}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                aria-invalid={Boolean(error)}
-            />
-            <FieldError message={error} />
-        </div>
+        <ReasonFields
+            {...props}
+            act="correction"
+            idPrefix="correccion-motivo"
+            hint="si corregís un dato ya cargado"
+        />
     );
 }

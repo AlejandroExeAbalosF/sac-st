@@ -596,11 +596,16 @@ multa y en la auditoría.
 
 - **Completar** es llenar un dato que faltaba o precisar una fecha sin moverla de
   mes. Lo hace quien carga y no pide motivo.
-- **Corregir** es cambiar un dato que ya tenía valor. Pide motivo y el permiso de
-  ajustar.
+- **Corregir** es cambiar un dato que ya tenía valor. Pide el motivo y el permiso
+  de ajustar.
 
 En los dos casos el cambio queda como una revisión con el valor anterior y el
 nuevo. Dejar menos precisa una fecha —de un día a «solo el mes»— es corregir.
+
+Todo motivo se elige de una lista que depende del acto —«Error de carga», «Se
+leyó mal el papel», «Era de otra multa»…— y lleva un detalle opcional, que es
+obligatorio con «Otro». Se guarda el código, así se puede contar cuántas veces
+pasó cada cosa ([reglas](multas-reglas.md#motivos)).
 
 El formulario recuerda lo que mostraba al abrirse: lo que el operador no tocó no
 pisa lo que otro cambió mientras tanto, y lo que sí tocó se rechaza si otro lo

@@ -318,14 +318,14 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $reduccion = FineDebtEntry::query()->where('kind', 'reduction')->sole();
 
         $this->actingAs($contador)
-            ->post(route('multas.ajustes.reverse', $reduccion), ['reason' => 'Se cargó en la multa equivocada'])
+            ->post(route('multas.ajustes.reverse', $reduccion), ['reasonCode' => 'wrong_fine', 'reason' => 'Se cargó en la multa equivocada'])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
         expect($this->saldo($multa, 'obligation'))->toBe('1400000.00');
 
         $this->actingAs($contador)
-            ->post(route('multas.ajustes.reverse', $reduccion), ['reason' => 'Otra vez'])
+            ->post(route('multas.ajustes.reverse', $reduccion), ['reasonCode' => 'duplicate', 'reason' => 'Otra vez'])
             ->assertSessionHasErrors(['reason' => 'Ese ajuste ya se revirtió.']);
     }
 
@@ -335,7 +335,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $constitucion = FineDebtEntry::query()->where('fine_id', $multa->id)->sole();
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.ajustes.reverse', $constitucion), ['reason' => 'Anularla'])
+            ->post(route('multas.ajustes.reverse', $constitucion), ['reasonCode' => 'other', 'reason' => 'Anularla'])
             ->assertSessionHasErrors('reason');
     }
 
@@ -391,6 +391,10 @@ class CuentaCorrienteDeMultasTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.antecedentes.review', $antecedente), ['status' => 'rejected'])
+            ->assertSessionHasErrors('reasonCode');
+
+        // Con «Otro», el detalle cuenta el motivo.
+        $this->post(route('multas.antecedentes.review', $antecedente), ['status' => 'rejected', 'reasonCode' => 'other'])
             ->assertSessionHasErrors('note');
     }
 
@@ -432,11 +436,11 @@ class CuentaCorrienteDeMultasTest extends TestCase
                 'caption' => 'CRISTOMAX SAS', 'registeredOn' => '2026-05-07',
                 'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
             ])
-            ->assertSessionHasErrors('reason');
+            ->assertSessionHasErrors('reasonCode');
 
         $this->actingAs($contador)
             ->post(route('multas.revisiones.store', $multa), [
-                'caption' => 'CRISTOMAX SAS', 'registeredOn' => '2026-05-07', 'reason' => 'Razón social según AFIP',
+                'caption' => 'CRISTOMAX SAS', 'registeredOn' => '2026-05-07', 'reasonCode' => 'misread_paper', 'reason' => 'Razón social según AFIP',
                 'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
             ])
             ->assertSessionHasNoErrors()
@@ -454,7 +458,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.revisiones.store', $multa), [
-                'caption' => 'CRISTOMAX S.A.S', 'registeredOn' => '2026-05', 'reason' => 'Solo se sabe el mes',
+                'caption' => 'CRISTOMAX S.A.S', 'registeredOn' => '2026-05', 'reasonCode' => 'other', 'reason' => 'Solo se sabe el mes',
                 'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
             ])
             ->assertSessionHasErrors('registeredOn');
@@ -467,7 +471,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.expedientes.revisiones.store', $otro), [
-                'number' => 169607, 'year' => 2024, 'suffix' => '0', 'reason' => 'Era el mismo',
+                'number' => 169607, 'year' => 2024, 'suffix' => '0', 'reasonCode' => 'data_entry_error', 'reason' => 'Era el mismo',
                 'expected' => ['number' => 1, 'year' => 2024, 'suffix' => null],
             ])
             ->assertSessionHasErrors('number');
@@ -491,7 +495,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         // A corrige la carátula.
         $this->actingAs($contador)
             ->post(route('multas.revisiones.store', $multa), [
-                'caption' => 'CRISTOMAX SAS', 'registeredOn' => '2026-05-07', 'reason' => 'Razón social según AFIP',
+                'caption' => 'CRISTOMAX SAS', 'registeredOn' => '2026-05-07', 'reasonCode' => 'misread_paper', 'reason' => 'Razón social según AFIP',
                 'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
             ])
             ->assertSessionHasNoErrors()
@@ -513,7 +517,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         // C también abrió antes y sí quiere cambiar la carátula: se rechaza.
         $this->actingAs($contador)
             ->post(route('multas.revisiones.store', $multa), [
-                'caption' => 'CRISTOMAX', 'personId' => null, 'registeredOn' => '2026-05-07', 'reason' => 'Otra lectura',
+                'caption' => 'CRISTOMAX', 'personId' => null, 'registeredOn' => '2026-05-07', 'reasonCode' => 'misread_paper', 'reason' => 'Otra lectura',
                 'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
             ])
             ->assertSessionHasErrors('reason');
@@ -666,6 +670,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
             'amount' => $importe,
             'effectiveOn' => '2026-06-01',
             'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
+            'reasonCode' => 'appeal_admitted',
             'reason' => 'Recurso jerárquico parcialmente admitido',
         ];
     }

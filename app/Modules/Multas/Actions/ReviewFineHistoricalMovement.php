@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Actions;
 
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,7 @@ final class ReviewFineHistoricalMovement
         HistoricalMovementStatus $resultado,
         ?string $note,
         ?int $actorId,
+        ?FineReasonCode $rejectionReason = null,
     ): FineHistoricalMovement {
         if ($resultado === HistoricalMovementStatus::PendingReview) {
             throw new InvalidArgumentException('Revisar es validar o descartar.');
@@ -41,11 +44,18 @@ final class ReviewFineHistoricalMovement
 
         $nota = trim((string) $note);
 
-        if ($resultado === HistoricalMovementStatus::Rejected && $nota === '') {
-            throw ValidationException::withMessages(['note' => 'Decí por qué se descarta el antecedente.']);
+        // Descartar elige el motivo de la lista y la nota es su detalle.
+        if ($resultado === HistoricalMovementStatus::Rejected && $rejectionReason === null) {
+            throw ValidationException::withMessages(['reasonCode' => 'Elegí por qué se descarta el antecedente.']);
         }
 
-        return DB::transaction(function () use ($antecedente, $resultado, $nota, $actorId): FineHistoricalMovement {
+        if ($rejectionReason === FineReasonCode::Other && $nota === '') {
+            throw ValidationException::withMessages(['note' => 'Con «Otro», contá el motivo en el detalle.']);
+        }
+
+        $codigo = $resultado === HistoricalMovementStatus::Rejected ? $rejectionReason : null;
+
+        return DB::transaction(function () use ($antecedente, $resultado, $nota, $codigo, $actorId): FineHistoricalMovement {
             $fila = FineHistoricalMovement::query()->whereKey($antecedente->id)->lockForUpdate()->firstOrFail();
 
             if ($fila->status !== HistoricalMovementStatus::PendingReview) {
@@ -60,6 +70,7 @@ final class ReviewFineHistoricalMovement
                 'status' => $resultado,
                 'reviewed_by' => $actorId,
                 'reviewed_at' => now(),
+                'review_reason_code' => $codigo,
                 'review_note' => $nota === '' ? null : $nota,
             ]);
 
@@ -77,7 +88,7 @@ final class ReviewFineHistoricalMovement
                 metadata: array_filter([
                     'amount' => $fila->amount,
                     'respaldo' => $fila->evidence_text,
-                    'reason' => $fila->review_note,
+                    'reason' => FineReason::text($codigo, $fila->review_note),
                 ]),
                 actorId: $actorId,
             );

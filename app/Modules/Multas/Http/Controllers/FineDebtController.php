@@ -16,12 +16,14 @@ use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Los ajustes de la obligación y su reversión.
@@ -50,7 +52,7 @@ final class FineDebtController extends Controller
             (string) $request->validated('amount'),
             CarbonImmutable::parse((string) $request->validated('effectiveOn')),
             $documento,
-            (string) $request->validated('reason'),
+            FineReason::fromValidated($request->validated()) ?? throw new LogicException('El motivo del ajuste ya se validó.'),
             $request->user()?->id,
         );
 
@@ -61,7 +63,7 @@ final class FineDebtController extends Controller
 
     public function reverse(ReasonRequest $request, FineDebtEntry $entry, ReverseFineDebtEntry $revertir): RedirectResponse
     {
-        $revertir->handle($entry, (string) $request->validated('reason'), $request->user()?->id);
+        $revertir->handle($entry, $request->reason(), $request->user()?->id);
 
         Toast::success('Ajuste revertido.');
 
@@ -82,7 +84,7 @@ final class FineDebtController extends Controller
             $entry,
             ['effective_on' => $fecha->date, 'effective_precision' => $fecha->precision->value],
             ['effective_on' => $fechaVista->date, 'effective_precision' => $fechaVista->precision->value],
-            $request->validated('reason'),
+            FineReason::fromValidated($request->validated()),
             $request->canCorrect(),
             $request->user()?->id,
         );

@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import ReasonFields from '@/features/multas/components/reason-fields';
 import { HISTORICAL_KIND, partialDate } from '@/features/multas/labels';
 import { review } from '@/routes/multas/antecedentes';
 
@@ -25,6 +26,7 @@ export default function ReviewHistoricalDialog({
     const valida = resultado === 'validated';
     const { data, setData, post, processing, errors } = useForm({
         status: resultado,
+        reasonCode: '' as App.Modules.Multas.Enums.FineReasonCode | '',
         note: '',
     });
 
@@ -64,31 +66,41 @@ export default function ReviewHistoricalDialog({
                 </span>
             </p>
 
-            <div>
-                <Label htmlFor="revision-nota">
-                    {valida ? 'Nota' : 'Motivo'}
-                    {valida && (
+            {!valida && (
+                <ReasonFields
+                    act="historical_rejection"
+                    code={data.reasonCode}
+                    detail={data.note}
+                    onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                    onDetailChange={(detalle) => setData('note', detalle)}
+                    codeError={errors.reasonCode}
+                    detailError={errors.note}
+                    idPrefix="revision-nota"
+                    detailPlaceholder="Por qué no corresponde."
+                />
+            )}
+
+            {valida && (
+                <div>
+                    <Label htmlFor="revision-nota">
+                        Nota
                         <span className="ml-1 font-normal text-muted-foreground">
                             (opcional)
                         </span>
-                    )}
-                </Label>
-                <Textarea
-                    id="revision-nota"
-                    className="mt-1"
-                    rows={2}
-                    maxLength={500}
-                    value={data.note}
-                    onChange={(e) => setData('note', e.target.value)}
-                    placeholder={
-                        valida
-                            ? 'Contra qué se verificó.'
-                            : 'Por qué no corresponde.'
-                    }
-                    aria-invalid={Boolean(errors.note)}
-                />
-                <FieldError message={errors.note} />
-            </div>
+                    </Label>
+                    <Textarea
+                        id="revision-nota"
+                        className="mt-1"
+                        rows={2}
+                        maxLength={500}
+                        value={data.note}
+                        onChange={(e) => setData('note', e.target.value)}
+                        placeholder="Contra qué se verificó."
+                        aria-invalid={Boolean(errors.note)}
+                    />
+                    <FieldError message={errors.note} />
+                </div>
+            )}
         </FormDialog>
     );
 }
