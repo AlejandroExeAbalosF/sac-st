@@ -13,9 +13,9 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +49,7 @@ final class AdjustFineDebt
         string $amount,
         CarbonImmutable $effectiveOn,
         FineDocument|NewDocument $documento,
-        FineReason $reason,
+        Reason $reason,
         ?int $actorId,
     ): FineDebtEntry {
         if (! in_array($tipo, [FineDebtEntryKind::Increase, FineDebtEntryKind::Reduction], true)) {

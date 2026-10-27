@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
+import ReasonFields from '@/components/reason-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,7 +14,6 @@ import {
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday, parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/ajustes';
 

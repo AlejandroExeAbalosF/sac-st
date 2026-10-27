@@ -10,14 +10,15 @@ use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Actions\RevokeFineDocumentLink;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
+use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDocument;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
@@ -110,7 +111,7 @@ final class FineDocumentController extends Controller
             $fineDocument,
             $cambios,
             $esperados,
-            FineReason::fromValidated($request->validated()),
+            Reason::fromValidated($request->validated(), FineReasonAct::Correction),
             $request->canCorrect(),
             $request->user()?->id,
         );

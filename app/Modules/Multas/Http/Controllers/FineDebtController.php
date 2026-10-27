@@ -10,15 +10,16 @@ use App\Modules\Multas\Actions\ReverseFineDebtEntry;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Enums\FineDebtEntryKind;
 use App\Modules\Multas\Enums\FineDocumentKind;
+use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\AdjustFineDebtRequest;
 use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -52,7 +53,7 @@ final class FineDebtController extends Controller
             (string) $request->validated('amount'),
             CarbonImmutable::parse((string) $request->validated('effectiveOn')),
             $documento,
-            FineReason::fromValidated($request->validated()) ?? throw new LogicException('El motivo del ajuste ya se validó.'),
+            Reason::fromValidated($request->validated(), FineReasonAct::Adjustment) ?? throw new LogicException('El motivo del ajuste ya se validó.'),
             $request->user()?->id,
         );
 
@@ -84,7 +85,7 @@ final class FineDebtController extends Controller
             $entry,
             ['effective_on' => $fecha->date, 'effective_precision' => $fecha->precision->value],
             ['effective_on' => $fechaVista->date, 'effective_precision' => $fechaVista->precision->value],
-            FineReason::fromValidated($request->validated()),
+            Reason::fromValidated($request->validated(), FineReasonAct::Correction),
             $request->canCorrect(),
             $request->user()?->id,
         );

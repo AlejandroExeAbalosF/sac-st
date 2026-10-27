@@ -6,8 +6,8 @@ namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\TwoDigitYear;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -48,7 +48,7 @@ final class ReviseFineRecordRequest extends FormRequest
 
         $reglas = [
             // Completar no pide motivo; corregir, sí: lo decide el Action.
-            ...FineReason::rules(FineReasonAct::Correction, required: false),
+            ...Reason::rules(FineReasonAct::Correction, required: false),
             'expected' => ['required', 'array'],
         ];
 

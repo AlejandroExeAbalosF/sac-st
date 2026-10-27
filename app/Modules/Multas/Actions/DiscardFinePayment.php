@@ -7,8 +7,8 @@ namespace App\Modules\Multas\Actions;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -27,7 +27,7 @@ final class DiscardFinePayment
     /**
      * @throws ValidationException
      */
-    public function handle(FinePayment $pago, FineReason $motivo, ?int $actorId): FinePayment
+    public function handle(FinePayment $pago, Reason $motivo, ?int $actorId): FinePayment
     {
         return DB::transaction(function () use ($pago, $motivo, $actorId): FinePayment {
             $multa = Fine::query()->whereKey($pago->fine_id)->lockForUpdate()->firstOrFail();

@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import InputError from '@/components/input-error';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -8,20 +9,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { FieldError } from '@/features/multas/components/form-dialog';
 
-type Acto = App.Modules.Multas.Enums.FineReasonAct;
-type Codigo = App.Modules.Multas.Enums.FineReasonCode;
-type Opcion = { value: Codigo; label: string };
+type Opcion = { value: string; label: string };
 
 /**
  * El motivo de un acto: se elige de la lista y el detalle es opcional, salvo
  * con «Otro».
  *
- * La lista la manda el servidor (`motivos`, por acto): es la misma que valida
- * el Form Request y la que acepta la base.
+ * La lista la manda el servidor en la prop `motivos`, por acto: es la misma
+ * que valida el Form Request y la que acepta la base (`Reason`). Cada módulo
+ * tipa sus actos y sus códigos.
  */
-export default function ReasonFields({
+export default function ReasonFields<A extends string, C extends string>({
     act,
     code,
     detail,
@@ -32,11 +31,12 @@ export default function ReasonFields({
     idPrefix = 'motivo',
     hint,
     detailPlaceholder,
+    maxLength = 500,
 }: {
-    act: Acto;
-    code: Codigo | '';
+    act: A;
+    code: C | '';
     detail: string;
-    onCodeChange: (code: Codigo) => void;
+    onCodeChange: (code: C) => void;
     onDetailChange: (detail: string) => void;
     codeError?: string;
     detailError?: string;
@@ -44,11 +44,16 @@ export default function ReasonFields({
     /** Cuándo hace falta, si no siempre: «si corregís un dato ya cargado». */
     hint?: string;
     detailPlaceholder?: string;
+    /** El largo de la columna del detalle. */
+    maxLength?: number;
 }) {
-    const { motivos } = usePage<{ motivos?: Record<Acto, Opcion[]> }>().props;
+    const { motivos } = usePage<{ motivos?: Record<string, Opcion[]> }>().props;
+    const opciones = motivos?.[act];
 
-    if (motivos === undefined) {
-        throw new Error('La pantalla no recibió las listas de motivos.');
+    if (opciones === undefined) {
+        throw new Error(
+            `La pantalla no recibió la lista de motivos de «${act}».`,
+        );
     }
 
     const otro = code === 'other';
@@ -66,7 +71,7 @@ export default function ReasonFields({
                 </Label>
                 <Select
                     value={code === '' ? undefined : code}
-                    onValueChange={(valor) => onCodeChange(valor as Codigo)}
+                    onValueChange={(valor) => onCodeChange(valor as C)}
                 >
                     <SelectTrigger
                         id={`${idPrefix}-codigo`}
@@ -76,14 +81,14 @@ export default function ReasonFields({
                         <SelectValue placeholder="Elegí el motivo" />
                     </SelectTrigger>
                     <SelectContent>
-                        {motivos[act].map((opcion) => (
+                        {opciones.map((opcion) => (
                             <SelectItem key={opcion.value} value={opcion.value}>
                                 {opcion.label}
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
-                <FieldError message={codeError} />
+                <InputError className="mt-1" message={codeError} />
             </div>
             <div>
                 <Label htmlFor={`${idPrefix}-detalle`}>
@@ -96,13 +101,13 @@ export default function ReasonFields({
                     id={`${idPrefix}-detalle`}
                     className="mt-1"
                     rows={2}
-                    maxLength={500}
+                    maxLength={maxLength}
                     value={detail}
                     onChange={(e) => onDetailChange(e.target.value)}
                     placeholder={detailPlaceholder}
                     aria-invalid={Boolean(detailError)}
                 />
-                <FieldError message={detailError} />
+                <InputError className="mt-1" message={detailError} />
             </div>
         </div>
     );

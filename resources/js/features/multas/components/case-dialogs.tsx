@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import PartialDateInput from '@/components/partial-date-input';
+import ReasonFields from '@/components/reason-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,7 +16,6 @@ import DocumentFields, {
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 import { ACT_TYPE } from '@/features/multas/labels';
 import { businessToday } from '@/lib/format';
 import { store as storeRevisionDeDocumento } from '@/routes/multas/documentos/revisiones';
@@ -296,12 +296,14 @@ export function ReviseDocumentDialog({
     );
 }
 
-function MotivoDeCorreccion(
-    props: Omit<
-        React.ComponentProps<typeof ReasonFields>,
-        'act' | 'idPrefix' | 'hint'
-    >,
-) {
+function MotivoDeCorreccion(props: {
+    code: Codigo | '';
+    detail: string;
+    onCodeChange: (code: Codigo) => void;
+    onDetailChange: (detail: string) => void;
+    codeError?: string;
+    detailError?: string;
+}) {
     return (
         <ReasonFields
             {...props}

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Data;
 
 use App\Modules\Multas\Enums\FineDocumentRole;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Models\FineDocument;
-use App\Modules\Multas\Support\FineReason;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -41,7 +42,7 @@ final class FineRevokedDocumentData extends Data
             documentId: $documento->id,
             label: $documento->label(),
             role: FineDocumentRole::from($vinculo->role),
-            reason: FineReason::stored($vinculo->revocation_reason_code, $vinculo->revocation_reason),
+            reason: Reason::stored(FineReasonCode::from($vinculo->revocation_reason_code), $vinculo->revocation_reason),
             revokedAt: Carbon::parse($vinculo->revoked_at)->toIso8601String(),
             revokedByName: $vinculo->revoked_by === null ? null : ($nombres[$vinculo->revoked_by] ?? null),
         );

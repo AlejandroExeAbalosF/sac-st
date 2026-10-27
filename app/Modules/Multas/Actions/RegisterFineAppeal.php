@@ -13,10 +13,10 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
@@ -204,7 +204,7 @@ final class RegisterFineAppeal
             throw ValidationException::withMessages(['replacesPaymentId' => 'Ese pago ya no está informado: lo que ya se aplicó tiene recibo y no se corrige así.']);
         }
 
-        $this->descartar->handle($anterior, new FineReason(FineReasonCode::ReplacedByCorrection, $motivo), $actorId);
+        $this->descartar->handle($anterior, new Reason(FineReasonCode::ReplacedByCorrection, $motivo), $actorId);
     }
 
     /**

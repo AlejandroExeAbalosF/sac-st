@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
+import ReasonFields from '@/components/reason-fields';
 import FormDialog from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 
 type Acto = App.Modules.Multas.Enums.FineReasonAct;
 type Codigo = App.Modules.Multas.Enums.FineReasonCode;

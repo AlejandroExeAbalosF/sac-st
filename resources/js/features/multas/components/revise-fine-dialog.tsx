@@ -2,12 +2,12 @@ import { useForm } from '@inertiajs/react';
 import PartialDateInput from '@/components/partial-date-input';
 import PersonPicker from '@/components/person-picker';
 import type { PersonOption } from '@/components/person-picker';
+import ReasonFields from '@/components/reason-fields';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday } from '@/lib/format';
 import { store } from '@/routes/multas/revisiones';
 

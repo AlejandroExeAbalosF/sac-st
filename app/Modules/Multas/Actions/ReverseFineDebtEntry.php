@@ -10,8 +10,8 @@ use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +34,7 @@ final class ReverseFineDebtEntry
         private readonly RecordAuditEvent $auditar,
     ) {}
 
-    public function handle(FineDebtEntry $ajuste, FineReason $reason, ?int $actorId): FineDebtEntry
+    public function handle(FineDebtEntry $ajuste, Reason $reason, ?int $actorId): FineDebtEntry
     {
         return DB::transaction(function () use ($ajuste, $reason, $actorId): FineDebtEntry {
             $multa = Fine::query()->whereKey($ajuste->fine_id)->lockForUpdate()->firstOrFail();

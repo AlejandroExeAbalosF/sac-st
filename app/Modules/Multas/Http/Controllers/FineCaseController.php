@@ -16,9 +16,9 @@ use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Support\FineAttachments;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Ui\Toast;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -100,7 +100,7 @@ final class FineCaseController extends Controller
                     'year' => $request->validated('expected.year'),
                     'suffix' => $request->validated('expected.suffix'),
                 ],
-                FineReason::fromValidated($request->validated()),
+                Reason::fromValidated($request->validated(), FineReasonAct::Correction),
                 $request->canCorrect(),
                 $request->user()?->id,
             );

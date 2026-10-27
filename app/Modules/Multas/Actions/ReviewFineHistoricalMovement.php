@@ -9,8 +9,8 @@ use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -88,7 +88,7 @@ final class ReviewFineHistoricalMovement
                 metadata: array_filter([
                     'amount' => $fila->amount,
                     'respaldo' => $fila->evidence_text,
-                    'reason' => FineReason::text($codigo, $fila->review_note),
+                    'reason' => Reason::text($codigo, $fila->review_note),
                 ]),
                 actorId: $actorId,
             );

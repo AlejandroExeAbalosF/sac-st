@@ -33,10 +33,10 @@ use App\Modules\Multas\Support\FineCaseListQuery;
 use App\Modules\Multas\Support\FineCaseNumber;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Multas\Support\FineListQuery;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Excel\SpreadsheetWriter;
 use App\Support\Money\Decimal;
@@ -339,7 +339,7 @@ final class FineController extends Controller
                 'registered_on' => $fechaVista->date,
                 'registered_precision' => $fechaVista->precision->value,
             ],
-            FineReason::fromValidated($request->validated()),
+            Reason::fromValidated($request->validated(), FineReasonAct::Correction),
             $request->canCorrect(),
             $request->user()?->id,
         );

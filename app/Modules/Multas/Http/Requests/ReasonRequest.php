@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Enums\FineReasonAct;
-use App\Modules\Multas\Support\FineReason;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
 use LogicException;
 
@@ -24,7 +24,7 @@ final class ReasonRequest extends FormRequest
      */
     public function rules(): array
     {
-        return FineReason::rules($this->act());
+        return Reason::rules($this->act());
     }
 
     /**
@@ -32,7 +32,7 @@ final class ReasonRequest extends FormRequest
      */
     public function messages(): array
     {
-        return FineReason::messages();
+        return Reason::messages();
     }
 
     /**
@@ -43,9 +43,9 @@ final class ReasonRequest extends FormRequest
         return ['reasonCode' => 'motivo', 'reason' => 'detalle'];
     }
 
-    public function reason(): FineReason
+    public function reason(): Reason
     {
-        return FineReason::fromValidated($this->validated())
+        return Reason::fromValidated($this->validated(), $this->act())
             ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
     }
 

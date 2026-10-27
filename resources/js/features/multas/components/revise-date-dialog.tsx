@@ -1,10 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import PartialDateInput from '@/components/partial-date-input';
+import ReasonFields from '@/components/reason-fields';
 import { Label } from '@/components/ui/label';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 import { businessToday } from '@/lib/format';
 
 /**

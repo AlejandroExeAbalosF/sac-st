@@ -25,10 +25,10 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineBankCredits;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -359,7 +359,7 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
     public function test_the_database_keeps_the_presentation_of_a_correction(): void
     {
         $multa = $this->escenario();
-        $descartado = app(DiscardFinePayment::class)->handle($this->informar($multa, '1000.00'), new FineReason(FineReasonCode::Duplicate), $this->quienAbre());
+        $descartado = app(DiscardFinePayment::class)->handle($this->informar($multa, '1000.00'), new Reason(FineReasonCode::Duplicate), $this->quienAbre());
         $fila = [
             ...$this->filaInformada($multa),
             'replaces_fine_payment_id' => $descartado->id,

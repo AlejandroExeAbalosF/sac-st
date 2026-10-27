@@ -9,8 +9,8 @@ use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +30,7 @@ final class RevokeFineDocumentLink
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
 
-    public function handle(Fine $multa, FineDocument $documento, FineDocumentRole $papel, FineReason $reason, ?int $actorId): void
+    public function handle(Fine $multa, FineDocument $documento, FineDocumentRole $papel, Reason $reason, ?int $actorId): void
     {
         DB::transaction(function () use ($multa, $documento, $papel, $reason, $actorId): void {
             // Como el ajuste: dos actos simultáneos sobre la multa no se cruzan.

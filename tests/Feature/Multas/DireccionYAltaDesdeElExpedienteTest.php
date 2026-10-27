@@ -8,7 +8,7 @@ use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
-use App\Modules\Multas\Support\FineReason;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -75,7 +75,7 @@ class DireccionYAltaDesdeElExpedienteTest extends TestCase
             $expediente,
             ['number' => 169607, 'year' => 2024, 'suffix' => '1'],
             ['number' => 169607, 'year' => 2024, 'suffix' => '0'],
-            new FineReason(FineReasonCode::MisreadPaper, 'El sufijo del papel es 1'),
+            new Reason(FineReasonCode::MisreadPaper, 'El sufijo del papel es 1'),
             true,
             null,
         );

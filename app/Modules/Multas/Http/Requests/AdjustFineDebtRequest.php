@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Enums\FineReasonAct;
-use App\Modules\Multas\Support\FineReason;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -30,7 +30,7 @@ final class AdjustFineDebtRequest extends FormRequest
             'document' => ['nullable', 'array'],
             'document.text' => ['required_without:documentId', 'nullable', 'string', 'max:120'],
             'document.issuedOn' => ['required_without:documentId', 'nullable', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
-            ...FineReason::rules(FineReasonAct::Adjustment),
+            ...Reason::rules(FineReasonAct::Adjustment),
         ];
     }
 
@@ -39,7 +39,7 @@ final class AdjustFineDebtRequest extends FormRequest
      */
     public function messages(): array
     {
-        return FineReason::messages();
+        return Reason::messages();
     }
 
     /**

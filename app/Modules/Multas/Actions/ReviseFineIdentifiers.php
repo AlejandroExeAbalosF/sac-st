@@ -11,8 +11,8 @@ use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Models\FineIdentifierRevision;
-use App\Modules\Multas\Support\FineReason;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +76,7 @@ final class ReviseFineIdentifiers
         FineCase|FineDocument|Fine|FineDebtEntry|FineHistoricalMovement $sujeto,
         array $cambios,
         array $esperados,
-        ?FineReason $reason,
+        ?Reason $reason,
         bool $puedeCorregir,
         ?int $actorId,
     ): ?FineIdentifierRevision {

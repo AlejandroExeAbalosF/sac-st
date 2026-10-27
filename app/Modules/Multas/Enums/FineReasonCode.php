@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Enums;
 
+use App\Modules\Shared\Support\ReasonCode;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
@@ -15,7 +16,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * ajustar con el área.
  */
 #[TypeScript]
-enum FineReasonCode: string
+enum FineReasonCode: string implements ReasonCode
 {
     case DataEntryError = 'data_entry_error';
     case Duplicate = 'duplicate';

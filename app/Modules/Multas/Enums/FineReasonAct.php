@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Enums;
 
+use App\Modules\Shared\Support\Reason;
+use App\Modules\Shared\Support\ReasonAct;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
@@ -14,7 +16,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * (`2026_10_27_020000_add_reason_codes_to_fines`).
  */
 #[TypeScript]
-enum FineReasonAct: string
+enum FineReasonAct: string implements ReasonAct
 {
     case Adjustment = 'adjustment';
     case Reversal = 'reversal';
@@ -41,19 +43,10 @@ enum FineReasonAct: string
     /**
      * Lo que ofrece cada pantalla, en el orden de la lista.
      *
-     * @return array<string, list<array{value: string, label: string}>>
+     * @return array<string, list<array{value: string|int, label: string}>>
      */
     public static function options(): array
     {
-        $opciones = [];
-
-        foreach (self::cases() as $acto) {
-            $opciones[$acto->value] = array_map(
-                static fn (FineReasonCode $codigo): array => ['value' => $codigo->value, 'label' => $codigo->label()],
-                $acto->codes(),
-            );
-        }
-
-        return $opciones;
+        return Reason::options(self::class);
     }
 }

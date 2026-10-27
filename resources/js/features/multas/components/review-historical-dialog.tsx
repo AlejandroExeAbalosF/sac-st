@@ -1,11 +1,11 @@
 import { useForm } from '@inertiajs/react';
 import Money from '@/components/money';
+import ReasonFields from '@/components/reason-fields';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReasonFields from '@/features/multas/components/reason-fields';
 import { HISTORICAL_KIND, partialDate } from '@/features/multas/labels';
 import { review } from '@/routes/multas/antecedentes';
 

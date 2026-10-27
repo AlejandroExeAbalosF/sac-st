@@ -110,10 +110,11 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   «Otro». Son: ajustar la obligación, revertir un ajuste, descartar un pago,
   desvincular un documento, corregir un dato y descartar un pago anterior.
   **Base:** columnas `*_reason_code` con CHECK por tabla. **Action:** el motivo
-  llega como `FineReason`; la lista de cada acto es `FineReasonAct`.
+  llega como `Reason`, de Shared, el mismo que usa Haberes; la lista de cada acto es
+  `FineReasonAct`.
 - Cada acto acepta solo los códigos de su lista. **Base:** el CHECK de cada
   columna repite la lista; en `fine_debt_entries` depende del tipo de
-  movimiento. **Form Request:** `FineReason::rules()`.
+  movimiento. **Form Request:** `Reason::rules()`.
 - Hay motivo exactamente cuando el acto lo pide: un movimiento que no es el
   importe original, un pago descartado, un vínculo anulado, una revisión que
   corrige y un pago anterior descartado. Completar un dato no lleva motivo.
