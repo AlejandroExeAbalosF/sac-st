@@ -170,6 +170,21 @@ export default function ExpedienteDeMultas({
                     <CaseSheets
                         fines={multas}
                         documents={expediente.documents}
+                        addFine={
+                            can.register
+                                ? (resolucion, actas) =>
+                                      addFine(expediente.routeKey, {
+                                          query: {
+                                              ...(resolucion !== null && {
+                                                  resolucion,
+                                              }),
+                                              ...(actas.length > 0 && {
+                                                  actas,
+                                              }),
+                                          },
+                                      }).url
+                                : undefined
+                        }
                         attachments={adjuntosDeDocumentos}
                         can={can}
                         onAttach={(documento) =>

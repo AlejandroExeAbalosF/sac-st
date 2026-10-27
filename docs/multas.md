@@ -51,6 +51,19 @@ esa multa una sola vez. Los vínculos de modificación, ratificación y respaldo
 se muestran en la multa correspondiente; los documentos sin multas vinculadas
 y los archivos generales del expediente permanecen accesibles por separado.
 
+Quien carga multas tiene un **«+»** al final de Adjuntar y Corregir, que abre
+«Agregar multa» con documentos **fijos**: en la cabecera de la resolución, esa
+resolución sin actas; en la de las actas de un grupo, la resolución y esas actas; en
+un documento sin multa, ese documento. Es el caso de dos sancionados por la misma
+inspección, o de un papel que llegó antes que la multa. Un tooltip dice qué va a
+quedar fijo.
+
+Lo fijo se muestra como texto, sin selects, casillas, «Agregar un acta» ni archivos:
+solo se carga la multa. Con un acta sola, la resolución se elige o se escribe igual.
+Viaja en la dirección (`?resolucion=…&actas[]=…`), el servidor solo fija documentos de
+ese expediente y del tipo que corresponde, y el alta rechaza la que no los respete.
+Para otra combinación está el «Agregar multa» de la cabecera, que es libre.
+
 | Pantalla | Ruta | Permiso |
 | --- | --- | --- |
 | Expedientes y multas | `/multas/expedientes` | `multas.ver` |
@@ -103,10 +116,15 @@ Una multa se carga con todo lo que trae el papel:
   un aviso al lado del campo lo dice y lleva a su ficha; la multa se le agrega y
   se ofrecen sus documentos —un acta compartida por dos multas se carga una vez—. Si hay otro con el mismo número y año y distinto
   sufijo, se avisa: no se fusionan solos.
-- **Resolución.** Una del expediente o una nueva, con su fecha: es la fecha del
-  importe original.
-- **Actas.** Las del expediente o nuevas, con su tipo (laboral o higiene y
-  seguridad). Pueden no tener año.
+- **Resolución.** Si el expediente ya tiene resoluciones, primero se elige: el
+  select no trae ninguna elegida de antemano, para que nadie atribuya la multa a
+  una resolución por descuido, y al final ofrece «Otra resolución, que no está
+  cargada», que abre los campos para escribirla con su fecha —es la fecha del
+  importe original—. Sin resoluciones cargadas se escribe directo. Sin elegir ni
+  escribir, el alta pide elegirla.
+- **Actas.** Las del expediente, como casillas sin marcar, y «Agregar un acta que
+  no está cargada» para las nuevas, con su tipo (laboral o higiene y seguridad).
+  Pueden no tener año.
 - **Carátula, persona y fecha de registro.** La persona es opcional: la carátula
   alcanza para identificar al sancionado y es la que va a llevar el recibo. El mes
   de la fecha de registro es el período de origen de la multa.

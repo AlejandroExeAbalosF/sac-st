@@ -16,6 +16,7 @@ use App\Modules\Multas\Data\FineCaseListItemData;
 use App\Modules\Multas\Data\FineDetailData;
 use App\Modules\Multas\Data\FineDocumentData;
 use App\Modules\Multas\Data\FineListItemData;
+use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Http\Requests\FineIndexRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
@@ -138,6 +139,7 @@ final class FineController extends Controller
             'existente' => $existente === null ? null : FineCaseData::fromModel($existente->load('documents')),
             'similares' => $numero === null || $existente !== null ? [] : $this->similares($numero),
             'fijo' => false,
+            'preseleccion' => ['fixed' => false, 'resolutionId' => null, 'actIds' => []],
         ]);
     }
 
@@ -148,13 +150,50 @@ final class FineController extends Controller
      * cambia, y el alta lo identifica por id —un expediente importado puede
      * no tener el número normalizado que el campo pediría—.
      */
-    public function createForCase(FineCase $fineCase): Response
+    public function createForCase(Request $request, FineCase $fineCase): Response
     {
+        $fineCase->load('documents');
+
         return Inertia::render('multas/create', [
-            'existente' => FineCaseData::fromModel($fineCase->load('documents')),
+            'existente' => FineCaseData::fromModel($fineCase),
             'similares' => [],
             'fijo' => true,
+            'preseleccion' => $this->preseleccion($request, $fineCase),
         ]);
+    }
+
+    /**
+     * Los documentos fijos que trae el «+» de la ficha del expediente: el de
+     * una resolución, esa resolución sin actas; el de un grupo, su resolución
+     * y sus actas; el de un documento sin multa, ese documento.
+     *
+     * Viajan en la consulta (`?resolucion=…&actas[]=…`) y se filtran contra
+     * los documentos del expediente y su tipo: lo que no corresponde se
+     * descarta. Si no queda nada, el formulario es el libre de siempre. Si
+     * queda, la multa se carga con exactamente esos documentos: las actas no
+     * se cambian ni se agregan, y la resolución tampoco si vino una —con un
+     * acta sola, la resolución se elige o se escribe—. `StoreFineRequest`
+     * rechaza un alta que no los respete.
+     *
+     * @return array{fixed: bool, resolutionId: int|null, actIds: list<int>}
+     */
+    private function preseleccion(Request $request, FineCase $fineCase): array
+    {
+        $documentos = $fineCase->documents->keyBy('id');
+        $resolucion = $request->integer('resolucion');
+        $actas = array_map(intval(...), array_filter((array) $request->query('actas', []), is_numeric(...)));
+
+        $resolucionId = ($documentos->get($resolucion)?->kind === FineDocumentKind::Resolution) ? $resolucion : null;
+        $actIds = array_values(array_unique(array_filter(
+            $actas,
+            fn (int $id): bool => $documentos->get($id)?->kind === FineDocumentKind::Act,
+        )));
+
+        return [
+            'fixed' => $resolucionId !== null || $actIds !== [],
+            'resolutionId' => $resolucionId,
+            'actIds' => $actIds,
+        ];
     }
 
     public function store(StoreFineRequest $request, RegisterFine $registrar): RedirectResponse

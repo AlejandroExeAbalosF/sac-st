@@ -38,6 +38,15 @@ final class StoreFineRequest extends FormRequest
             'resolution.text' => ['required_without:resolutionId', 'nullable', 'string', 'max:120'],
             'resolution.issuedOn' => ['required_without:resolutionId', 'nullable', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
 
+            /*
+             * Los documentos fijos del «+» de la ficha: si vienen, la multa se
+             * carga con exactamente esos (ver `respetaLosDocumentosFijos`).
+             */
+            'fixedDocuments' => ['nullable', 'array'],
+            'fixedDocuments.resolutionId' => ['nullable', 'integer'],
+            'fixedDocuments.actIds' => ['array', 'max:20'],
+            'fixedDocuments.actIds.*' => ['integer'],
+
             'actIds' => ['array', 'max:20'],
             'actIds.*' => ['integer', 'distinct'],
             'acts' => ['array', 'max:20'],
@@ -87,6 +96,9 @@ final class StoreFineRequest extends FormRequest
     public function messages(): array
     {
         return [
+            // Sin resolución elegida ni escrita: se dice qué hacer, no qué campo falta.
+            'resolution.text.required_without' => 'Elegí la resolución del expediente o cargá la que no está cargada.',
+            'resolution.issuedOn.required_without' => 'Falta la fecha de la resolución: es la fecha del importe original.',
             ...ScannedDocument::messages('caseFile', 'El archivo del expediente'),
             ...ScannedDocument::messages('resolutionFile', 'El archivo de la resolución'),
             ...ScannedDocument::messages('acts.*.file', 'El archivo del acta'),
@@ -113,7 +125,41 @@ final class StoreFineRequest extends FormRequest
                     );
                 }
             },
+            $this->respetaLosDocumentosFijos(...),
         ];
+    }
+
+    /**
+     * Con documentos fijos, la multa lleva exactamente esos: las mismas
+     * actas, ninguna nueva, y la resolución fija si vino una.
+     *
+     * Lo que se protege es la coherencia entre lo que la pantalla mostró
+     * fijo y lo que se guarda. No es un permiso: el formulario libre de
+     * «Agregar multa» deja elegir cualquier documento del expediente, y
+     * `RegisterFine` exige igual que cada uno sea de ese expediente.
+     */
+    private function respetaLosDocumentosFijos(Validator $validator): void
+    {
+        if (! is_array($this->input('fixedDocuments'))) {
+            return;
+        }
+
+        $fijas = array_map(intval(...), (array) $this->input('fixedDocuments.actIds', []));
+        $elegidas = array_map(intval(...), (array) $this->input('actIds', []));
+        sort($fijas);
+        sort($elegidas);
+
+        // Con archivos el pedido viaja como FormData, y ahí un nulo llega vacío.
+        $resolucionFija = $this->filled('fixedDocuments.resolutionId') ? $this->integer('fixedDocuments.resolutionId') : null;
+        $resolucionRespetada = $resolucionFija === null
+            || ($this->integer('resolutionId') === $resolucionFija && ! $this->filled('resolution.text'));
+
+        if ($fijas !== $elegidas || (array) $this->input('acts', []) !== [] || ! $resolucionRespetada) {
+            $validator->errors()->add(
+                'fixedDocuments',
+                'Los documentos de esta multa vienen fijos desde la ficha del expediente: no se cambian ni se agregan. Para otra combinación, usá «Agregar multa».',
+            );
+        }
     }
 
     protected function prepareForValidation(): void

@@ -6,7 +6,7 @@ import {
     Trash2,
     TriangleAlert,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import PageHeader from '@/components/page-header';
@@ -24,7 +24,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ACT_TYPE } from '@/features/multas/labels';
+import { ACT_TYPE, partialDate } from '@/features/multas/labels';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
@@ -49,12 +49,64 @@ type Props = {
      * ni se cambia, y el alta lo identifica por id.
      */
     fijo: boolean;
+    /**
+     * Los documentos fijos del «+» de la ficha: una resolución, la resolución
+     * y las actas de un grupo, o un documento sin multa. Con `fixed`, la
+     * multa se carga con exactamente esos: las actas no se cambian ni se
+     * agregan, y la resolución tampoco si vino una.
+     */
+    preseleccion: {
+        fixed: boolean;
+        resolutionId: number | null;
+        actIds: number[];
+    };
 };
 
 function FieldError({ message }: { message?: string }) {
     return message ? (
         <p className="mt-1 text-xs text-destructive-strong">{message}</p>
     ) : null;
+}
+
+/**
+ * Los documentos que vienen fijos desde un «+» de la ficha: se muestran como
+ * el número del expediente, sin nada que elegir.
+ */
+function DocumentosFijos({
+    titulo,
+    documentos,
+    vacio,
+}: {
+    titulo: string;
+    documentos: App.Modules.Multas.Data.FineDocumentData[];
+    vacio?: string;
+}) {
+    return (
+        <div className="grid gap-1.5">
+            <p className="text-sm font-medium">{titulo}</p>
+            {documentos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{vacio}</p>
+            ) : (
+                <ul className="grid gap-1.5">
+                    {documentos.map((documento) => (
+                        <li
+                            key={documento.id}
+                            className="max-w-md rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+                        >
+                            <span className="font-medium text-foreground">
+                                {documento.label}
+                            </span>{' '}
+                            ·{' '}
+                            {partialDate(
+                                documento.issuedOn,
+                                documento.issuedPrecision,
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 /**
@@ -69,7 +121,12 @@ function FieldError({ message }: { message?: string }) {
  * nueva, a ese documento. Las actas ya cargadas reciben el suyo desde la
  * ficha del expediente.
  */
-export default function NuevaMulta({ existente, similares, fijo }: Props) {
+export default function NuevaMulta({
+    existente,
+    similares,
+    fijo,
+    preseleccion,
+}: Props) {
     const { data, setData, post, transform, processing, errors } = useForm<{
         caseNumber: string;
         caseNotes: string;
@@ -87,10 +144,10 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
         caseNumber: existente?.originalText ?? '',
         caseNotes: '',
         caseFile: null,
-        resolutionId: null,
+        resolutionId: preseleccion.resolutionId,
         resolution: { text: '', issuedOn: '' },
         resolutionFile: null,
-        actIds: [],
+        actIds: preseleccion.actIds,
         acts: [],
         caption: '',
         personId: null,
@@ -103,6 +160,22 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
     const resoluciones =
         existente?.documents.filter((d) => d.kind === 'resolution') ?? [];
     const actas = existente?.documents.filter((d) => d.kind === 'act') ?? [];
+
+    /*
+     * Primero se elige: si el expediente tiene resoluciones, ninguna viene
+     * elegida de antemano —nadie atribuye la multa a una resolución por
+     * descuido— y escribir una nueva es la opción del final. Sin
+     * resoluciones cargadas no hay nada que elegir y se escribe directo.
+     */
+    const [cargarNueva, setCargarNueva] = useState(false);
+    const resolucionNueva = resoluciones.length === 0 || cargarNueva;
+
+    // Desde un «+»: lo fijo se muestra, no se elige. Con un acta sola, la resolución se elige igual.
+    const actasFijas = preseleccion.fixed;
+    const resolucionFija =
+        preseleccion.fixed && preseleccion.resolutionId !== null
+            ? resoluciones.find((r) => r.id === preseleccion.resolutionId)
+            : undefined;
 
     /*
      * Mientras se escribe el número se pregunta si el expediente existe, con
@@ -125,6 +198,7 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
             only: ['existente', 'similares'],
             data: { expediente: numero },
             onSuccess: () => {
+                setCargarNueva(false);
                 setData((actual) => ({
                     ...actual,
                     resolutionId: null,
@@ -153,9 +227,10 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
                       caseNotes:
                           datos.caseNotes === '' ? null : datos.caseNotes,
                   }),
+            // Sin elegir ni escribir no viaja nada: el servidor pide elegir.
             ...(datos.resolutionId !== null
                 ? { resolutionId: datos.resolutionId }
-                : { resolution: datos.resolution }),
+                : resolucionNueva && { resolution: datos.resolution }),
             actIds: datos.actIds,
             // Un archivo que no se eligió no viaja: sin él, la carga es la de siempre.
             acts: datos.acts.map(({ file, ...acta }) =>
@@ -164,6 +239,13 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
             ...(datos.caseFile !== null && { caseFile: datos.caseFile }),
             ...(datos.resolutionFile !== null && {
                 resolutionFile: datos.resolutionFile,
+            }),
+            // Lo que la pantalla mostró fijo: el servidor rechaza un alta que no lo respete.
+            ...(preseleccion.fixed && {
+                fixedDocuments: {
+                    resolutionId: preseleccion.resolutionId,
+                    actIds: preseleccion.actIds,
+                },
             }),
             caption: datos.caption,
             personId: datos.personId,
@@ -361,56 +443,91 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
                             Resolución y actas
                         </h2>
                         <p className="mt-1 text-xs text-muted-foreground">
-                            La resolución impone la multa: su fecha es la del
-                            importe original.
+                            {actasFijas
+                                ? 'Vienen fijos desde la ficha del expediente. Para otra combinación, usá «Agregar multa».'
+                                : 'La resolución impone la multa: su fecha es la del importe original.'}
                         </p>
+                        <FieldError message={errores.fixedDocuments} />
 
                         <div className="mt-4 grid gap-5">
-                            {resoluciones.length > 0 && (
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="resolutionId">
-                                        Resolución del expediente
-                                    </Label>
-                                    <Select
-                                        value={
-                                            data.resolutionId === null
-                                                ? 'nueva'
-                                                : String(data.resolutionId)
-                                        }
-                                        onValueChange={(valor) =>
-                                            setData(
-                                                'resolutionId',
-                                                valor === 'nueva'
-                                                    ? null
-                                                    : Number(valor),
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="resolutionId"
-                                            className="max-w-md"
+                            {resolucionFija ? (
+                                <DocumentosFijos
+                                    titulo="Resolución"
+                                    documentos={[resolucionFija]}
+                                />
+                            ) : (
+                                resoluciones.length > 0 && (
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="resolutionId">
+                                            Resolución
+                                        </Label>
+                                        <Select
+                                            value={
+                                                data.resolutionId !== null
+                                                    ? String(data.resolutionId)
+                                                    : cargarNueva
+                                                      ? 'nueva'
+                                                      : ''
+                                            }
+                                            onValueChange={(valor) => {
+                                                setCargarNueva(
+                                                    valor === 'nueva',
+                                                );
+                                                setData(
+                                                    'resolutionId',
+                                                    valor === 'nueva'
+                                                        ? null
+                                                        : Number(valor),
+                                                );
+                                            }}
                                         >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="nueva">
-                                                Cargar una resolución nueva
-                                            </SelectItem>
-                                            {resoluciones.map((r) => (
-                                                <SelectItem
-                                                    key={r.id}
-                                                    value={String(r.id)}
-                                                >
-                                                    {r.label}
+                                            <SelectTrigger
+                                                id="resolutionId"
+                                                className="max-w-md"
+                                                aria-invalid={Boolean(
+                                                    errors.resolutionId ??
+                                                    (!resolucionNueva &&
+                                                        errores[
+                                                            'resolution.text'
+                                                        ]),
+                                                )}
+                                            >
+                                                <SelectValue placeholder="Elegí la resolución" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {resoluciones.map((r) => (
+                                                    <SelectItem
+                                                        key={r.id}
+                                                        value={String(r.id)}
+                                                    >
+                                                        {r.label} ·{' '}
+                                                        {partialDate(
+                                                            r.issuedOn,
+                                                            r.issuedPrecision,
+                                                        )}
+                                                    </SelectItem>
+                                                ))}
+                                                <SelectItem value="nueva">
+                                                    Otra resolución, que no está
+                                                    cargada
                                                 </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FieldError message={errors.resolutionId} />
-                                </div>
+                                            </SelectContent>
+                                        </Select>
+                                        <FieldError
+                                            message={
+                                                errors.resolutionId ??
+                                                (resolucionNueva
+                                                    ? undefined
+                                                    : errores[
+                                                          'resolution.text'
+                                                      ])
+                                            }
+                                        />
+                                    </div>
+                                )
                             )}
 
-                            {data.resolutionId === null && (
+                            {data.resolutionId === null && resolucionNueva && (
                                 <div className="grid gap-x-8 gap-y-5 sm:grid-cols-12">
                                     <div className="sm:col-span-5">
                                         <Label htmlFor="resolutionText">
@@ -463,199 +580,243 @@ export default function NuevaMulta({ existente, similares, fijo }: Props) {
                                 </div>
                             )}
 
-                            <div className="lg:max-w-[58%]">
-                                <PaperPhotoDropzone
-                                    id="resolutionFile"
-                                    label="Archivo de la resolución"
-                                    foto={data.resolutionFile}
-                                    onElegir={(archivo) =>
-                                        setData('resolutionFile', archivo)
-                                    }
-                                    error={errores.resolutionFile}
-                                />
-                            </div>
-
-                            {actas.length > 0 && (
-                                <fieldset>
-                                    <legend className="text-sm font-medium">
-                                        Actas del expediente
-                                    </legend>
-                                    <div className="mt-2 grid gap-2">
-                                        {actas.map((acta) => (
-                                            <label
-                                                key={acta.id}
-                                                className="flex items-center gap-2 text-sm"
-                                            >
-                                                <Checkbox
-                                                    checked={data.actIds.includes(
-                                                        acta.id,
-                                                    )}
-                                                    onCheckedChange={(
-                                                        marcada,
-                                                    ) =>
-                                                        setData(
-                                                            'actIds',
-                                                            marcada === true
-                                                                ? [
-                                                                      ...data.actIds,
-                                                                      acta.id,
-                                                                  ]
-                                                                : data.actIds.filter(
-                                                                      (id) =>
-                                                                          id !==
-                                                                          acta.id,
-                                                                  ),
-                                                        )
-                                                    }
-                                                />
-                                                {acta.label}
-                                            </label>
-                                        ))}
-                                    </div>
-                                </fieldset>
-                            )}
-
-                            {data.acts.map((acta, i) => (
-                                <div
-                                    key={i}
-                                    className="grid items-start gap-x-6 gap-y-3 rounded-md border border-dashed p-3 sm:grid-cols-12"
-                                >
-                                    <div className="sm:col-span-4">
-                                        <Label htmlFor={`acta-tipo-${i}`}>
-                                            Tipo de acta
-                                        </Label>
-                                        <Select
-                                            value={acta.actType}
-                                            onValueChange={(valor) =>
-                                                cambiarActa(i, {
-                                                    actType: valor as ActType,
-                                                })
-                                            }
-                                        >
-                                            <SelectTrigger
-                                                id={`acta-tipo-${i}`}
-                                                className="mt-1"
-                                            >
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {(
-                                                    Object.keys(
-                                                        ACT_TYPE,
-                                                    ) as ActType[]
-                                                ).map((tipo) => (
-                                                    <SelectItem
-                                                        key={tipo}
-                                                        value={tipo}
-                                                    >
-                                                        {tipo} ·{' '}
-                                                        {ACT_TYPE[tipo]}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="sm:col-span-4">
-                                        <Label htmlFor={`acta-${i}`}>
-                                            Acta
-                                        </Label>
-                                        <Input
-                                            id={`acta-${i}`}
-                                            className="mt-1 font-mono"
-                                            value={acta.text}
-                                            onChange={(e) =>
-                                                cambiarActa(i, {
-                                                    text: e.target.value,
-                                                })
-                                            }
-                                            placeholder="N°1025288/25"
-                                            maxLength={120}
-                                            aria-invalid={Boolean(
-                                                errores[`acts.${i}.text`],
-                                            )}
-                                        />
-                                        <FieldError
-                                            message={errores[`acts.${i}.text`]}
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-3">
-                                        <Label htmlFor={`acta-fecha-${i}`}>
-                                            Fecha
-                                            <span className="ml-1 font-normal text-muted-foreground">
-                                                (opcional)
-                                            </span>
-                                        </Label>
-                                        <DateInput
-                                            id={`acta-fecha-${i}`}
-                                            className="mt-1"
-                                            value={acta.issuedOn}
-                                            onChange={(e) =>
-                                                cambiarActa(i, {
-                                                    issuedOn: e.target.value,
-                                                })
-                                            }
-                                        />
-                                        <FieldError
-                                            message={
-                                                errores[`acts.${i}.issuedOn`]
-                                            }
-                                        />
-                                    </div>
-                                    <div className="flex sm:col-span-1 sm:justify-end sm:pt-6">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            aria-label={`Quitar el acta ${i + 1}`}
-                                            onClick={() =>
+                            {!resolucionFija &&
+                                (data.resolutionId !== null ||
+                                    resolucionNueva) && (
+                                    <div className="lg:max-w-[58%]">
+                                        <PaperPhotoDropzone
+                                            id="resolutionFile"
+                                            label="Archivo de la resolución"
+                                            foto={data.resolutionFile}
+                                            onElegir={(archivo) =>
                                                 setData(
-                                                    'acts',
-                                                    data.acts.filter(
-                                                        (_, j) => j !== i,
-                                                    ),
+                                                    'resolutionFile',
+                                                    archivo,
                                                 )
                                             }
-                                        >
-                                            <Trash2 aria-hidden="true" />
-                                        </Button>
-                                    </div>
-                                    <div className="sm:col-span-11">
-                                        <PaperPhotoDropzone
-                                            id={`acta-archivo-${i}`}
-                                            label="Archivo del acta"
-                                            foto={acta.file}
-                                            onElegir={(archivo) =>
-                                                cambiarActa(i, {
-                                                    file: archivo,
-                                                })
-                                            }
-                                            error={errores[`acts.${i}.file`]}
+                                            error={errores.resolutionFile}
                                         />
                                     </div>
-                                </div>
-                            ))}
+                                )}
 
-                            <div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setData('acts', [
-                                            ...data.acts,
-                                            {
-                                                actType: 'HYS',
-                                                text: '',
-                                                issuedOn: '',
-                                                file: null,
-                                            },
-                                        ])
-                                    }
-                                >
-                                    <Plus aria-hidden="true" />
-                                    Agregar un acta
-                                </Button>
-                            </div>
+                            {actasFijas ? (
+                                <DocumentosFijos
+                                    titulo="Actas"
+                                    documentos={actas.filter((acta) =>
+                                        preseleccion.actIds.includes(acta.id),
+                                    )}
+                                    vacio="Sin actas: la multa se carga solo con la resolución."
+                                />
+                            ) : (
+                                <>
+                                    {actas.length > 0 && (
+                                        <fieldset>
+                                            <legend className="text-sm font-medium">
+                                                Actas del expediente
+                                            </legend>
+                                            <div className="mt-2 grid gap-2">
+                                                {actas.map((acta) => (
+                                                    <label
+                                                        key={acta.id}
+                                                        className="flex items-center gap-2 text-sm"
+                                                    >
+                                                        <Checkbox
+                                                            checked={data.actIds.includes(
+                                                                acta.id,
+                                                            )}
+                                                            onCheckedChange={(
+                                                                marcada,
+                                                            ) =>
+                                                                setData(
+                                                                    'actIds',
+                                                                    marcada ===
+                                                                        true
+                                                                        ? [
+                                                                              ...data.actIds,
+                                                                              acta.id,
+                                                                          ]
+                                                                        : data.actIds.filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  acta.id,
+                                                                          ),
+                                                                )
+                                                            }
+                                                        />
+                                                        {acta.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </fieldset>
+                                    )}
+
+                                    {data.acts.map((acta, i) => (
+                                        <div
+                                            key={i}
+                                            className="grid items-start gap-x-6 gap-y-3 rounded-md border border-dashed p-3 sm:grid-cols-12"
+                                        >
+                                            <div className="sm:col-span-4">
+                                                <Label
+                                                    htmlFor={`acta-tipo-${i}`}
+                                                >
+                                                    Tipo de acta
+                                                </Label>
+                                                <Select
+                                                    value={acta.actType}
+                                                    onValueChange={(valor) =>
+                                                        cambiarActa(i, {
+                                                            actType:
+                                                                valor as ActType,
+                                                        })
+                                                    }
+                                                >
+                                                    <SelectTrigger
+                                                        id={`acta-tipo-${i}`}
+                                                        className="mt-1"
+                                                    >
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(
+                                                            Object.keys(
+                                                                ACT_TYPE,
+                                                            ) as ActType[]
+                                                        ).map((tipo) => (
+                                                            <SelectItem
+                                                                key={tipo}
+                                                                value={tipo}
+                                                            >
+                                                                {tipo} ·{' '}
+                                                                {ACT_TYPE[tipo]}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="sm:col-span-4">
+                                                <Label htmlFor={`acta-${i}`}>
+                                                    Acta
+                                                </Label>
+                                                <Input
+                                                    id={`acta-${i}`}
+                                                    className="mt-1 font-mono"
+                                                    value={acta.text}
+                                                    onChange={(e) =>
+                                                        cambiarActa(i, {
+                                                            text: e.target
+                                                                .value,
+                                                        })
+                                                    }
+                                                    placeholder="N°1025288/25"
+                                                    maxLength={120}
+                                                    aria-invalid={Boolean(
+                                                        errores[
+                                                            `acts.${i}.text`
+                                                        ],
+                                                    )}
+                                                />
+                                                <FieldError
+                                                    message={
+                                                        errores[
+                                                            `acts.${i}.text`
+                                                        ]
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-3">
+                                                <Label
+                                                    htmlFor={`acta-fecha-${i}`}
+                                                >
+                                                    Fecha
+                                                    <span className="ml-1 font-normal text-muted-foreground">
+                                                        (opcional)
+                                                    </span>
+                                                </Label>
+                                                <DateInput
+                                                    id={`acta-fecha-${i}`}
+                                                    className="mt-1"
+                                                    value={acta.issuedOn}
+                                                    onChange={(e) =>
+                                                        cambiarActa(i, {
+                                                            issuedOn:
+                                                                e.target.value,
+                                                        })
+                                                    }
+                                                />
+                                                <FieldError
+                                                    message={
+                                                        errores[
+                                                            `acts.${i}.issuedOn`
+                                                        ]
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="flex sm:col-span-1 sm:justify-end sm:pt-6">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label={`Quitar el acta ${i + 1}`}
+                                                    onClick={() =>
+                                                        setData(
+                                                            'acts',
+                                                            data.acts.filter(
+                                                                (_, j) =>
+                                                                    j !== i,
+                                                            ),
+                                                        )
+                                                    }
+                                                >
+                                                    <Trash2 aria-hidden="true" />
+                                                </Button>
+                                            </div>
+                                            <div className="sm:col-span-11">
+                                                <PaperPhotoDropzone
+                                                    id={`acta-archivo-${i}`}
+                                                    label="Archivo del acta"
+                                                    foto={acta.file}
+                                                    onElegir={(archivo) =>
+                                                        cambiarActa(i, {
+                                                            file: archivo,
+                                                        })
+                                                    }
+                                                    error={
+                                                        errores[
+                                                            `acts.${i}.file`
+                                                        ]
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setData('acts', [
+                                                    ...data.acts,
+                                                    {
+                                                        actType: 'HYS',
+                                                        text: '',
+                                                        issuedOn: '',
+                                                        file: null,
+                                                    },
+                                                ])
+                                            }
+                                        >
+                                            <Plus aria-hidden="true" />
+                                            {actas.length > 0
+                                                ? 'Agregar un acta que no está cargada'
+                                                : 'Agregar un acta'}
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </section>
 

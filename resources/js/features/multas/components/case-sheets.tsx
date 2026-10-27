@@ -1,9 +1,14 @@
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Paperclip } from 'lucide-react';
+import { ArrowUpRight, Paperclip, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { caseSheets } from '@/features/multas/case-sheets';
 import {
     DEBT_STATUS,
@@ -24,6 +29,36 @@ type DocumentControls = {
     onRevise: (document: Documento) => void;
 };
 
+/**
+ * «Agregar multa» con esos documentos marcados. Ausente si quien mira no
+ * puede cargar multas: no se ofrece un botón que termine en un 403.
+ */
+type AddFine = (resolutionId: number | null, actIds: number[]) => string;
+
+/**
+ * Una multa con estos papeles: el caso de dos sancionados por la misma
+ * inspección, o de un papel que llegó antes que la multa. Va junto a
+ * Adjuntar y Corregir, como otra acción sobre el documento. Los documentos
+ * llegan marcados, pero el formulario deja cambiarlos —una segunda multa
+ * suele compartir el acta y traer su propia resolución—.
+ */
+type NewFine = { href: string; tooltip: string };
+
+function AddFineButton({ href, tooltip }: NewFine) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button asChild size="sm" variant="ghost" aria-label={tooltip}>
+                    <Link href={href}>
+                        <Plus aria-hidden="true" />
+                    </Link>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>{tooltip}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 /** El pliegue es decorativo; el contenido conserva todo el ancho disponible. */
 function Paper({ children, label }: { children: ReactNode; label: string }) {
     return (
@@ -42,11 +77,12 @@ function Paper({ children, label }: { children: ReactNode; label: string }) {
 
 function DocumentHeader({
     document,
+    newFine,
     attachments,
     can,
     onAttach,
     onRevise,
-}: DocumentControls & { document: Documento }) {
+}: DocumentControls & { document: Documento; newFine?: NewFine }) {
     const files = attachments[document.id] ?? [];
 
     return (
@@ -90,6 +126,7 @@ function DocumentHeader({
                             Corregir
                         </Button>
                     )}
+                    {newFine && <AddFineButton {...newFine} />}
                 </div>
             </div>
             {files.length > 0 ? (
@@ -181,8 +218,13 @@ function FineCard({ entry, ...controls }: DocumentControls & { entry: Multa }) {
 export default function CaseSheets({
     fines,
     documents,
+    addFine,
     ...controls
-}: DocumentControls & { fines: Multa[]; documents: Documento[] }) {
+}: DocumentControls & {
+    fines: Multa[];
+    documents: Documento[];
+    addFine?: AddFine;
+}) {
     const { resolutions, unlinked } = caseSheets(fines, documents);
 
     return (
@@ -213,6 +255,19 @@ export default function CaseSheets({
                                 <DocumentHeader
                                     key={document.id}
                                     document={document}
+                                    newFine={
+                                        addFine &&
+                                        resolution.documents.length === 1
+                                            ? {
+                                                  href: addFine(
+                                                      document.id,
+                                                      [],
+                                                  ),
+                                                  tooltip:
+                                                      'Agregar una multa con esta resolución',
+                                              }
+                                            : undefined
+                                    }
                                     {...controls}
                                 />
                             ))}
@@ -249,13 +304,46 @@ export default function CaseSheets({
                                                     Actas de origen
                                                 </p>
                                             )}
-                                            {act.documents.map((document) => (
-                                                <DocumentHeader
-                                                    key={document.id}
-                                                    document={document}
-                                                    {...controls}
-                                                />
-                                            ))}
+                                            {act.documents.map(
+                                                (document, index) => (
+                                                    <DocumentHeader
+                                                        key={document.id}
+                                                        document={document}
+                                                        newFine={
+                                                            // Una vez por grupo; con varias resoluciones de origen no se elige una por el operador.
+                                                            addFine &&
+                                                            index === 0
+                                                                ? {
+                                                                      href: addFine(
+                                                                          resolution
+                                                                              .documents
+                                                                              .length ===
+                                                                              1
+                                                                              ? resolution
+                                                                                    .documents[0]
+                                                                                    .id
+                                                                              : null,
+                                                                          act.documents.map(
+                                                                              ({
+                                                                                  id,
+                                                                              }) =>
+                                                                                  id,
+                                                                          ),
+                                                                      ),
+                                                                      tooltip:
+                                                                          act
+                                                                              .documents
+                                                                              .length >
+                                                                          1
+                                                                              ? 'Agregar una multa con esta resolución y estas actas'
+                                                                              : 'Agregar una multa con esta resolución y esta acta',
+                                                                  }
+                                                                : undefined
+                                                        }
+                                                        {...controls}
+                                                    />
+                                                ),
+                                            )}
                                         </div>
                                         <div className="border-t bg-muted/20 p-3 sm:p-4">
                                             {cards}
@@ -284,6 +372,24 @@ export default function CaseSheets({
                             <Paper key={document.id} label={document.label}>
                                 <DocumentHeader
                                     document={document}
+                                    newFine={
+                                        addFine && document.kind !== 'other'
+                                            ? {
+                                                  href:
+                                                      document.kind ===
+                                                      'resolution'
+                                                          ? addFine(
+                                                                document.id,
+                                                                [],
+                                                            )
+                                                          : addFine(null, [
+                                                                document.id,
+                                                            ]),
+                                                  tooltip:
+                                                      'Agregar una multa con este documento',
+                                              }
+                                            : undefined
+                                    }
                                     {...controls}
                                 />
                             </Paper>
