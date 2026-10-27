@@ -17,6 +17,7 @@ use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -45,11 +46,14 @@ final class FineDocumentController extends Controller
             $documento = NewDocument::fromArray($datos, FineDocumentKind::from((string) ($datos['kind'] ?? '')));
         }
 
+        $archivo = $request->file('file');
+
         $vincular->handle(
             $fine,
             $documento,
             FineDocumentRole::from((string) $request->validated('role')),
             $request->user()?->id,
+            $archivo instanceof UploadedFile ? $archivo : null,
         );
 
         Toast::success('Documento vinculado a la multa.');

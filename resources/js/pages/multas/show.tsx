@@ -23,6 +23,7 @@ import {
     AttachmentList,
 } from '@/features/multas/components/attachments';
 import BankPaymentDialog from '@/features/multas/components/bank-payment-dialog';
+import { ReviseDocumentDialog } from '@/features/multas/components/case-dialogs';
 import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import CollectionDeposit from '@/features/multas/components/collection-deposit';
@@ -51,6 +52,7 @@ import { store as attachToFine } from '@/routes/multas/adjuntos';
 import { reverse } from '@/routes/multas/ajustes';
 import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
 import { store as reviseMovementDate } from '@/routes/multas/antecedentes/revisiones';
+import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
 import { discard } from '@/routes/multas/pagos';
@@ -107,6 +109,8 @@ type Dialogo =
     | { tipo: 'recibo'; id: number; numero: string }
     | { tipo: 'revertir'; movimiento: Movimiento }
     | { tipo: 'vincular' }
+    | { tipo: 'adjuntar-documento'; documento: Documento }
+    | { tipo: 'corregir-documento'; documento: Documento }
     | { tipo: 'antecedente' }
     | {
           tipo: 'revisar';
@@ -328,6 +332,41 @@ export default function MultaShow({
                                             label={DOCUMENT_ROLE[rol]}
                                         />
                                     ))}
+                                </span>
+                                {/* El documento es del expediente: adjuntar o corregir lo ve cada multa que lo cita. */}
+                                <span className="flex basis-full flex-wrap justify-end gap-1">
+                                    {can.register && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                setDialogo({
+                                                    tipo: 'adjuntar-documento',
+                                                    documento,
+                                                })
+                                            }
+                                            aria-label={`Adjuntar archivo a ${documento.label}`}
+                                        >
+                                            <Paperclip aria-hidden="true" />
+                                            Adjuntar
+                                        </Button>
+                                    )}
+                                    {(can.register || can.adjust) && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                setDialogo({
+                                                    tipo: 'corregir-documento',
+                                                    documento,
+                                                })
+                                            }
+                                            aria-label={`Corregir ${documento.label}`}
+                                        >
+                                            <Pencil aria-hidden="true" />
+                                            Corregir
+                                        </Button>
+                                    )}
                                 </span>
                                 {(adjuntosDeDocumentos[documento.id] ?? [])
                                     .length > 0 && (
@@ -1099,6 +1138,20 @@ export default function MultaShow({
                     description="Deshace el ajuste entero, por el mismo importe. El ajuste queda a la vista marcado como revertido. Si solo una parte estaba mal, registrá otro ajuste."
                     url={reverse(dialogo.movimiento.id).url}
                     submitLabel="Revertir ajuste"
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'adjuntar-documento' && (
+                <AttachFileDialog
+                    url={attachToDocument(dialogo.documento.id).url}
+                    title={`Adjuntar el archivo de ${dialogo.documento.label}`}
+                    description="La foto o el PDF de este papel. Queda en el documento, y lo ve cada multa y cada expediente que lo usa."
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'corregir-documento' && (
+                <ReviseDocumentDialog
+                    documento={dialogo.documento}
                     onClose={cerrar}
                 />
             )}

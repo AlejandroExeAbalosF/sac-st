@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -55,6 +56,8 @@ export default function LinkDocumentDialog({
         documentId: (disponibles('ratification')[0]?.id ?? null) as
             number | null,
         document: EMPTY_DOCUMENT,
+        // La foto del documento nuevo: queda en el documento, no en la multa.
+        file: null as File | null,
     });
 
     const errores = errors as Record<string, string | undefined>;
@@ -65,6 +68,7 @@ export default function LinkDocumentDialog({
         const sigue = ofrecidos.some((d) => d.id === data.documentId);
 
         setData({
+            ...data,
             role: rol,
             documentId: sigue
                 ? data.documentId
@@ -82,7 +86,10 @@ export default function LinkDocumentDialog({
             role: datos.role,
             ...(datos.documentId !== null
                 ? { documentId: datos.documentId }
-                : { document: datos.document }),
+                : {
+                      document: datos.document,
+                      ...(datos.file !== null && { file: datos.file }),
+                  }),
         }));
 
         post(store(fineId).url, { preserveScroll: true, onSuccess: onClose });
@@ -165,6 +172,16 @@ export default function LinkDocumentDialog({
                     errors={errores}
                     idPrefix="vinculo-nuevo"
                     kinds={tipos(data.role)}
+                />
+            )}
+
+            {data.documentId === null && (
+                <PaperPhotoDropzone
+                    id="vinculo-nuevo-archivo"
+                    label="Archivo del documento"
+                    foto={data.file}
+                    onElegir={(archivo) => setData('file', archivo)}
+                    error={errores.file}
                 />
             )}
         </FormDialog>

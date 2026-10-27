@@ -10,8 +10,12 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Models\Attachment;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Vincula un documento del expediente con la multa, diciendo qué papel cumple.
@@ -20,17 +24,38 @@ use Illuminate\Validation\ValidationException;
  * sin cambiar su importe queda vinculada y la obligación no se mueve
  * (M04). También sirve para un acta o un papel de respaldo que llegó
  * después.
+ *
+ * El archivo, si llega, va al documento: es su foto, y la ven todas las
+ * multas que lo citan.
  */
 final class LinkFineDocument
 {
     public function __construct(
         private readonly AttachFineDocument $registrarDocumento,
+        private readonly AttachFineFile $adjuntar,
+        private readonly StoreAttachment $archivos,
         private readonly RecordAuditEvent $auditar,
     ) {}
 
-    public function handle(Fine $multa, FineDocument|NewDocument $documento, FineDocumentRole $papel, ?int $actorId): FineDocument
+    public function handle(Fine $multa, FineDocument|NewDocument $documento, FineDocumentRole $papel, ?int $actorId, ?UploadedFile $archivo = null): FineDocument
     {
-        return DB::transaction(function () use ($multa, $documento, $papel, $actorId): FineDocument {
+        $adjunto = null;
+
+        try {
+            return $this->vincular($multa, $documento, $papel, $actorId, $archivo, $adjunto);
+        } catch (Throwable $exception) {
+            // La fila volvió atrás: el archivo ya escrito quedaría huérfano.
+            if ($adjunto instanceof Attachment) {
+                $this->archivos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function vincular(Fine $multa, FineDocument|NewDocument $documento, FineDocumentRole $papel, ?int $actorId, ?UploadedFile $archivo, ?Attachment &$adjunto): FineDocument
+    {
+        return DB::transaction(function () use ($multa, $documento, $papel, $actorId, $archivo, &$adjunto): FineDocument {
             $multa->loadMissing('fineCase');
 
             $vinculado = $documento instanceof NewDocument
@@ -81,6 +106,10 @@ final class LinkFineDocument
                 metadata: ['documento' => $vinculado->label(), 'papel' => $papel->label()],
                 actorId: $actorId,
             );
+
+            if ($archivo instanceof UploadedFile) {
+                $adjunto = $this->adjuntar->handle($vinculado, $archivo, null, $actorId);
+            }
 
             return $vinculado;
         });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
+use App\Support\Validation\ScannedDocument;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -12,7 +13,8 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * Desde la ficha de la multa se puede elegir uno que el expediente ya tiene
  * (`documentId`) con el papel que cumple; desde el expediente siempre es
- * uno nuevo.
+ * uno nuevo. Al vincular, el documento puede llegar con su archivo, que
+ * queda en el documento.
  */
 final class StoreFineDocumentRequest extends FormRequest
 {
@@ -31,6 +33,7 @@ final class StoreFineDocumentRequest extends FormRequest
             'document.actType' => ['nullable', 'in:LAB,HYS'],
             'document.text' => [$vinculaAMulta ? 'required_without:documentId' : 'required', 'nullable', 'string', 'max:120'],
             'document.issuedOn' => ['nullable', new PartialDateRule],
+            'file' => $vinculaAMulta ? ScannedDocument::rules(required: false) : ['prohibited'],
         ];
     }
 
@@ -46,6 +49,15 @@ final class StoreFineDocumentRequest extends FormRequest
             'document.actType' => 'tipo de acta',
             'document.text' => 'documento',
             'document.issuedOn' => 'fecha',
+            'file' => 'archivo del documento',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ScannedDocument::messages('file', 'El archivo del documento');
     }
 }

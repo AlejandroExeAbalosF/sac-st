@@ -145,7 +145,10 @@ saldo y estado. Abajo:
 - **Datos**, con la carátula y el expediente tal como vinieron.
 - **Documentos**, con el papel que cumple cada uno: origen, modificación,
   ratificación o respaldo, y debajo de cada uno su archivo. Vincular una
-  ratificación no mueve la obligación.
+  ratificación no mueve la obligación. Un documento nuevo se vincula con su
+  archivo, que queda en el documento. Cada documento se adjunta y se corrige
+  desde acá igual que en el expediente; como es del expediente, el cambio lo ve
+  toda multa que lo cita.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos de la multa**: los de la multa y, debajo, los del expediente.
