@@ -110,7 +110,7 @@ final class RegisterFine
             };
 
             $resolucion = $this->resolucion($expediente, $datos, $actorId);
-            $actas = $this->actas($expediente, $datos, $actorId);
+            $actas = $this->actas($expediente, $resolucion, $datos, $actorId);
 
             $multa = Fine::query()->create([
                 'fine_case_id' => $expediente->id,
@@ -230,7 +230,7 @@ final class RegisterFine
      * @param  array<string, mixed>  $datos
      * @return list<FineDocument>
      */
-    private function actas(FineCase $expediente, array $datos, ?int $actorId): array
+    private function actas(FineCase $expediente, FineDocument $resolucion, array $datos, ?int $actorId): array
     {
         $actas = [];
 
@@ -250,6 +250,8 @@ final class RegisterFine
                 NewDocument::fromArray((array) $nueva, FineDocumentKind::Act),
                 $actorId,
                 "acts.{$indice}.text",
+                // Un acta sin fecha es de la época de su resolución.
+                $resolucion->issued_on?->year,
             );
         }
 

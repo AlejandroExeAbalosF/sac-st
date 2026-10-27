@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
 use App\Modules\Multas\Support\FineCaseNumber;
+use App\Modules\Multas\Support\TwoDigitYear;
 use App\Support\BusinessDate;
 use App\Support\Validation\ScannedDocument;
 use Illuminate\Foundation\Http\FormRequest;
@@ -97,6 +98,7 @@ final class StoreFineRequest extends FormRequest
     {
         return [
             // Sin resolución elegida ni escrita: se dice qué hacer, no qué campo falta.
+            'caseNumber.required_without' => 'Falta el número de expediente, como figura en el papel.',
             'resolution.text.required_without' => 'Elegí la resolución del expediente o cargá la que no está cargada.',
             'resolution.issuedOn.required_without' => 'Falta la fecha de la resolución: es la fecha del importe original.',
             ...ScannedDocument::messages('caseFile', 'El archivo del expediente'),
@@ -123,6 +125,14 @@ final class StoreFineRequest extends FormRequest
                         'caseNumber',
                         'El número de expediente se escribe como en el papel: 169607/24-0 o 120276/25.',
                     );
+
+                    return;
+                }
+
+                $leido = FineCaseNumber::parse($numero);
+
+                if ($leido !== null && ! TwoDigitYear::inRange($leido->year)) {
+                    $validator->errors()->add('caseNumber', TwoDigitYear::outOfRangeMessage('El expediente', $leido->year));
                 }
             },
             $this->respetaLosDocumentosFijos(...),

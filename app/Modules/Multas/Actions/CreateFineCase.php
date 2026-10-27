@@ -7,6 +7,7 @@ namespace App\Modules\Multas\Actions;
 use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Support\FineCaseNumber;
+use App\Modules\Multas\Support\TwoDigitYear;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +30,12 @@ final class CreateFineCase
         if ($numero === null) {
             throw ValidationException::withMessages([
                 'caseNumber' => 'El número de expediente se escribe como en el papel: 169607/24-0 o 120276/25.',
+            ]);
+        }
+
+        if (! TwoDigitYear::inRange($numero->year)) {
+            throw ValidationException::withMessages([
+                'caseNumber' => TwoDigitYear::outOfRangeMessage('El expediente', $numero->year),
             ]);
         }
 

@@ -11,6 +11,7 @@ use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\FineDocumentNumber;
 use App\Modules\Multas\Support\NewDocument;
+use App\Modules\Multas\Support\TwoDigitYear;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -32,9 +33,14 @@ final class AttachFineDocument
     /**
      * @param  string  $field  Dónde mostrar el error si el texto no se entiende.
      */
-    public function handle(FineCase $expediente, NewDocument $documento, ?int $actorId, string $field = 'text'): FineDocument
+    /**
+     * @param  int|null  $referenceYear  el año de otro papel de la misma época —la resolución de un acta sin fecha—, para leer un año de dos cifras
+     */
+    public function handle(FineCase $expediente, NewDocument $documento, ?int $actorId, string $field = 'text', ?int $referenceYear = null): FineDocument
     {
-        $leido = FineDocumentNumber::parse($documento->originalText);
+        // El siglo de «/29» sale de la fecha del propio papel o, si no la tiene, de la de referencia.
+        $referencia = $documento->issued->date === null ? $referenceYear : (int) substr($documento->issued->date, 0, 4);
+        $leido = FineDocumentNumber::parse($documento->originalText, $referencia);
         $tipoDeActa = $documento->actType ?? $leido?->actType;
 
         $this->assertReadable($documento, $leido, $tipoDeActa, $field);
@@ -91,6 +97,15 @@ final class AttachFineDocument
                 $field => $documento->kind === FineDocumentKind::Resolution
                     ? 'No se entiende el número de la resolución. Se espera N°0649/26.'
                     : 'No se entiende el número del acta. Se espera HYS N°1025288/25 o LAB N°25045/25.',
+            ]);
+        }
+
+        if ($leido->year !== null && ! TwoDigitYear::inRange($leido->year)) {
+            throw ValidationException::withMessages([
+                $field => TwoDigitYear::outOfRangeMessage(
+                    $documento->kind === FineDocumentKind::Resolution ? 'La resolución' : 'El acta',
+                    $leido->year,
+                ),
             ]);
         }
 

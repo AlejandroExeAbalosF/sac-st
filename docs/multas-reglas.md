@@ -63,6 +63,16 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   acta con número y tipo; multa con fecha de registro exacta; movimientos de deuda
   con fecha exacta. Una importada puede llegar incompleta. **Base:** CHECK
   `*_manual_*`.
+- El año de un expediente o un documento va de 1990 a 2100. **Base:** CHECK
+  `*_year_check`. Un año de dos cifras toma el siglo de la **fecha del papel**: el
+  que lo deja más cerca de ella —con fecha de 2026, «/29» es 2029 y «/98», 1998—.
+  Un acta sin fecha usa la de su resolución. El expediente no tiene fecha y usa el
+  pivote del año próximo: hasta ahí este siglo, por encima el anterior
+  (`TwoDigitYear`). Solo se rechaza lo que queda fuera del rango sin otra lectura
+  posible, con el mensaje en el campo del número. **Action.**
+- Si el año del número no coincide con el de la fecha del documento, la pantalla
+  avisa mientras se escribe y deja guardar: una resolución numerada a fin de año
+  puede firmarse en enero. Es un aviso, no una regla.
 - Una fecha con precisión `month` se guarda como el primer día del mes; `unknown`
   es fecha nula. **Base:** CHECK `*_known_check` y `*_month_check`.
 - Una multa no cita un documento de otro expediente. **Base:** las dos FK

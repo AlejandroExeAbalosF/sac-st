@@ -23,7 +23,10 @@ final readonly class FineDocumentNumber
         public ?FineActType $actType,
     ) {}
 
-    public static function parse(string $text): ?self
+    /**
+     * @param  int|null  $referenceYear  el año del papel, si se sabe: decide el siglo de un año de dos cifras
+     */
+    public static function parse(string $text, ?int $referenceYear = null): ?self
     {
         if (preg_match(self::PATTERN, $text, $partes) !== 1) {
             return null;
@@ -33,7 +36,7 @@ final readonly class FineDocumentNumber
 
         return new self(
             (int) $partes[2],
-            ($partes[3] ?? '') === '' ? null : TwoDigitYear::expand((int) $partes[3]),
+            ($partes[3] ?? '') === '' ? null : TwoDigitYear::expand((int) $partes[3], $referenceYear),
             match ($tipo) {
                 'LAB' => FineActType::Labor,
                 'HYS' => FineActType::HealthSafety,

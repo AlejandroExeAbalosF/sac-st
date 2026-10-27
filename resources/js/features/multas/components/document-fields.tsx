@@ -8,6 +8,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { FieldError } from '@/features/multas/components/form-dialog';
+import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, DOCUMENT_KIND } from '@/features/multas/labels';
 
 type Kind = App.Modules.Multas.Enums.FineDocumentKind;
@@ -122,6 +123,13 @@ export default function DocumentFields({
                 <FieldError
                     message={errors['document.text'] ?? errors['document.kind']}
                 />
+                {/* Aviso, no error: el año del número no coincide con la fecha. */}
+                {value.kind !== 'other' &&
+                    documentYearWarning(value.text, value.issuedOn) && (
+                        <p className="mt-1 text-xs text-warning-strong">
+                            {documentYearWarning(value.text, value.issuedOn)}
+                        </p>
+                    )}
             </div>
 
             <div>

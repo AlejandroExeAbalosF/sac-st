@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Requests;
 
 use App\Modules\Multas\Http\Requests\Rules\PartialDateRule;
+use App\Modules\Multas\Support\TwoDigitYear;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -90,13 +91,13 @@ final class ReviseFineRecordRequest extends FormRequest
         return match (true) {
             $this->routeIs('multas.expedientes.revisiones.store') => [
                 'number' => ['nullable', 'integer', 'min:1', 'max:999999999'],
-                'year' => ['nullable', 'integer', 'between:1990,2100'],
+                'year' => ['nullable', 'integer', 'between:'.TwoDigitYear::MIN.','.TwoDigitYear::MAX],
                 'suffix' => ['nullable', 'string', 'regex:/^[0-9A-Za-z]{1,10}$/'],
             ],
             $this->routeIs('multas.documentos.revisiones.store') => [
                 'actType' => ['nullable', 'in:LAB,HYS'],
                 'number' => ['nullable', 'integer', 'min:1', 'max:999999999'],
-                'year' => ['nullable', 'integer', 'between:1990,2100'],
+                'year' => ['nullable', 'integer', 'between:'.TwoDigitYear::MIN.','.TwoDigitYear::MAX],
                 'issuedOn' => ['nullable', new PartialDateRule],
             ],
             $this->routeIs('multas.movimientos.revisiones.store', 'multas.antecedentes.revisiones.store') => [

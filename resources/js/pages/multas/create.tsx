@@ -24,6 +24,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, partialDate } from '@/features/multas/labels';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
@@ -61,6 +62,13 @@ type Props = {
         actIds: number[];
     };
 };
+
+/** Un aviso que no bloquea: el año del número no coincide con la fecha. */
+function YearWarning({ message }: { message: string | null }) {
+    return message ? (
+        <p className="mt-1 text-xs text-warning-strong">{message}</p>
+    ) : null;
+}
 
 function FieldError({ message }: { message?: string }) {
     return message ? (
@@ -552,6 +560,12 @@ export default function NuevaMulta({
                                         <FieldError
                                             message={errores['resolution.text']}
                                         />
+                                        <YearWarning
+                                            message={documentYearWarning(
+                                                data.resolution.text,
+                                                data.resolution.issuedOn,
+                                            )}
+                                        />
                                     </div>
                                     <div className="sm:col-span-3">
                                         <Label htmlFor="resolutionDate">
@@ -723,6 +737,12 @@ export default function NuevaMulta({
                                                             `acts.${i}.text`
                                                         ]
                                                     }
+                                                />
+                                                <YearWarning
+                                                    message={documentYearWarning(
+                                                        acta.text,
+                                                        acta.issuedOn,
+                                                    )}
                                                 />
                                             </div>
                                             <div className="sm:col-span-3">
