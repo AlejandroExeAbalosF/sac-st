@@ -950,6 +950,11 @@ declare namespace App {
                         label: string;
                     }[];
                 };
+                export type FineCaseFineData = {
+                    fine: App.Modules.Multas.Data.FineListItemData;
+                    number: number;
+                    documents: App.Modules.Multas.Data.FineDocumentData[];
+                };
                 export type FineCaseListItemData = {
                     id: number;
                     routeKey: string;

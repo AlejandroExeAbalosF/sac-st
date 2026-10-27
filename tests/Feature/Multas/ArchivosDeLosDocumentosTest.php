@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Multas;
 
+use App\Modules\Multas\Actions\LinkFineDocument;
 use App\Modules\Multas\Enums\FineDocumentKind;
+use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -54,6 +56,11 @@ class ArchivosDeLosDocumentosTest extends TestCase
         $this->get(route('multas.expedientes.show', $multa->fineCase))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('adjuntos', 1)
+                ->where('multas.0.fine.id', $multa->id)
+                ->where('multas.0.number', $multa->fine_number)
+                ->has('multas.0.documents', 3)
+                ->where('multas.0.documents.0.id', $resolucion->id)
+                ->where('multas.0.documents.0.roles', ['origin'])
                 ->has("adjuntosDeDocumentos.{$resolucion->id}", 1)
                 ->has("adjuntosDeDocumentos.{$actaHys->id}", 1));
 
@@ -77,6 +84,28 @@ class ArchivosDeLosDocumentosTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         expect($this->duenios())->toBe([['fine_document', $resolucion->id, 'resolucion.pdf']]);
+    }
+
+    public function test_las_hojas_conservan_los_roles_de_cada_multa_sin_repetir_documentos(): void
+    {
+        $this->actingAs($this->operador())->post(route('multas.store'), $this->alta())->assertSessionHasNoErrors();
+        $primera = Fine::query()->sole();
+        $resolucion = $this->documento(FineDocumentKind::Resolution, 'N°0649/26');
+        app(LinkFineDocument::class)->handle($primera, $resolucion, FineDocumentRole::Ratification, null);
+
+        $datos = $this->alta(['caption' => 'OTRA EMPRESA', 'acts' => []]);
+        unset($datos['resolution']);
+        $this->post(route('multas.store'), [...$datos, 'resolutionId' => $resolucion->id])->assertSessionHasNoErrors();
+
+        $this->get(route('multas.expedientes.show', $primera->fineCase))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('multas', 2)
+                ->has('multas.0.documents', 2)
+                ->where('multas.0.documents.0.id', $resolucion->id)
+                ->where('multas.0.documents.0.roles', ['origin', 'ratification'])
+                ->has('multas.1.documents', 1)
+                ->where('multas.1.documents.0.id', $resolucion->id)
+                ->where('multas.1.documents.0.roles', ['origin']));
     }
 
     public function test_un_archivo_que_no_es_un_papel_frena_el_alta_entera(): void

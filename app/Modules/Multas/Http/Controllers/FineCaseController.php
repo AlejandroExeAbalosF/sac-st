@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\AttachFineDocument;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Data\FineCaseData;
-use App\Modules\Multas\Data\FineListItemData;
+use App\Modules\Multas\Data\FineCaseFineData;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
@@ -44,7 +44,7 @@ final class FineCaseController extends Controller
 
         return Inertia::render('multas/expediente', [
             'expediente' => FineCaseData::fromModel($fineCase),
-            'multas' => $multas->map(fn (Fine $multa): FineListItemData => FineListItemData::fromModel($multa))->values(),
+            'multas' => $multas->map(fn (Fine $multa): FineCaseFineData => FineCaseFineData::fromModel($multa))->values(),
             // Los papeles del expediente sin documento propio, y lo subido antes de que cada documento tuviera el suyo.
             'adjuntos' => $adjuntos->for(AttachmentSubject::FineCase, [$fineCase->id])[$fineCase->id] ?? [],
             // La foto de cada resolución y de cada acta, por id del documento.

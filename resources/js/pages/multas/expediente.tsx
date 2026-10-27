@@ -7,9 +7,7 @@ import {
     TriangleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
-import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
-import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     AttachFileDialog,
@@ -20,11 +18,7 @@ import {
     ReviseCaseDialog,
     ReviseDocumentDialog,
 } from '@/features/multas/components/case-dialogs';
-import {
-    DEBT_STATUS,
-    DOCUMENT_KIND,
-    partialDate,
-} from '@/features/multas/labels';
+import CaseSheets from '@/features/multas/components/case-sheets';
 import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as attachToCase } from '@/routes/multas/expedientes/adjuntos';
@@ -32,7 +26,7 @@ import { create as addFine } from '@/routes/multas/expedientes/multas';
 
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
-type Multa = App.Modules.Multas.Data.FineListItemData;
+type Multa = App.Modules.Multas.Data.FineCaseFineData;
 type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
 
 type Props = {
@@ -149,6 +143,50 @@ export default function ExpedienteDeMultas({
                     </p>
                 )}
 
+                <section
+                    className="space-y-4"
+                    aria-labelledby="documentos-y-multas"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2
+                            id="documentos-y-multas"
+                            className="text-lg font-semibold"
+                        >
+                            Resoluciones, actas y multas
+                        </h2>
+                        {can.register && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                    setDialogo({ tipo: 'documento' })
+                                }
+                            >
+                                <FilePlus2 aria-hidden="true" /> Agregar
+                                documento
+                            </Button>
+                        )}
+                    </div>
+                    <CaseSheets
+                        fines={multas}
+                        documents={expediente.documents}
+                        attachments={adjuntosDeDocumentos}
+                        can={can}
+                        onAttach={(documento) =>
+                            setDialogo({
+                                tipo: 'adjuntar-documento',
+                                documento,
+                            })
+                        }
+                        onRevise={(documento) =>
+                            setDialogo({
+                                tipo: 'corregir-documento',
+                                documento,
+                            })
+                        }
+                    />
+                </section>
+
                 <section className="rounded-lg border bg-card shadow-raised">
                     <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
                         <h2 className="text-sm font-semibold">
@@ -178,145 +216,6 @@ export default function ExpedienteDeMultas({
                             />
                         )}
                     </div>
-                </section>
-
-                <section className="rounded-lg border bg-card shadow-raised">
-                    <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                        <h2 className="text-sm font-semibold">Documentos</h2>
-                        {can.register && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    setDialogo({ tipo: 'documento' })
-                                }
-                            >
-                                <FilePlus2 aria-hidden="true" />
-                                Agregar documento
-                            </Button>
-                        )}
-                    </div>
-                    {expediente.documents.length === 0 ? (
-                        <p className="px-5 py-4 text-sm text-muted-foreground">
-                            Sin documentos cargados.
-                        </p>
-                    ) : (
-                        <ul className="divide-y">
-                            {expediente.documents.map((documento) => (
-                                <li
-                                    key={documento.id}
-                                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm"
-                                >
-                                    <StatusBadge
-                                        label={DOCUMENT_KIND[documento.kind]}
-                                    />
-                                    <span className="font-medium">
-                                        {documento.label}
-                                    </span>
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                        {documento.originalText}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {partialDate(
-                                            documento.issuedOn,
-                                            documento.issuedPrecision,
-                                        )}
-                                    </span>
-                                    <span className="ml-auto flex gap-1">
-                                        {can.register && (
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                    setDialogo({
-                                                        tipo: 'adjuntar-documento',
-                                                        documento,
-                                                    })
-                                                }
-                                            >
-                                                <Paperclip aria-hidden="true" />
-                                                Adjuntar
-                                            </Button>
-                                        )}
-                                        {(can.register || can.adjust) && (
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                    setDialogo({
-                                                        tipo: 'corregir-documento',
-                                                        documento,
-                                                    })
-                                                }
-                                            >
-                                                Corregir
-                                            </Button>
-                                        )}
-                                    </span>
-                                    {(adjuntosDeDocumentos[documento.id] ?? [])
-                                        .length > 0 && (
-                                        <div className="basis-full pt-1">
-                                            <AttachmentList
-                                                adjuntos={
-                                                    adjuntosDeDocumentos[
-                                                        documento.id
-                                                    ] ?? []
-                                                }
-                                                canView={can.viewAttachments}
-                                            />
-                                        </div>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-
-                <section className="rounded-lg border bg-card shadow-raised">
-                    <h2 className="border-b px-5 py-3 text-sm font-semibold">
-                        Multas
-                    </h2>
-                    {multas.length === 0 ? (
-                        <p className="px-5 py-4 text-sm text-muted-foreground">
-                            Todavía no tiene multas.
-                        </p>
-                    ) : (
-                        <ul className="divide-y">
-                            {multas.map((multa) => {
-                                const estado =
-                                    DEBT_STATUS[multa.balance.status];
-
-                                return (
-                                    <li
-                                        key={multa.id}
-                                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm"
-                                    >
-                                        <Link
-                                            href={multa.href}
-                                            className="font-medium hover:underline"
-                                        >
-                                            {multa.caption}
-                                        </Link>
-                                        <span className="text-xs text-muted-foreground">
-                                            {multa.originDocuments.join(' · ')}
-                                        </span>
-                                        <span className="ml-auto flex items-center gap-3">
-                                            <span className="text-xs text-muted-foreground">
-                                                Saldo{' '}
-                                                <Money
-                                                    value={multa.balance.debt}
-                                                />
-                                            </span>
-                                            <StatusBadge
-                                                label={estado.label}
-                                                tone={estado.tone}
-                                            />
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
                 </section>
             </div>
 

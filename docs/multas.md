@@ -43,6 +43,14 @@ conoce. El test de fronteras lo exige.
 
 ## Pantallas
 
+La ficha del expediente muestra hojas por resolución de origen. Dentro se
+agrupan las actas, con los archivos de cada documento en su cabecera, y debajo
+las multas con su número, carátula, estado, obligación y saldo. Si una multa
+tiene varias actas o resoluciones de origen, se presentan juntas para mostrar
+esa multa una sola vez. Los vínculos de modificación, ratificación y respaldo
+se muestran en la multa correspondiente; los documentos sin multas vinculadas
+y los archivos generales del expediente permanecen accesibles por separado.
+
 | Pantalla | Ruta | Permiso |
 | --- | --- | --- |
 | Expedientes y multas | `/multas/expedientes` | `multas.ver` |
