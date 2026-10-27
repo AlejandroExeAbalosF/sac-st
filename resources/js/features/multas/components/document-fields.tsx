@@ -1,3 +1,4 @@
+import PartialDateInput from '@/components/partial-date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -10,6 +11,7 @@ import {
 import { FieldError } from '@/features/multas/components/form-dialog';
 import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, DOCUMENT_KIND } from '@/features/multas/labels';
+import { businessToday } from '@/lib/format';
 
 type Kind = App.Modules.Multas.Enums.FineDocumentKind;
 type ActType = App.Modules.Multas.Enums.FineActType;
@@ -139,14 +141,12 @@ export default function DocumentFields({
                         (opcional)
                     </span>
                 </Label>
-                <Input
+                <PartialDateInput
                     id={`${idPrefix}-fecha`}
                     className="mt-1"
                     value={value.issuedOn}
-                    onChange={(e) =>
-                        onChange({ ...value, issuedOn: e.target.value })
-                    }
-                    placeholder="2026-05-07 o 2026-05"
+                    onChange={(issuedOn) => onChange({ ...value, issuedOn })}
+                    max={businessToday()}
                     aria-invalid={Boolean(errors['document.issuedOn'])}
                 />
                 <FieldError message={errors['document.issuedOn']} />

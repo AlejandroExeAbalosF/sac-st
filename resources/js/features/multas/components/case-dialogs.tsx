@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import PartialDateInput from '@/components/partial-date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -16,6 +17,7 @@ import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
 import { ACT_TYPE } from '@/features/multas/labels';
+import { businessToday } from '@/lib/format';
 import { store as storeRevisionDeDocumento } from '@/routes/multas/documentos/revisiones';
 import { store as storeDocumento } from '@/routes/multas/expedientes/documentos';
 import { store as storeRevisionDeExpediente } from '@/routes/multas/expedientes/revisiones';
@@ -265,12 +267,12 @@ export function ReviseDocumentDialog({
                 </div>
                 <div>
                     <Label htmlFor="documento-fecha">Fecha</Label>
-                    <Input
+                    <PartialDateInput
                         id="documento-fecha"
                         className="mt-1"
                         value={data.issuedOn}
-                        onChange={(e) => setData('issuedOn', e.target.value)}
-                        placeholder="2026-05-07 o 2026-05"
+                        onChange={(issuedOn) => setData('issuedOn', issuedOn)}
+                        max={businessToday()}
                         aria-invalid={Boolean(errors.issuedOn)}
                     />
                     <FieldError message={errors.issuedOn} />

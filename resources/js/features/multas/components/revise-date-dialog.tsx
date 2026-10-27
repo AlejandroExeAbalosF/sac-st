@@ -1,10 +1,11 @@
 import { useForm } from '@inertiajs/react';
-import { Input } from '@/components/ui/input';
+import PartialDateInput from '@/components/partial-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import { businessToday } from '@/lib/format';
 
 /**
  * Completar o corregir la fecha de un movimiento de la obligación o de un
@@ -51,12 +52,12 @@ export default function ReviseDateDialog({
                         (día, solo el mes, o vacía)
                     </span>
                 </Label>
-                <Input
+                <PartialDateInput
                     id="revision-fecha"
                     className="mt-1 max-w-48"
                     value={data.date}
-                    onChange={(e) => setData('date', e.target.value)}
-                    placeholder="2026-05-07 o 2026-05"
+                    onChange={(fecha) => setData('date', fecha)}
+                    max={businessToday()}
                     aria-invalid={Boolean(errors.date)}
                 />
                 <FieldError message={errors.date} />

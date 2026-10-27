@@ -1,8 +1,8 @@
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import PartialDateInput from '@/components/partial-date-input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -17,7 +17,7 @@ import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
 import { HISTORICAL_KIND } from '@/features/multas/labels';
-import { parseAmount } from '@/lib/format';
+import { businessToday, parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/antecedentes';
 import { store as storeFromCredit } from '@/routes/multas/antecedentes/credito';
 
@@ -144,12 +144,14 @@ function Manual({
                         (día, solo el mes, o vacía)
                     </span>
                 </Label>
-                <Input
+                <PartialDateInput
                     id="antecedente-fecha"
-                    className="mt-1 max-w-48"
+                    className="mt-1"
                     value={data.occurredOn}
-                    onChange={(e) => setData('occurredOn', e.target.value)}
-                    placeholder="2025-07"
+                    onChange={(fecha) => setData('occurredOn', fecha)}
+                    // Los pagos anteriores del Excel se conocen por el mes.
+                    monthFirst
+                    max={businessToday()}
                     aria-invalid={Boolean(errors.occurredOn)}
                 />
                 <FieldError message={errors.occurredOn} />

@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import PartialDateInput from '@/components/partial-date-input';
 import PersonPicker from '@/components/person-picker';
 import type { PersonOption } from '@/components/person-picker';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
+import { businessToday } from '@/lib/format';
 import { store } from '@/routes/multas/revisiones';
 
 type Multa = App.Modules.Multas.Data.FineDetailData;
@@ -107,12 +109,12 @@ export default function ReviseFineDialog({
 
             <div>
                 <Label htmlFor="revision-registro">Fecha de registro</Label>
-                <Input
+                <PartialDateInput
                     id="revision-registro"
                     className="mt-1 max-w-48"
                     value={data.registeredOn}
-                    onChange={(e) => setData('registeredOn', e.target.value)}
-                    placeholder="2026-05-07 o 2026-05"
+                    onChange={(fecha) => setData('registeredOn', fecha)}
+                    max={businessToday()}
                     aria-invalid={Boolean(errors.registeredOn)}
                 />
                 <FieldError message={errors.registeredOn} />
