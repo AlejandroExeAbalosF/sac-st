@@ -48,11 +48,14 @@ export default function DocumentFields({
     onChange,
     errors,
     idPrefix,
+    kinds = Object.keys(DOCUMENT_KIND) as Kind[],
 }: {
     value: NewDocumentForm;
     onChange: (value: NewDocumentForm) => void;
     errors: Record<string, string | undefined>;
     idPrefix: string;
+    /** Los tipos que se ofrecen; por defecto, todos. */
+    kinds?: Kind[];
 }) {
     return (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -75,7 +78,7 @@ export default function DocumentFields({
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Object.keys(DOCUMENT_KIND) as Kind[]).map((kind) => (
+                        {kinds.map((kind) => (
                             <SelectItem key={kind} value={kind}>
                                 {DOCUMENT_KIND[kind]}
                             </SelectItem>

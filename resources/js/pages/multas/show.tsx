@@ -1106,6 +1106,7 @@ export default function MultaShow({
                 <LinkDocumentDialog
                     fineId={multa.id}
                     documentos={documentosDelExpediente}
+                    vinculados={multa.documents}
                     onClose={cerrar}
                 />
             )}

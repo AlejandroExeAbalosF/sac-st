@@ -14,6 +14,11 @@ import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
 import { DOCUMENT_ROLE } from '@/features/multas/labels';
+import {
+    blocksResolution,
+    linkableDocuments,
+    linkableKinds,
+} from '@/features/multas/link-options';
 import { store } from '@/routes/multas/documentos';
 
 type Documento = App.Modules.Multas.Data.FineDocumentData;
@@ -24,23 +29,53 @@ type Rol = 'origin' | 'ratification' | 'support';
  *
  * Es lo que registra una ratificación: la resolución que confirma la multa
  * sin cambiar su importe. La obligación no se mueve.
+ *
+ * Solo ofrece lo que el servidor acepta: no repite un documento en el papel
+ * que ya cumple, y si la multa ya tiene su resolución de origen, como origen
+ * no ofrece otra resolución (`LinkFineDocument`).
  */
 export default function LinkDocumentDialog({
     fineId,
     documentos,
+    vinculados,
     onClose,
 }: {
     fineId: number;
     documentos: Documento[];
+    /** Los documentos de la multa, con sus papeles. */
+    vinculados: Documento[];
     onClose: () => void;
 }) {
+    const disponibles = (rol: Rol) =>
+        linkableDocuments(documentos, vinculados, rol);
+    const tipos = (rol: Rol) => linkableKinds(vinculados, rol);
+
     const { data, setData, post, transform, processing, errors } = useForm({
         role: 'ratification' as Rol,
-        documentId: (documentos[0]?.id ?? null) as number | null,
+        documentId: (disponibles('ratification')[0]?.id ?? null) as
+            number | null,
         document: EMPTY_DOCUMENT,
     });
 
     const errores = errors as Record<string, string | undefined>;
+
+    // Al cambiar el papel, lo elegido que ya no se ofrece cede su lugar.
+    const cambiarPapel = (rol: Rol) => {
+        const ofrecidos = disponibles(rol);
+        const sigue = ofrecidos.some((d) => d.id === data.documentId);
+
+        setData({
+            role: rol,
+            documentId: sigue
+                ? data.documentId
+                : data.documentId === null
+                  ? null
+                  : (ofrecidos[0]?.id ?? null),
+            document: tipos(rol).includes(data.document.kind)
+                ? data.document
+                : { ...data.document, kind: 'act', actType: 'HYS' },
+        });
+    };
 
     const enviar = () => {
         transform((datos) => ({
@@ -66,7 +101,7 @@ export default function LinkDocumentDialog({
                 <Label htmlFor="vinculo-papel">Papel</Label>
                 <Select
                     value={data.role}
-                    onValueChange={(valor) => setData('role', valor as Rol)}
+                    onValueChange={(valor) => cambiarPapel(valor as Rol)}
                 >
                     <SelectTrigger id="vinculo-papel" className="mt-1">
                         <SelectValue />
@@ -81,6 +116,13 @@ export default function LinkDocumentDialog({
                         )}
                     </SelectContent>
                 </Select>
+                {blocksResolution(vinculados, data.role) && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        La multa ya tiene su resolución de origen: como origen
+                        se vinculan actas. Una resolución posterior va como
+                        ratificación.
+                    </p>
+                )}
                 <FieldError message={errors.role} />
             </div>
 
@@ -103,7 +145,7 @@ export default function LinkDocumentDialog({
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        {documentos.map((d) => (
+                        {disponibles(data.role).map((d) => (
                             <SelectItem key={d.id} value={String(d.id)}>
                                 {d.label}
                             </SelectItem>
@@ -122,6 +164,7 @@ export default function LinkDocumentDialog({
                     onChange={(documento) => setData('document', documento)}
                     errors={errores}
                     idPrefix="vinculo-nuevo"
+                    kinds={tipos(data.role)}
                 />
             )}
         </FormDialog>
