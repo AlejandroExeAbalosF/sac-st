@@ -109,6 +109,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.ajustar')->group(function (): void {
         Route::post('{fine}/ajustes', [FineDebtController::class, 'store'])->whereNumber('fine')->name('ajustes.store');
         Route::post('ajustes/{entry}/reversion', [FineDebtController::class, 'reverse'])->whereNumber('entry')->name('ajustes.reverse');
+        // Desvincular es anular el vínculo, con motivo: el documento sigue en el expediente.
+        Route::post('{fine}/documentos/{fineDocument}/{role}/anulacion', [FineDocumentController::class, 'revoke'])
+            ->whereNumber(['fine', 'fineDocument'])
+            ->name('documentos.anulacion.store');
         Route::post('antecedentes/{movement}/revision', [FineHistoricalMovementController::class, 'review'])
             ->whereNumber('movement')
             ->name('antecedentes.review');

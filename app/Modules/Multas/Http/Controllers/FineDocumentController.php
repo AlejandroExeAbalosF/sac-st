@@ -7,8 +7,10 @@ namespace App\Modules\Multas\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\LinkFineDocument;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
+use App\Modules\Multas\Actions\RevokeFineDocumentLink;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
+use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
@@ -21,8 +23,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Los documentos de una multa: vincularlos con su papel y completar o
- * corregir cómo se leyeron.
+ * Los documentos de una multa: vincularlos con su papel, desvincularlos y
+ * completar o corregir cómo se leyeron.
  */
 final class FineDocumentController extends Controller
 {
@@ -57,6 +59,19 @@ final class FineDocumentController extends Controller
         );
 
         Toast::success('Documento vinculado a la multa.');
+
+        return to_route('multas.show', $fine->showParameters());
+    }
+
+    /**
+     * Desvincula un documento cargado por error: el vínculo queda anulado,
+     * con su motivo, y el documento sigue en el expediente.
+     */
+    public function revoke(ReasonRequest $request, Fine $fine, FineDocument $fineDocument, FineDocumentRole $role, RevokeFineDocumentLink $desvincular): RedirectResponse
+    {
+        $desvincular->handle($fine, $fineDocument, $role, (string) $request->validated('reason'), $request->user()?->id);
+
+        Toast::success('Documento desvinculado de la multa.');
 
         return to_route('multas.show', $fine->showParameters());
     }

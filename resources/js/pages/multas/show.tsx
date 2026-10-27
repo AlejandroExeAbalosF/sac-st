@@ -9,6 +9,7 @@ import {
     Pencil,
     Receipt,
     Scale,
+    Unlink,
 } from 'lucide-react';
 import { useState } from 'react';
 import DataField, { EmptyValue } from '@/components/data-field';
@@ -53,6 +54,7 @@ import { reverse } from '@/routes/multas/ajustes';
 import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
 import { store as reviseMovementDate } from '@/routes/multas/antecedentes/revisiones';
 import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
+import { store as revokeLink } from '@/routes/multas/documentos/anulacion';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
 import { discard } from '@/routes/multas/pagos';
@@ -60,6 +62,7 @@ import { store as attachToPayment } from '@/routes/multas/pagos/adjuntos';
 
 type Multa = App.Modules.Multas.Data.FineDetailData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
+type Papel = App.Modules.Multas.Enums.FineDocumentRole;
 type Movimiento = App.Modules.Multas.Data.FineDebtEntryData;
 type Antecedente = App.Modules.Multas.Data.FineHistoricalMovementData;
 type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
@@ -111,6 +114,7 @@ type Dialogo =
     | { tipo: 'vincular' }
     | { tipo: 'adjuntar-documento'; documento: Documento }
     | { tipo: 'corregir-documento'; documento: Documento }
+    | { tipo: 'desvincular'; documento: Documento; papel: Papel }
     | { tipo: 'antecedente' }
     | {
           tipo: 'revisar';
@@ -367,6 +371,28 @@ export default function MultaShow({
                                             Corregir
                                         </Button>
                                     )}
+                                    {can.adjust &&
+                                        documento.roles.map((papel) => (
+                                            <Button
+                                                key={papel}
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-destructive hover:text-destructive"
+                                                onClick={() =>
+                                                    setDialogo({
+                                                        tipo: 'desvincular',
+                                                        documento,
+                                                        papel,
+                                                    })
+                                                }
+                                                aria-label={`Desvincular ${documento.label} como ${DOCUMENT_ROLE[papel].toLowerCase()}`}
+                                            >
+                                                <Unlink aria-hidden="true" />
+                                                {documento.roles.length > 1
+                                                    ? `Desvincular (${DOCUMENT_ROLE[papel].toLowerCase()})`
+                                                    : 'Desvincular'}
+                                            </Button>
+                                        ))}
                                 </span>
                                 {(adjuntosDeDocumentos[documento.id] ?? [])
                                     .length > 0 && (
@@ -384,6 +410,31 @@ export default function MultaShow({
                             </li>
                         ))}
                     </ul>
+                    {multa.revokedDocuments.length > 0 && (
+                        <div className="border-t px-5 py-3">
+                            <p className="text-xs tracking-wide text-field-label uppercase">
+                                Desvinculados
+                            </p>
+                            <ul className="mt-1.5 grid gap-1.5">
+                                {multa.revokedDocuments.map((anulado) => (
+                                    <li
+                                        key={`${anulado.documentId}-${anulado.role}-${anulado.revokedAt}`}
+                                        className="text-sm text-muted-foreground"
+                                    >
+                                        <span className="line-through">
+                                            {anulado.label}
+                                        </span>{' '}
+                                        · {DOCUMENT_ROLE[anulado.role]}.
+                                        Desvinculado el{' '}
+                                        {dateTime(anulado.revokedAt)}
+                                        {anulado.revokedByName !== null &&
+                                            ` por ${anulado.revokedByName}`}
+                                        : {anulado.reason}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </section>
 
                 <section className="rounded-lg border bg-card shadow-raised">
@@ -1152,6 +1203,21 @@ export default function MultaShow({
             {dialogo?.tipo === 'corregir-documento' && (
                 <ReviseDocumentDialog
                     documento={dialogo.documento}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'desvincular' && (
+                <ReasonDialog
+                    title={`Desvincular ${dialogo.documento.label}`}
+                    description={`Anula el vínculo como ${DOCUMENT_ROLE[dialogo.papel].toLowerCase()}. El documento sigue en el expediente y el vínculo queda a la vista como desvinculado, con el motivo.`}
+                    url={
+                        revokeLink({
+                            fine: multa.id,
+                            fineDocument: dialogo.documento.id,
+                            role: dialogo.papel,
+                        }).url
+                    }
+                    submitLabel="Desvincular"
                     onClose={cerrar}
                 />
             )}

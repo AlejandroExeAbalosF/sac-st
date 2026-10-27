@@ -41,7 +41,7 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'multas.ajustar',
                 'Ajustar multas',
-                'Registrar los aumentos y reducciones que dispone una resolución, revertir un ajuste, corregir datos ya cargados y validar o descartar los pagos anteriores.',
+                'Registrar los aumentos y reducciones que dispone una resolución, revertir un ajuste, desvincular un documento, corregir datos ya cargados y validar o descartar los pagos anteriores.',
                 'multas',
                 ['administrador', 'contador'],
                 sensitive: true,

@@ -148,7 +148,10 @@ saldo y estado. Abajo:
   ratificación no mueve la obligación. Un documento nuevo se vincula con su
   archivo, que queda en el documento. Cada documento se adjunta y se corrige
   desde acá igual que en el expediente; como es del expediente, el cambio lo ve
-  toda multa que lo cita.
+  toda multa que lo cita. **Desvincular** anula el vínculo con un motivo: el
+  documento pasa a «Desvinculados», con quién y por qué, y sigue en el
+  expediente. Lo que respalda el importe original o un ajuste vigente no se
+  desvincula.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos de la multa**: los de la multa y, debajo, los del expediente.

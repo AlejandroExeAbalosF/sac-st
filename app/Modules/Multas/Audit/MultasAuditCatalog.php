@@ -97,6 +97,13 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['documento' => 'Documento', 'papel' => 'Papel'],
             ),
             new AuditActionDefinition(
+                'multa.documento-desvinculado',
+                'Se desvinculó un documento de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['documento' => 'Documento', 'papel' => 'Papel', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.ajuste-registrado',
                 'Se ajustó la obligación de la multa',
                 'Multas',

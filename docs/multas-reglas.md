@@ -83,8 +83,23 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   histórico: 135 multas con dos resoluciones, y en las que lo aclaran la segunda es
   posterior (reducción del Ministerio, fallo de la Cámara, corrección de un número).
   No está confirmado por el área. **Base:** trigger
-  `fine_document_links_single_origin_resolution`. **Action:** `LinkFineDocument`
-  dice qué hacer en el campo del papel.
+  `fine_document_links_single_origin_resolution`, que cuenta solo los vínculos
+  vigentes. **Action:** `LinkFineDocument` dice qué hacer en el campo del papel.
+- Un vínculo de documento con multa **no se borra ni se edita: se anula**, una
+  vez, con fecha, motivo y autor. Desvincular pide el permiso de ajustar. El
+  vínculo anulado queda a la vista y el documento sigue en el expediente.
+  **Base:** `fine_document_links_revoke_only` y CHECK
+  `fine_document_links_revocation_check`. **Action:** `RevokeFineDocumentLink`.
+- Multa, documento y papel son únicos **entre los vínculos vigentes**: un
+  documento desvinculado por error se vuelve a vincular. **Base:** índice único
+  parcial `fine_document_links_active_unique`.
+- No se anula el último vínculo de un documento que respalda un movimiento
+  vigente de la obligación: el importe original queda con su resolución, y un
+  ajuste se revierte antes. **Base:** `fine_document_links_revoke_only`, con
+  bloqueo de la multa. **Action:** `RevokeFineDocumentLink` dice qué hacer.
+- El tipo de un documento y el texto del papel no se corrigen: un acta cargada
+  como resolución es otro documento, y se corrige desvinculándolo y vinculando el
+  correcto. **Base:** `fine_identity_guard`.
 
 <a id="obligacion"></a>
 
@@ -99,7 +114,9 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   con bloqueo de la multa.
 - Una reversión deshace un movimiento de la misma multa, por el mismo importe, una
   sola vez; no revierte la constitución ni otra reversión. **Base.**
-- El documento que respalda un movimiento está vinculado a la multa. **Base.**
+- El documento que respalda un movimiento está vinculado a la multa, con un
+  vínculo vigente. **Base:** `fine_debt_entries_coherent` y
+  `fine_debt_entries_cite_active_link`.
 - Los movimientos no se editan ni se borran. **Base:** `forbid_mutation()`.
 
 <a id="saldo"></a>

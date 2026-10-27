@@ -189,14 +189,28 @@ final class Fine extends Model
 
     /**
      * Los documentos con el papel que cumplen. Un mismo documento aparece
-     * dos veces si cumple dos papeles.
+     * dos veces si cumple dos papeles. Solo los vínculos vigentes: uno
+     * anulado ya no dice nada de la multa.
      *
      * @return BelongsToMany<FineDocument, $this>
      */
     public function documents(): BelongsToMany
     {
         return $this->belongsToMany(FineDocument::class, 'fine_document_links')
-            ->withPivot('role');
+            ->withPivot('role')
+            ->wherePivotNull('revoked_at');
+    }
+
+    /**
+     * Los documentos que se desvincularon, con el papel, el motivo y quién.
+     *
+     * @return BelongsToMany<FineDocument, $this>
+     */
+    public function revokedDocuments(): BelongsToMany
+    {
+        return $this->belongsToMany(FineDocument::class, 'fine_document_links')
+            ->withPivot('role', 'revoked_at', 'revoked_by', 'revocation_reason')
+            ->wherePivotNotNull('revoked_at');
     }
 
     /**

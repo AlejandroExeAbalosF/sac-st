@@ -1053,6 +1053,7 @@ declare namespace App {
                     registeredPrecision: App.Modules.Multas.Enums.DatePrecision;
                     provenance: App.Modules.Multas.Enums.FineProvenance;
                     documents: App.Modules.Multas.Data.FineDocumentData[];
+                    revokedDocuments: App.Modules.Multas.Data.FineRevokedDocumentData[];
                     debtEntries: App.Modules.Multas.Data.FineDebtEntryData[];
                     historicalMovements: App.Modules.Multas.Data.FineHistoricalMovementData[];
                     balance: App.Modules.Multas.Data.FineBalanceData;
@@ -1142,6 +1143,14 @@ declare namespace App {
                     fineCaption: string;
                     caseLabel: string;
                     payment: App.Modules.Multas.Data.FinePaymentData;
+                };
+                export type FineRevokedDocumentData = {
+                    documentId: number;
+                    label: string;
+                    role: App.Modules.Multas.Enums.FineDocumentRole;
+                    reason: string;
+                    revokedAt: string;
+                    revokedByName: string | null;
                 };
                 export type FineUnidentifiedCreditData = {
                     credit: App.Modules.Multas.Data.FineBankCreditData;

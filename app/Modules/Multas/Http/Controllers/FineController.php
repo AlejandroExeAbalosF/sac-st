@@ -222,6 +222,7 @@ final class FineController extends Controller
             'fineCase.documents',
             'person:id,name,document,type',
             'documents',
+            'revokedDocuments',
             'balance',
             'creator:id,name',
             'debtEntries.document',

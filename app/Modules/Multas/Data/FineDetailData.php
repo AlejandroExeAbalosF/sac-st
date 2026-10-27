@@ -43,6 +43,8 @@ final class FineDetailData extends Data
         public FineProvenance $provenance,
         /** @var list<FineDocumentData> */
         public array $documents,
+        /** @var list<FineRevokedDocumentData> */
+        public array $revokedDocuments,
         /** @var list<FineDebtEntryData> */
         public array $debtEntries,
         /** @var list<FineHistoricalMovementData> */
@@ -57,7 +59,7 @@ final class FineDetailData extends Data
     ) {}
 
     /**
-     * Espera cargados `fineCase`, `person`, `documents`, `balance`, `creator`,
+     * Espera cargados `fineCase`, `person`, `documents`, `revokedDocuments`, `balance`, `creator`,
      * `debtEntries.{document,reversedBy,creator}` e
      * `historicalMovements.{creator,reviewer,bankTransaction}` y
      * `payments.{application.fundReceipt,paymentReceipt.receipt,creator}`.
@@ -85,6 +87,16 @@ final class FineDetailData extends Data
             ))
             ->all();
 
+        $autores = User::query()
+            ->whereIn('id', $multa->revokedDocuments->map(fn (FineDocument $documento): mixed => $documento->getRelationValue('pivot')->revoked_by)->filter()->unique()->values())
+            ->pluck('name', 'id')
+            ->all();
+
+        $anulados = array_values($multa->revokedDocuments
+            ->sortBy(fn (FineDocument $documento): string => (string) $documento->getRelationValue('pivot')->revoked_at)
+            ->map(fn (FineDocument $documento): FineRevokedDocumentData => FineRevokedDocumentData::fromModel($documento, $autores))
+            ->all());
+
         return new self(
             id: $multa->id,
             caseId: $multa->fine_case_id,
@@ -101,6 +113,7 @@ final class FineDetailData extends Data
             registeredPrecision: $multa->registered_precision,
             provenance: $multa->provenance,
             documents: array_values($documentos),
+            revokedDocuments: $anulados,
             debtEntries: array_values($multa->debtEntries
                 ->sortBy('id')
                 ->map(fn (FineDebtEntry $movimiento): FineDebtEntryData => FineDebtEntryData::fromModel($movimiento))

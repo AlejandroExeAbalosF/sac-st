@@ -7,10 +7,11 @@ namespace App\Modules\Multas\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Un acto que solo pide el motivo: revertir un ajuste.
+ * Un acto que solo pide el motivo: revertir un ajuste, desvincular un
+ * documento.
  *
  * El motivo es lo único que va a quedar para entender, dentro de un tiempo,
- * por qué ese ajuste figura revertido.
+ * por qué ese ajuste figura revertido o ese documento desvinculado.
  */
 final class ReasonRequest extends FormRequest
 {
