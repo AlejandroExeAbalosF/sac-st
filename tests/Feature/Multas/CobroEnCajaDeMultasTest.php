@@ -81,6 +81,50 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->get(route('recepciones.show', $pago->application()->value('fund_receipt_id')))->assertNotFound();
     }
 
+    /**
+     * El recibo cita la resolución que impuso la multa, no un acta: las dos
+     * son de origen. Acá el acta llegó antes que la resolución y su documento
+     * es el primero del expediente, que es lo que «el primer documento de
+     * origen» devolvía.
+     */
+    public function test_the_receipt_cites_the_origin_resolution_even_when_the_act_came_first(): void
+    {
+        $this->abrirMultas($this->cuenta(), '2026-06-01');
+        $operador = $this->operador();
+
+        $this->actingAs($operador)->post(route('multas.store'), [
+            'caseNumber' => '169607/24-0',
+            'resolution' => ['text' => 'N°0649/26', 'issuedOn' => '2026-05-07'],
+            'acts' => [['actType' => 'HYS', 'text' => 'N°1089657', 'issuedOn' => null]],
+            'caption' => 'PRIMERA S.A.',
+            'registeredOn' => '2026-05-07',
+            'amount' => '1400000.00',
+        ])->assertSessionHasNoErrors();
+        $primera = Fine::query()->sole();
+
+        // El acta de la segunda multa ya estaba en el expediente; su resolución llega después.
+        $this->post(route('multas.expedientes.documentos.store', $primera->fineCase), [
+            'document' => ['kind' => 'act', 'actType' => 'LAB', 'text' => 'N°2000/25'],
+        ])->assertSessionHasNoErrors();
+        $acta = $primera->fineCase->documents()->where('original_text', 'N°2000/25')->sole();
+
+        $this->post(route('multas.store'), [
+            'fineCaseId' => $primera->fine_case_id,
+            'resolution' => ['text' => 'N°0700/26', 'issuedOn' => '2026-05-08'],
+            'actIds' => [$acta->id],
+            'acts' => [],
+            'caption' => 'SEGUNDA S.A.',
+            'registeredOn' => '2026-05-08',
+            'amount' => '500000.00',
+        ])->assertSessionHasNoErrors();
+        $segunda = Fine::query()->latest('id')->firstOrFail();
+
+        $this->post(route('multas.cobros.store', $segunda), $this->cobro('100000.00'))->assertSessionHasNoErrors();
+
+        expect(FinePaymentReceipt::query()->with('receipt')->sole()->receipt->concept_snapshot)
+            ->toBe('Pago parcial de la multa por Resolución 700/2026');
+    }
+
     /** El cheque entra entero; lo que supera la deuda es excedente (M05, M06). */
     public function test_a_cheque_that_exceeds_the_debt_cancels_it_and_keeps_the_excess(): void
     {

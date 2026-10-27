@@ -14,6 +14,7 @@ use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Multas\Enums\DatePrecision;
+use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
@@ -121,7 +122,15 @@ final class ApplyFinePayment
 
         $despues = FineBalance::query()->whereKey($multa->id)->firstOrFail();
         $cancela = Decimal::equals($despues->debt, '0');
-        $resolucion = $multa->documents()->wherePivot('role', FineDocumentRole::Origin->value)->first()?->label();
+        /*
+         * La resolución que impuso la multa, que es única. Sin filtrar por
+         * tipo, «el primer documento de origen» podía ser un acta —también
+         * son de origen— y el recibo decía «por Acta HYS …».
+         */
+        $resolucion = $multa->documents()
+            ->where('kind', FineDocumentKind::Resolution)
+            ->wherePivot('role', FineDocumentRole::Origin->value)
+            ->first()?->label();
         $concepto = ($cancela ? 'Pago cancelatorio de la multa' : 'Pago parcial de la multa')
             .($resolucion === null ? '' : ' por '.$resolucion);
 

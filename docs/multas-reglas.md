@@ -67,6 +67,14 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   es fecha nula. **Base:** CHECK `*_known_check` y `*_month_check`.
 - Una multa no cita un documento de otro expediente. **Base:** las dos FK
   compuestas de `fine_document_links`.
+- Una multa tiene **una sola resolución de origen**: la que la impone. Las
+  posteriores la reducen, la revocan o la ratifican y van como modificación o
+  ratificación; las actas de origen pueden ser varias. Es lo que muestra el Excel
+  histórico: 135 multas con dos resoluciones, y en las que lo aclaran la segunda es
+  posterior (reducción del Ministerio, fallo de la Cámara, corrección de un número).
+  No está confirmado por el área. **Base:** trigger
+  `fine_document_links_single_origin_resolution`. **Action:** `LinkFineDocument`
+  dice qué hacer en el campo del papel.
 
 <a id="obligacion"></a>
 
@@ -361,6 +369,9 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
   por tipo y caja.
 - Sin persona del maestro: «recibí de» = carátula en `counterparty_name_snapshot`.
   **Base:** `receipts_belong_to_cash_box`.
+- El concepto cita la resolución de origen de la multa («Pago parcial de la multa
+  por Resolución 649/2026»), nunca un acta, aunque las actas también sean de
+  origen. **Action:** `ApplyFinePayment`.
 - Todo recibo de la caja Multas documenta un pago, con su snapshot
   (`fine_payment_receipts`), por el importe del pago y vigente. **Base:**
   `fine_payment_receipt_coherent` y `receipts_multas_belong_to_a_payment`

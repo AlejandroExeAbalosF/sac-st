@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Actions;
 
+use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineDocument;
@@ -47,6 +48,25 @@ final class LinkFineDocument
 
             if ($repetido) {
                 throw ValidationException::withMessages(['documentId' => 'Ese documento ya está vinculado a la multa con ese papel.']);
+            }
+
+            /*
+             * Una sola resolución de origen: la que impone la multa. Las que
+             * vienen después la reducen, la revocan o la ratifican. La base
+             * lo impone (`fine_document_links_single_origin_resolution`);
+             * acá se dice qué hacer.
+             */
+            $otraResolucionDeOrigen = $papel === FineDocumentRole::Origin
+                && $vinculado->kind === FineDocumentKind::Resolution
+                && $multa->documents()
+                    ->where('kind', FineDocumentKind::Resolution)
+                    ->wherePivot('role', FineDocumentRole::Origin->value)
+                    ->exists();
+
+            if ($otraResolucionDeOrigen) {
+                throw ValidationException::withMessages([
+                    'role' => 'La multa ya tiene su resolución de origen. Una resolución posterior se vincula como ratificación, o se registra como ajuste si cambia el importe.',
+                ]);
             }
 
             $multa->documents()->attach($vinculado->id, [
