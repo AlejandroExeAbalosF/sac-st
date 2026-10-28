@@ -1211,7 +1211,8 @@ declare namespace App {
                     | 'payment_discard'
                     | 'link_revocation'
                     | 'correction'
-                    | 'historical_rejection';
+                    | 'historical_rejection'
+                    | 'origin_replacement';
                 export type FineReasonCode =
                     | 'data_entry_error'
                     | 'duplicate'

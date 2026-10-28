@@ -106,6 +106,13 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
             ->name('antecedentes.revisiones.store');
     });
 
+    // Reemplazar de qué resolución nace la multa: un permiso propio, en pocas manos.
+    Route::middleware('can:multas.reemplazar-origen')->group(function (): void {
+        Route::post('{fine}/resolucion-de-origen', [FineDocumentController::class, 'replaceOrigin'])
+            ->whereNumber('fine')
+            ->name('resolucion-de-origen.store');
+    });
+
     Route::middleware('can:multas.ajustar')->group(function (): void {
         Route::post('{fine}/ajustes', [FineDebtController::class, 'store'])->whereNumber('fine')->name('ajustes.store');
         Route::post('ajustes/{entry}/reversion', [FineDebtController::class, 'reverse'])->whereNumber('entry')->name('ajustes.reverse');

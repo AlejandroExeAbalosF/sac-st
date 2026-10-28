@@ -6,12 +6,14 @@ namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\LinkFineDocument;
+use App\Modules\Multas\Actions\ReplaceFineOriginResolution;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Actions\RevokeFineDocumentLink;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\ReasonRequest;
+use App\Modules\Multas\Http\Requests\ReplaceOriginResolutionRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
@@ -74,6 +76,41 @@ final class FineDocumentController extends Controller
         $desvincular->handle($fine, $fineDocument, $role, $request->reason(), $request->user()?->id);
 
         Toast::success('Documento desvinculado de la multa.');
+
+        return to_route('multas.show', $fine->showParameters());
+    }
+
+    /**
+     * Reemplaza la resolución de origen cuando se cargó la equivocada: el
+     * importe original pasa a citar la nueva y la vieja queda desvinculada.
+     */
+    public function replaceOrigin(ReplaceOriginResolutionRequest $request, Fine $fine, ReplaceFineOriginResolution $reemplazar): RedirectResponse
+    {
+        $id = $request->validated('documentId');
+
+        if ($id !== null) {
+            $documento = FineDocument::query()->find((int) $id);
+
+            if (! $documento instanceof FineDocument) {
+                throw ValidationException::withMessages(['documentId' => 'Ese documento no existe.']);
+            }
+        } else {
+            /** @var array{text?: string, issuedOn?: string|null} $datos */
+            $datos = (array) $request->validated('document');
+            $documento = NewDocument::fromArray($datos, FineDocumentKind::Resolution);
+        }
+
+        $archivo = $request->file('file');
+
+        $nueva = $reemplazar->handle(
+            $fine,
+            $documento,
+            $request->reason(),
+            $request->user()?->id,
+            $archivo instanceof UploadedFile ? $archivo : null,
+        );
+
+        Toast::success('Resolución de origen reemplazada.', "La multa nace ahora de {$nueva->label()}.");
 
         return to_route('multas.show', $fine->showParameters());
     }

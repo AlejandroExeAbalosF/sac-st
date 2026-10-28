@@ -153,7 +153,11 @@ saldo y estado. Abajo:
   expediente. El papel que exige un movimiento vigente —el origen de la
   resolución del importe original, la modificación de un ajuste— no se
   desvincula, y la ficha no lo ofrece; los otros papeles del mismo documento,
-  sí.
+  sí. Si la resolución de origen era otro papel —no un número mal leído, que
+  se corrige—, quien tenga el permiso la **reemplaza** desde ese documento: elige
+  otra resolución del expediente o carga la que falta, con su fecha y su
+  archivo, y un motivo. El importe no cambia; la vieja queda desvinculada como
+  origen.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos de la multa**: los de la multa y, debajo, los del expediente.
@@ -628,7 +632,8 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | --- | --- | --- |
 | `multas.ver` | Consultar los expedientes y las multas | administrador, contador, administrativo, consulta |
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
-| `multas.ajustar` | Ajustar y revertir; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
+| `multas.ajustar` | Ajustar y revertir; desvincular documentos; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
+| `multas.reemplazar-origen` | Reemplazar la resolución de origen cargada por error | administrador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |

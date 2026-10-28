@@ -417,7 +417,7 @@ class GuardasDelNucleoDeMultasTest extends TestCase
             'old_values' => json_encode(['amount' => 1000]), 'new_values' => json_encode(['amount' => 1]),
         ]));
 
-        $this->rechaza('solo su fecha se completa o corrige', fn () => DB::table('fine_debt_entries')
+        $this->rechaza('solo su fecha, y el documento del importe original, se revisan', fn () => DB::table('fine_debt_entries')
             ->where('id', $constitucion)->update(['effective_on' => '2026-05-08']));
 
         DB::table('fine_identifier_revisions')->insert([

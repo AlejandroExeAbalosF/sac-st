@@ -9,6 +9,7 @@ import {
     Pencil,
     Receipt,
     Scale,
+    Replace,
     Unlink,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,6 +33,7 @@ import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog'
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
+import ReplaceOriginDialog from '@/features/multas/components/replace-origin-dialog';
 import ReviewHistoricalDialog from '@/features/multas/components/review-historical-dialog';
 import ReviseDateDialog from '@/features/multas/components/revise-date-dialog';
 import ReviseFineDialog from '@/features/multas/components/revise-fine-dialog';
@@ -91,6 +93,7 @@ type Props = {
         reportBank: boolean;
         verifyBank: boolean;
         adjust: boolean;
+        replaceOrigin: boolean;
         viewAttachments: boolean;
         linkBankCredit: boolean;
         deposit: boolean;
@@ -115,6 +118,7 @@ type Dialogo =
     | { tipo: 'adjuntar-documento'; documento: Documento }
     | { tipo: 'corregir-documento'; documento: Documento }
     | { tipo: 'desvincular'; documento: Documento; papel: Papel }
+    | { tipo: 'reemplazar-origen'; documento: Documento }
     | { tipo: 'antecedente' }
     | {
           tipo: 'revisar';
@@ -371,6 +375,27 @@ export default function MultaShow({
                                             Corregir
                                         </Button>
                                     )}
+                                    {/* El origen del importe original no se desvincula: se reemplaza por otra resolución. */}
+                                    {can.replaceOrigin &&
+                                        documento.kind === 'resolution' &&
+                                        documento.requiredRoles.includes(
+                                            'origin',
+                                        ) && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setDialogo({
+                                                        tipo: 'reemplazar-origen',
+                                                        documento,
+                                                    })
+                                                }
+                                                aria-label={`Reemplazar ${documento.label} como origen`}
+                                            >
+                                                <Replace aria-hidden="true" />
+                                                Reemplazar
+                                            </Button>
+                                        )}
                                     {/* El papel que exige un movimiento vigente no se desvincula: no se ofrece. */}
                                     {can.adjust &&
                                         documento.roles
@@ -1229,6 +1254,18 @@ export default function MultaShow({
                         }).url
                     }
                     submitLabel="Desvincular"
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'reemplazar-origen' && (
+                <ReplaceOriginDialog
+                    fineId={multa.id}
+                    actual={dialogo.documento}
+                    resoluciones={documentosDelExpediente.filter(
+                        (d) =>
+                            d.kind === 'resolution' &&
+                            d.id !== dialogo.documento.id,
+                    )}
                     onClose={cerrar}
                 />
             )}

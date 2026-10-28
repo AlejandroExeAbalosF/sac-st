@@ -97,6 +97,13 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['documento' => 'Documento', 'papel' => 'Papel'],
             ),
             new AuditActionDefinition(
+                'multa.resolucion-de-origen-reemplazada',
+                'Se reemplazó la resolución de origen de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['anterior' => 'Resolución anterior', 'nueva' => 'Resolución nueva', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.documento-desvinculado',
                 'Se desvinculó un documento de la multa',
                 'Multas',

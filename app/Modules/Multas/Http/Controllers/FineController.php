@@ -310,6 +310,7 @@ final class FineController extends Controller
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
                 'replaceCheque' => $cobra,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
+                'replaceOrigin' => $usuario?->can('multas.reemplazar-origen') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.
                 'linkBankCredit' => $creditos->book() !== null,

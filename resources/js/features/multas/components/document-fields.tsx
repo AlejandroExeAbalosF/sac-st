@@ -49,6 +49,7 @@ export default function DocumentFields({
     errors,
     idPrefix,
     kinds = Object.keys(DOCUMENT_KIND) as Kind[],
+    dateRequired = false,
 }: {
     value: NewDocumentForm;
     onChange: (value: NewDocumentForm) => void;
@@ -56,6 +57,8 @@ export default function DocumentFields({
     idPrefix: string;
     /** Los tipos que se ofrecen; por defecto, todos. */
     kinds?: Kind[];
+    /** Si la fecha es obligatoria: la de una resolución de origen lo es. */
+    dateRequired?: boolean;
 }) {
     return (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -140,9 +143,11 @@ export default function DocumentFields({
             <div>
                 <Label htmlFor={`${idPrefix}-fecha`}>
                     Fecha
-                    <span className="ml-1 font-normal text-muted-foreground">
-                        (opcional)
-                    </span>
+                    {!dateRequired && (
+                        <span className="ml-1 font-normal text-muted-foreground">
+                            (opcional)
+                        </span>
+                    )}
                 </Label>
                 <PartialDateInput
                     id={`${idPrefix}-fecha`}

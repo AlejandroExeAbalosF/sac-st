@@ -46,6 +46,16 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Cambia de qué resolución nace la multa: queda en pocas manos y el
+            // área lo puede extender desde la matriz.
+            new PermissionDefinition(
+                'multas.reemplazar-origen',
+                'Reemplazar la resolución de origen',
+                'Reemplazar la resolución de la que nace una multa cuando se cargó la equivocada. El importe no cambia y la resolución anterior queda desvinculada, a la vista.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
             // Cobrar en el mostrador y entregar el recibo: lo de todos los días.
             new PermissionDefinition(
                 'multas.cobrar',

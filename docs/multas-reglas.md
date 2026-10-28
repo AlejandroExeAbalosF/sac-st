@@ -105,6 +105,15 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 - El tipo de un documento y el texto del papel no se corrigen: un acta cargada
   como resolución es otro documento, y se corrige desvinculándolo y vinculando el
   correcto. **Base:** `fine_identity_guard`.
+- La resolución de origen del importe original se **reemplaza** en un acto
+  propio, con su permiso (`multas.reemplazar-origen`) y un motivo de su lista. En
+  una transacción: una revisión cambia el documento —y la fecha, que es la de
+  la resolución— del importe original; el origen de la vieja queda anulado; la
+  nueva queda vinculada como origen. El importe no cambia, y una multa cargada a
+  mano exige la fecha exacta de la nueva. **Base:** `fine_identifier_revision_apply`
+  admite revisar `fine_document_id` solo en el importe original;
+  `fine_debt_entries_keep_document_role`, diferida, exige al cierre el vínculo
+  con su papel. **Action:** `ReplaceFineOriginResolution`.
 
 <a id="motivos"></a>
 
