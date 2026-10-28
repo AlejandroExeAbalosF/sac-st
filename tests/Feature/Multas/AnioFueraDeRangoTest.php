@@ -9,6 +9,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\TwoDigitYear;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,21 @@ class AnioFueraDeRangoTest extends TestCase
             ->and(TwoDigitYear::expand(2025, 2026))->toBe(2025)
             // Sin referencia, el pivote de siempre.
             ->and(TwoDigitYear::expand(29))->toBe(1929);
+    }
+
+    /** Sin referencia, el siglo sale del año de hoy, no de un 2000 fijo. */
+    public function test_sin_referencia_el_siglo_es_el_del_anio_en_curso(): void
+    {
+        $this->travelTo(CarbonImmutable::create(2026, 10, 28, 12));
+
+        expect(TwoDigitYear::expand(27))->toBe(2027)
+            ->and(TwoDigitYear::expand(28))->toBe(1928);
+
+        $this->travelTo(CarbonImmutable::create(2105, 3, 1, 12));
+
+        expect(TwoDigitYear::expand(5))->toBe(2105)
+            ->and(TwoDigitYear::expand(6))->toBe(2106)
+            ->and(TwoDigitYear::expand(98))->toBe(2098);
     }
 
     public function test_la_resolucion_lee_el_siglo_de_su_fecha_y_se_guarda(): void

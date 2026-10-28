@@ -1,3 +1,5 @@
+import { businessToday } from '@/lib/format';
+
 /**
  * Una fecha pegada, en el `AAAA-MM-DD` que entiende `<input type="date">`.
  *
@@ -7,11 +9,15 @@
  * el año con cuatro cifras al principio es el ISO. Una hora detrás
  * (`06/06/2023 10:30`) se ignora.
  *
- * Un año de dos cifras es de este siglo: el sistema no registra nada del
- * siglo pasado. Una fecha que no existe —`31/02/2023`— devuelve `null`, y
- * el pegado se deja pasar como si nada.
+ * Un año de dos cifras es del siglo en curso hasta el año próximo, y del
+ * anterior por encima, como en el servidor (`TwoDigitYear`): el siglo sale
+ * del año de hoy, no de un 2000 fijo. Una fecha que no existe —`31/02/2023`—
+ * devuelve `null`, y el pegado se deja pasar como si nada.
  */
-export function parsePastedDate(text: string): string | null {
+export function parsePastedDate(
+    text: string,
+    now: Date = new Date(),
+): string | null {
     const limpio = text.trim().split(/\s+/)[0] ?? '';
 
     const iso = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(limpio);
@@ -27,7 +33,9 @@ export function parsePastedDate(text: string): string | null {
         dia = Number(local[1]);
         mes = Number(local[2]);
         anio =
-            local[3].length === 2 ? 2000 + Number(local[3]) : Number(local[3]);
+            local[3].length === 2
+                ? fullYear(Number(local[3]), now)
+                : Number(local[3]);
     } else {
         return null;
     }
@@ -44,6 +52,14 @@ export function parsePastedDate(text: string): string | null {
     }
 
     return `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+/** Un año de dos cifras, con el siglo del año de hoy. */
+function fullYear(year: number, now: Date): number {
+    const hoy = Number(businessToday(now).slice(0, 4));
+    const siglo = Math.floor(hoy / 100) * 100;
+
+    return year <= (hoy % 100) + 1 ? siglo + year : siglo - 100 + year;
 }
 
 /** `2023-06-06` → `06062023`: las cifras que muestra el campo, sin barras. */

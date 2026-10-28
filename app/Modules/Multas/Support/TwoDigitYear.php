@@ -57,8 +57,10 @@ final class TwoDigitYear
             return $candidatos[0];
         }
 
-        $pivote = (BusinessDate::today()->year % 100) + 1;
+        // Sin fecha: del siglo en curso hasta el año próximo, y del anterior por encima.
+        $hoy = BusinessDate::today()->year;
+        $siglo = intdiv($hoy, 100) * 100;
 
-        return $year <= $pivote ? 2000 + $year : 1900 + $year;
+        return $year <= ($hoy % 100) + 1 ? $siglo + $year : $siglo - 100 + $year;
     }
 }

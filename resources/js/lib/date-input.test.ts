@@ -8,6 +8,17 @@ describe('una fecha pegada', () => {
         expect(parsePastedDate('6/6/2023')).toBe('2023-06-06');
     });
 
+    it('toma el siglo del año de hoy, no un 2000 fijo', () => {
+        const en2026 = new Date('2026-10-28T12:00:00Z');
+        const en2105 = new Date('2105-03-01T12:00:00Z');
+
+        expect(parsePastedDate('6/6/23', en2026)).toBe('2023-06-06');
+        expect(parsePastedDate('6/6/27', en2026)).toBe('2027-06-06');
+        expect(parsePastedDate('6/6/98', en2026)).toBe('1998-06-06');
+        expect(parsePastedDate('6/6/05', en2105)).toBe('2105-06-06');
+        expect(parsePastedDate('6/6/98', en2105)).toBe('2098-06-06');
+    });
+
     it('acepta guiones, puntos y el año de dos cifras de este siglo', () => {
         expect(parsePastedDate('06-06-2023')).toBe('2023-06-06');
         expect(parsePastedDate('06.06.2023')).toBe('2023-06-06');
