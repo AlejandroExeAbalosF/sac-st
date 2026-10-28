@@ -108,6 +108,25 @@ class PersonTest extends TestCase
         ]);
     }
 
+    public function test_a_name_typed_in_capitals_is_stored_as_it_is_shown(): void
+    {
+        $this->actingAs($this->operador())->postJson(route('people.store'), [
+            'role' => 'beneficiary',
+            'type' => 'individual',
+            'firstName' => 'JUAN CARLOS',
+            'lastName' => 'DE LA FUENTE',
+            'document' => '23456789',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'De la Fuente, Juan Carlos');
+
+        $this->assertDatabaseHas('people', [
+            'document' => '23456789',
+            'first_name' => 'Juan Carlos',
+            'last_name' => 'De la Fuente',
+        ]);
+    }
+
     public function test_a_beneficiary_can_be_created_with_an_optional_unverified_cbu(): void
     {
         $response = $this->actingAs($this->operador())->postJson(route('people.store'), [

@@ -26,6 +26,26 @@ class UsuariosTest extends TestCase
         return $user;
     }
 
+    public function test_el_nombre_cargado_en_mayusculas_se_guarda_como_se_muestra(): void
+    {
+        $this
+            ->actingAs($this->administrador())
+            ->from(route('configuracion.usuarios.index'))
+            ->post(route('configuracion.usuarios.store'), [
+                'firstName' => 'NORA BEATRIZ',
+                'lastName' => 'achad',
+                'username' => 'n.achad',
+                'documentNumber' => '20111222',
+                'email' => 'n.achad@salta.gob.ar',
+                'role' => 'contador',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $creado = User::query()->where('username', 'n.achad')->firstOrFail();
+
+        $this->assertSame('Achad, Nora Beatriz', $creado->name);
+    }
+
     public function test_el_alta_devuelve_una_contrasena_temporal_y_obliga_a_cambiarla(): void
     {
         $response = $this

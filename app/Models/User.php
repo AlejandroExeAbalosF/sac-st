@@ -6,9 +6,11 @@ namespace App\Models;
 
 use App\Concerns\HasGeneratedColumns;
 use App\Modules\Shared\Models\UserLoginEvent;
+use App\Support\Text\PersonName;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -74,6 +76,22 @@ class User extends Authenticatable implements PasskeyUser
     public function isActive(): bool
     {
         return $this->is_active;
+    }
+
+    /**
+     * @return Attribute<never, string>
+     */
+    protected function firstName(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => PersonName::format($value));
+    }
+
+    /**
+     * @return Attribute<never, string>
+     */
+    protected function lastName(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => PersonName::format($value));
     }
 
     /**

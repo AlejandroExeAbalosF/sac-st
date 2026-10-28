@@ -6,7 +6,9 @@ namespace App\Modules\Shared\Models;
 
 use App\Concerns\HasGeneratedColumns;
 use App\Models\User;
+use App\Support\Text\PersonName;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -148,6 +150,22 @@ final class Person extends Model
             'document' => $this->document,
             'type' => $this->type,
         ];
+    }
+
+    /**
+     * @return Attribute<never, string|null>
+     */
+    protected function firstName(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => $value === null ? null : PersonName::format($value));
+    }
+
+    /**
+     * @return Attribute<never, string|null>
+     */
+    protected function lastName(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => $value === null ? null : PersonName::format($value));
     }
 
     /**
