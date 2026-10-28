@@ -9,11 +9,14 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { FieldError } from '@/features/multas/components/form-dialog';
+import LoadedDocumentWarning from '@/features/multas/components/loaded-document-warning';
 import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, DOCUMENT_KIND } from '@/features/multas/labels';
+import { findLoadedDocument } from '@/features/multas/loaded-document';
 import { businessToday } from '@/lib/format';
 
 type Kind = App.Modules.Multas.Enums.FineDocumentKind;
+type Documento = App.Modules.Multas.Data.FineDocumentData;
 type ActType = App.Modules.Multas.Enums.FineActType;
 
 export type NewDocumentForm = {
@@ -50,6 +53,8 @@ export default function DocumentFields({
     idPrefix,
     kinds = Object.keys(DOCUMENT_KIND) as Kind[],
     dateRequired = false,
+    loaded = [],
+    onUseLoaded,
 }: {
     value: NewDocumentForm;
     onChange: (value: NewDocumentForm) => void;
@@ -59,6 +64,10 @@ export default function DocumentFields({
     kinds?: Kind[];
     /** Si la fecha es obligatoria: la de una resolución de origen lo es. */
     dateRequired?: boolean;
+    /** Los documentos del expediente: si el número ya está, se avisa. */
+    loaded?: Documento[];
+    /** Usar el ya cargado en vez de cargar otro; `null` si ese no se puede usar acá. */
+    onUseLoaded?: (documento: Documento) => (() => void) | null;
 }) {
     return (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -131,6 +140,15 @@ export default function DocumentFields({
                 <FieldError
                     message={errors['document.text'] ?? errors['document.kind']}
                 />
+                <AvisoDeCargado
+                    documento={findLoadedDocument(
+                        loaded,
+                        value.kind,
+                        value.text,
+                        value.actType,
+                    )}
+                    onUseLoaded={onUseLoaded}
+                />
                 {/* Aviso, no error: el año del número no coincide con la fecha. */}
                 {value.kind !== 'other' &&
                     documentYearWarning(value.text, value.issuedOn) && (
@@ -160,5 +178,24 @@ export default function DocumentFields({
                 <FieldError message={errors['document.issuedOn']} />
             </div>
         </div>
+    );
+}
+
+function AvisoDeCargado({
+    documento,
+    onUseLoaded,
+}: {
+    documento: Documento | null;
+    onUseLoaded?: (documento: Documento) => (() => void) | null;
+}) {
+    return (
+        <LoadedDocumentWarning
+            documento={documento}
+            onUse={
+                documento === null
+                    ? undefined
+                    : (onUseLoaded?.(documento) ?? undefined)
+            }
+        />
     );
 }

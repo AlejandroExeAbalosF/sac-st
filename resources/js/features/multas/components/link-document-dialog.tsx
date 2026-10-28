@@ -172,6 +172,12 @@ export default function LinkDocumentDialog({
                     errors={errores}
                     idPrefix="vinculo-nuevo"
                     kinds={tipos(data.role)}
+                    loaded={documentos}
+                    onUseLoaded={(cargado) =>
+                        disponibles(data.role).some((d) => d.id === cargado.id)
+                            ? () => setData('documentId', cargado.id)
+                            : null
+                    }
                 />
             )}
 

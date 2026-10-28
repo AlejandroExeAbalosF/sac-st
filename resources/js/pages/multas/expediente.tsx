@@ -235,7 +235,11 @@ export default function ExpedienteDeMultas({
             </div>
 
             {dialogo?.tipo === 'documento' && (
-                <AddDocumentDialog caseId={expediente.id} onClose={cerrar} />
+                <AddDocumentDialog
+                    caseId={expediente.id}
+                    documentos={expediente.documents}
+                    onClose={cerrar}
+                />
             )}
             {dialogo?.tipo === 'adjuntar' && (
                 <AttachFileDialog

@@ -24,8 +24,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import LoadedDocumentWarning from '@/features/multas/components/loaded-document-warning';
 import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, partialDate } from '@/features/multas/labels';
+import { findLoadedDocument } from '@/features/multas/loaded-document';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
@@ -68,6 +70,22 @@ function YearWarning({ message }: { message: string | null }) {
     return message ? (
         <p className="mt-1 text-xs text-warning-strong">{message}</p>
     ) : null;
+}
+
+/** El número ya está en el expediente: se ofrece usar el cargado en vez de cargar otro. */
+function DocumentoCargado({
+    documento,
+    onUse,
+}: {
+    documento: App.Modules.Multas.Data.FineDocumentData | null;
+    onUse: (cargado: App.Modules.Multas.Data.FineDocumentData) => void;
+}) {
+    return (
+        <LoadedDocumentWarning
+            documento={documento}
+            onUse={documento === null ? undefined : () => onUse(documento)}
+        />
+    );
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -560,6 +578,20 @@ export default function NuevaMulta({
                                         <FieldError
                                             message={errores['resolution.text']}
                                         />
+                                        <DocumentoCargado
+                                            documento={findLoadedDocument(
+                                                resoluciones,
+                                                'resolution',
+                                                data.resolution.text,
+                                            )}
+                                            onUse={(cargada) => {
+                                                setCargarNueva(false);
+                                                setData(
+                                                    'resolutionId',
+                                                    cargada.id,
+                                                );
+                                            }}
+                                        />
                                         <YearWarning
                                             message={documentYearWarning(
                                                 data.resolution.text,
@@ -736,6 +768,31 @@ export default function NuevaMulta({
                                                         errores[
                                                             `acts.${i}.text`
                                                         ]
+                                                    }
+                                                />
+                                                <DocumentoCargado
+                                                    documento={findLoadedDocument(
+                                                        actas,
+                                                        'act',
+                                                        acta.text,
+                                                        acta.actType,
+                                                    )}
+                                                    onUse={(cargada) =>
+                                                        setData({
+                                                            ...data,
+                                                            actIds: data.actIds.includes(
+                                                                cargada.id,
+                                                            )
+                                                                ? data.actIds
+                                                                : [
+                                                                      ...data.actIds,
+                                                                      cargada.id,
+                                                                  ],
+                                                            acts: data.acts.filter(
+                                                                (_, j) =>
+                                                                    j !== i,
+                                                            ),
+                                                        })
                                                     }
                                                 />
                                                 <YearWarning

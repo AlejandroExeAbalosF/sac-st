@@ -8,7 +8,7 @@
  * nada: no coincidir no bloquea —una resolución numerada a fin de año puede
  * firmarse en enero—.
  */
-const NUMERO =
+export const NUMERO =
     /^\s*(?:(LAB|H\s*Y\s*S|HYS)\b)?\s*(?:N\s*[°º]?|Nro\.?)?\s*(\d{1,9})\s*(?:\/\s*(\d{2}|\d{4}))?\s*$/iu;
 
 /** Un año de dos cifras, en el siglo que lo deja más cerca del de referencia. */

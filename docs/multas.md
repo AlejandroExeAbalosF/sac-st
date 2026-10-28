@@ -125,6 +125,12 @@ Una multa se carga con todo lo que trae el papel:
 - **Actas.** Las del expediente, como casillas sin marcar, y «Agregar un acta que
   no está cargada» para las nuevas, con su tipo (laboral o higiene y seguridad).
   Pueden no tener año.
+- **Documento ya cargado.** Al escribir una resolución o un acta nueva, si el
+  expediente ya tiene una del mismo tipo con el mismo número y año, se avisa y se
+  ofrece «Usar la cargada». Se compara el número leído, no el texto: «LAB. Nº
+  05196/11» y «LAB Nº 5196/11» son la misma acta. Es solo un aviso —no bloquea ni
+  lo impone la base— y vale también al agregar un documento al expediente, al
+  vincular uno a la multa y al reemplazar la resolución de origen.
 - **Carátula, persona y fecha de registro.** La persona es opcional: la carátula
   alcanza para identificar al sancionado y es la que va a llevar el recibo. El mes
   de la fecha de registro es el período de origen de la multa.

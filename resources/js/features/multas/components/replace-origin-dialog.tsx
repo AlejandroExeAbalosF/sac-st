@@ -119,6 +119,12 @@ export default function ReplaceOriginDialog({
                         idPrefix="origen-nueva"
                         kinds={['resolution']}
                         dateRequired
+                        loaded={[actual, ...resoluciones]}
+                        onUseLoaded={(cargado) =>
+                            cargado.id === actual.id
+                                ? null
+                                : () => setData('documentId', cargado.id)
+                        }
                     />
                     <PaperPhotoDropzone
                         id="origen-nueva-archivo"

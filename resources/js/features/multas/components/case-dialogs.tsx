@@ -33,9 +33,12 @@ type Codigo = App.Modules.Multas.Enums.FineReasonCode;
  */
 export function AddDocumentDialog({
     caseId,
+    documentos,
     onClose,
 }: {
     caseId: number;
+    /** Los del expediente: si el número ya está, se avisa. */
+    documentos: Documento[];
     onClose: () => void;
 }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -61,6 +64,7 @@ export function AddDocumentDialog({
                 onChange={(documento) => setData('document', documento)}
                 errors={errors as Record<string, string | undefined>}
                 idPrefix="nuevo-documento"
+                loaded={documentos}
             />
         </FormDialog>
     );
