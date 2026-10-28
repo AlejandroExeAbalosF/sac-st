@@ -10,6 +10,7 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Modules\Shared\Enums\ReceiptType;
@@ -57,16 +58,7 @@ final class ReceiveFinePaymentAtCounter
         $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->valueOrFail('id');
         $moneda = Currency::from($multa->currency);
 
-        if (CashBookOpening::for($caja, $moneda) === null) {
-            throw ValidationException::withMessages([
-                'amount' => $moneda === Currency::Ars
-                    ? 'La caja de Multas todavía no se abrió: no puede cobrar.'
-                    : 'La caja de Multas no opera en '.$multa->currency.'.',
-            ]);
-        }
-
-        // Una hoja del talonario se usa una vez, aunque el recibo se haya anulado.
-        $this->talonarios->assertFree(ReceiptType::Income, $caja, $talonario);
+        $this->assertCanReceive($multa, $talonario);
 
         $recepcion = $this->recibir->handle(
             amount: $pago->amount,
@@ -82,5 +74,29 @@ final class ReceiveFinePaymentAtCounter
         );
 
         return $this->aplicar->handle($pago, $recepcion, $fecha, $talonario, $signedById, $actorId);
+    }
+
+    /**
+     * Si la caja puede recibir este cobro: abierta en la moneda de la multa
+     * y con la hoja del talonario sin usar. La vista previa del recibo lo
+     * pregunta antes de mostrar un papel que el cobro rechazaría.
+     *
+     * @throws ValidationException
+     */
+    public function assertCanReceive(Fine $multa, ?string $talonario): void
+    {
+        $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->valueOrFail('id');
+        $moneda = Currency::from($multa->currency);
+
+        if (CashBookOpening::for($caja, $moneda) === null) {
+            throw ValidationException::withMessages([
+                'amount' => $moneda === Currency::Ars
+                    ? 'La caja de Multas todavía no se abrió: no puede cobrar.'
+                    : 'La caja de Multas no opera en '.$multa->currency.'.',
+            ]);
+        }
+
+        // Una hoja del talonario se usa una vez, aunque el recibo se haya anulado.
+        $this->talonarios->assertFree(ReceiptType::Income, $caja, $talonario);
     }
 }

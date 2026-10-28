@@ -139,6 +139,8 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
      * El cobro en la caja: efectivo o cheque, con su recibo en el acto (M02).
      */
     Route::middleware('can:multas.cobrar')->group(function (): void {
+        // La vista previa va antes del cobro y con el mismo permiso: es el anticipo del recibo.
+        Route::get('{fine}/cobros/previsualizar', [FinePaymentController::class, 'preview'])->whereNumber('fine')->name('cobros.preview');
         Route::post('{fine}/cobros', [FinePaymentController::class, 'store'])->whereNumber('fine')->name('cobros.store');
     });
 

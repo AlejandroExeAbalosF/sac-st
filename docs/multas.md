@@ -495,6 +495,14 @@ cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
   uno, y separa el excedente. Lo que dice queda congelado, incluida la cuenta de
   depósito: un ajuste posterior de la multa o un cambio en la cuenta no lo cambian
   (M09). Una hoja del talonario ya usada se rechaza en el campo.
+- **Revisar el recibo**: el cobro va en dos pasos. «Revisar recibo» comprueba los
+  datos con las mismas reglas que el cobro —un error se marca en su campo— y
+  muestra el recibo tal como va a salir, sobre papel en blanco o sobre la hoja del
+  talonario, sin escribir nada. Recién «Cobrar y emitir recibo» cobra; «Volver»
+  conserva lo cargado. La vista previa y la emisión arman el papel con el mismo
+  código, así que lo que se mira es lo que se imprime. El número que muestra es un
+  anticipo: el definitivo se toma al emitir, y si entretanto se emite otro recibo
+  de Multas, le toca el siguiente.
 - **Término** (M08): el pago se juzga contra el cierre mensual de la caja de
   Multas del mes en que se registró la multa. Sin cierre todavía, en término;
   presentado después del cierre, fuera de término; sin fecha de registro, o

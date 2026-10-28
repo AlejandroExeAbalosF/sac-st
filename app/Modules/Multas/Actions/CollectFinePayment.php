@@ -10,6 +10,7 @@ use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
@@ -39,7 +40,52 @@ final class CollectFinePayment
         private readonly ReceiveFinePaymentAtCounter $recibir,
         private readonly RecordAuditEvent $auditar,
         private readonly TalonarioSequence $talonarios,
+        private readonly ApplyFinePayment $aplicar,
     ) {}
+
+    /**
+     * El recibo que saldría de este cobro, sin cobrar nada.
+     *
+     * Pasa por las mismas comprobaciones que el cobro, así un dato que el
+     * cobro va a rechazar se marca en el formulario antes de mostrar un
+     * papel que nunca se va a emitir.
+     *
+     * @param  array{number: string, bank: string|null, issueDate: string|null}|null  $cheque
+     *
+     * @throws ValidationException
+     */
+    public function preview(
+        Fine $multa,
+        FinePaymentMedium $medio,
+        string $amount,
+        ?CarbonImmutable $receivedOn = null,
+        ?array $cheque = null,
+        ?string $judicialReference = null,
+        ?string $talonarioNumber = null,
+        ?int $signedById = null,
+    ): FinePaymentReceipt {
+        $importe = Decimal::scale($amount);
+        $hoy = BusinessDate::today();
+        $fecha = $receivedOn ?? $hoy;
+        $talonario = trim((string) $talonarioNumber) ?: null;
+        $judicial = trim((string) $judicialReference) ?: null;
+
+        $this->assertCollectable($medio, $importe, $fecha, $hoy, $talonario, $judicial, $cheque);
+        $this->assertHasDebt($multa);
+        $this->recibir->assertCanReceive($multa, $talonario);
+
+        $pago = new FinePayment([
+            'fine_id' => $multa->id,
+            'medium' => $medio,
+            'judicial_origin' => $judicial !== null,
+            'judicial_reference' => $judicial,
+            'amount' => $importe,
+            'payer_person_id' => $multa->person_id,
+            'payer_name' => $multa->caption,
+        ]);
+
+        return $this->aplicar->preview($pago, $fecha, $talonario, $signedById);
+    }
 
     /**
      * @param  array{number: string, bank: string|null, issueDate: string|null}|null  $cheque
@@ -110,11 +156,7 @@ final class CollectFinePayment
             }
 
             $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
-            $saldo = (string) FineBalance::query()->whereKey($multa->id)->value('debt');
-
-            if (Decimal::equals($saldo, '0')) {
-                throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay nada que cobrar.']);
-            }
+            $this->assertHasDebt($multa);
 
             /*
              * El cobro de hoy se presenta en el momento; el de un día anterior,
@@ -157,6 +199,16 @@ final class CollectFinePayment
 
             return $pago;
         });
+    }
+
+    /** @throws ValidationException */
+    private function assertHasDebt(Fine $multa): void
+    {
+        $saldo = (string) FineBalance::query()->whereKey($multa->id)->value('debt');
+
+        if (Decimal::equals($saldo, '0')) {
+            throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay nada que cobrar.']);
+        }
     }
 
     private function cajaDeMultas(): int

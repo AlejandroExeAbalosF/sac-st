@@ -156,6 +156,58 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->cobrar($multa, FinePaymentMedium::Cash, '1.00');
     }
 
+    // ── La vista previa del recibo ──────────────────────────────────────
+
+    /**
+     * Lo que se mira antes de cobrar es lo que se emite: el mismo papel,
+     * parcial o cancelatorio, sin que mirar escriba nada.
+     */
+    public function test_the_preview_is_the_receipt_the_collection_issues(): void
+    {
+        $multa = $this->escenario();
+        $this->actingAs($this->operador());
+
+        foreach ([
+            $this->cobro('300000.00'),
+            [...$this->cobro('1500000.00'), 'medium' => 'cheque', 'cheque' => ['number' => '00123', 'bank' => 'Macro']],
+        ] as $datos) {
+            $consulta = route('multas.cobros.preview', $multa).'?'.http_build_query($datos);
+            $recibos = DB::table('receipts')->count();
+
+            $vistaPrevia = $this->sinNonce($this->get($consulta)->assertOk()->getContent());
+            $numero = $this->getJson($consulta)->assertOk()->json('numero');
+
+            expect(DB::table('receipts')->count())->toBe($recibos)
+                ->and(FinePayment::query()->count())->toBe($recibos);
+
+            $this->post(route('multas.cobros.store', $multa), $datos)->assertSessionHasNoErrors();
+            $recibo = FinePaymentReceipt::query()->with('receipt')->latest('id')->firstOrFail()->receipt;
+
+            expect($numero)->toBe($recibo->formatted_number)
+                ->and($vistaPrevia)->toBe($this->sinNonce($this->get(route('multas.recibos.view', $recibo->id))->getContent()));
+        }
+
+        expect(FinePaymentReceipt::query()->latest('id')->firstOrFail()->is_cancellation)->toBeTrue();
+    }
+
+    /** La vista previa frena lo mismo que el cobro, y en el mismo campo. */
+    public function test_the_preview_rejects_what_the_collection_rejects(): void
+    {
+        $multa = $this->escenario();
+        $vista = fn (Fine $multa, array $datos) => $this->getJson(route('multas.cobros.preview', $multa).'?'.http_build_query($datos));
+
+        $this->actingAs($this->operador());
+        $vista($multa, [...$this->cobro('100.00'), 'medium' => 'cheque'])->assertJsonValidationErrors('cheque.number');
+        $vista($multa, [...$this->cobro('100.00'), 'receivedOn' => BusinessDate::today()->subDay()->toDateString()])
+            ->assertJsonValidationErrors('talonarioNumber');
+
+        $this->post(route('multas.cobros.store', $multa), [...$this->cobro('100.00'), 'talonarioNumber' => '18470']);
+        $vista($multa, [...$this->cobro('100.00'), 'talonarioNumber' => '18470'])->assertJsonValidationErrors('talonarioNumber');
+
+        $this->actingAs($this->operador('consulta'));
+        $vista($multa, $this->cobro('100.00'))->assertForbidden();
+    }
+
     public function test_the_same_click_twice_collects_once(): void
     {
         $multa = $this->escenario();
@@ -197,6 +249,9 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->actingAs($this->operador())
             ->post(route('multas.cobros.store', $multa), $this->cobro('100.00'))
             ->assertSessionHasErrors('amount');
+        // Tampoco muestra un recibo que no se podría emitir.
+        $this->getJson(route('multas.cobros.preview', $multa).'?'.http_build_query($this->cobro('100.00')))
+            ->assertJsonValidationErrors('amount');
 
         expect(FinePayment::query()->count())->toBe(0);
     }
@@ -477,6 +532,12 @@ class CobroEnCajaDeMultasTest extends TestCase
     private function cobro(string $importe): array
     {
         return ['medium' => 'cash', 'amount' => $importe, 'idempotencyKey' => (string) Str::uuid()];
+    }
+
+    /** El nonce de la CSP cambia en cada respuesta; el papel no. */
+    private function sinNonce(string|false $html): string
+    {
+        return (string) preg_replace('/ nonce="[^"]*"/', '', (string) $html);
     }
 
     /** @return array<string, mixed> */

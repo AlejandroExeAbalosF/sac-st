@@ -69,6 +69,7 @@ const RUTAS_SIN_PANTALLA = [
     'haberes.installments.pase.preview.print',
     'haberes.installments.receipt.preview',
     'haberes.installments.disbursement.preview',
+    'multas.cobros.preview',
 
     /*
      * Las planillas de pendientes. No son comprobantes ni pantallas: son

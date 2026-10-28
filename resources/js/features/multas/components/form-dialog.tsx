@@ -23,6 +23,7 @@ export default function FormDialog({
     onSubmit,
     processing,
     submitLabel,
+    processingLabel = 'Guardando…',
     destructive = false,
     children,
 }: {
@@ -32,6 +33,8 @@ export default function FormDialog({
     onSubmit: () => void;
     processing: boolean;
     submitLabel: string;
+    /** Lo que dice el botón mientras trabaja: no todo diálogo guarda. */
+    processingLabel?: string;
     destructive?: boolean;
     children: ReactNode;
 }) {
@@ -68,7 +71,7 @@ export default function FormDialog({
                             variant={destructive ? 'destructive' : 'default'}
                             disabled={processing}
                         >
-                            {processing ? 'Guardando…' : submitLabel}
+                            {processing ? processingLabel : submitLabel}
                         </Button>
                     </DialogFooter>
                 </form>

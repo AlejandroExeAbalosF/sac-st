@@ -67,6 +67,8 @@ return [
             'pases.view',
             // El recibo de Multas, con su propio formulario.
             'multas.recibos.view',
+            // El recibo de Multas antes de cobrar: el paso «Revisar recibo».
+            'multas.cobros.preview',
             // La rendición mensual de Multas, en el visor.
             'multas.rendiciones.view',
         ],

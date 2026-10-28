@@ -34,6 +34,7 @@ use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
@@ -78,10 +79,7 @@ final class ApplyFinePayment
         $multa = $pago->fine()->with('fineCase')->firstOrFail();
         $antes = FineBalance::query()->whereKey($multa->id)->firstOrFail();
 
-        // Lo que excede la deuda es excedente, no queda sin aplicar (M05).
-        $sobrante = Decimal::sub($pago->amount, $antes->debt);
-        $excedente = Decimal::isNegative($sobrante) ? '0.00' : $sobrante;
-        $aplicado = Decimal::sub($pago->amount, $excedente);
+        ['aplicado' => $aplicado, 'excedente' => $excedente] = $this->reparto($pago->amount, $antes->debt);
 
         $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->valueOrFail('id');
         $moneda = Currency::from($multa->currency);
@@ -121,47 +119,16 @@ final class ApplyFinePayment
         ]);
 
         $despues = FineBalance::query()->whereKey($multa->id)->firstOrFail();
-        $cancela = Decimal::equals($despues->debt, '0');
-        /*
-         * La resolución que impuso la multa, que es única. Sin filtrar por
-         * tipo, «el primer documento de origen» podía ser un acta —también
-         * son de origen— y el recibo decía «por Acta HYS …».
-         */
-        $resolucion = $multa->documents()
-            ->where('kind', FineDocumentKind::Resolution)
-            ->wherePivot('role', FineDocumentRole::Origin->value)
-            ->first()?->label();
-        $concepto = ($cancela ? 'Pago cancelatorio de la multa' : 'Pago parcial de la multa')
-            .($resolucion === null ? '' : ' por '.$resolucion);
-
+        $papel = $this->componer($multa, $pago, $antes, $despues->obligation, $despues->debt, $fecha, $talonarioNumber, $signedById);
         $numero = $this->numerar->handle(FineReceiptSeries::CODE);
-        $firmante = $signedById === null ? null : User::query()->find($signedById);
 
         $recibo = Receipt::query()->create([
+            ...$papel['receipt'],
             'document_series_id' => $numero['series_id'],
-            'cash_box_id' => $caja,
             'number' => $numero['number'],
             'formatted_number' => $numero['formatted'],
-            'talonario_number' => $talonarioNumber,
-            'prints_talonario_number' => false,
-            'receipt_type' => ReceiptType::Income,
-            'person_id' => $pago->payer_person_id,
-            'concept_snapshot' => mb_substr($concepto, 0, 300),
-            'medium_snapshot' => match ($pago->medium) {
-                FinePaymentMedium::Cash => 'cash',
-                FinePaymentMedium::Cheque => 'cheque',
-                default => 'bank',
-            },
-            'counterparty_name_snapshot' => mb_substr($pago->payer_name, 0, 200),
-            'expediente_number_snapshot' => mb_substr($multa->fineCase->label(), 0, 40),
-            'amount' => $pago->amount,
-            'issue_date' => $fecha->toDateString(),
             'status' => ReceiptStatus::Issued,
-            'issue_mode' => $talonarioNumber === null ? ReceiptIssueMode::Online : ReceiptIssueMode::OfflineTalonario,
             'issued_by' => $actorId,
-            'signed_by' => $firmante?->id,
-            'signed_by_name_snapshot' => $firmante?->name,
-            'signed_by_title_snapshot' => $firmante?->position,
             'recorded_at' => $talonarioNumber === null ? null : now(),
             'recorded_by' => $talonarioNumber === null ? null : $actorId,
         ]);
@@ -174,18 +141,132 @@ final class ApplyFinePayment
         return FinePaymentReceipt::query()->create([
             'fine_payment_id' => $pago->id,
             'receipt_id' => $recibo->id,
-            'is_cancellation' => $cancela,
+            'is_cancellation' => $papel['cancela'],
+            'snapshot' => $papel['snapshot'],
+        ]);
+    }
+
+    /**
+     * El recibo sin emitir, para mirarlo antes de cobrar.
+     *
+     * **Es el mismo armado que la emisión**, como en Haberes: una vista
+     * previa que compone los datos por su cuenta termina mostrando algo
+     * distinto de lo que se imprime. No escribe nada: el pago llega sin
+     * guardar y el saldo posterior se calcula en vez de leerse.
+     *
+     * El número es el que le tocaría, como anticipo y no como promesa: el
+     * correlativo real se toma bajo lock recién al emitir.
+     */
+    public function preview(
+        FinePayment $pago,
+        CarbonImmutable $fecha,
+        ?string $talonarioNumber,
+        ?int $signedById,
+    ): FinePaymentReceipt {
+        /** @var Fine $multa */
+        $multa = $pago->fine()->with('fineCase')->firstOrFail();
+        $antes = FineBalance::query()->whereKey($multa->id)->firstOrFail();
+        ['aplicado' => $aplicado] = $this->reparto($pago->amount, $antes->debt);
+
+        $papel = $this->componer(
+            $multa, $pago, $antes, $antes->obligation, Decimal::sub($antes->debt, $aplicado), $fecha, $talonarioNumber, $signedById,
+        );
+        $serie = DocumentSeries::activeForCode(FineReceiptSeries::CODE);
+
+        $recibo = new Receipt([
+            ...$papel['receipt'],
+            'formatted_number' => $serie === null ? '—' : $serie->formatNumber($serie->next_number),
+            'status' => ReceiptStatus::Issued,
+        ]);
+
+        return (new FinePaymentReceipt([
+            'is_cancellation' => $papel['cancela'],
+            'snapshot' => $papel['snapshot'],
+        ]))->setRelation('receipt', $recibo)->setRelation('payment', $pago);
+    }
+
+    /**
+     * Cuánto del pago cubre deuda y cuánto la excede: lo que la excede es
+     * excedente, no queda sin aplicar (M05).
+     *
+     * @return array{aplicado: string, excedente: string}
+     */
+    private function reparto(string $importe, string $deuda): array
+    {
+        $sobrante = Decimal::sub($importe, $deuda);
+        $excedente = Decimal::isNegative($sobrante) ? '0.00' : $sobrante;
+
+        return ['aplicado' => Decimal::sub($importe, $excedente), 'excedente' => $excedente];
+    }
+
+    /**
+     * Lo que va a decir el papel.
+     *
+     * Una sola definición para la emisión y para la vista previa: es lo que
+     * garantiza que lo que se mira sea lo que se imprime. Lo que no compone
+     * es lo que solo existe al emitir: el número y quién lo emitió.
+     *
+     * @return array{receipt: array<string, mixed>, cancela: bool, snapshot: array<string, mixed>}
+     */
+    private function componer(
+        Fine $multa,
+        FinePayment $pago,
+        FineBalance $antes,
+        string $obligacion,
+        string $deudaDespues,
+        CarbonImmutable $fecha,
+        ?string $talonarioNumber,
+        ?int $signedById,
+    ): array {
+        ['aplicado' => $aplicado, 'excedente' => $excedente] = $this->reparto($pago->amount, $antes->debt);
+        $cancela = Decimal::equals($deudaDespues, '0');
+        /*
+         * La resolución que impuso la multa, que es única. Sin filtrar por
+         * tipo, «el primer documento de origen» podía ser un acta —también
+         * son de origen— y el recibo decía «por Acta HYS …».
+         */
+        $resolucion = $multa->documents()
+            ->where('kind', FineDocumentKind::Resolution)
+            ->wherePivot('role', FineDocumentRole::Origin->value)
+            ->first()?->label();
+        $concepto = ($cancela ? 'Pago cancelatorio de la multa' : 'Pago parcial de la multa')
+            .($resolucion === null ? '' : ' por '.$resolucion);
+        $firmante = $signedById === null ? null : User::query()->find($signedById);
+
+        return [
+            'receipt' => [
+                'cash_box_id' => (int) CashBox::query()->where('code', CashBox::MULTAS)->valueOrFail('id'),
+                'talonario_number' => $talonarioNumber,
+                'prints_talonario_number' => false,
+                'receipt_type' => ReceiptType::Income,
+                'person_id' => $pago->payer_person_id,
+                'concept_snapshot' => mb_substr($concepto, 0, 300),
+                'medium_snapshot' => match ($pago->medium) {
+                    FinePaymentMedium::Cash => 'cash',
+                    FinePaymentMedium::Cheque => 'cheque',
+                    default => 'bank',
+                },
+                'counterparty_name_snapshot' => mb_substr($pago->payer_name, 0, 200),
+                'expediente_number_snapshot' => mb_substr($multa->fineCase->label(), 0, 40),
+                'amount' => $pago->amount,
+                'issue_date' => $fecha->toDateString(),
+                'issue_mode' => $talonarioNumber === null ? ReceiptIssueMode::Online : ReceiptIssueMode::OfflineTalonario,
+                'signed_by' => $firmante?->id,
+                'signed_by_name_snapshot' => $firmante?->name,
+                'signed_by_title_snapshot' => $firmante?->position,
+            ],
+            'cancela' => $cancela,
             'snapshot' => [
                 'caption' => $multa->caption,
                 'caseLabel' => $multa->fineCase->label(),
                 'resolution' => $resolucion,
                 'concept' => $concepto,
                 'judicialReference' => $pago->judicial_reference,
-                'obligation' => $despues->obligation,
+                'obligation' => $obligacion,
                 'paidBefore' => Decimal::add($antes->operational_paid, $antes->historical_paid),
                 'applied' => $aplicado,
                 'excess' => $excedente,
-                'debtAfter' => $despues->debt,
+                'debtAfter' => $deudaDespues,
                 'previousPayments' => $cancela ? $this->anteriores($multa, $pago) : [],
                 /*
                  * La cuenta que el formulario imprime en «Depósito Cta.», como
@@ -194,7 +275,7 @@ final class ApplyFinePayment
                  */
                 'bankAccountNumber' => $this->cuenta(),
             ],
-        ]);
+        ];
     }
 
     /**
@@ -211,7 +292,8 @@ final class ApplyFinePayment
         $delSistema = FinePayment::query()
             ->where('fine_id', $multa->id)
             ->where('status', FinePaymentStatus::Applied)
-            ->whereKeyNot($actual->id)
+            // En la vista previa el pago no está guardado: no hay propio que excluir.
+            ->when($actual->exists, fn ($consulta) => $consulta->whereKeyNot($actual->id))
             ->with('paymentReceipt.receipt')
             ->orderBy('id')
             ->get()
