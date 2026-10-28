@@ -468,7 +468,8 @@ Inicio lista los días y los meses de Multas sin cerrar a quien puede cerrarlos.
 moneda de la multa y saldo pendiente), registra un pago en **efectivo o con
 cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
 
-- **Importe**: arranca en el saldo, pero se cobra lo que se recibe. Un pago
+- **Importe**: arranca vacío, para que se cargue lo que se recibe; el saldo se
+  muestra debajo del campo y un clic lo copia. Un pago
   parcial deja saldo; uno que lo supera cancela la multa y lo que sobra queda como
   **excedente pendiente**, que no se devuelve ni se acredita solo (M05). El cheque
   se recibe por su importe entero y queda en custodia (M06); si es una **orden de

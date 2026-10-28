@@ -24,9 +24,10 @@ const SIN_FIRMANTE = 'ninguno';
 /**
  * El cobro en la caja: efectivo o cheque, con su recibo en el acto (M02).
  *
- * El importe arranca en el saldo, pero se cobra lo que se recibe: un pago
- * parcial deja saldo, y uno que lo supera deja excedente, que no se devuelve
- * solo (M05). El cheque entra por su importe entero.
+ * El importe arranca vacío para que se cargue lo que se recibe y no se confirme
+ * el saldo por inercia; el saldo se ofrece debajo para copiarlo con un clic. Un
+ * pago parcial deja saldo, y uno que lo supera deja excedente, que no se
+ * devuelve solo (M05). El cheque entra por su importe entero.
  *
  * La fecha cambia solo para cargar un cobro de un día anterior, y entonces
  * pide el número del recibo de talonario que se entregó ese día.
@@ -49,7 +50,7 @@ export default function CollectPaymentDialog({
     const hoy = businessToday();
     const { data, setData, post, transform, processing, errors } = useForm({
         medium: 'cash' as 'cash' | 'cheque',
-        amount: money(debt, { symbol: false }),
+        amount: '',
         receivedOn: hoy,
         talonarioNumber: '',
         signedById: SIN_FIRMANTE,
@@ -94,9 +95,9 @@ export default function CollectPaymentDialog({
             title="Cobrar en caja"
             description={
                 <>
-                    Recibí de <strong>{caption}</strong>. Saldo {money(debt)}.
-                    Al confirmar se registra el cobro, se aplica a la multa y se
-                    emite el recibo.
+                    Recibí de <strong>{caption}</strong>. Al confirmar se
+                    registra el cobro, se aplica a la multa y se emite el
+                    recibo.
                 </>
             }
             onClose={onClose}
@@ -136,6 +137,16 @@ export default function CollectPaymentDialog({
                             aria-invalid={Boolean(errors.amount)}
                         />
                     </div>
+                    <button
+                        type="button"
+                        className="mt-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        onClick={() =>
+                            setData('amount', money(debt, { symbol: false }))
+                        }
+                    >
+                        Saldo:{' '}
+                        <span className="tabular-nums">{money(debt)}</span>
+                    </button>
                     <FieldError message={errors.amount} />
                 </div>
             </div>
