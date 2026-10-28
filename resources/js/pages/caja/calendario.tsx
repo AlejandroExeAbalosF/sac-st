@@ -706,16 +706,15 @@ function Celda({
                     />
                 )}
                 {/*
-                 * El arqueo parcial se marca aparte: cuadrar no es haber
-                 * contado todo, y en una grilla es la única forma de que se
-                 * note sin abrir el día.
+                 * El conteo del día se distingue del recuento completo
+                 * para que el alcance se vea sin abrir el día.
                  */}
                 {dia.partiallyCounted && (
                     <span
-                        className="text-xs text-warning-strong"
-                        title="Cuadró, pero no se contó todo el cajón"
+                        className="text-xs text-muted-foreground"
+                        title="El conteo del día cuadró; el saldo anterior se incorporó sin recontar"
                     >
-                        parcial
+                        conteo del día
                     </span>
                 )}
                 {dia.countBalanced === false && (
@@ -766,7 +765,7 @@ function descripcionAccesible(dia: Dia, estado: string): string {
         dia.closingCash === null
             ? null
             : `saldo de cierre ${money(dia.closingCash)}`,
-        dia.partiallyCounted ? 'arqueo parcial' : null,
+        dia.partiallyCounted ? 'conteo del día' : null,
         dia.countBalanced === false ? 'arqueo con diferencia' : null,
         dia.hasSheet ? 'planilla emitida' : null,
     ].filter((detalle): detalle is string => detalle !== null);

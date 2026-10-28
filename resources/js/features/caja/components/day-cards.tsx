@@ -95,12 +95,14 @@ export function TarjetaArqueo({
                 <>
                     <dl className="mt-3 space-y-1.5 text-sm">
                         <Renglon
-                            termino="Contado"
+                            termino={
+                                arqueo.fullyCounted ? 'Contado' : 'Contado hoy'
+                            }
                             valor={arqueo.countedAmount}
                         />
                         {!arqueo.fullyCounted && (
                             <Renglon
-                                termino="No recontado"
+                                termino="Saldo anterior sin recontar"
                                 valor={arqueo.uncountedAmount}
                             />
                         )}
@@ -122,8 +124,8 @@ export function TarjetaArqueo({
                          * cajón sin contar se ve idéntico a uno completo.
                          */}
                         {arqueo.balanced && !arqueo.fullyCounted && (
-                            <p className="pt-1 text-xs text-warning-strong">
-                                Cuadra, pero no se contó todo el cajón.
+                            <p className="pt-1 text-xs text-muted-foreground">
+                                El conteo del día cuadra.
                             </p>
                         )}
 

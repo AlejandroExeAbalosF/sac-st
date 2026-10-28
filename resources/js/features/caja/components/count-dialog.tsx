@@ -286,8 +286,9 @@ export default function DialogoConteo({
                 <DialogHeader>
                     <DialogTitle>Arqueo de caja</DialogTitle>
                     <DialogDescription>
-                        Contá los billetes por denominación. El total lo calcula
-                        el sistema y lo compara con el libro.
+                        Contá los billetes del día por denominación. El saldo
+                        anterior se incorpora automáticamente; podés recontarlo
+                        por separado si hace falta.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -482,7 +483,7 @@ export default function DialogoConteo({
                                 >
                                     {recuento !== null
                                         ? 'Deshacer el recuento'
-                                        : 'Recontar'}
+                                        : 'Recontar saldo anterior (opcional)'}
                                 </Button>
                             )}
                         </div>
@@ -547,13 +548,22 @@ export default function DialogoConteo({
                     <div className="grid gap-1 rounded-lg border bg-muted/40 px-3 py-2">
                         <div className="flex items-baseline justify-between">
                             <span className="text-sm font-medium">
-                                Total en el cajón
+                                Total según conteo y saldo anterior
                             </span>
                             <Money
                                 value={enElCajon}
                                 className="text-base font-semibold"
                             />
                         </div>
+
+                        {esperado !== null && esperadoAplica && (
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-sm text-muted-foreground">
+                                    Total esperado
+                                </span>
+                                <Money value={esperado} className="text-sm" />
+                            </div>
+                        )}
 
                         {diferencia !== null && (
                             <div className="flex items-baseline justify-between border-t pt-1">

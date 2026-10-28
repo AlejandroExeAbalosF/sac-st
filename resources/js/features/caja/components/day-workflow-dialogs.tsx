@@ -108,7 +108,7 @@ function DetalleDeUnArqueo({
                 />
                 {!arqueo.fullyCounted && (
                     <FilaRevision
-                        termino="No recontado"
+                        termino="Saldo anterior sin recontar"
                         valor={arqueo.uncountedAmount}
                     />
                 )}
@@ -265,7 +265,7 @@ export function DialogoRevision({
                     />
                     {!arqueo.fullyCounted && (
                         <FilaRevision
-                            termino="No recontado"
+                            termino="Saldo anterior sin recontar"
                             valor={arqueo.uncountedAmount}
                         />
                     )}

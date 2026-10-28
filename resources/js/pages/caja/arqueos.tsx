@@ -120,7 +120,7 @@ export default function CajaArqueos({
                                                 Contado
                                             </th>
                                             <th className="px-4 py-2 text-right font-medium">
-                                                No recontado
+                                                Saldo anterior sin recontar
                                             </th>
                                             <th className="px-4 py-2 text-right font-medium">
                                                 Saldo del libro
@@ -216,11 +216,11 @@ function Renglon({
                          */}
                         {arqueo.balanced && !arqueo.fullyCounted && (
                             <span
-                                className="inline-flex items-center gap-1 text-xs text-warning-strong"
-                                title="Cuadró, pero no se contó todo el cajón"
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                                title="El conteo del día cuadró; el saldo anterior se incorporó sin recontar"
                             >
                                 <Scissors className="size-3" />
-                                parcial
+                                conteo del día
                             </span>
                         )}
                         {/*
@@ -292,7 +292,7 @@ function Renglon({
                         />
                         {!arqueo.fullyCounted && (
                             <p className="text-xs text-warning-strong">
-                                Hay efectivo declarado como no recontado.
+                                El saldo anterior se incorporó sin recontar.
                             </p>
                         )}
                     </dl>
