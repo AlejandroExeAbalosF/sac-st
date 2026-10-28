@@ -10,9 +10,11 @@ import {
 } from '@/components/ui/select';
 import { FieldError } from '@/features/multas/components/form-dialog';
 import LoadedDocumentWarning from '@/features/multas/components/loaded-document-warning';
+import NumberReadingHint from '@/features/multas/components/number-reading-hint';
 import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, DOCUMENT_KIND } from '@/features/multas/labels';
 import { findLoadedDocument } from '@/features/multas/loaded-document';
+import { readDocumentNumber } from '@/features/multas/number-reading';
 import { businessToday } from '@/lib/format';
 
 type Kind = App.Modules.Multas.Enums.FineDocumentKind;
@@ -139,6 +141,15 @@ export default function DocumentFields({
                 />
                 <FieldError
                     message={errors['document.text'] ?? errors['document.kind']}
+                />
+                <NumberReadingHint
+                    reading={readDocumentNumber(
+                        value.text,
+                        value.kind,
+                        value.issuedOn,
+                        value.actType,
+                    )}
+                    text={value.text}
                 />
                 <AvisoDeCargado
                     documento={findLoadedDocument(

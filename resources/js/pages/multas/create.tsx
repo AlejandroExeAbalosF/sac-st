@@ -25,9 +25,15 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import LoadedDocumentWarning from '@/features/multas/components/loaded-document-warning';
+import NumberReadingHint from '@/features/multas/components/number-reading-hint';
 import { documentYearWarning } from '@/features/multas/document-year';
 import { ACT_TYPE, partialDate } from '@/features/multas/labels';
 import { findLoadedDocument } from '@/features/multas/loaded-document';
+import {
+    readCaseNumber,
+    readDocumentNumber,
+    yearOf,
+} from '@/features/multas/number-reading';
 import { businessToday, parseAmount } from '@/lib/format';
 import { create, index, store } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
@@ -196,6 +202,13 @@ export default function NuevaMulta({
     const [cargarNueva, setCargarNueva] = useState(false);
     const resolucionNueva = resoluciones.length === 0 || cargarNueva;
 
+    // Un acta sin fecha toma el siglo de la fecha de su resolución, como en el servidor.
+    const anioDeLaResolucion = yearOf(
+        data.resolutionId !== null
+            ? resoluciones.find((r) => r.id === data.resolutionId)?.issuedOn
+            : data.resolution.issuedOn,
+    );
+
     // Desde un «+»: lo fijo se muestra, no se elige. Con un acta sola, la resolución se elige igual.
     const actasFijas = preseleccion.fixed;
     const resolucionFija =
@@ -350,6 +363,14 @@ export default function NuevaMulta({
                                         errors.caseNumber ?? errores.fineCaseId
                                     }
                                 />
+                                {!fijo && (
+                                    <NumberReadingHint
+                                        reading={readCaseNumber(
+                                            data.caseNumber,
+                                        )}
+                                        text={data.caseNumber}
+                                    />
+                                )}
                                 {!existente && (
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         Como en el papel. Si no está cargado, se
@@ -578,6 +599,14 @@ export default function NuevaMulta({
                                         <FieldError
                                             message={errores['resolution.text']}
                                         />
+                                        <NumberReadingHint
+                                            reading={readDocumentNumber(
+                                                data.resolution.text,
+                                                'resolution',
+                                                data.resolution.issuedOn,
+                                            )}
+                                            text={data.resolution.text}
+                                        />
                                         <DocumentoCargado
                                             documento={findLoadedDocument(
                                                 resoluciones,
@@ -769,6 +798,16 @@ export default function NuevaMulta({
                                                             `acts.${i}.text`
                                                         ]
                                                     }
+                                                />
+                                                <NumberReadingHint
+                                                    reading={readDocumentNumber(
+                                                        acta.text,
+                                                        'act',
+                                                        acta.issuedOn,
+                                                        acta.actType,
+                                                        anioDeLaResolucion,
+                                                    )}
+                                                    text={acta.text}
                                                 />
                                                 <DocumentoCargado
                                                     documento={findLoadedDocument(

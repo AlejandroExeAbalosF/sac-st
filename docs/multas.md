@@ -126,6 +126,13 @@ Una multa se carga con todo lo que trae el papel:
 - **Actas.** Las del expediente, como casillas sin marcar, y «Agregar un acta que
   no está cargada» para las nuevas, con su tipo (laboral o higiene y seguridad).
   Pueden no tener año.
+- **Cómo se lee.** Debajo del expediente, la resolución y cada acta nueva, una
+  línea dice cómo los va a leer el sistema, con el año completo: «Se lee como
+  169607/2024-0», «Se lee como Resolución 649/2026». El campo guarda el texto
+  como figura en el papel; si el siglo no es el correcto, se escribe el año con
+  cuatro cifras y la línea cambia. Vale también en vincular, agregar un
+  documento y reemplazar el origen. Es solo presentación: la lectura que vale es
+  la del servidor.
 - **Documento ya cargado.** Al escribir una resolución o un acta nueva, si el
   expediente ya tiene una del mismo tipo con el mismo número y año, se avisa y se
   ofrece «Usar la cargada». Se compara el número leído, no el texto: «LAB. Nº

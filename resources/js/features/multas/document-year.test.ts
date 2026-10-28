@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { documentYearWarning, expandYear } from './document-year';
+import { fullYear } from '@/lib/two-digit-year';
+import { documentYearWarning } from './document-year';
 
 describe('el año de dos cifras', () => {
     it('toma el siglo que lo deja más cerca de la fecha', () => {
-        expect(expandYear(29, 2026)).toBe(2029);
-        expect(expandYear(98, 2026)).toBe(1998);
-        expect(expandYear(26, 2026)).toBe(2026);
-        expect(expandYear(2025, 2026)).toBe(2025);
+        expect(fullYear(29, 2026)).toBe(2029);
+        expect(fullYear(98, 2026)).toBe(1998);
+        expect(fullYear(26, 2026)).toBe(2026);
+        expect(fullYear(2025, 2026)).toBe(2025);
     });
 });
 

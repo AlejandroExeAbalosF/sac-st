@@ -1,4 +1,4 @@
-import { businessToday } from '@/lib/format';
+import { fullYear } from '@/lib/two-digit-year';
 
 /**
  * Una fecha pegada, en el `AAAA-MM-DD` que entiende `<input type="date">`.
@@ -34,7 +34,7 @@ export function parsePastedDate(
         mes = Number(local[2]);
         anio =
             local[3].length === 2
-                ? fullYear(Number(local[3]), now)
+                ? fullYear(Number(local[3]), null, now)
                 : Number(local[3]);
     } else {
         return null;
@@ -52,14 +52,6 @@ export function parsePastedDate(
     }
 
     return `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-}
-
-/** Un año de dos cifras, con el siglo del año de hoy. */
-function fullYear(year: number, now: Date): number {
-    const hoy = Number(businessToday(now).slice(0, 4));
-    const siglo = Math.floor(hoy / 100) * 100;
-
-    return year <= (hoy % 100) + 1 ? siglo + year : siglo - 100 + year;
 }
 
 /** `2023-06-06` → `06062023`: las cifras que muestra el campo, sin barras. */
