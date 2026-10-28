@@ -506,7 +506,9 @@ class AperturaObligatoriaTest extends TestCase
 
         $this->actingAs($usuario)
             ->get(route('caja.apertura.index'))
-            ->assertInertia(fn (AssertableInertia $page) => $page->has('bankAccounts', 1));
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('bankAccounts', 1)
+                ->where('bankAccounts.0.label', 'Cta. Cte. — Haberes · Banco Macro · CTA. 310000123456789'));
 
         $this->actingAs($usuario)
             ->get(route('caja.apertura.index', ['moneda' => 'usd']))

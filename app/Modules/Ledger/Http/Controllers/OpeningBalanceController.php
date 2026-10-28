@@ -130,14 +130,15 @@ final class OpeningBalanceController extends Controller
             ->where('is_active', true)
             ->where('currency', $moneda->value)
             ->orderBy('label')
-            ->get(['id', 'bank_name', 'account_number']);
+            ->get(['id', 'label', 'bank_name', 'account_number']);
 
         $lista = [];
 
         foreach ($cuentas as $cuenta) {
             $lista[] = [
                 'id' => (int) $cuenta->id,
-                'label' => sprintf('%s · CTA. %s', $cuenta->bank_name, $cuenta->account_number),
+                // El nombre va primero: es como el área distingue dos cuentas del mismo banco.
+                'label' => sprintf('%s · %s · CTA. %s', $cuenta->label, $cuenta->bank_name, $cuenta->account_number),
             ];
         }
 
