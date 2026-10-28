@@ -255,6 +255,17 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 'Multas',
                 metadata: ['aviso' => 'Aviso a la empresa', 'disposicion' => 'Qué se hizo con el cheque'],
             ),
+            new AuditActionDefinition(
+                'multa.rendicion-emitida',
+                'Se emitió la rendición mensual de Multas',
+                'Multas',
+                metadata: [
+                    'mes' => 'Mes rendido',
+                    'version' => 'Versión del cierre',
+                    'en_termino' => 'Total en término',
+                    'fuera_de_termino' => 'Total fuera de término',
+                ],
+            ),
         );
 
         $catalog->registerSubject(new FineCaseSubject);

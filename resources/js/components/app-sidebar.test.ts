@@ -79,6 +79,7 @@ describe('el grupo Multas de la barra', () => {
         expect(multasPara({ 'multas.ver': true })).toEqual([
             'Expedientes',
             'Caja de Multas',
+            'Rendiciones',
             'Movimientos',
         ]);
     });

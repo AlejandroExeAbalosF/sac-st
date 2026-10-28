@@ -17,6 +17,7 @@ use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDepositController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
+use App\Modules\Multas\Http\Controllers\FineMonthlyReportController;
 use App\Modules\Multas\Http\Controllers\FineMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
 use App\Modules\Multas\Http\Controllers\FinePaymentQueueController;
@@ -189,6 +190,11 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('pagos/{payment}/descarte', [FineBankPaymentController::class, 'discard'])->whereNumber('payment')->name('pagos.discard');
     });
 
+    // La rendición mensual a la SAF: la emite quien rinde, con el mes cerrado.
+    Route::middleware('can:multas.rendicion.emitir')->group(function (): void {
+        Route::post('rendiciones/{closing}', [FineMonthlyReportController::class, 'store'])->whereNumber('closing')->name('rendiciones.store');
+    });
+
     Route::middleware('can:multas.ver')->group(function (): void {
         // El recibo de Multas: el mismo papel en el visor y en la impresora.
         Route::get('recibos/{receipt}/ver', [FinePaymentController::class, 'view'])->whereNumber('receipt')->name('recibos.view');
@@ -200,6 +206,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         // La consulta operativa de un mes: no es la rendición oficial (P02).
         Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');
         Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
+        // La rendición oficial a la SAF (P02): sus dos notas por mes cerrado.
+        Route::get('rendiciones', [FineMonthlyReportController::class, 'index'])->name('rendiciones.index');
+        Route::get('rendiciones/informes/{report}/ver', [FineMonthlyReportController::class, 'view'])->whereNumber('report')->name('rendiciones.view');
+        Route::get('rendiciones/informes/{report}/pdf', [FineMonthlyReportController::class, 'download'])->whereNumber('report')->name('rendiciones.pdf');
         Route::get('exportar', [FineController::class, 'export'])->name('exportar');
         Route::get('expedientes/{fineCase}', [FineCaseController::class, 'show'])->name('expedientes.show');
         // La multa cuelga de su expediente y va por su número dentro de él (ver `Fine::showParameters`).

@@ -162,6 +162,15 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 'multas',
                 ['administrador', 'contador', 'administrativo', 'consulta'],
             ),
+            // La rendición mensual a la SAF (P02): la emite quien cierra el mes.
+            new PermissionDefinition(
+                'multas.rendicion.emitir',
+                'Emitir la rendición mensual de Multas',
+                'Generar, con el mes cerrado, las dos notas de rendición a la SAF: los ingresos en término y los fuera de término. Se emite una vez por cierre y no se modifica.',
+                'multas',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
             new PermissionDefinition(
                 'multas.caja.regenerar-planilla',
                 'Rehacer la planilla de Multas',

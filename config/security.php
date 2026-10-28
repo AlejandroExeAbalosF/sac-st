@@ -67,6 +67,8 @@ return [
             'pases.view',
             // El recibo de Multas, con su propio formulario.
             'multas.recibos.view',
+            // La rendición mensual de Multas, en el visor.
+            'multas.rendiciones.view',
         ],
     ],
 

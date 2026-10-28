@@ -50,6 +50,7 @@ import {
 import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
 import { index as movimientosDeMultas } from '@/routes/multas/movimientos';
 import { index as pagosDeMultas } from '@/routes/multas/pagos';
+import { index as rendicionesDeMultas } from '@/routes/multas/rendiciones';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
@@ -163,6 +164,13 @@ export const navGroups: NavGroup[] = [
                         href: pagosDeMultas(),
                         icon: ClipboardCheck,
                         permission: 'multas.verificar-pagos',
+                    },
+                    // La rendición oficial a la SAF: dos notas por mes cerrado.
+                    {
+                        title: 'Rendiciones',
+                        href: rendicionesDeMultas(),
+                        icon: FileText,
+                        permission: 'multas.ver',
                     },
                     // La consulta operativa del mes: no es la rendición oficial.
                     {

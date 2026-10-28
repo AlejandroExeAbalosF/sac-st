@@ -78,6 +78,7 @@ Para otra combinación está el «Agregar multa» de la cabecera, que es libre.
 | Cierres | `/multas/caja/cierres` | `multas.caja.ver`; cerrar, `multas.caja.cerrar` |
 | Calendario | `/multas/caja/calendario` | `multas.caja.ver` |
 | Movimientos del mes | `/multas/movimientos` | `multas.ver` |
+| Rendiciones | `/multas/rendiciones` | `multas.ver`; emitir, `multas.rendicion.emitir` |
 
 <a id="listado"></a>
 
@@ -353,6 +354,46 @@ vez en el libro de Multas el crédito que ya estaba en el extracto, con su
 aplicación y su recibo. Siguen el crédito entero, una sola multa, la clave contra
 el doble clic y la base frente a dos operadores con el mismo crédito; si el recibo
 falla, no queda nada a medias.
+
+<a id="rendicion"></a>
+
+## Rendición mensual · `/multas/rendiciones`
+
+La rendición oficial a la SAF (P02), con el modelo del área: por cada mes cerrado,
+**dos notas en PDF** —«ingresos de Multas correspondientes al MES DE …» y «depósitos
+FUERA DE TÉRMINO MES DE …»—, con fecha, caja (CC, Trans., Cheque), comprobante,
+carátula, expediente, importe y recibo, el total y el importe en letras. Si la
+tabla no entra en una hoja, sigue en las siguientes con el encabezado repetido;
+el total es la última fila y nunca queda solo en una hoja, y cada hoja lleva
+«Hoja N de M» al pie.
+
+- **Qué entra:** lo **acreditado en la cuenta**. Un pago por banco, por la fecha de su
+  movimiento; un cobro de la caja, por la acreditación de su depósito (cobrado el
+  04/09 y acreditado el 11/09 figura el 11/09). Lo que no se acreditó todavía no
+  entra en ninguna.
+- **En término (mes M):** acreditado en M y reconocido —con su recibo y su
+  acreditación— antes del cierre mensual de M.
+- **Fuera de término (mes M):** reconocido mientras M estaba abierto, con una
+  acreditación de un mes que ya estaba cerrado o anterior a la apertura de la caja.
+  Un crédito del 30/09 identificado el 02/10, con septiembre cerrado el 05/10, va en
+  término en septiembre; identificado el 06/10, fuera de término en octubre. **Cada
+  pago va a un solo informe**, y lo tardío nunca cambia uno ya emitido.
+- **«Antes del cierre» no se mide con el reloj.** `closed_at` y `created_at` se
+  guardan al segundo, y lo identificado en el mismo segundo que el cierre no se
+  distinguiría. El reconocimiento es un asiento de la caja de Multas, y la base anota
+  en la evidencia de cada versión del cierre el último asiento de la caja que vio
+  (`period_closing_evidence.covers_through_event_id`, por trigger). Como los asientos
+  de una caja y su cierre toman el mismo candado, entra en el mes lo que tiene un
+  asiento menor o igual a esa marca.
+- Se emite con el mes cerrado (`multas.rendicion.emitir`) y queda **congelado**:
+  pedirla de nuevo devuelve la misma. Reabrir y volver a cerrar el mes produce otra
+  versión; la anterior se conserva. La base exige el cierre mensual vigente y
+  cerrado, y no deja cambiar ni borrar una rendición.
+- **Sin relevar:** el número de cuenta impreso («Nº 452680-1 del Bco. Macro», distinto
+  del del recibo), el destinatario y el lugar están en `config/multas.php`; la caja
+  de un cheque acreditado por remesa (P15); un cheque acreditado y después rechazado
+  se lista con la marca «cheque rechazado», sin descontarlo. El membrete queda
+  reservado hasta que el área entregue el logotipo.
 
 <a id="movimientos"></a>
 
@@ -653,6 +694,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.caja.reabrir` | Reabrir un período de Multas, con motivo | administrador, contador |
 | `multas.caja.exportar` | Descargar la planilla de un cierre de Multas | administrador, contador, administrativo, consulta |
 | `multas.caja.regenerar-planilla` | Rehacer la planilla de un cierre de Multas | administrador |
+| `multas.rendicion.emitir` | Emitir la rendición mensual a la SAF, con el mes cerrado | administrador, contador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a
 los roles ya configurados (`RolesAndPermissionsSeeder`); uno que ya existía no se

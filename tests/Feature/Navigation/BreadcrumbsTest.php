@@ -43,6 +43,8 @@ const RUTAS_SIN_PANTALLA = [
     'configuracion.auditoria.exportar',
     'multas.exportar',
     'multas.movimientos.exportar',
+    'multas.rendiciones.pdf',
+    'multas.rendiciones.view',
 
     // Acceso anterior a la caja del día; ahora redirige a su URL canónica.
     'caja.index',
