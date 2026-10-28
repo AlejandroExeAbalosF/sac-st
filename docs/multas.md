@@ -150,8 +150,10 @@ saldo y estado. Abajo:
   desde acá igual que en el expediente; como es del expediente, el cambio lo ve
   toda multa que lo cita. **Desvincular** anula el vínculo con un motivo: el
   documento pasa a «Desvinculados», con quién y por qué, y sigue en el
-  expediente. Lo que respalda el importe original o un ajuste vigente no se
-  desvincula.
+  expediente. El papel que exige un movimiento vigente —el origen de la
+  resolución del importe original, la modificación de un ajuste— no se
+  desvincula, y la ficha no lo ofrece; los otros papeles del mismo documento,
+  sí.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
   su motivo y quién lo cargó. Un ajuste revertido queda tachado.
 - **Archivos de la multa**: los de la multa y, debajo, los del expediente.

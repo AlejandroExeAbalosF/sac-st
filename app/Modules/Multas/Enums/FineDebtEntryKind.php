@@ -29,4 +29,19 @@ enum FineDebtEntryKind: string
             self::Reversal => 'Reversión',
         };
     }
+
+    /**
+     * El papel con el que el documento que cita el movimiento tiene que
+     * seguir vinculado a la multa: el importe original, el de origen; un
+     * ajuste, el de modificación. Una reversión no exige uno. La base lo
+     * repite en `fine_debt_entry_document_role`.
+     */
+    public function requiredDocumentRole(): ?FineDocumentRole
+    {
+        return match ($this) {
+            self::Constitution => FineDocumentRole::Origin,
+            self::Increase, self::Reduction => FineDocumentRole::Modification,
+            self::Reversal => null,
+        };
+    }
 }

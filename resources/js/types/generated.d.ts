@@ -1099,6 +1099,7 @@ declare namespace App {
                     issuedPrecision: App.Modules.Multas.Enums.DatePrecision;
                     provenance: App.Modules.Multas.Enums.FineProvenance;
                     roles: App.Modules.Multas.Enums.FineDocumentRole[];
+                    requiredRoles: App.Modules.Multas.Enums.FineDocumentRole[];
                 };
                 export type FineHistoricalMovementData = {
                     id: number;

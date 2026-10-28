@@ -93,10 +93,15 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 - Multa, documento y papel son únicos **entre los vínculos vigentes**: un
   documento desvinculado por error se vuelve a vincular. **Base:** índice único
   parcial `fine_document_links_active_unique`.
-- No se anula el último vínculo de un documento que respalda un movimiento
-  vigente de la obligación: el importe original queda con su resolución, y un
-  ajuste se revierte antes. **Base:** `fine_document_links_revoke_only`, con
-  bloqueo de la multa. **Action:** `RevokeFineDocumentLink` dice qué hacer.
+- Cada movimiento vigente exige que su documento conserve **su papel**: el
+  importe original, el de origen; un aumento o una reducción, el de
+  modificación. Ese vínculo no se anula aunque el documento tenga otros —el
+  respaldo o la ratificación del mismo documento sí se desvinculan—, y un
+  ajuste se revierte antes de quitarle la modificación. La ficha no ofrece
+  desvincular el papel exigido (`requiredRoles`). **Base:**
+  `fine_document_links_revoke_only`, con bloqueo de la multa, y
+  `fine_debt_entry_document_role`. **Action:** `RevokeFineDocumentLink` dice
+  qué hacer.
 - El tipo de un documento y el texto del papel no se corrigen: un acta cargada
   como resolución es otro documento, y se corrige desvinculándolo y vinculando el
   correcto. **Base:** `fine_identity_guard`.
@@ -144,9 +149,10 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   con bloqueo de la multa.
 - Una reversión deshace un movimiento de la misma multa, por el mismo importe, una
   sola vez; no revierte la constitución ni otra reversión. **Base.**
-- El documento que respalda un movimiento está vinculado a la multa, con un
-  vínculo vigente. **Base:** `fine_debt_entries_coherent` y
-  `fine_debt_entries_cite_active_link`.
+- El documento que respalda un movimiento está vinculado a la multa con un
+  vínculo vigente y con el papel que el movimiento exige: origen para el
+  importe original, modificación para un ajuste. **Base:**
+  `fine_debt_entries_coherent` y `fine_debt_entries_cite_active_link`.
 - Los movimientos no se editan ni se borran. **Base:** `forbid_mutation()`.
 
 <a id="saldo"></a>

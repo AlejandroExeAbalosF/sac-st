@@ -93,6 +93,11 @@ class ExporteConcurrenteDeMultasTest extends TestCase
             'old_values' => json_encode(['caption' => 'CRISTOMAX B']),
             'new_values' => json_encode(['caption' => 'OTRA EMPRESA']),
         ]);
+        // Un ajuste cita su resolución vinculada como modificación.
+        $this->otra()->table('fine_document_links')->insert([
+            'fine_id' => $b, 'fine_case_id' => $this->otra()->table('fines')->where('id', $b)->value('fine_case_id'),
+            'fine_document_id' => $this->resolucionDe($b), 'role' => 'modification',
+        ]);
         $this->otra()->table('fine_debt_entries')->insert([
             'fine_id' => $b, 'kind' => 'reduction', 'amount' => '400.00', 'reason_code' => 'appeal_admitted', 'reason' => 'Recurso admitido',
             'fine_document_id' => $this->resolucionDe($b), 'effective_on' => '2026-06-01', 'effective_precision' => 'day',

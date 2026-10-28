@@ -80,7 +80,7 @@ class DesvincularDocumentoTest extends TestCase
 
         $this->actingAs($this->operador('contador'))
             ->post($this->anular($multa, $resolucion, 'origin'), ['reasonCode' => 'wrong_document', 'reason' => 'Se cargó la que no era'])
-            ->assertSessionHasErrors(['reason' => 'Es el documento del importe original de la multa: no se desvincula. Si se leyó mal, corregí su número o su fecha.']);
+            ->assertSessionHasErrors(['reason' => 'Es la resolución de origen del importe original de la multa: no se desvincula como origen. Si se leyó mal, corregí su número o su fecha.']);
 
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('respalda un movimiento vigente');
@@ -89,6 +89,64 @@ class DesvincularDocumentoTest extends TestCase
             ->where('fine_id', $multa->id)
             ->where('fine_document_id', $resolucion->id)
             ->update(['revoked_at' => now(), 'revocation_reason_code' => 'other', 'revocation_reason' => 'Directo en la base']);
+    }
+
+    /**
+     * El importe original exige el origen de su resolución, aunque la
+     * resolución tenga otros papeles: así se perdía la resolución de origen.
+     * El respaldo de la misma resolución sí se desvincula.
+     */
+    public function test_el_origen_del_importe_original_no_se_anula_aunque_tenga_otro_papel(): void
+    {
+        $multa = $this->multa();
+        $resolucion = $this->resolucionDeOrigen($multa);
+        $contador = $this->operador('contador');
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.documentos.store', $multa), ['documentId' => $resolucion->id, 'role' => 'support'])
+            ->assertSessionHasNoErrors();
+
+        $this->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('multa.documents.0.id', $resolucion->id)
+                ->where('multa.documents.0.requiredRoles', ['origin']));
+
+        $this->actingAs($contador)
+            ->post($this->anular($multa, $resolucion, 'origin'), ['reasonCode' => 'wrong_document'])
+            ->assertSessionHasErrors(['reason' => 'Es la resolución de origen del importe original de la multa: no se desvincula como origen. Si se leyó mal, corregí su número o su fecha.']);
+
+        $this->post($this->anular($multa, $resolucion, 'support'), ['reasonCode' => 'duplicate'])
+            ->assertSessionHasNoErrors();
+
+        expect($multa->documents()->whereKey($resolucion->id)->wherePivot('role', 'origin')->exists())->toBeTrue();
+    }
+
+    public function test_la_base_no_anula_el_origen_del_importe_original_aunque_tenga_otro_papel(): void
+    {
+        $multa = $this->multa();
+        $resolucion = $this->resolucionDeOrigen($multa);
+
+        DB::table('fine_document_links')->insert([
+            'fine_id' => $multa->id, 'fine_case_id' => $multa->fine_case_id, 'fine_document_id' => $resolucion->id, 'role' => 'support',
+        ]);
+
+        $this->rechaza('con el papel origin', fn () => DB::table('fine_document_links')
+            ->where('fine_id', $multa->id)
+            ->where('fine_document_id', $resolucion->id)
+            ->where('role', 'origin')
+            ->update(['revoked_at' => now(), 'revocation_reason_code' => 'wrong_document']));
+    }
+
+    /** Un ajuste cita su resolución vinculada como modificación, no con otro papel. */
+    public function test_un_ajuste_cita_su_resolucion_como_modificacion(): void
+    {
+        $multa = $this->multa();
+        $resolucion = $this->resolucionDeOrigen($multa);
+
+        $this->rechaza('no esta vinculado a la multa con el papel que le corresponde', fn () => DB::table('fine_debt_entries')->insert([
+            'fine_id' => $multa->id, 'kind' => 'reduction', 'amount' => '5.00', 'fine_document_id' => $resolucion->id,
+            'reason_code' => 'appeal_admitted', 'effective_on' => '2026-06-01', 'effective_precision' => 'day',
+        ]));
     }
 
     public function test_el_respaldo_de_un_ajuste_se_desvincula_solo_despues_de_revertirlo(): void
@@ -110,7 +168,7 @@ class DesvincularDocumentoTest extends TestCase
         $respaldo = FineDocument::query()->where('original_text', 'N°0900/26')->sole();
 
         $this->post($this->anular($multa, $respaldo, 'modification'), ['reasonCode' => 'data_entry_error'])
-            ->assertSessionHasErrors(['reason' => 'Respalda una reducción vigente de la obligación: revertí esa reducción antes de desvincularlo.']);
+            ->assertSessionHasErrors(['reason' => 'Respalda una reducción vigente de la obligación: revertí esa reducción antes de quitarle la modificación.']);
 
         $ajuste = FineDebtEntry::query()->where('fine_id', $multa->id)->where('kind', 'reduction')->sole();
         $this->post(route('multas.ajustes.reverse', $ajuste), ['reasonCode' => 'wrong_fine', 'reason' => 'Se cargó en la multa equivocada'])
@@ -197,7 +255,7 @@ class DesvincularDocumentoTest extends TestCase
             ->where('fine_document_id', $acta->id)
             ->update(['revoked_at' => now(), 'revocation_reason_code' => 'wrong_document']);
 
-        $this->rechaza('tiene el vinculo con la multa anulado', fn () => DB::table('fine_debt_entries')->insert([
+        $this->rechaza('no esta vinculado a la multa con el papel que le corresponde', fn () => DB::table('fine_debt_entries')->insert([
             'fine_id' => $multa->id, 'kind' => 'increase', 'amount' => '5.00', 'fine_document_id' => $acta->id,
             'effective_on' => '2026-06-01', 'effective_precision' => 'day',
         ]));

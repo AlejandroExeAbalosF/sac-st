@@ -371,28 +371,36 @@ export default function MultaShow({
                                             Corregir
                                         </Button>
                                     )}
+                                    {/* El papel que exige un movimiento vigente no se desvincula: no se ofrece. */}
                                     {can.adjust &&
-                                        documento.roles.map((papel) => (
-                                            <Button
-                                                key={papel}
-                                                size="sm"
-                                                variant="ghost"
-                                                className="text-destructive hover:text-destructive"
-                                                onClick={() =>
-                                                    setDialogo({
-                                                        tipo: 'desvincular',
-                                                        documento,
+                                        documento.roles
+                                            .filter(
+                                                (papel) =>
+                                                    !documento.requiredRoles.includes(
                                                         papel,
-                                                    })
-                                                }
-                                                aria-label={`Desvincular ${documento.label} como ${DOCUMENT_ROLE[papel].toLowerCase()}`}
-                                            >
-                                                <Unlink aria-hidden="true" />
-                                                {documento.roles.length > 1
-                                                    ? `Desvincular (${DOCUMENT_ROLE[papel].toLowerCase()})`
-                                                    : 'Desvincular'}
-                                            </Button>
-                                        ))}
+                                                    ),
+                                            )
+                                            .map((papel) => (
+                                                <Button
+                                                    key={papel}
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="text-destructive hover:text-destructive"
+                                                    onClick={() =>
+                                                        setDialogo({
+                                                            tipo: 'desvincular',
+                                                            documento,
+                                                            papel,
+                                                        })
+                                                    }
+                                                    aria-label={`Desvincular ${documento.label} como ${DOCUMENT_ROLE[papel].toLowerCase()}`}
+                                                >
+                                                    <Unlink aria-hidden="true" />
+                                                    {documento.roles.length > 1
+                                                        ? `Desvincular (${DOCUMENT_ROLE[papel].toLowerCase()})`
+                                                        : 'Desvincular'}
+                                                </Button>
+                                            ))}
                                 </span>
                                 {(adjuntosDeDocumentos[documento.id] ?? [])
                                     .length > 0 && (

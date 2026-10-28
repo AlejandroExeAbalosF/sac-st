@@ -316,6 +316,11 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->rechaza('falta reclasificar', function () use ($multa): void {
             $original = (array) DB::table('fine_debt_entries')->where('fine_id', $multa->id)->first();
             unset($original['id']);
+            // Un ajuste cita su resolución como modificación, como lo deja `AdjustFineDebt`.
+            DB::table('fine_document_links')->insert([
+                'fine_id' => $multa->id, 'fine_case_id' => $multa->fine_case_id,
+                'fine_document_id' => $original['fine_document_id'], 'role' => 'modification',
+            ]);
             DB::table('fine_debt_entries')->insert([...$original, 'kind' => 'reduction', 'amount' => '600000.00', 'reason_code' => 'other', 'reason' => 'Directo']);
         });
     }

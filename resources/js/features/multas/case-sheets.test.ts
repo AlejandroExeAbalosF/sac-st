@@ -12,6 +12,7 @@ const document = (
     id,
     kind,
     roles,
+    requiredRoles: [],
     actType: null,
     number: 100,
     year: 2026,

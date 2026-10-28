@@ -21,10 +21,12 @@ use Illuminate\Validation\ValidationException;
  * vínculo queda a la vista como anulado, con el motivo y quién lo hizo, y el
  * documento sigue en el expediente. Lo correcto se vincula después.
  *
- * No se desvincula un documento que respalda un movimiento vigente de la
- * obligación: el importe original queda con su resolución, y un ajuste se
- * revierte antes. La base lo impone (`fine_document_links_revoke_only`);
- * acá se dice qué hacer.
+ * No se anula el vínculo con el papel que exige un movimiento vigente que
+ * cita el documento, aunque el documento tenga otros: el importe original
+ * conserva el origen de su resolución, y un ajuste se revierte antes de
+ * quitarle la modificación. Los demás papeles del mismo documento sí se
+ * desvinculan. La base lo impone (`fine_document_links_revoke_only`); acá se
+ * dice qué hacer.
  */
 final class RevokeFineDocumentLink
 {
@@ -47,27 +49,21 @@ final class RevokeFineDocumentLink
                 throw ValidationException::withMessages(['reason' => 'Ese documento no está vinculado a la multa con ese papel.']);
             }
 
-            $otroPapel = DB::table('fine_document_links')
-                ->where('fine_id', $multa->id)
-                ->where('fine_document_id', $documento->id)
-                ->whereNull('revoked_at')
-                ->where('id', '<>', $vinculo)
-                ->exists();
-
-            $respaldado = $otroPapel ? null : FineDebtEntry::query()
+            $respaldado = FineDebtEntry::query()
                 ->where('fine_id', $multa->id)
                 ->where('fine_document_id', $documento->id)
                 ->where('kind', '<>', FineDebtEntryKind::Reversal)
                 ->whereDoesntHave('reversedBy')
                 ->orderBy('id')
-                ->first();
+                ->get()
+                ->first(fn (FineDebtEntry $movimiento): bool => $movimiento->kind->requiredDocumentRole() === $papel);
 
             if ($respaldado instanceof FineDebtEntry) {
                 throw ValidationException::withMessages([
                     'reason' => match ($respaldado->kind) {
-                        FineDebtEntryKind::Constitution => 'Es el documento del importe original de la multa: no se desvincula. Si se leyó mal, corregí su número o su fecha.',
-                        FineDebtEntryKind::Reduction => 'Respalda una reducción vigente de la obligación: revertí esa reducción antes de desvincularlo.',
-                        default => 'Respalda un aumento vigente de la obligación: revertí ese aumento antes de desvincularlo.',
+                        FineDebtEntryKind::Constitution => 'Es la resolución de origen del importe original de la multa: no se desvincula como origen. Si se leyó mal, corregí su número o su fecha.',
+                        FineDebtEntryKind::Reduction => 'Respalda una reducción vigente de la obligación: revertí esa reducción antes de quitarle la modificación.',
+                        default => 'Respalda un aumento vigente de la obligación: revertí ese aumento antes de quitarle la modificación.',
                     },
                 ]);
             }

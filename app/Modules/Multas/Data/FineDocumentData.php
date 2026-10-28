@@ -39,12 +39,20 @@ final class FineDocumentData extends Data
          * @var list<FineDocumentRole>
          */
         public array $roles = [],
+        /**
+         * Los papeles que exige un movimiento vigente de la obligación que
+         * cita el documento: no se desvinculan. Vacío fuera de la ficha.
+         *
+         * @var list<FineDocumentRole>
+         */
+        public array $requiredRoles = [],
     ) {}
 
     /**
      * @param  list<FineDocumentRole>  $roles
+     * @param  list<FineDocumentRole>  $requiredRoles
      */
-    public static function fromModel(FineDocument $documento, array $roles = []): self
+    public static function fromModel(FineDocument $documento, array $roles = [], array $requiredRoles = []): self
     {
         return new self(
             id: $documento->id,
@@ -58,6 +66,7 @@ final class FineDocumentData extends Data
             issuedPrecision: $documento->issued_precision,
             provenance: $documento->provenance,
             roles: $roles,
+            requiredRoles: $requiredRoles,
         );
     }
 }

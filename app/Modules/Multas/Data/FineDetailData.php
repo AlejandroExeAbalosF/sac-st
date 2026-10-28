@@ -77,6 +77,8 @@ final class FineDetailData extends Data
          * Un documento que cumple dos papeles llega dos veces en la relación;
          * en la ficha va una vez, con sus papeles juntos.
          */
+        $exigidos = self::papelesExigidos($multa);
+
         $documentos = $multa->documents
             ->groupBy('id')
             ->map(fn ($repetidos): FineDocumentData => FineDocumentData::fromModel(
@@ -84,6 +86,7 @@ final class FineDetailData extends Data
                 array_values($repetidos
                     ->map(fn (FineDocument $documento): FineDocumentRole => FineDocumentRole::from(self::rol($documento)))
                     ->all()),
+                $exigidos[$repetidos->first()->id] ?? [],
             ))
             ->all();
 
@@ -133,6 +136,33 @@ final class FineDetailData extends Data
             createdAt: $multa->created_at?->toIso8601String(),
             attachments: $adjuntos,
         );
+    }
+
+    /**
+     * Por documento, los papeles que exige un movimiento vigente que lo cita:
+     * la ficha no ofrece desvincularlos (`RevokeFineDocumentLink`).
+     *
+     * @return array<int, list<FineDocumentRole>>
+     */
+    private static function papelesExigidos(Fine $multa): array
+    {
+        $exigidos = [];
+
+        foreach ($multa->debtEntries as $movimiento) {
+            $papel = $movimiento->kind->requiredDocumentRole();
+
+            if ($papel === null || $movimiento->fine_document_id === null || $movimiento->reversedBy !== null) {
+                continue;
+            }
+
+            $exigidos[$movimiento->fine_document_id] ??= [];
+
+            if (! in_array($papel, $exigidos[$movimiento->fine_document_id], true)) {
+                $exigidos[$movimiento->fine_document_id][] = $papel;
+            }
+        }
+
+        return $exigidos;
     }
 
     private static function rol(FineDocument $documento): string
