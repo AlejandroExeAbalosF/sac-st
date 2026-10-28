@@ -136,7 +136,7 @@ export default function MultasIndex({
                                             className="size-4"
                                             aria-hidden="true"
                                         />
-                                        Nueva multa
+                                        Nuevo expediente
                                     </Link>
                                 </Button>
                             )}

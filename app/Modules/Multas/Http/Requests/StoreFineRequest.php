@@ -29,7 +29,7 @@ final class StoreFineRequest extends FormRequest
         $hoy = BusinessDate::today()->toDateString();
 
         return [
-            // Desde la ficha del expediente llega el id; desde Nueva multa, el número.
+            // Desde la ficha del expediente llega el id; desde Nuevo expediente, el número.
             'fineCaseId' => ['nullable', 'integer', 'exists:fine_cases,id'],
             'caseNumber' => ['required_without:fineCaseId', 'nullable', 'string', 'max:60'],
             'caseNotes' => ['nullable', 'string', 'max:500'],

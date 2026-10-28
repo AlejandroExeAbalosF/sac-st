@@ -67,7 +67,7 @@ Para otra combinación está el «Agregar multa» de la cabecera, que es libre.
 | Pantalla | Ruta | Permiso |
 | --- | --- | --- |
 | Expedientes y multas | `/multas/expedientes` | `multas.ver` |
-| Nueva multa | `/multas/nueva` | `multas.registrar` |
+| Nuevo expediente | `/multas/nueva` | `multas.registrar` |
 | Ficha de la multa | `/multas/expedientes/{id}/{número}/multa/{n}` | `multas.ver` |
 | Expediente | `/multas/expedientes/{id}/{número}` | `multas.ver` |
 | Agregar multa al expediente | `/multas/expedientes/{id}/{número}/agregar-multa` | `multas.registrar` |
@@ -109,9 +109,11 @@ no como número de Excel. Todo el archivo sale de una misma foto de los datos: l
 que otro carga o corrige mientras se baja —una fecha, una carátula, un ajuste— no
 repite ni saltea filas ni mezcla momentos, y quien corrige no espera.
 
-### Nueva multa · `/multas/nueva`
+### Nuevo expediente · `/multas/nueva`
 
-Una multa se carga con todo lo que trae el papel:
+El expediente se carga con su primera multa, con todo lo que trae el papel. Si
+el número escrito ya está cargado, el título pasa a «Agregar multa» y la multa
+se le agrega:
 
 - **Expediente.** Al escribir el número se pregunta si ya está cargado. Si está,
   un aviso al lado del campo lo dice y lleva a su ficha; la multa se le agrega y
@@ -202,7 +204,7 @@ tramo porque el sufijo también lleva guion: pegado al número, `169607-2024-75`
 decía si 75 era el sufijo o el id. Los enlaces de las pantallas reciben la clave
 armada por el servidor (`routeKey`) y llegan directo a la dirección actual.
 
-**Agregar multa** abre el mismo formulario de Nueva multa con el expediente fijo:
+**Agregar multa** abre el mismo formulario de Nuevo expediente con el expediente fijo:
 el número se muestra pero no se escribe, no se ofrecen observaciones ni archivo del
 expediente, y el alta lo identifica por id —así funciona también con un expediente
 importado sin número—.
@@ -230,7 +232,7 @@ La foto o el PDF de un papel se adjunta a quien es dueño de ese papel:
 - **Pago anterior**: su comprobante —recibo, boleta, planilla—, que ayuda a
   validarlo.
 
-**Nueva multa** ofrece un archivo opcional en cada bloque: el del expediente, el
+**Nuevo expediente** ofrece un archivo opcional en cada bloque: el del expediente, el
 de la resolución —nueva o ya cargada— y el de cada acta nueva. Las actas que
 el expediente ya tenía reciben el suyo desde la ficha del expediente. Todo entra
 en el mismo acto que la multa: si algo falla no queda la multa a medias ni un

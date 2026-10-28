@@ -303,18 +303,21 @@ export default function NuevaMulta({
             ),
         );
 
+    // Si el número escrito ya está cargado, no se crea un expediente: se le agrega la multa.
+    const titulo = fijo || existente ? 'Agregar multa' : 'Nuevo expediente';
+
     return (
         <>
-            <Head title={fijo ? 'Agregar multa' : 'Nueva multa'} />
+            <Head title={titulo} />
 
             <div className="flex flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
-                    title={fijo ? 'Agregar multa' : 'Nueva multa'}
+                    title={titulo}
                     eyebrow="Multas"
                     description={
-                        fijo
+                        fijo || existente
                             ? 'Agregá al expediente la multa tal como la trae la resolución.'
-                            : 'Cargá la multa tal como la trae la resolución.'
+                            : 'Cargá el expediente con su primera multa, tal como la trae la resolución.'
                     }
                 />
 

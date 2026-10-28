@@ -347,7 +347,7 @@ Breadcrumbs::for('multas.pagos.index', fn (): array => [
 
 Breadcrumbs::for('multas.create', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
-    Crumb::make('Nueva multa'),
+    Crumb::make('Nuevo expediente'),
 ]);
 
 Breadcrumbs::for('multas.expedientes.show', fn (FineCase $fineCase): array => [
