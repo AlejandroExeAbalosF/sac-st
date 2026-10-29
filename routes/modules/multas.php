@@ -114,6 +114,13 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
             ->name('resolucion-de-origen.store');
     });
 
+    // Corregir un importe mal cargado, sin resolución: en pocas manos.
+    Route::middleware('can:multas.corregir-importe')->group(function (): void {
+        Route::post('{fine}/correcciones-de-importe', [FineDebtController::class, 'correct'])
+            ->whereNumber('fine')
+            ->name('correcciones-de-importe.store');
+    });
+
     Route::middleware('can:multas.ajustar')->group(function (): void {
         Route::post('{fine}/ajustes', [FineDebtController::class, 'store'])->whereNumber('fine')->name('ajustes.store');
         Route::post('ajustes/{entry}/reversion', [FineDebtController::class, 'reverse'])->whereNumber('entry')->name('ajustes.reverse');

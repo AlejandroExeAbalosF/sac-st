@@ -118,6 +118,13 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['tipo' => 'Tipo', 'amount' => 'Importe', 'resolucion' => 'Resolución', 'reason' => 'Motivo'],
             ),
             new AuditActionDefinition(
+                'multa.importe-corregido',
+                'Se corrigió el importe de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['tipo' => 'Tipo', 'amount' => 'Importe', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.ajuste-revertido',
                 'Se revirtió un ajuste de la multa',
                 'Multas',

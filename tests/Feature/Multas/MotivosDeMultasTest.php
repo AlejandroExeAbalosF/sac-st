@@ -14,6 +14,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\AdjustsFines;
 use Tests\TestCase;
 
 /**
@@ -22,6 +23,7 @@ use Tests\TestCase;
  */
 class MotivosDeMultasTest extends TestCase
 {
+    use AdjustsFines;
     use RefreshDatabase;
 
     public function test_la_ficha_recibe_la_lista_de_cada_acto(): void
@@ -42,7 +44,7 @@ class MotivosDeMultasTest extends TestCase
 
         $this->actingAs($contador)
             ->post(route('multas.ajustes.store', $multa), [
-                'kind' => 'reduction', 'amount' => '400000.00', 'effectiveOn' => '2026-06-01',
+                ...$this->importeAjustado($multa, 'reduction', '400000.00'), 'effectiveOn' => '2026-06-01',
                 'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
                 'reasonCode' => 'appeal_admitted',
             ])
@@ -111,7 +113,10 @@ class MotivosDeMultasTest extends TestCase
             'old_values' => json_encode(['effective_on' => null]), 'new_values' => json_encode(['effective_on' => '2026-05-08']),
         ]));
 
-        DB::table('fine_debt_entries')->insert($fila(['reason_code' => 'court_ruling']));
+        // Sin resolución, el motivo de una resolución no vale: es una corrección del importe.
+        $this->rechaza('fine_debt_entries_reason_check', fn () => DB::table('fine_debt_entries')->insert($fila(['reason_code' => 'court_ruling'])));
+
+        DB::table('fine_debt_entries')->insert($fila(['reason_code' => 'data_entry_error', 'reason' => 'Un cero de más']));
     }
 
     private function rechaza(string $mensaje, callable $consulta): void

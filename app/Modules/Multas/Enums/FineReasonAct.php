@@ -13,12 +13,14 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  *
  * La lista es la que ofrece la pantalla y valida el Form Request; la base
  * repite la misma en el CHECK de cada columna
- * (`2026_10_27_020000_add_reason_codes_to_fines`).
+ * (`2026_10_27_020000_add_reason_codes_to_fines`; la corrección del importe,
+ * `2026_10_28_020000_add_amount_corrections_to_fine_debt_entries`).
  */
 #[TypeScript]
 enum FineReasonAct: string implements ReasonAct
 {
     case Adjustment = 'adjustment';
+    case AmountCorrection = 'amount_correction';
     case Reversal = 'reversal';
     case PaymentDiscard = 'payment_discard';
     case LinkRevocation = 'link_revocation';
@@ -33,6 +35,7 @@ enum FineReasonAct: string implements ReasonAct
     {
         return match ($this) {
             self::Adjustment => [FineReasonCode::AppealAdmitted, FineReasonCode::CourtRuling, FineReasonCode::ResolutionCorrection, FineReasonCode::Other],
+            self::AmountCorrection => [FineReasonCode::DataEntryError, FineReasonCode::MisreadPaper, FineReasonCode::Other],
             self::Reversal => [FineReasonCode::DataEntryError, FineReasonCode::WrongFine, FineReasonCode::Duplicate, FineReasonCode::Other],
             self::PaymentDiscard => [FineReasonCode::DataEntryError, FineReasonCode::Duplicate, FineReasonCode::WrongFine, FineReasonCode::NotCredited, FineReasonCode::Other],
             self::LinkRevocation => [FineReasonCode::DataEntryError, FineReasonCode::WrongDocument, FineReasonCode::WrongFine, FineReasonCode::Duplicate, FineReasonCode::Other],

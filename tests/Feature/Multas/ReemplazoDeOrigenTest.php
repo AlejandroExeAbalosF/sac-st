@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\AdjustsFines;
 use Tests\TestCase;
 
 /**
@@ -25,6 +26,7 @@ use Tests\TestCase;
  */
 class ReemplazoDeOrigenTest extends TestCase
 {
+    use AdjustsFines;
     use RefreshDatabase;
 
     public function test_reemplazar_por_otra_resolucion_del_expediente(): void
@@ -152,7 +154,7 @@ class ReemplazoDeOrigenTest extends TestCase
         $multa = $this->multa();
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.ajustes.store', $multa), [
-                'kind' => 'reduction', 'amount' => '400000.00', 'effectiveOn' => '2026-06-01',
+                ...$this->importeAjustado($multa, 'reduction', '400000.00'), 'effectiveOn' => '2026-06-01',
                 'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
                 'reasonCode' => 'appeal_admitted',
             ])

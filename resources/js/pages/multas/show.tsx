@@ -93,6 +93,7 @@ type Props = {
         reportBank: boolean;
         verifyBank: boolean;
         adjust: boolean;
+        correctAmount: boolean;
         replaceOrigin: boolean;
         viewAttachments: boolean;
         linkBankCredit: boolean;
@@ -515,7 +516,7 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Obligación">
-                        {can.adjust && (
+                        {(can.adjust || can.correctAmount) && (
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -595,7 +596,11 @@ export default function MultaShow({
                                                             : undefined
                                                     }
                                                 >
-                                                    {DEBT_KIND[movimiento.kind]}
+                                                    {movimiento.isCorrection
+                                                        ? `Corrección de importe (${DEBT_KIND[movimiento.kind].toLowerCase()})`
+                                                        : DEBT_KIND[
+                                                              movimiento.kind
+                                                          ]}
                                                 </span>
                                                 {revertido && (
                                                     <span className="ml-2 text-xs text-muted-foreground">
@@ -655,7 +660,9 @@ export default function MultaShow({
                                                         Fecha
                                                     </Button>
                                                 )}
-                                                {can.adjust &&
+                                                {(movimiento.isCorrection
+                                                    ? can.correctAmount
+                                                    : can.adjust) &&
                                                     !revertido &&
                                                     (movimiento.kind ===
                                                         'increase' ||
@@ -1211,6 +1218,9 @@ export default function MultaShow({
             {dialogo?.tipo === 'ajustar' && (
                 <AdjustDebtDialog
                     fineId={multa.id}
+                    obligacion={multa.balance.obligation}
+                    puedeAjustar={can.adjust}
+                    puedeCorregir={can.correctAmount}
                     resoluciones={documentosDelExpediente.filter(
                         (d) => d.kind === 'resolution',
                     )}
@@ -1220,7 +1230,11 @@ export default function MultaShow({
             {dialogo?.tipo === 'revertir' && (
                 <ReasonDialog
                     act="reversal"
-                    title={`Revertir el ${DEBT_KIND[dialogo.movimiento.kind].toLowerCase()}`}
+                    title={
+                        dialogo.movimiento.isCorrection
+                            ? 'Revertir la corrección de importe'
+                            : `Revertir el ${DEBT_KIND[dialogo.movimiento.kind].toLowerCase()}`
+                    }
                     description="Deshace el ajuste entero, por el mismo importe. El ajuste queda a la vista marcado como revertido. Si solo una parte estaba mal, registrá otro ajuste."
                     url={reverse(dialogo.movimiento.id).url}
                     submitLabel="Revertir ajuste"

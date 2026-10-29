@@ -1043,6 +1043,7 @@ declare namespace App {
                     effectiveOn: string;
                     effectivePrecision: App.Modules.Multas.Enums.DatePrecision;
                     documentLabel: string | null;
+                    isCorrection: boolean;
                     reason: string | null;
                     reversalOfId: number | null;
                     reversedById: number | null;
@@ -1207,6 +1208,7 @@ declare namespace App {
                 export type FineProvenance = 'manual' | 'import';
                 export type FineReasonAct =
                     | 'adjustment'
+                    | 'amount_correction'
                     | 'reversal'
                     | 'payment_discard'
                     | 'link_revocation'

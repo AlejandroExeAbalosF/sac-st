@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\AdjustsFines;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
@@ -36,6 +37,7 @@ use Tests\TestCase;
  */
 class CobroEnCajaDeMultasTest extends TestCase
 {
+    use AdjustsFines;
     use BuildsSharedBankAccount;
     use CollectsInstallments {
         cuota as cuotaDeHaberes;
@@ -331,18 +333,35 @@ class CobroEnCajaDeMultasTest extends TestCase
         $this->cobrar($multa, FinePaymentMedium::Cash, '1000000.00');
         $quien = $this->operador('administrador');
 
-        $this->actingAs($quien)->post(route('multas.ajustes.store', $multa), $this->ajuste('reduction', '600000.00'))
+        $this->actingAs($quien)->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'reduction', '600000.00'))
             ->assertSessionHasNoErrors();
 
         expect($this->saldo($multa, 'operational_excess'))->toBe('200000.00')
             ->and($this->libro())->toMatchArray(['COLLECTED_FUNDS' => '-800000.00', 'PENDING_EXCESS' => '-200000.00']);
 
-        $this->post(route('multas.ajustes.store', $multa), $this->ajuste('increase', '150000.00'))->assertSessionHasNoErrors();
+        $this->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'increase', '150000.00'))->assertSessionHasNoErrors();
 
         expect($this->saldo($multa, 'operational_excess'))->toBe('50000.00')
             ->and($this->libro())->toMatchArray(['COLLECTED_FUNDS' => '-950000.00', 'PENDING_EXCESS' => '-50000.00'])
             ->and(DB::table('fine_excess_reclassifications')->orderBy('id')->pluck('amount')->all())
             ->toBe(['200000.00', '-150000.00']);
+    }
+
+    public function test_correcting_the_amount_below_what_was_collected_leaves_the_excess(): void
+    {
+        $multa = $this->escenario();
+        $this->cobrar($multa, FinePaymentMedium::Cash, '1000000.00');
+
+        $this->actingAs($this->operador('administrador'))
+            ->post(route('multas.correcciones-de-importe.store', $multa), [
+                ...$this->importeAjustado($multa, 'reduction', '600000.00'),
+                'reasonCode' => 'data_entry_error',
+                'reason' => 'El importe se cargó mal',
+            ])
+            ->assertSessionHasNoErrors();
+
+        expect($this->saldo($multa, 'operational_excess'))->toBe('200000.00')
+            ->and($this->libro())->toMatchArray(['COLLECTED_FUNDS' => '-800000.00', 'PENDING_EXCESS' => '-200000.00']);
     }
 
     /** Un antecedente consume la obligación primero: lo cobrado después pasa a excedente. */
@@ -541,10 +560,10 @@ class CobroEnCajaDeMultasTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function ajuste(string $tipo, string $importe): array
+    private function ajuste(Fine $multa, string $tipo, string $importe): array
     {
         return [
-            'kind' => $tipo, 'amount' => $importe, 'effectiveOn' => '2026-06-01',
+            ...$this->importeAjustado($multa, $tipo, $importe), 'effectiveOn' => '2026-06-01',
             'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
             'reasonCode' => 'appeal_admitted',
             'reason' => 'Recurso jerárquico parcialmente admitido',

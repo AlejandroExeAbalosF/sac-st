@@ -255,9 +255,20 @@ multa.
 
 ## Ajustes de la obligación
 
-Cuando una resolución cambia el importe se registra un **aumento** o una
-**reducción**, con la resolución que lo dispone (del expediente o nueva) y el
-motivo. El importe original no se toca.
+«Ajustar» lleva la obligación a otro importe. Se escribe el **importe nuevo**, no
+la diferencia: el sistema muestra si es un aumento o una reducción y por cuánto, y
+lo registra así. Si mientras tanto otro cambió el importe, se rechaza en vez de
+aplicar una diferencia pensada sobre otro número. El importe original no se toca:
+cada ajuste es otra fila. Hay dos vías:
+
+- **Por resolución** (`multas.ajustar`): la normal. Con la resolución que lo
+  dispone (del expediente o nueva), su fecha y el motivo.
+- **Corrección de importe** (`multas.corregir-importe`, solo administrador): para
+  un importe mal cargado. Sin resolución —el área confirmó el 28/10/2026 que estos
+  errores no se corrigen con un papel—, con motivo («Error de carga», «Se leyó mal
+  el papel», «Otro») y **detalle obligatorio**. Rige desde el día en que se carga.
+  En la ficha se lee «Corrección de importe (reducción)», y revertirla pide el
+  mismo permiso.
 
 Si la obligación queda por debajo de lo pagado, la deuda es cero y la diferencia es
 **excedente**: queda a la vista, no se devuelve ni se acredita sola.
@@ -699,6 +710,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.registrar` | Cargar expedientes, documentos y multas; completar datos; registrar pagos anteriores; adjuntar archivos | administrador, administrativo |
 | `multas.ajustar` | Ajustar y revertir; desvincular documentos; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.reemplazar-origen` | Reemplazar la resolución de origen cargada por error | administrador |
+| `multas.corregir-importe` | Corregir un importe mal cargado sin resolución, y revertir esa corrección | administrador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |

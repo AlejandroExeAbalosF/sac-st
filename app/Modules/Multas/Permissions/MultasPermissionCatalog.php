@@ -46,6 +46,16 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Cambia cuánto se debe sin un papel que lo respalde: es para el
+            // importe mal cargado, y queda en pocas manos.
+            new PermissionDefinition(
+                'multas.corregir-importe',
+                'Corregir el importe de una multa',
+                'Corregir un importe mal cargado sin resolución, con su motivo y su detalle, y revertir esa corrección. Queda como un movimiento más de la obligación.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
             // Cambia de qué resolución nace la multa: queda en pocas manos y el
             // área lo puede extender desde la matriz.
             new PermissionDefinition(

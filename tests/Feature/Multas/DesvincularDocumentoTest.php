@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\AdjustsFines;
 use Tests\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use Tests\TestCase;
  */
 class DesvincularDocumentoTest extends TestCase
 {
+    use AdjustsFines;
     use RefreshDatabase;
 
     public function test_desvincular_un_acta_la_saca_de_la_multa_y_la_deja_a_la_vista(): void
@@ -156,8 +158,7 @@ class DesvincularDocumentoTest extends TestCase
 
         $this->actingAs($contador)
             ->post(route('multas.ajustes.store', $multa), [
-                'kind' => 'reduction',
-                'amount' => '400000.00',
+                ...$this->importeAjustado($multa, 'reduction', '400000.00'),
                 'effectiveOn' => '2026-06-01',
                 'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
                 'reasonCode' => 'appeal_admitted',

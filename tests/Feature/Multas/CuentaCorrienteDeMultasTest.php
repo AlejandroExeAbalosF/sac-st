@@ -14,6 +14,7 @@ use App\Modules\Shared\Models\AuditEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\AdjustsFines;
 use Tests\TestCase;
 
 /**
@@ -25,6 +26,7 @@ use Tests\TestCase;
  */
 class CuentaCorrienteDeMultasTest extends TestCase
 {
+    use AdjustsFines;
     use RefreshDatabase;
 
     // ── Alta ────────────────────────────────────────────────────────────
@@ -200,7 +202,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
     {
         [$primera] = $this->dosMultasEnUnExpediente();
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.ajustes.store', $primera), $this->ajuste('reduction', '1400000.00'))
+            ->post(route('multas.ajustes.store', $primera), $this->ajuste($primera, 'reduction', '1400000.00'))
             ->assertSessionHasNoErrors();
 
         $consulta = $this->operador('consulta');
@@ -281,7 +283,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $multa = $this->multa();
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.ajustes.store', $multa), $this->ajuste('reduction', '400000.00'))
+            ->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'reduction', '400000.00'))
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
@@ -295,8 +297,8 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $multa = $this->multa();
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('multas.ajustes.store', $multa), $this->ajuste('reduction', '1400000.01'))
-            ->assertSessionHasErrors('amount');
+            ->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'reduction', '1400000.01'))
+            ->assertSessionHasErrors('newAmount');
 
         expect($this->saldo($multa, 'obligation'))->toBe('1400000.00');
     }
@@ -306,7 +308,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
         $multa = $this->multa();
 
         $this->actingAs($this->operador('administrativo'))
-            ->post(route('multas.ajustes.store', $multa), $this->ajuste('reduction', '1.00'))
+            ->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'reduction', '1.00'))
             ->assertForbidden();
     }
 
@@ -314,7 +316,7 @@ class CuentaCorrienteDeMultasTest extends TestCase
     {
         $multa = $this->multa();
         $contador = $this->operador('contador');
-        $this->actingAs($contador)->post(route('multas.ajustes.store', $multa), $this->ajuste('reduction', '400000.00'));
+        $this->actingAs($contador)->post(route('multas.ajustes.store', $multa), $this->ajuste($multa, 'reduction', '400000.00'));
         $reduccion = FineDebtEntry::query()->where('kind', 'reduction')->sole();
 
         $this->actingAs($contador)
@@ -663,11 +665,10 @@ class CuentaCorrienteDeMultasTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function ajuste(string $tipo, string $importe): array
+    private function ajuste(Fine $multa, string $tipo, string $importe): array
     {
         return [
-            'kind' => $tipo,
-            'amount' => $importe,
+            ...$this->importeAjustado($multa, $tipo, $importe),
             'effectiveOn' => '2026-06-01',
             'document' => ['text' => 'N°0900/26', 'issuedOn' => '2026-06-01'],
             'reasonCode' => 'appeal_admitted',

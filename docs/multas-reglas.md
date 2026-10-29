@@ -154,6 +154,13 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 - Una multa manual nace citando la resolución que la origina. **Base.**
 - Importes siempre positivos; el tipo dice el efecto. Un ajuste lleva motivo.
   **Base:** CHECK.
+- Un aumento o una reducción es una de dos cosas: con documento, lo dispone una
+  resolución y lleva un motivo de la lista del ajuste; sin documento, es una
+  corrección del importe y lleva un motivo de su propia lista y siempre el
+  detalle. **Base:** `fine_debt_entries_reason_check`. Que la corrección sea solo
+  del administrador (`multas.corregir-importe`), también para revertirla, lo
+  decide la ruta y el controlador. Que el importe que vio el formulario siga
+  siendo el vigente lo decide el **Action**, con la multa bloqueada.
 - La obligación vigente nunca es negativa. **Base:** `fine_debt_entries_coherent`,
   con bloqueo de la multa.
 - Una reversión deshace un movimiento de la misma multa, por el mismo importe, una

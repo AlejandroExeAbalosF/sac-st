@@ -23,17 +23,28 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * Sube o baja la obligación por lo que dispone una resolución (M04).
+ * Lleva la obligación al importe que corresponde (M04).
  *
- * El importe original no se toca: el ajuste es otra fila, con su documento,
- * su fecha y su motivo. Los pagos ya hechos no cambian; si la obligación
- * queda por debajo de lo pagado, la deuda es cero y lo demás es excedente;
- * si eso cambia cuánto de lo cobrado en el sistema es excedente, el libro se
- * reclasifica en la misma transacción (M05).
+ * Se pide el importe nuevo, no la diferencia: el aumento o la reducción y su
+ * monto salen de comparar con el vigente, con la multa bloqueada. El importe
+ * que vio el formulario tiene que seguir siendo el vigente; si otro lo cambió
+ * mientras tanto, se rechaza en vez de aplicar una diferencia pensada sobre
+ * otro número.
  *
- * La resolución que lo respalda queda vinculada a la multa como
- * «modificación», si todavía no lo estaba: es lo que exige la base para
- * citarla.
+ * Hay dos vías, y las dos dejan otra fila: el importe original no se toca.
+ *
+ * - **Con resolución**, la vía normal: la resolución queda vinculada a la
+ *   multa como «modificación», si todavía no lo estaba, que es lo que exige
+ *   la base para citarla.
+ * - **Sin documento**, la corrección de un importe mal cargado: el área no
+ *   la respalda con un papel (confirmado el 28/10/2026), así que la explica
+ *   el motivo, con detalle obligatorio. Quién puede hacerla lo decide la
+ *   ruta (`multas.corregir-importe`); la base exige el motivo de su lista.
+ *
+ * Los pagos ya hechos no cambian; si la obligación queda por debajo de lo
+ * pagado, la deuda es cero y lo demás es excedente; si eso cambia cuánto de
+ * lo cobrado en el sistema es excedente, el libro se reclasifica en la misma
+ * transacción (M05).
  */
 final class AdjustFineDebt
 {
@@ -45,60 +56,68 @@ final class AdjustFineDebt
 
     public function handle(
         Fine $multa,
-        FineDebtEntryKind $tipo,
-        string $amount,
+        string $newObligation,
+        string $expectedObligation,
         CarbonImmutable $effectiveOn,
-        FineDocument|NewDocument $documento,
+        FineDocument|NewDocument|null $documento,
         Reason $reason,
         ?int $actorId,
     ): FineDebtEntry {
-        if (! in_array($tipo, [FineDebtEntryKind::Increase, FineDebtEntryKind::Reduction], true)) {
-            throw new InvalidArgumentException('Un ajuste aumenta o reduce la obligación.');
+        $nueva = Decimal::scale($newObligation);
+
+        if (Decimal::isNegative($nueva)) {
+            throw new InvalidArgumentException('La obligación no puede ser negativa.');
         }
 
-        $importe = Decimal::scale($amount);
-
-        return DB::transaction(function () use ($multa, $tipo, $importe, $effectiveOn, $documento, $reason, $actorId): FineDebtEntry {
+        return DB::transaction(function () use ($multa, $nueva, $expectedObligation, $effectiveOn, $documento, $reason, $actorId): FineDebtEntry {
             // Dos ajustes simultáneos no leen la misma obligación.
             Fine::query()->whereKey($multa->id)->lockForUpdate()->first();
 
             $multa->loadMissing('fineCase');
 
+            $obligacion = (string) FineBalance::query()->whereKey($multa->id)->value('obligation');
+
+            if (! Decimal::equals($obligacion, $expectedObligation)) {
+                throw ValidationException::withMessages([
+                    'newAmount' => sprintf('El importe de la multa cambió mientras cargabas: ahora es $ %s. Revisá el nuevo importe.', Decimal::format($obligacion)),
+                ]);
+            }
+
+            if (Decimal::equals($obligacion, $nueva)) {
+                throw ValidationException::withMessages(['newAmount' => 'Es el mismo importe que la multa ya tiene.']);
+            }
+
+            $diferencia = Decimal::sub($nueva, $obligacion);
+            $tipo = Decimal::isNegative($diferencia) ? FineDebtEntryKind::Reduction : FineDebtEntryKind::Increase;
+            $importe = Decimal::abs($diferencia);
+
             $respaldo = $documento instanceof NewDocument
                 ? $this->registrarDocumento->handle($multa->fineCase, $documento, $actorId, 'document.text')
                 : $documento;
 
-            if ($respaldo->kind !== FineDocumentKind::Resolution) {
-                throw ValidationException::withMessages(['documentId' => 'Un ajuste lo dispone una resolución.']);
-            }
+            if ($respaldo !== null) {
+                if ($respaldo->kind !== FineDocumentKind::Resolution) {
+                    throw ValidationException::withMessages(['documentId' => 'Un ajuste lo dispone una resolución.']);
+                }
 
-            if (! $multa->fineCase->documents()->whereKey($respaldo->id)->exists()) {
-                throw ValidationException::withMessages(['documentId' => 'Esa resolución no pertenece al expediente de la multa.']);
-            }
+                if (! $multa->fineCase->documents()->whereKey($respaldo->id)->exists()) {
+                    throw ValidationException::withMessages(['documentId' => 'Esa resolución no pertenece al expediente de la multa.']);
+                }
 
-            $obligacion = (string) FineBalance::query()->whereKey($multa->id)->value('obligation');
+                $vinculado = $multa->documents()
+                    ->whereKey($respaldo->id)
+                    ->wherePivot('role', FineDocumentRole::Modification->value)
+                    ->exists();
 
-            if ($tipo === FineDebtEntryKind::Reduction && Decimal::isNegative(Decimal::sub($obligacion, $importe))) {
-                throw ValidationException::withMessages([
-                    'amount' => sprintf(
-                        'La obligación es de $ %s: una reducción de $ %s la dejaría negativa. Para dejarla sin efecto, reducila hasta cero.',
-                        Decimal::format($obligacion),
-                        Decimal::format($importe),
-                    ),
-                ]);
-            }
-
-            $vinculado = $multa->documents()
-                ->whereKey($respaldo->id)
-                ->wherePivot('role', FineDocumentRole::Modification->value)
-                ->exists();
-
-            if (! $vinculado) {
-                $multa->documents()->attach($respaldo->id, [
-                    'fine_case_id' => $multa->fine_case_id,
-                    'role' => FineDocumentRole::Modification->value,
-                    'created_by' => $actorId,
-                ]);
+                if (! $vinculado) {
+                    $multa->documents()->attach($respaldo->id, [
+                        'fine_case_id' => $multa->fine_case_id,
+                        'role' => FineDocumentRole::Modification->value,
+                        'created_by' => $actorId,
+                    ]);
+                }
+            } elseif ($reason->detail === null) {
+                throw ValidationException::withMessages(['reason' => 'Contá en el detalle qué estaba mal cargado.']);
             }
 
             $ajuste = FineDebtEntry::query()->create([
@@ -107,24 +126,30 @@ final class AdjustFineDebt
                 'amount' => $importe,
                 'effective_on' => $effectiveOn->toDateString(),
                 'effective_precision' => DatePrecision::Day,
-                'fine_document_id' => $respaldo->id,
+                'fine_document_id' => $respaldo?->id,
                 'reason_code' => $reason->code,
                 'reason' => $reason->detail,
                 'provenance' => FineProvenance::Manual,
                 'created_by' => $actorId,
             ]);
 
-            $this->reclasificar->handle($multa, sprintf('%s de la obligación por %s', $tipo->label(), $respaldo->label()), $actorId);
+            $this->reclasificar->handle(
+                $multa,
+                $respaldo !== null
+                    ? sprintf('%s de la obligación por %s', $tipo->label(), $respaldo->label())
+                    : sprintf('Corrección del importe de la multa (%s)', mb_strtolower($tipo->label())),
+                $actorId,
+            );
 
             $this->auditar->handle(
-                'multa.ajuste-registrado',
+                $respaldo !== null ? 'multa.ajuste-registrado' : 'multa.importe-corregido',
                 $multa,
                 before: ['obligation' => $obligacion],
                 after: ['obligation' => (string) FineBalance::query()->whereKey($multa->id)->value('obligation')],
                 metadata: [
                     'tipo' => $tipo->label(),
                     'amount' => $importe,
-                    'resolucion' => $respaldo->label(),
+                    ...($respaldo !== null ? ['resolucion' => $respaldo->label()] : []),
                     ...$reason->auditMetadata(),
                 ],
                 actorId: $actorId,

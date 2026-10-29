@@ -8,10 +8,10 @@ use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\AdjustFineDebt;
 use App\Modules\Multas\Actions\ReverseFineDebtEntry;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
-use App\Modules\Multas\Enums\FineDebtEntryKind;
 use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineReasonAct;
 use App\Modules\Multas\Http\Requests\AdjustFineDebtRequest;
+use App\Modules\Multas\Http\Requests\CorrectFineAmountRequest;
 use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Models\Fine;
@@ -20,14 +20,17 @@ use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Support\Reason;
+use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
 /**
- * Los ajustes de la obligación y su reversión.
+ * Los ajustes de la obligación —por resolución o como corrección del
+ * importe— y su reversión.
  */
 final class FineDebtController extends Controller
 {
@@ -49,8 +52,8 @@ final class FineDebtController extends Controller
 
         $ajustar->handle(
             $fine,
-            FineDebtEntryKind::from((string) $request->validated('kind')),
-            (string) $request->validated('amount'),
+            (string) $request->validated('newAmount'),
+            (string) $request->validated('expectedAmount'),
             CarbonImmutable::parse((string) $request->validated('effectiveOn')),
             $documento,
             Reason::fromValidated($request->validated(), FineReasonAct::Adjustment) ?? throw new LogicException('El motivo del ajuste ya se validó.'),
@@ -62,8 +65,33 @@ final class FineDebtController extends Controller
         return to_route('multas.show', $fine->showParameters());
     }
 
+    /**
+     * Corregir un importe mal cargado, sin resolución: rige desde hoy.
+     */
+    public function correct(CorrectFineAmountRequest $request, Fine $fine, AdjustFineDebt $ajustar): RedirectResponse
+    {
+        $ajustar->handle(
+            $fine,
+            (string) $request->validated('newAmount'),
+            (string) $request->validated('expectedAmount'),
+            BusinessDate::today(),
+            null,
+            Reason::fromValidated($request->validated(), FineReasonAct::AmountCorrection) ?? throw new LogicException('El motivo de la corrección ya se validó.'),
+            $request->user()?->id,
+        );
+
+        Toast::success('Importe corregido.');
+
+        return to_route('multas.show', $fine->showParameters());
+    }
+
     public function reverse(ReasonRequest $request, FineDebtEntry $entry, ReverseFineDebtEntry $revertir): RedirectResponse
     {
+        // Deshacer una corrección del importe es de quien puede corregirlo.
+        if ($entry->isAmountCorrection()) {
+            Gate::authorize('multas.corregir-importe');
+        }
+
         $revertir->handle($entry, $request->reason(), $request->user()?->id);
 
         Toast::success('Ajuste revertido.');

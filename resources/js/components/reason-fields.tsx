@@ -14,7 +14,7 @@ type Opcion = { value: string; label: string };
 
 /**
  * El motivo de un acto: se elige de la lista y el detalle es opcional, salvo
- * con «Otro».
+ * con «Otro» o cuando el acto lo exige siempre.
  *
  * La lista la manda el servidor en la prop `motivos`, por acto: es la misma
  * que valida el Form Request y la que acepta la base (`Reason`). Cada módulo
@@ -31,6 +31,7 @@ export default function ReasonFields<A extends string, C extends string>({
     idPrefix = 'motivo',
     hint,
     detailPlaceholder,
+    detailRequired = false,
     maxLength = 500,
 }: {
     act: A;
@@ -44,6 +45,8 @@ export default function ReasonFields<A extends string, C extends string>({
     /** Cuándo hace falta, si no siempre: «si corregís un dato ya cargado». */
     hint?: string;
     detailPlaceholder?: string;
+    /** Cuando el acto no tiene otro respaldo que el detalle, no es opcional. */
+    detailRequired?: boolean;
     /** El largo de la columna del detalle. */
     maxLength?: number;
 }) {
@@ -94,7 +97,11 @@ export default function ReasonFields<A extends string, C extends string>({
                 <Label htmlFor={`${idPrefix}-detalle`}>
                     Detalle
                     <span className="ml-1 font-normal text-muted-foreground">
-                        {otro ? '(contá el motivo)' : '(opcional)'}
+                        {detailRequired
+                            ? '(obligatorio)'
+                            : otro
+                              ? '(contá el motivo)'
+                              : '(opcional)'}
                     </span>
                 </Label>
                 <Textarea

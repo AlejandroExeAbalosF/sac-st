@@ -10,8 +10,9 @@ use App\Support\BusinessDate;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Un ajuste de la obligación: aumento o reducción, con la resolución que lo
- * dispone —ya cargada o nueva— y el motivo.
+ * Un ajuste de la obligación por resolución: el importe nuevo, el que se veía
+ * al cargarlo, la resolución que lo dispone —ya cargada o nueva— y el motivo.
+ * Si es aumento o reducción lo deduce el Action.
  */
 final class AdjustFineDebtRequest extends FormRequest
 {
@@ -23,14 +24,27 @@ final class AdjustFineDebtRequest extends FormRequest
         $hoy = BusinessDate::today()->toDateString();
 
         return [
-            'kind' => ['required', 'in:increase,reduction'],
-            'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2', 'max:99999999999999999'],
+            ...self::importes(),
             'effectiveOn' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
             'documentId' => ['nullable', 'integer'],
             'document' => ['nullable', 'array'],
             'document.text' => ['required_without:documentId', 'nullable', 'string', 'max:120'],
             'document.issuedOn' => ['required_without:documentId', 'nullable', 'date_format:Y-m-d', 'before_or_equal:'.$hoy],
             ...Reason::rules(FineReasonAct::Adjustment),
+        ];
+    }
+
+    /**
+     * El importe nuevo y el vigente que vio el formulario: los comparte con la
+     * corrección del importe.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function importes(): array
+    {
+        return [
+            'newAmount' => ['required', 'numeric', 'gte:0', 'decimal:0,2', 'max:99999999999999999'],
+            'expectedAmount' => ['required', 'numeric', 'gte:0', 'decimal:0,2'],
         ];
     }
 
@@ -48,8 +62,7 @@ final class AdjustFineDebtRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'kind' => 'tipo de ajuste',
-            'amount' => 'importe',
+            'newAmount' => 'nuevo importe',
             'effectiveOn' => 'fecha',
             'documentId' => 'resolución',
             'document.text' => 'resolución',

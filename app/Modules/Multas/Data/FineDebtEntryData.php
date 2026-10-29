@@ -27,6 +27,8 @@ final class FineDebtEntryData extends Data
         public string $effectiveOn,
         public DatePrecision $effectivePrecision,
         public ?string $documentLabel,
+        /** Un aumento o una reducción sin resolución: corrige un importe mal cargado. */
+        public bool $isCorrection,
         public ?string $reason,
         public ?int $reversalOfId,
         /** El id de la reversión que lo deshizo, si la hubo. */
@@ -49,6 +51,7 @@ final class FineDebtEntryData extends Data
             effectiveOn: PartialDate::fromStored($movimiento->effective_on?->toDateString(), $movimiento->effective_precision)->toInput(),
             effectivePrecision: $movimiento->effective_precision,
             documentLabel: $movimiento->document?->label(),
+            isCorrection: $movimiento->isAmountCorrection(),
             reason: Reason::text($movimiento->reason_code, $movimiento->reason),
             reversalOfId: $movimiento->reversal_of_id,
             reversedById: $movimiento->reversedBy?->id,

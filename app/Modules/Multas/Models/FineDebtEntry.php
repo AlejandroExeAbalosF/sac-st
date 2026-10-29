@@ -73,6 +73,16 @@ final class FineDebtEntry extends Model
     }
 
     /**
+     * Un aumento o una reducción sin resolución: la corrección de un importe
+     * mal cargado. La base exige que lleve el motivo de su propia lista.
+     */
+    public function isAmountCorrection(): bool
+    {
+        return in_array($this->kind, [FineDebtEntryKind::Increase, FineDebtEntryKind::Reduction], true)
+            && $this->fine_document_id === null;
+    }
+
+    /**
      * @return BelongsTo<Fine, $this>
      */
     public function fine(): BelongsTo
