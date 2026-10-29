@@ -50,7 +50,13 @@ import {
     TIMELINESS,
     partialDate,
 } from '@/features/multas/labels';
-import { date, dateTime, isNonZero, sumAmounts } from '@/lib/format';
+import {
+    date,
+    dateTime,
+    isNonZero,
+    subtractAmounts,
+    sumAmounts,
+} from '@/lib/format';
 import { store as attachToFine } from '@/routes/multas/adjuntos';
 import { reverse } from '@/routes/multas/ajustes';
 import { store as attachToMovement } from '@/routes/multas/antecedentes/adjuntos';
@@ -162,6 +168,7 @@ export default function MultaShow({
         precision: App.Modules.Multas.Enums.DatePrecision,
     ): boolean => can.adjust || (can.register && precision !== 'day');
     const estado = DEBT_STATUS[multa.balance.status];
+    const vigentes = vigenteTrasCadaMovimiento(multa.debtEntries);
     const pagado = multa.balance.paid;
 
     return (
@@ -559,6 +566,12 @@ export default function MultaShow({
                                     </th>
                                     <th
                                         scope="col"
+                                        className="py-2 pr-5 text-right font-medium"
+                                    >
+                                        Vigente
+                                    </th>
+                                    <th
+                                        scope="col"
                                         className="py-2 pr-5 font-medium"
                                     >
                                         Cargado
@@ -574,14 +587,10 @@ export default function MultaShow({
                                 {multa.debtEntries.map((movimiento) => {
                                     const revertido =
                                         movimiento.reversedById !== null;
-                                    const resta =
-                                        movimiento.kind === 'reduction' ||
-                                        (movimiento.kind === 'reversal' &&
-                                            multa.debtEntries.find(
-                                                (m) =>
-                                                    m.id ===
-                                                    movimiento.reversalOfId,
-                                            )?.kind === 'increase');
+                                    const resta = restaDeLaObligacion(
+                                        movimiento,
+                                        multa.debtEntries,
+                                    );
 
                                     return (
                                         <tr
@@ -625,9 +634,20 @@ export default function MultaShow({
                                                 )}
                                             </td>
                                             <td className="py-2.5 pr-5 text-right whitespace-nowrap">
-                                                {resta && '− '}
+                                                {movimiento.kind !==
+                                                    'constitution' &&
+                                                    (resta ? '− ' : '+ ')}
                                                 <Money
                                                     value={movimiento.amount}
+                                                />
+                                            </td>
+                                            <td className="py-2.5 pr-5 text-right font-medium whitespace-nowrap">
+                                                <Money
+                                                    value={
+                                                        vigentes.get(
+                                                            movimiento.id,
+                                                        ) ?? '0.00'
+                                                    }
                                                 />
                                             </td>
                                             <td className="py-2.5 pr-5 text-xs text-muted-foreground">
@@ -1381,4 +1401,41 @@ function Encabezado({
             {children}
         </div>
     );
+}
+
+/**
+ * Si el movimiento baja la obligación: una reducción, o la reversión de un
+ * aumento.
+ */
+function restaDeLaObligacion(
+    movimiento: Movimiento,
+    movimientos: Movimiento[],
+): boolean {
+    return (
+        movimiento.kind === 'reduction' ||
+        (movimiento.kind === 'reversal' &&
+            movimientos.find((m) => m.id === movimiento.reversalOfId)?.kind ===
+                'increase')
+    );
+}
+
+/**
+ * El importe vigente después de cada movimiento, en el orden en que se
+ * cargaron. La fila dice cuánto sumó o restó; esto, cómo quedó la multa. El
+ * último es el «Importe vigente» de arriba.
+ */
+function vigenteTrasCadaMovimiento(
+    movimientos: Movimiento[],
+): Map<number, string> {
+    const vigentes = new Map<number, string>();
+    let vigente = '0.00';
+
+    for (const movimiento of movimientos) {
+        vigente = restaDeLaObligacion(movimiento, movimientos)
+            ? subtractAmounts(vigente, movimiento.amount)
+            : sumAmounts([vigente, movimiento.amount]);
+        vigentes.set(movimiento.id, vigente);
+    }
+
+    return vigentes;
 }

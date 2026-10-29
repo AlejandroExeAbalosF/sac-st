@@ -175,7 +175,10 @@ saldo y estado. Abajo:
   archivo, y un motivo. El importe no cambia; la vieja queda desvinculada como
   origen.
 - **Obligación**: el importe original y cada ajuste, con su resolución, su fecha,
-  su motivo y quién lo cargó. Un ajuste revertido queda tachado.
+  su motivo y quién lo cargó. «Importe» es lo que cada fila sumó o restó, con su
+  signo; «Vigente», cómo quedó la multa después de esa fila, en el orden de carga.
+  El último vigente es el importe vigente de arriba. Un ajuste revertido queda
+  tachado.
 - **Archivos de la multa**: los de la multa y, debajo, los del expediente.
 - **Pagos**: los del sistema, con su medio, su estado, su recibo, si fue el
   cancelatorio, si se presentó en término, su comprobante y, si sobró, cuánto
