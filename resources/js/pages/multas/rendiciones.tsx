@@ -66,11 +66,12 @@ function nombreDelMes(mes: string): string {
 /**
  * La rendición mensual de Multas a la SAF (P02).
  *
- * Por cada mes cerrado, sus dos notas: los ingresos acreditados en el mes y
- * reconocidos antes del cierre (en término), y los reconocidos en el mes con
- * una acreditación de un mes ya cerrado (fuera de término). Se emiten una
- * vez por cierre y quedan guardadas; si el mes se reabre y se vuelve a
- * cerrar, sale una versión nueva y la anterior se conserva.
+ * Por cada mes cerrado, sus dos notas: los ingresos acreditados y
+ * reconocidos en el mes (en término), y los reconocidos en el mes con una
+ * acreditación de un mes anterior (fuera de término). El corte es el fin del
+ * mes, no su cierre. Se emiten una vez por cierre y quedan guardadas; si el
+ * mes se reabre y se vuelve a cerrar, sale una versión nueva y la anterior
+ * se conserva.
  */
 export default function Rendiciones({
     months,

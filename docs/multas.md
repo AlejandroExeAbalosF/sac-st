@@ -367,8 +367,8 @@ verificado— ni lo que respalda un pago anterior vigente.
 
 - **Alguien lo informó**: la cola ofrece primero los pagos informados del mismo
   importe. Se verifica ese pago, que conserva su presentación —la que decide el
-  término— y su respaldo. Un pago presentado el 29/09 e identificado el 02/10, con
-  septiembre cerrado el 30/09, queda en término.
+  término— y su respaldo. Un pago de una multa de septiembre presentado el 29/09 e
+  identificado el 02/10 queda en término: cuenta la presentación, no la carga.
 - **Nadie lo informó**: se busca la multa por expediente, resolución, acta o
   carátula y se registra el pago verificado, presentado ese día.
 
@@ -394,20 +394,18 @@ el total es la última fila y nunca queda solo en una hoja, y cada hoja lleva
   movimiento; un cobro de la caja, por la acreditación de su depósito (cobrado el
   04/09 y acreditado el 11/09 figura el 11/09). Lo que no se acreditó todavía no
   entra en ninguna.
-- **En término (mes M):** acreditado en M y reconocido —con su recibo y su
-  acreditación— antes del cierre mensual de M.
-- **Fuera de término (mes M):** reconocido mientras M estaba abierto, con una
-  acreditación de un mes que ya estaba cerrado o anterior a la apertura de la caja.
-  Un crédito del 30/09 identificado el 02/10, con septiembre cerrado el 05/10, va en
-  término en septiembre; identificado el 06/10, fuera de término en octubre. **Cada
-  pago va a un solo informe**, y lo tardío nunca cambia uno ya emitido.
-- **«Antes del cierre» no se mide con el reloj.** `closed_at` y `created_at` se
-  guardan al segundo, y lo identificado en el mismo segundo que el cierre no se
-  distinguiría. El reconocimiento es un asiento de la caja de Multas, y la base anota
-  en la evidencia de cada versión del cierre el último asiento de la caja que vio
-  (`period_closing_evidence.covers_through_event_id`, por trigger). Como los asientos
-  de una caja y su cierre toman el mismo candado, entra en el mes lo que tiene un
-  asiento menor o igual a esa marca.
+- **Reconocido** es el día en que el sistema da por cobrado el pago contra la
+  cuenta: la verificación de un pago por banco, o el más tardío entre el cobro en
+  caja y la confirmación de la acreditación de su depósito. Es la fecha del asiento,
+  que siempre es la del día en que se carga.
+- **En término (mes M):** acreditado y reconocido en M.
+- **Fuera de término (mes M):** reconocido en M, con una acreditación de un mes
+  anterior.
+- **El corte es el fin del mes calendario, no su cierre manual** (decisión del
+  usuario, 29/10/2026). Un crédito del 29/10 reconocido el 29/10 va en término en
+  octubre; reconocido el 02/11, fuera de término en noviembre, aunque octubre
+  siguiera sin cerrar. **Cada pago va a un solo informe**, y como un mes cerrado no
+  admite asientos con su fecha, lo emitido no cambia.
 - Se emite con el mes cerrado (`multas.rendicion.emitir`) y queda **congelado**:
   pedirla de nuevo devuelve la misma. Reabrir y volver a cerrar el mes produce otra
   versión; la anterior se conserva. La base exige el cierre mensual vigente y
@@ -477,8 +475,9 @@ Lo que cambia respecto de Haberes:
   expediente, carátula y librador ([rechazo](#rechazo) para los renglones del
   cheque rechazado y su reemplazo). La copia firmada no bloquea el cierre (M10).
 
-Con el cierre mensual, el término de un pago (M08) se juzga contra él y queda
-guardado con la evidencia del cierre: reabrir el mes no reclasifica lo ya juzgado.
+El cierre mensual es de la caja —arqueos, días cerrados, totales congelados— y no
+decide el término de un pago (M08) ni la rendición: los dos se cortan en el último día
+del mes.
 Inicio lista los días y los meses de Multas sin cerrar a quien puede cerrarlos.
 
 ---
@@ -517,11 +516,11 @@ cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
   código, así que lo que se mira es lo que se imprime. El número que muestra es un
   anticipo: el definitivo se toma al emitir, y si entretanto se emite otro recibo
   de Multas, le toca el siguiente.
-- **Término** (M08): el pago se juzga contra el cierre mensual de la caja de
-  Multas del mes en que se registró la multa. Sin cierre todavía, en término;
-  presentado después del cierre, fuera de término; sin fecha de registro, o
-  presentado el mismo día del cierre cuando solo se sabe el día, queda «a
-  revisar». Se calcula una vez y no cambia si el mes se reabre.
+- **Término** (M08): en término si el comprobante se **presentó** hasta el
+  último día del mes en que se registró la multa; después, fuera de término, se
+  haya cerrado la caja o no (decisión del usuario, 29/10/2026). Sin fecha de
+  registro o sin fecha de presentación queda «a revisar». Se calcula una vez, al
+  aplicar el pago, y se guarda con el día contra el que se juzgó.
 
 Un ajuste de la obligación, su reversión o validar un pago anterior pueden
 cambiar cuánto de lo ya cobrado es excedente: el sistema lo reclasifica en el mismo
@@ -639,8 +638,8 @@ un cheque electrónico** (M02):
   crédito deja de estar en la cola de la caja.
 - **Reconocerlo del extracto**: quien concilia puede marcar «el crédito ya está en
   el extracto» y hacer las dos cosas en un acto, por el importe del crédito. La
-  presentación es ese momento: identificar después del cierre del mes de la multa
-  es fuera de término (M08).
+  presentación es ese momento: identificar después del último día del mes de la
+  multa es fuera de término (M08).
 - **Corregir** (quien informa): un informado mal cargado —el importe, el medio, la
   fecha de pago— se reemplaza por otro. El anterior queda descartado con el motivo,
   y el corregido conserva la misma presentación: la fecha de presentación no se

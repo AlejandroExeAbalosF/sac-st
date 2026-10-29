@@ -7,8 +7,8 @@ namespace App\Modules\Multas\Enums;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
- * Si el comprobante se presentó antes o después del cierre del mes en que
- * se registró la multa (M08). Se calcula una vez, al aplicar el pago.
+ * Si el comprobante se presentó dentro del mes en que se registró la multa
+ * o después de su último día (M08). Se calcula una vez, al aplicar el pago.
  */
 #[TypeScript]
 enum FineTimeliness: string

@@ -113,8 +113,7 @@ final class ApplyFinePayment
             'applied_amount' => $aplicado,
             'excess_amount' => $excedente,
             'timeliness' => $termino['timeliness'],
-            'origin_closing_evidence_id' => $termino['evidenceId'],
-            'origin_closed_at' => $termino['closedAt'],
+            'term_ends_on' => $termino['termEndsOn']?->toDateString(),
             'applied_by' => $actorId,
         ]);
 

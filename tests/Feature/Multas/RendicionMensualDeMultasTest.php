@@ -31,9 +31,10 @@ use Tests\TestCase;
 /**
  * La rendición mensual de Multas a la SAF (P02, Etapa 8), con el escenario de
  * las notas de septiembre de 2026 corrido un mes —la base exige que el mes
- * haya terminado según su propio reloj—: lo acreditado en el mes y reconocido antes
- * del cierre va en término; lo reconocido en el mes con una acreditación de un
- * mes ya cerrado, fuera de término. Cada pago, en un solo informe.
+ * haya terminado según su propio reloj—: lo acreditado y reconocido en el mes va
+ * en término; lo reconocido en el mes con una acreditación de un mes anterior,
+ * fuera de término. El corte es el fin del mes, no su cierre manual. Cada pago,
+ * en un solo informe.
  */
 class RendicionMensualDeMultasTest extends TestCase
 {
@@ -44,7 +45,7 @@ class RendicionMensualDeMultasTest extends TestCase
 
     private Fine $multa;
 
-    public function test_each_payment_lands_in_one_report_by_its_credit_and_the_closing(): void
+    public function test_each_payment_lands_in_one_report_by_its_credit_and_its_recognition(): void
     {
         $this->escenario();
 
@@ -69,7 +70,8 @@ class RendicionMensualDeMultasTest extends TestCase
             'bankTransactionId' => $credito->id, 'idempotencyKey' => (string) Str::uuid(),
         ])->assertSessionHasNoErrors();
 
-        // Fin de agosto: dos créditos; uno se reconoce antes del cierre y otro después.
+        // Fin de agosto: dos créditos que se reconocen en septiembre, uno con agosto
+        // todavía abierto y otro ya cerrado. Los dos pasan a septiembre.
         $antes = $this->movimiento($this->laCuenta, '2026-08-31', '9000.00');
         $despues = $this->movimiento($this->laCuenta, '2026-08-29', '7000.00');
 
@@ -85,11 +87,8 @@ class RendicionMensualDeMultasTest extends TestCase
 
         $rendicion = app(EmitFineMonthlyReport::class)->handle($agostoCerrado, $this->quienAbre());
 
-        expect($this->filas($rendicion['on_time']))->toBe([
-            ['2026-08-11', 'CC', '4200.00'],
-            ['2026-08-31', 'Trans.', '9000.00'],
-        ])
-            ->and($rendicion['on_time']->total)->toBe('13200.00')
+        expect($this->filas($rendicion['on_time']))->toBe([['2026-08-11', 'CC', '4200.00']])
+            ->and($rendicion['on_time']->total)->toBe('4200.00')
             ->and($this->filas($rendicion['late']))->toBe([['2026-07-28', 'Trans.', '13000.00']])
             ->and($rendicion['on_time']->payload[0]['caption'])->toBe('CRISTOMAX S.A.S')
             ->and($rendicion['on_time']->attachment_id)->not->toBeNull();
@@ -99,7 +98,7 @@ class RendicionMensualDeMultasTest extends TestCase
         expect($otra['on_time']->id)->toBe($rendicion['on_time']->id)
             ->and(FineMonthlyReport::query()->count())->toBe(2);
 
-        // Septiembre: el crédito del 29/08 reconocido después del cierre de agosto va fuera de término.
+        // Septiembre: los dos créditos de agosto reconocidos en septiembre van fuera de término.
         $this->el('2026-10-02');
         foreach (['2026-09-02', '2026-09-06'] as $dia) {
             $this->cerrar($dia, PeriodType::Daily);
@@ -107,7 +106,10 @@ class RendicionMensualDeMultasTest extends TestCase
         $septiembreRendido = app(EmitFineMonthlyReport::class)->handle($this->cerrar('2026-09-30', PeriodType::Monthly), $this->quienAbre());
 
         expect($this->filas($septiembreRendido['on_time']))->toBe([])
-            ->and($this->filas($septiembreRendido['late']))->toBe([['2026-08-29', 'Trans.', '7000.00']]);
+            ->and($this->filas($septiembreRendido['late']))->toBe([
+                ['2026-08-29', 'Trans.', '7000.00'],
+                ['2026-08-31', 'Trans.', '9000.00'],
+            ]);
 
         // Ningún pago figura en dos informes.
         $todas = collect([$rendicion['on_time'], $rendicion['late'], $septiembreRendido['on_time'], $septiembreRendido['late']])
@@ -123,28 +125,34 @@ class RendicionMensualDeMultasTest extends TestCase
     }
 
     /**
-     * El cierre y los reconocimientos se guardan al segundo: comparar horas
-     * no distingue lo identificado justo antes del cierre de lo identificado
-     * justo después. Con el reloj quieto, el orden lo da el asiento.
+     * El corte es el último día del mes: lo reconocido el 31/08 va en término
+     * aunque agosto se cierre días después, y lo reconocido el 01/09 ya es de
+     * septiembre aunque agosto siguiera abierto.
      */
-    public function test_what_is_recognized_after_the_closing_stays_out_even_in_the_same_second(): void
+    public function test_the_cut_is_the_end_of_the_month_not_its_closing(): void
     {
         $this->escenario();
-        $antes = $this->movimiento($this->laCuenta, '2026-08-20', '9000.00');
-        $despues = $this->movimiento($this->laCuenta, '2026-08-21', '7000.00');
+        $ultimoDia = $this->movimiento($this->laCuenta, '2026-08-20', '9000.00');
+        $alOtroDia = $this->movimiento($this->laCuenta, '2026-08-21', '7000.00');
+
+        $this->el('2026-08-31');
+        $this->identificar($ultimoDia);
+        $this->el('2026-09-01');
+        $this->identificar($alOtroDia);
 
         $this->el('2026-09-05');
-        $this->identificar($antes);
         $this->cerrar('2026-07-31', PeriodType::Monthly);
-        $marca = DB::table('financial_events')->where('cash_box_id', $this->cajaDe(CashBox::MULTAS))->max('id');
-        $agosto = $this->cerrar('2026-08-31', PeriodType::Monthly);
-        $this->identificar($despues);
+        $this->cerrar('2026-08-31', PeriodType::Daily);
+        $agosto = app(EmitFineMonthlyReport::class)->handle($this->cerrar('2026-08-31', PeriodType::Monthly), $this->quienAbre());
 
-        $rendicion = app(EmitFineMonthlyReport::class)->handle($agosto, $this->quienAbre());
+        $this->el('2026-10-01');
+        $this->cerrar('2026-09-01', PeriodType::Daily);
+        $septiembre = app(EmitFineMonthlyReport::class)->handle($this->cerrar('2026-09-30', PeriodType::Monthly), $this->quienAbre());
 
-        expect(DB::table('period_closing_evidence')->where('period_closing_id', $agosto->id)->value('covers_through_event_id'))->toBe($marca)
-            ->and($this->filas($rendicion['on_time']))->toBe([['2026-08-20', 'Trans.', '9000.00']])
-            ->and($this->filas($rendicion['late']))->toBe([]);
+        expect($this->filas($agosto['on_time']))->toBe([['2026-08-20', 'Trans.', '9000.00']])
+            ->and($this->filas($agosto['late']))->toBe([])
+            ->and($this->filas($septiembre['on_time']))->toBe([])
+            ->and($this->filas($septiembre['late']))->toBe([['2026-08-21', 'Trans.', '7000.00']]);
     }
 
     /** Reabrir y volver a cerrar el mes da otra versión; la anterior queda. */

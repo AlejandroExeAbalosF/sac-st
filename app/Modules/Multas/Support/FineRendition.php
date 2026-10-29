@@ -19,18 +19,18 @@ use Illuminate\Support\Facades\DB;
  * acreditación de su depósito —lo cobrado el 04/09 y acreditado el 11/09
  * figura el 11/09—. Un cobro que todavía no se acreditó no entra en ninguna.
  *
- * Cada pago va a **un solo informe**: el del primer mes, desde el de su
- * acreditación, cuyo cierre mensual es posterior a su reconocimiento —el
- * más tardío entre la emisión del recibo y la confirmación del crédito—.
- * «Posterior» no se mide con el reloj, que se guarda al segundo: el
- * reconocimiento es un asiento de la caja, y la evidencia del cierre anota
- * el último asiento de la caja que vio (`covers_through_event_id`).
- * Si es el mismo mes de la acreditación, va **en término**; si es uno
- * posterior, **fuera de término** en ese mes (decisión del usuario,
- * 28/10/2026). Un crédito del 30/09 reconocido el 02/10 con septiembre
- * cerrado el 05/10 va en término en septiembre; reconocido el 06/10, fuera
- * de término en octubre. Lo que llega tarde nunca altera un informe ya
- * emitido: cae en el siguiente.
+ * Cada pago va a **un solo informe**: el del mes de su **reconocimiento**,
+ * la fecha del asiento que lo da por cobrado contra la cuenta —la
+ * verificación del pago por banco, o el más tardío entre el cobro en caja y
+ * la confirmación de la acreditación de su depósito—. Si se acreditó ese
+ * mismo mes, va **en término**; si se acreditó antes, **fuera de término**.
+ *
+ * El corte es el **fin del mes calendario**, no su cierre manual (decisión
+ * del usuario, 29/10/2026): un crédito del 29/10 reconocido el 29/10 va en
+ * término en octubre; reconocido el 02/11, fuera de término en noviembre,
+ * aunque octubre siguiera sin cerrar. Los asientos llevan la fecha del día
+ * en que se cargan y un mes cerrado no admite asientos con su fecha, así que
+ * lo emitido no cambia.
  *
  * @phpstan-type Fila array{date: string, origin: string, voucher: string, caption: string, caseLabel: string, amount: numeric-string, receipt: string, rejected: bool}
  */
@@ -44,26 +44,12 @@ final class FineRendition
     public function rows(PeriodClosing $closing, string $kind): array
     {
         $mes = $closing->period_from->startOfMonth();
-        $cierres = $this->monthlyClosings((int) $closing->cash_box_id);
-        $hasta = $cierres[$mes->format('Y-m')] ?? null;
-
-        if ($hasta === null) {
-            return [];
-        }
-
         $filas = [];
 
-        foreach ($this->candidates($mes, $hasta) as $pago) {
+        foreach ($this->recognizedIn($mes) as $pago) {
             $texto = fn (string $columna): string => is_scalar($pago[$columna] ?? null) ? (string) $pago[$columna] : '';
             $acreditado = CarbonImmutable::parse($texto('credited_on'));
-            $reconocido = (int) $texto('recognized_by');
-            $destino = $this->reportMonth($acreditado, $reconocido, $cierres);
-
-            if ($destino !== $mes->format('Y-m')) {
-                continue;
-            }
-
-            $enTermino = $acreditado->format('Y-m') === $destino;
+            $enTermino = $acreditado->format('Y-m') === $mes->format('Y-m');
 
             if ($enTermino !== ($kind === FineMonthlyReport::ON_TIME)) {
                 continue;
@@ -87,57 +73,15 @@ final class FineRendition
     }
 
     /**
-     * El primer mes, desde el de la acreditación, cuyo cierre vio el asiento
-     * del reconocimiento. Un mes sin cierre —anterior a la apertura, o
-     * reabierto— no recibe a nadie: el pago pasa al siguiente cerrado.
-     *
-     * @param  array<string, int>  $cierres
-     */
-    private function reportMonth(CarbonImmutable $acreditado, int $reconocido, array $cierres): ?string
-    {
-        foreach ($cierres as $mes => $vioHasta) {
-            if ($mes >= $acreditado->format('Y-m') && $reconocido <= $vioHasta) {
-                return $mes;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Los cierres mensuales cerrados de la caja, por mes `AAAA-MM`, en orden,
-     * con el último asiento que vio la evidencia de su versión vigente.
-     *
-     * @return array<string, int>
-     */
-    private function monthlyClosings(int $cashBoxId): array
-    {
-        return DB::table('period_closings AS cierre')
-            ->join('period_closing_evidence AS evidencia', function ($join): void {
-                $join->on('evidencia.period_closing_id', '=', 'cierre.id')
-                    ->on('evidencia.version', '=', 'cierre.evidence_version');
-            })
-            ->where('cierre.cash_box_id', $cashBoxId)
-            ->where('cierre.period_type', 'monthly')
-            ->where('cierre.status', 'closed')
-            ->orderBy('cierre.period_from')
-            ->get(['cierre.period_from', 'evidencia.covers_through_event_id'])
-            ->mapWithKeys(fn (object $c): array => [
-                CarbonImmutable::parse(is_string($c->period_from) ? $c->period_from : '')->format('Y-m') => is_numeric($c->covers_through_event_id) ? (int) $c->covers_through_event_id : 0,
-            ])
-            ->all();
-    }
-
-    /**
-     * Los pagos aplicados que pueden caer en el informe de ese mes: los
-     * acreditados hasta fin de mes y reconocidos hasta su cierre —el último
-     * asiento que vio—. Cuál de ellos cae acá lo decide `reportMonth`.
+     * Los pagos aplicados reconocidos dentro del mes, acreditados ese mes o
+     * antes.
      *
      * @return list<array<string, mixed>>
      */
-    private function candidates(CarbonImmutable $mes, int $hasta): array
+    private function recognizedIn(CarbonImmutable $mes): array
     {
-        $fin = $mes->endOfMonth()->toDateString();
+        $desde = $mes->toDateString();
+        $hasta = $mes->endOfMonth()->toDateString();
 
         // Pagos por banco: el movimiento del extracto que respalda la recepción.
         $banco = DB::table('fine_payment_applications AS aplicacion')
@@ -152,11 +96,11 @@ final class FineRendition
             ->leftJoin('fine_payment_receipts AS papel', 'papel.fine_payment_id', '=', 'pago.id')
             ->leftJoin('receipts AS recibo', 'recibo.id', '=', 'papel.receipt_id')
             ->whereNotIn('pago.medium', ['cash', 'cheque'])
-            ->where('movimiento.transaction_date', '<=', $fin)
-            ->where('aplicada.id', '<=', $hasta)
+            ->where('movimiento.transaction_date', '<=', $hasta)
+            ->whereBetween('aplicada.event_date', [$desde, $hasta])
             ->select([
                 'pago.medium', 'aplicacion.amount', 'movimiento.transaction_date AS credited_on',
-                'aplicada.id AS recognized_by', 'movimiento.operation_id AS voucher',
+                'movimiento.operation_id AS voucher',
             ])
             ->selectRaw('FALSE AS rejected');
 
@@ -175,12 +119,11 @@ final class FineRendition
             ->leftJoin('fine_payment_receipts AS papel', 'papel.fine_payment_id', '=', 'pago.id')
             ->leftJoin('receipts AS recibo', 'recibo.id', '=', 'papel.receipt_id')
             ->where('traslado.status', 'bank_confirmed')
-            ->where('movimiento.transaction_date', '<=', $fin)
-            ->whereRaw('GREATEST(aplicada.id, acreditada.id) <= ?', [$hasta])
+            ->where('movimiento.transaction_date', '<=', $hasta)
+            ->whereRaw('GREATEST(aplicada.event_date, acreditada.event_date) BETWEEN ? AND ?', [$desde, $hasta])
             ->select([
                 'pago.medium', 'aplicacion.amount', 'movimiento.transaction_date AS credited_on',
             ])
-            ->selectRaw('GREATEST(aplicada.id, acreditada.id) AS recognized_by')
             ->selectRaw('COALESCE(traslado.deposit_operation_number, movimiento.operation_id) AS voucher')
             // El cheque acreditado que el banco después rechazó: se acreditó, y se marca.
             ->selectRaw('EXISTS (SELECT 1 FROM cheque_rejections r WHERE r.fund_receipt_id = item.fund_receipt_id) AS rejected');

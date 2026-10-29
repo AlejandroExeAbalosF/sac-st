@@ -432,13 +432,13 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 
 ## Término
 
-- Se juzga al aplicar contra el cierre **mensual** de la caja de Multas, en la
-  moneda de la multa, del mes de `fines.registered_on`, y se guarda con la versión
-  de `period_closing_evidence` y el instante de cierre. **Action**
-  (`FinePaymentTimeliness`); la base exige la evidencia para `late`.
-- Sin cierre cerrado de ese mes (incluido uno reabierto), `on_time`; sin fecha de
-  registro, sin presentación, cierre sin evidencia o, con precisión de día, el
-  mismo día del cierre: `undetermined`.
+- Se juzga al aplicar: `on_time` si la presentación, en el día de Salta, es
+  hasta el último día del mes de `fines.registered_on`; si no, `late`. El cierre
+  mensual no interviene (decisión del usuario, 29/10/2026). **Action**
+  (`FinePaymentTimeliness`).
+- Sin fecha de registro o sin presentación: `undetermined`.
+- Se guarda el día contra el que se juzgó (`term_ends_on`). **Base:**
+  `fine_payment_applications_timeliness_check` lo exige salvo en `undetermined`.
 
 <a id="recibo"></a>
 

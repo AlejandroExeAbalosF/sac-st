@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  * Es el caso habitual: el área lee el extracto, reconoce la transferencia y
  * emite el recibo. Se informa y se verifica en el mismo acto, por el importe
  * del crédito; la presentación es este momento, así que una identificación
- * posterior al cierre del mes de la multa queda fuera de término.
+ * posterior al último día del mes de la multa queda fuera de término.
  */
 final class RecordVerifiedFineBankPayment
 {

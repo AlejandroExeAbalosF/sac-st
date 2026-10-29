@@ -26,8 +26,7 @@ use Illuminate\Support\Carbon;
  * @property numeric-string $applied_amount
  * @property numeric-string $excess_amount
  * @property FineTimeliness $timeliness
- * @property int|null $origin_closing_evidence_id
- * @property Carbon|null $origin_closed_at
+ * @property Carbon|null $term_ends_on
  * @property int|null $applied_by
  * @property Carbon $applied_at
  * @property-read FundReceipt $fundReceipt
@@ -48,8 +47,7 @@ final class FinePaymentApplication extends Model
         'applied_amount',
         'excess_amount',
         'timeliness',
-        'origin_closing_evidence_id',
-        'origin_closed_at',
+        'term_ends_on',
         'applied_by',
         'applied_at',
     ];
@@ -64,7 +62,7 @@ final class FinePaymentApplication extends Model
             'applied_amount' => 'decimal:2',
             'excess_amount' => 'decimal:2',
             'timeliness' => FineTimeliness::class,
-            'origin_closed_at' => 'datetime',
+            'term_ends_on' => 'date',
             'applied_at' => 'datetime',
         ];
     }

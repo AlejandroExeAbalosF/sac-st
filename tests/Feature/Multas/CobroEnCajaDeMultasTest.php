@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Multas;
 
-use App\Models\User;
-use App\Modules\Ledger\Actions\ClosePeriod;
-use App\Modules\Ledger\Enums\Currency;
-use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Multas\Actions\CollectFinePayment;
 use App\Modules\Multas\Enums\DatePrecision;
 use App\Modules\Multas\Enums\FinePaymentMedium;
@@ -401,22 +397,22 @@ class CobroEnCajaDeMultasTest extends TestCase
 
     // ── El término ──────────────────────────────────────────────────────
 
-    public function test_a_payment_presented_after_the_month_closed_is_late(): void
+    /** Junio sigue sin cerrar: lo presentado después de su último día ya es tarde. */
+    public function test_a_payment_presented_after_the_registration_month_is_late_even_without_a_closing(): void
     {
         $multa = $this->escenario(registrada: '2026-06-05');
-        $this->cerrarJunio();
 
         $pago = $this->cobrar($multa, FinePaymentMedium::Cash, '1000.00');
         $aplicacion = $pago->application()->firstOrFail();
 
-        expect($aplicacion->timeliness)->toBe(FineTimeliness::Late)
-            ->and($aplicacion->origin_closing_evidence_id)->not->toBeNull()
-            ->and($aplicacion->origin_closed_at)->not->toBeNull();
+        expect(DB::table('period_closings')->where('period_type', 'monthly')->exists())->toBeFalse()
+            ->and($aplicacion->timeliness)->toBe(FineTimeliness::Late)
+            ->and($aplicacion->term_ends_on?->toDateString())->toBe('2026-06-30');
     }
 
-    public function test_without_a_closing_the_payment_is_on_time_and_without_a_date_it_is_reviewed(): void
+    public function test_within_the_registration_month_the_payment_is_on_time_and_without_a_date_it_is_reviewed(): void
     {
-        $multa = $this->escenario();
+        $multa = $this->escenario(registrada: BusinessDate::today()->toDateString());
 
         expect($this->cobrar($multa, FinePaymentMedium::Cash, '1000.00')->application()->firstOrFail()->timeliness)
             ->toBe(FineTimeliness::OnTime);
@@ -424,22 +420,45 @@ class CobroEnCajaDeMultasTest extends TestCase
         // Una multa importada sin fecha de registro no tiene período de origen.
         $sinFecha = $multa->replicate()->forceFill(['registered_on' => null, 'registered_precision' => DatePrecision::Unknown]);
 
-        expect(app(FinePaymentTimeliness::class)->judge($sinFecha, now(), PresentationPrecision::Instant)['timeliness'])
-            ->toBe(FineTimeliness::Undetermined);
+        expect(app(FinePaymentTimeliness::class)->judge($sinFecha, now(), PresentationPrecision::Instant))
+            ->toBe(['timeliness' => FineTimeliness::Undetermined, 'termEndsOn' => null]);
     }
 
-    /** Con solo el día de presentación, el mismo día del cierre no se decide solo (P-T1). */
-    public function test_a_presentation_on_the_closing_day_is_left_for_review(): void
+    /** El corte es el último día del mes, en la hora de Salta; con solo el día ya alcanza. */
+    public function test_the_term_ends_with_the_last_day_of_the_registration_month(): void
     {
         $multa = $this->escenario(registrada: '2026-06-05');
-        $this->cerrarJunio();
-        $cerrado = CarbonImmutable::parse((string) DB::table('period_closings')->where('period_type', 'monthly')->value('closed_at'));
         $juez = app(FinePaymentTimeliness::class);
+        $termino = fn (string $dia, PresentationPrecision $precision, int $segundos = 0): FineTimeliness => $juez
+            ->judge($multa, BusinessDate::startOfDay($dia)->addSeconds($segundos), $precision)['timeliness'];
 
-        expect($juez->judge($multa, $cerrado->subDay(), PresentationPrecision::Day)['timeliness'])->toBe(FineTimeliness::OnTime)
-            ->and($juez->judge($multa, $cerrado, PresentationPrecision::Day)['timeliness'])->toBe(FineTimeliness::Undetermined)
-            ->and($juez->judge($multa, $cerrado->subSecond(), PresentationPrecision::Instant)['timeliness'])->toBe(FineTimeliness::OnTime)
-            ->and($juez->judge($multa, $cerrado->addSecond(), PresentationPrecision::Instant)['timeliness'])->toBe(FineTimeliness::Late);
+        expect($termino('2026-06-30', PresentationPrecision::Day))->toBe(FineTimeliness::OnTime)
+            ->and($termino('2026-07-01', PresentationPrecision::Day))->toBe(FineTimeliness::Late)
+            ->and($termino('2026-06-30', PresentationPrecision::Instant, 86399))->toBe(FineTimeliness::OnTime)
+            ->and($termino('2026-07-01', PresentationPrecision::Instant))->toBe(FineTimeliness::Late)
+            ->and($juez->judge($multa, null, PresentationPrecision::Unknown)['timeliness'])->toBe(FineTimeliness::Undetermined);
+
+        // Registrada con solo el mes: el mes es lo que cuenta.
+        $soloMes = $multa->replicate()->forceFill(['registered_on' => '2026-06-01', 'registered_precision' => DatePrecision::Month]);
+        expect($juez->judge($soloMes, BusinessDate::startOfDay('2026-06-30'), PresentationPrecision::Day)['termEndsOn']?->toDateString())
+            ->toBe('2026-06-30');
+    }
+
+    /**
+     * Un término decidido cita el día contra el que se juzgó. Se apaga la
+     * guarda append-only para llegar al CHECK, que es lo que se prueba.
+     */
+    public function test_the_database_requires_the_term_day_of_a_decided_term(): void
+    {
+        $multa = $this->escenario(registrada: '2026-06-05');
+        $aplicacion = $this->cobrar($multa, FinePaymentMedium::Cash, '1000.00')->application()->firstOrFail();
+        // Con eventos diferidos pendientes del cobro, la tabla no se deja alterar.
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+
+        $this->rechaza('fine_payment_applications_timeliness_check', function () use ($aplicacion): void {
+            DB::statement('ALTER TABLE fine_payment_applications DISABLE TRIGGER fine_payment_applications_append_only');
+            DB::table('fine_payment_applications')->where('id', $aplicacion->id)->update(['term_ends_on' => null]);
+        });
     }
 
     // ── La base ─────────────────────────────────────────────────────────
@@ -581,21 +600,6 @@ class CobroEnCajaDeMultasTest extends TestCase
             'payer_name' => 'CRISTOMAX S.A.S', 'idempotency_key' => (string) Str::uuid(),
             'created_at' => $ahora, 'updated_at' => $ahora,
         ];
-    }
-
-    private function cerrarJunio(): void
-    {
-        $quien = User::query()->findOrFail($this->quienAbre());
-        $caja = $this->cajaDe(CashBox::MULTAS);
-
-        $this->arqueoListoParaCerrar($caja, '2026-06-30', $quien);
-        app(ClosePeriod::class)->handle(
-            cashBoxId: $caja,
-            date: CarbonImmutable::parse('2026-06-30'),
-            type: PeriodType::Monthly,
-            currency: Currency::Ars,
-            actorId: $quien->id,
-        );
     }
 
     private function saldo(Fine $multa, string $columna): string
