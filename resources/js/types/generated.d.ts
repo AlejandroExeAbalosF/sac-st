@@ -805,6 +805,28 @@ declare namespace App {
                     closingStatus: string | null;
                     href: string;
                 };
+                export type CashMonthDocumentData = {
+                    label: string;
+                    detail: string;
+                    total: string;
+                    version: number;
+                    current: boolean;
+                    emittedAt: string;
+                    emittedBy: string | null;
+                    viewUrl: string;
+                    downloadUrl: string;
+                };
+                export type CashMonthLinkData = {
+                    label: string;
+                    href: string;
+                };
+                export type CashMonthPanelData = {
+                    title: string;
+                    documents: App.Modules.Ledger.Data.CashMonthDocumentData[];
+                    emptyText: string | null;
+                    emit: App.Modules.Ledger.Data.CashMonthLinkData | null;
+                    links: App.Modules.Ledger.Data.CashMonthLinkData[];
+                };
                 export type MovementRowData = {
                     publicId: string;
                     typeLabel: string;
@@ -943,15 +965,6 @@ declare namespace App {
                     counterparty: string | null;
                     operationId: string | null;
                     ignored: boolean;
-                };
-                export type FineBankPanelData = {
-                    bankAccountId: number;
-                    bankAccountLabel: string;
-                    latestStatementBalance: string | null;
-                    latestStatementDate: string | null;
-                    bookBalance: string;
-                    unclassifiedCount: number;
-                    unclassifiedAmount: string;
                 };
                 export type FineCancelledDepositData = {
                     transferId: number;
@@ -1178,10 +1191,6 @@ declare namespace App {
                     reason: string;
                     revokedAt: string;
                     revokedByName: string | null;
-                };
-                export type FineUnidentifiedCreditData = {
-                    credit: App.Modules.Multas.Data.FineBankCreditData;
-                    reported: App.Modules.Multas.Data.FinePendingPaymentData[];
                 };
             }
             namespace Enums {

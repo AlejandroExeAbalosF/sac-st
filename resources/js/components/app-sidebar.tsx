@@ -17,7 +17,6 @@ import {
     Settings,
     ShieldCheck,
     Users,
-    Wallet,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -44,13 +43,10 @@ import { index as usuarios } from '@/routes/configuracion/usuarios';
 import { index as haberes } from '@/routes/expedientes';
 import { index as multas } from '@/routes/multas';
 import {
+    calendario as calendarioDeMultas,
     dia as diaDeMultas,
-    index as cajaDeMultas,
 } from '@/routes/multas/caja';
-import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
-import { index as movimientosDeMultas } from '@/routes/multas/movimientos';
-import { index as pagosDeMultas } from '@/routes/multas/pagos';
-import { index as rendicionesDeMultas } from '@/routes/multas/rendiciones';
+import { index as pendientesDeMultas } from '@/routes/multas/pendientes';
 import { index as personas } from '@/routes/personas';
 import { index as planillas } from '@/routes/planillas';
 import type { Auth, NavGroup, NavItem, NavLink } from '@/types';
@@ -134,16 +130,10 @@ export const navGroups: NavGroup[] = [
                         permission: 'multas.ver',
                         activeOn: ['multas/show', 'multas/create'],
                     },
-                    {
-                        title: 'Caja de Multas',
-                        href: cajaDeMultas(),
-                        icon: Wallet,
-                        permission: 'multas.ver',
-                    },
                     /*
                      * El día, el arqueo y el cierre de Multas: las pantallas
-                     * de Caja, con su caja y su permiso. Los arqueos y el
-                     * calendario se abren desde ellas, como en Haberes.
+                     * de Caja, con su caja y su permiso. La apertura, que es
+                     * una sola vez, se abre desde el día en que se hizo.
                      */
                     {
                         title: 'Caja del día',
@@ -151,33 +141,24 @@ export const navGroups: NavGroup[] = [
                         icon: Scale,
                         permission: 'multas.caja.ver',
                     },
+                    // Lo que espera a alguien: pagos informados, cobros camino al banco y rechazos.
                     {
-                        title: 'Cierres de caja',
-                        href: cierresDeMultas(),
-                        icon: Lock,
-                        permission: 'multas.caja.ver',
-                    },
-                    // La cola de quien concilia: lo informado por el banco y
-                    // los recursos en revisión.
-                    {
-                        title: 'Pagos por verificar',
-                        href: pagosDeMultas(),
+                        title: 'Pendientes',
+                        href: pendientesDeMultas(),
                         icon: ClipboardCheck,
-                        permission: 'multas.verificar-pagos',
-                    },
-                    // La rendición oficial a la SAF: dos notas por mes cerrado.
-                    {
-                        title: 'Rendiciones',
-                        href: rendicionesDeMultas(),
-                        icon: FileText,
                         permission: 'multas.ver',
                     },
-                    // La consulta operativa del mes: no es la rendición oficial.
+                    /*
+                     * El mes de un vistazo: sus días, su cierre, lo reconocido
+                     * en el libro y la rendición a la SAF. Los cierres, la
+                     * rendición y los movimientos del mes se abren desde acá.
+                     */
                     {
-                        title: 'Movimientos',
-                        href: movimientosDeMultas(),
-                        icon: ArrowLeftRight,
-                        permission: 'multas.ver',
+                        title: 'Calendario',
+                        href: calendarioDeMultas(),
+                        icon: CalendarDays,
+                        permission: 'multas.caja.ver',
+                        activeOn: ['multas/rendiciones', 'multas/movimientos'],
                     },
                 ],
             },

@@ -60,6 +60,11 @@ muestran en ese libro un panel que lleva a la apertura —o dice que se la pidan
 un administrador—, y una operación que choca desde otra pantalla abre un diálogo
 con lo mismo.
 
+**Abierta, la Caja del día la nombra siempre**: «Libros abiertos el dd/mm/aaaa» es
+un enlace al día de la apertura. La observación de la apertura —de dónde salieron
+los saldos— se lee solo ese día, que es al que explica, y ahí quien puede abrir la
+caja tiene el enlace a la pantalla de la apertura.
+
 **Inicio muestra la puesta en marcha** mientras falte algo para operar: primero
 las cuentas bancarias del organismo, después la apertura de Haberes en pesos y
 la de Multas, que no se puede hacer sin una cuenta en pesos. La de dólares figura
@@ -417,6 +422,16 @@ Eligiendo un día, el panel de la derecha ofrece **el mismo flujo que la Caja de
 día** —no una copia de solo lectura— y lista los asientos que lo movieron, con su
 rótulo, su importe y, si fue revertido, el día en que se revirtió. También desde
 acá se cierra el mes, que es donde se lo está mirando.
+
+**Lo que agrega el módulo de cada caja** (`CashBoxModule`), sin que Ledger sepa qué
+es:
+
+- `bankLedgerLabel()`: si la caja muestra lo que su libro reconoció en la cuenta
+  bancaria, por mes y en el año (`CashBankLedger`). Haberes no, porque su cuenta es
+  propia; Multas sí, porque la comparte con Aranceles.
+- `monthPanel()`: un panel en el mes con los papeles de su cierre mensual, cómo
+  emitirlos y enlaces. Multas pone ahí la rendición a la SAF y los movimientos del
+  mes; Haberes, nada.
 
 ### Saldo del sistema anterior · `/caja/saldo-anterior`
 

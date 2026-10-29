@@ -192,6 +192,11 @@ class InicioTest extends TestCase
             'caja_mes_sin_cerrar',
             'multas_caja_sin_cerrar',
             'multas_caja_mes_sin_cerrar',
+            // Sin caja de Multas abierta no hay créditos de su cuenta que contar.
+            'multas_pagos_informados',
+            'multas_por_depositar',
+            'multas_en_transito',
+            'multas_rechazos',
         ], $this->clavesDeColas());
     }
 

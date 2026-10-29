@@ -13,6 +13,8 @@ use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Http\Requests\IgnoreBankTransactionRequest;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Support\BankCreditHandlers;
+use App\Modules\Banking\Support\LatestStatementBalance;
 use App\Support\Database\Like;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +25,7 @@ use RuntimeException;
 
 final class BankTransactionController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, BankCreditHandlers $identificadores, LatestStatementBalance $saldos): Response
     {
         $status = $this->enumFilter($request->query('estado'), ReconciliationStatus::class);
         $direction = $this->enumFilter($request->query('sentido'), TransactionDirection::class);
@@ -49,17 +51,30 @@ final class BankTransactionController extends Controller
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate(50)
-            ->withQueryString()
-            ->through(fn (BankTransaction $t): BankTransactionListItemData => BankTransactionListItemData::fromModel($t));
+            ->withQueryString();
+
+        /*
+         * Qué se puede hacer con cada crédito pendiente de la página lo dice
+         * el módulo que lleva la caja de su cuenta: Banking no sabe qué es
+         * una multa.
+         */
+        $acciones = $identificadores->actionsFor(array_values($transactions->items()), $request->user());
+        $transactions->through(fn (BankTransaction $t): BankTransactionListItemData => BankTransactionListItemData::fromModel($t));
+        $cuentas = BankAccount::query()->orderBy('label')->get();
 
         return Inertia::render('banco/movimientos/index', [
             'transactions' => $transactions,
-            'accounts' => BankAccount::query()
-                ->orderBy('label')
-                ->get()
+            'accounts' => $cuentas
                 ->map(fn (BankAccount $a): BankAccountData => BankAccountData::fromModel($a))
                 ->values()
                 ->all(),
+            // Lo que dice el banco de cada cuenta: el último saldo de un extracto.
+            'balances' => $cuentas
+                ->where('is_active', true)
+                ->map(fn (BankAccount $a): array => ['accountId' => $a->id, 'label' => $a->label, ...($saldos->of($a->id) ?? ['balance' => null, 'date' => null])])
+                ->values()
+                ->all(),
+            'creditActions' => (object) $acciones,
             'filters' => [
                 'cuenta' => $accountId > 0 ? $accountId : null,
                 'estado' => $status?->value,

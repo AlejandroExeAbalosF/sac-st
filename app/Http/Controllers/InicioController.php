@@ -27,6 +27,11 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDaysPendingClosing;
 use App\Modules\Ledger\Support\CashMonthsPendingClosing;
 use App\Modules\Ledger\Support\RecentMovements;
+use App\Modules\Multas\Enums\FineCollectionPlace;
+use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineBankCredits;
+use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Shared\Data\CashBoxSummaryData;
 use App\Modules\Shared\Data\RecentAccessData;
 use App\Modules\Shared\Data\SetupStepData;
@@ -76,6 +81,8 @@ final class InicioController extends Controller
         private readonly RecentMovements $movimientos,
         private readonly PendingOrderQueues $colasDeOrdenes,
         private readonly RegisterOpeningBalance $abrir,
+        private readonly FineBankCredits $creditosDeMultas,
+        private readonly FineDeposits $depositosDeMultas,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -106,7 +113,7 @@ final class InicioController extends Controller
                 'verExpedientes' => $verExpedientes,
                 'verMovimientos' => $verCaja,
                 'verVolumen' => $verExpedientes,
-                'verColas' => $verBanco || $verExpedientes || $verCierres || $user->can('multas.caja.cerrar'),
+                'verColas' => $verBanco || $verExpedientes || $verCierres || $user->can('multas.caja.cerrar') || $user->can('multas.ver'),
                 'crearExpediente' => $user->can('expedientes.crear'),
                 'importarExtracto' => $user->can('banco.extractos.importar'),
             ],
@@ -201,7 +208,7 @@ final class InicioController extends Controller
                 title: 'Abrir la Caja de Multas',
                 description: 'El efectivo y los cheques con que arranca la caja, y la cuenta en pesos con la que opera.',
                 done: $this->abrir->existingFor($multas, Currency::Ars) !== null,
-                href: $hayCuentaEnPesos && $user->can('multas.caja.abrir') ? route('multas.caja.index', absolute: false) : null,
+                href: $hayCuentaEnPesos && $user->can('multas.caja.abrir') ? route('multas.caja.apertura.index', absolute: false) : null,
                 blockedBy: $hayCuentaEnPesos ? null : 'Necesita una cuenta bancaria en pesos.',
             ),
             new SetupStepData(
@@ -265,7 +272,7 @@ final class InicioController extends Controller
             $colas[] = WorkQueueData::resuelta(
                 key: 'fondos_sin_identificar',
                 title: 'Fondos sin identificar',
-                description: 'Créditos del banco que todavía no se asignaron a una cuota',
+                description: 'Créditos del banco que todavía nadie identificó, de cualquier cuenta',
                 count: BankTransaction::query()->sinIdentificar()->count(),
                 tone: QueueTone::Action,
                 href: route(
@@ -376,7 +383,7 @@ final class InicioController extends Controller
                 description: 'Días anteriores de la caja de Multas con movimientos que todavía no se cerraron',
                 count: $this->diasSinCerrar->count($multas, $fecha, Currency::Ars),
                 tone: QueueTone::Action,
-                href: route('multas.caja.cierres.index', absolute: false),
+                href: route('multas.caja.calendario', absolute: false),
             );
 
             $colas[] = WorkQueueData::resuelta(
@@ -385,7 +392,62 @@ final class InicioController extends Controller
                 description: 'Meses terminados de la caja de Multas con movimientos que todavía no se cerraron',
                 count: $this->mesesSinCerrar->count($multas, $fecha, Currency::Ars),
                 tone: QueueTone::Action,
-                href: route('multas.caja.cierres.index', absolute: false),
+                href: route('multas.caja.calendario', absolute: false),
+            );
+        }
+
+        /*
+         * Lo que espera a alguien en Multas. Cada cola lleva a su pestaña de
+         * los pendientes; los créditos sin identificar, a la lista del banco
+         * con la cuenta de Multas.
+         */
+        if ($user->can('multas.verificar-pagos')) {
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_pagos_informados',
+                title: 'Pagos de multas por verificar',
+                description: 'Informados por el deudor, esperando su crédito del extracto',
+                count: FinePayment::query()->where('status', FinePaymentStatus::Reported)->count(),
+                tone: QueueTone::Action,
+                href: route('multas.pendientes.index', ['pestana' => 'informados'], absolute: false),
+            );
+
+            $apertura = $this->creditosDeMultas->book();
+
+            if ($apertura !== null) {
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'multas_creditos_sin_identificar',
+                    title: 'Créditos de Multas sin identificar',
+                    description: 'Entraron a la cuenta de Multas desde la apertura de la caja y nadie los reconoció',
+                    count: $this->creditosDeMultas->pending($apertura)->count(),
+                    tone: QueueTone::Action,
+                    href: route('banco.movimientos.index', ['cuenta' => $apertura->bank_account_id, 'estado' => 'pending', 'sentido' => 'credit'], absolute: false),
+                );
+            }
+        }
+
+        if ($user->can('multas.ver')) {
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_por_depositar',
+                title: 'Cobros de Multas por depositar',
+                description: 'Efectivo y cheques de la caja de Multas que todavía no fueron al banco',
+                count: $this->depositosDeMultas->counterPayments(FineCollectionPlace::InCustody)->count(),
+                tone: QueueTone::Action,
+                href: route('multas.pendientes.index', ['pestana' => 'depositar'], absolute: false),
+            );
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_en_transito',
+                title: 'Depósitos de Multas sin acreditar',
+                description: 'Depositados, esperando que el extracto los confirme',
+                count: $this->depositosDeMultas->counterPayments(FineCollectionPlace::InTransit)->count(),
+                href: route('multas.pendientes.index', ['pestana' => 'transito'], absolute: false),
+            );
+            $colas[] = WorkQueueData::resuelta(
+                key: 'multas_rechazos',
+                title: 'Cheques de Multas rechazados',
+                description: 'Con el reemplazo, un hecho del banco o los papeles todavía pendientes',
+                count: $this->depositosDeMultas->paymentsWithPendingRejections()->count(),
+                tone: QueueTone::Blocked,
+                href: route('multas.pendientes.index', ['pestana' => 'rechazos'], absolute: false),
             );
         }
 

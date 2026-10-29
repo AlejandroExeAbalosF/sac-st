@@ -155,6 +155,55 @@ class RendicionMensualDeMultasTest extends TestCase
             ->and($this->filas($septiembre['late']))->toBe([['2026-08-21', 'Trans.', '7000.00']]);
     }
 
+    /**
+     * El mes del calendario de Multas trae su rendición: emitirla con el mes
+     * cerrado, y después sus dos notas. Y lo que el libro reconoció en la
+     * cuenta, por mes y en el año.
+     */
+    public function test_the_calendar_month_carries_the_rendition_and_what_the_book_recognized(): void
+    {
+        $this->escenario();
+        $agosto = $this->movimiento($this->laCuenta, '2026-08-20', '9000.00');
+        $septiembre = $this->movimiento($this->laCuenta, '2026-08-21', '7000.00');
+        $this->el('2026-08-31');
+        $this->identificar($agosto);
+        $this->el('2026-09-01');
+        $this->identificar($septiembre);
+
+        $this->el('2026-09-05');
+        $this->cerrar('2026-07-31', PeriodType::Monthly);
+        $this->cerrar('2026-08-31', PeriodType::Daily);
+        $cierre = $this->cerrar('2026-08-31', PeriodType::Monthly);
+
+        $admin = $this->operador('administrador');
+        $mes = fn () => $this->actingAs($admin)->get(route('multas.caja.calendario', ['anio' => 2026, 'mes' => 8]));
+
+        $mes()->assertInertia(fn (Assert $page) => $page
+            ->where('bankLedger.label', 'Reconocido en el libro de Multas')
+            ->where('bankLedger.byMonth.8', '9000.00')
+            ->where('bankLedger.byMonth.9', '7000.00')
+            ->where('bankLedger.year', '16000.00')
+            ->where('monthPanel.title', 'Rendición a la SAF')
+            ->has('monthPanel.documents', 0)
+            ->where('monthPanel.emit.href', route('multas.rendiciones.store', $cierre, absolute: false))
+            ->where('monthPanel.links.0.href', route('multas.movimientos.index', ['mes' => '2026-08'], absolute: false)));
+
+        $this->actingAs($admin)
+            ->from(route('multas.caja.calendario', ['anio' => 2026, 'mes' => 8]))
+            ->post(route('multas.rendiciones.store', $cierre))
+            ->assertRedirect(route('multas.caja.calendario', ['anio' => 2026, 'mes' => 8]));
+
+        $mes()->assertInertia(fn (Assert $page) => $page
+            ->has('monthPanel.documents', 2)
+            ->where('monthPanel.documents.0.current', true)
+            ->where('monthPanel.emit', null));
+
+        // Quien no emite ve las notas sin el botón.
+        $this->actingAs($this->operador('administrativo'))
+            ->get(route('multas.caja.calendario', ['anio' => 2026, 'mes' => 7]))
+            ->assertInertia(fn (Assert $page) => $page->where('monthPanel.emit', null));
+    }
+
     /** Reabrir y volver a cerrar el mes da otra versión; la anterior queda. */
     public function test_reclosing_the_month_emits_a_new_version_and_keeps_the_old_one(): void
     {

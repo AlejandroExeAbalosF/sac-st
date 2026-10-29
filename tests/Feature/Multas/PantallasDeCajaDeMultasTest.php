@@ -297,11 +297,39 @@ class PantallasDeCajaDeMultasTest extends TestCase
         $colas = collect($this->colasDeInicio($this->operador('contador')))->keyBy('key');
 
         expect($colas['multas_caja_sin_cerrar']['count'])->toBe(1)
-            ->and($colas['multas_caja_sin_cerrar']['href'])->toBe('/multas/caja/cierres')
+            ->and($colas['multas_caja_sin_cerrar']['href'])->toBe('/multas/caja/calendario')
             ->and($colas['multas_caja_mes_sin_cerrar']['count'])->toBe(1);
 
         $administrativo = collect($this->colasDeInicio($this->operador()))->pluck('key');
         expect($administrativo)->not->toContain('multas_caja_sin_cerrar');
+    }
+
+    /**
+     * Inicio cuenta lo que espera en Multas y lleva a su pestaña de los
+     * pendientes; los créditos sin identificar, a la lista del banco.
+     */
+    public function test_the_dashboard_counts_what_waits_in_multas(): void
+    {
+        $multa = $this->escenario();
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
+        $this->cobrarEfectivo($multa, '5000.00');
+        $credito = $this->movimiento($this->laCuenta, '2026-09-15', '700.00');
+
+        $colas = collect($this->colasDeInicio($this->operador('contador')))->keyBy('key');
+
+        expect($colas['multas_por_depositar']['count'])->toBe(1)
+            ->and($colas['multas_por_depositar']['href'])->toBe(route('multas.pendientes.index', ['pestana' => 'depositar'], absolute: false))
+            ->and($colas['multas_en_transito']['count'])->toBe(0)
+            ->and($colas['multas_rechazos']['count'])->toBe(0)
+            ->and($colas['multas_pagos_informados']['count'])->toBe(0)
+            ->and($colas['multas_creditos_sin_identificar']['count'])->toBe(1)
+            ->and($colas['multas_creditos_sin_identificar']['href'])->toBe(route('banco.movimientos.index', ['cuenta' => $credito->bank_account_id, 'estado' => 'pending', 'sentido' => 'credit'], absolute: false));
+
+        // Quien no concilia ve los cobros, no los informados ni los créditos.
+        $administrativo = collect($this->colasDeInicio($this->operador()))->pluck('key');
+        expect($administrativo)->toContain('multas_por_depositar')
+            ->not->toContain('multas_pagos_informados')
+            ->not->toContain('multas_creditos_sin_identificar');
     }
 
     /** @return list<array<string, mixed>> */

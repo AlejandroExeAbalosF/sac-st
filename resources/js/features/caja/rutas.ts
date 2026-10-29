@@ -18,8 +18,8 @@ import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
 import {
     calendario as calendarioDeMultas,
     dia as diaDeMultas,
-    index as cajaDeMultas,
 } from '@/routes/multas/caja';
+import { index as aperturaDeMultas } from '@/routes/multas/caja/apertura';
 import {
     adjust as imputarEnMultas,
     index as arqueosDeMultas,
@@ -61,7 +61,7 @@ export type RutasDeCaja = {
         sheet: ConCierre;
         regenerate: ConCierre;
     };
-    /** Dónde se abre el libro: la apertura de Haberes, la caja de Multas. */
+    /** Dónde se abre el libro, y se ve lo que se declaró al abrirlo. */
     apertura: () => Ruta;
     /** El saldo del sistema anterior: solo Haberes reserva por cuota. */
     saldoAnterior: (() => Ruta) | null;
@@ -94,7 +94,7 @@ const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
             sheet: planillaDeMultas,
             regenerate: rehacerEnMultas,
         },
-        apertura: cajaDeMultas,
+        apertura: aperturaDeMultas,
         saldoAnterior: null,
     },
 };

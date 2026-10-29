@@ -8,9 +8,14 @@ obligación y pagos anteriores al sistema—, la apertura de la caja
 con su cuenta bancaria compartida, el cobro en caja con su recibo, los pagos por
 banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
 rechazado con su reemplazo, la caja del día con su arqueo, su cierre y su
-planilla, la cola de créditos sin identificar de la cuenta compartida y la
-consulta operativa del mes. Falta la rendición oficial, que espera el modelo del
-área (P02).
+planilla, la identificación de los créditos de la cuenta compartida desde Banco ›
+Movimientos, los pendientes, la consulta operativa del mes y la rendición mensual a
+la SAF.
+
+**La barra lateral** tiene cuatro entradas: Expedientes, Caja del día, Pendientes y
+Calendario. La apertura se abre desde el día en que se hizo; los cierres, la
+rendición y los movimientos del mes, desde el calendario; los créditos sin
+identificar, desde Banco › Movimientos (decisión del usuario, 29/10/2026).
 
 ---
 
@@ -72,7 +77,9 @@ Para otra combinación está el «Agregar multa» de la cabecera, que es libre.
 | Expediente | `/multas/expedientes/{id}/{número}` | `multas.ver` |
 | Agregar multa al expediente | `/multas/expedientes/{id}/{número}/agregar-multa` | `multas.registrar` |
 | Exportar las multas | `/multas/exportar` | `multas.ver` |
-| Caja de Multas | `/multas/caja` | `multas.ver`; abrirla, `multas.caja.abrir` |
+| Apertura de la caja | `/multas/caja/apertura` | `multas.ver`; abrirla, `multas.caja.abrir` |
+| Pendientes | `/multas/pendientes` | `multas.ver`; pagos informados, `multas.verificar-pagos` |
+| Identificar un crédito | `/multas/creditos/{movimiento}/identificar` | `multas.verificar-pagos` |
 | Caja del día | `/multas/caja/dia` | `multas.caja.ver` |
 | Arqueos | `/multas/caja/arqueos` | `multas.caja.ver`; contar, `multas.caja.arquear` |
 | Cierres | `/multas/caja/cierres` | `multas.caja.ver`; cerrar, `multas.caja.cerrar` |
@@ -187,11 +194,22 @@ saldo y estado. Abajo:
 - **Pagos anteriores al sistema**, con su respaldo, su revisión, su comprobante y,
   si vino del banco, el crédito que lo respalda.
 
-### Pagos por verificar · `/multas/pagos`
+<a id="pendientes"></a>
 
-La cola de quien concilia (`multas.verificar-pagos`): los pagos informados por el
-banco que esperan su crédito, del más viejo al más nuevo. Cada fila lleva a la
-ficha, donde se verifica, se corrige o se descarta.
+### Pendientes · `/multas/pendientes`
+
+Lo que espera a alguien, por pestañas, del más viejo al más nuevo. Inicio cuenta
+cada una y lleva directo a ella:
+
+- **Pagos informados** (`multas.verificar-pagos`): los informados por el deudor que
+  esperan su crédito. Cada fila lleva a la ficha, donde se verifica, se corrige o se
+  descarta; el crédito también se identifica desde Banco › Movimientos.
+- **Por depositar**: el efectivo y los cheques que siguen en la caja, con
+  «Depositar» (`multas.depositar`). El depósito vuelve acá, a la pestaña siguiente.
+- **Sin acreditar**: lo depositado que espera al extracto, con la confirmación de la
+  acreditación (`multas.verificar-pagos`).
+- **Rechazos**: los cheques rechazados con el reemplazo, un hecho del banco o los
+  papeles todavía pendientes.
 
 ### Expediente · `/multas/expedientes/{id}/{número}`
 
@@ -313,7 +331,7 @@ La cuenta bancaria de Multas es **compartida con Aranceles**, y su saldo no se
 puede repartir entre las dos (M08, M12): cada caja reconoce solo lo que
 identifica. Por eso la caja no declara un saldo bancario:
 
-- **La apertura de la caja** (`/multas/caja`, permiso `multas.caja.abrir`): como la
+- **La apertura de la caja** (`/multas/caja/apertura`, permiso `multas.caja.abrir`): como la
   de Haberes —fecha, efectivo contado por billete, cheques detallados, total
   calculado—, pero **sin saldo bancario** y diciendo con qué cuenta opera. Su
   fecha es la frontera: lo que el extracto trae antes ya estaba en el saldo que el
@@ -323,16 +341,15 @@ identifica. Por eso la caja no declara un saldo bancario:
 No hay un corte declarado para la cuenta: el saldo del banco lo trae el extracto
 (ver [corte de la cuenta compartida](#sin-corte-de-cuenta)).
 
-Abierta la caja, la pantalla muestra la cuenta en **dos números que no se suman
-nunca**: el saldo según el banco —el último que informó un extracto, de la cuenta
-entera y compartida— y lo **reconocido en el libro de Multas** —lo que el libro
-tiene asentado ahí: los depósitos de la caja ya acreditados y los pagos por banco
-ya verificados, menos los débitos de cheques rechazados—. Lo segundo no es la
-parte de Multas en el saldo del banco: de las salidas de la cuenta solo se conocen
-las que el libro registró. Debajo, los créditos desde la apertura que todavía nadie
-identificó: es la cola de «pendiente de clasificación de caja». Un crédito que ya
-respalda un pago anterior vigente sale de la cola; si ese pago se descarta,
-vuelve.
+La cuenta se mira en **dos números que no se suman nunca**, cada uno donde se usa:
+
+- **El saldo según el banco**, de la cuenta entera y compartida: el último que
+  informó un extracto, arriba de **Banco › Movimientos**, por cuenta.
+- **Lo reconocido en el libro de Multas**, en el **calendario** de la caja: por mes y
+  en el acumulado del año hasta hoy. Es lo que el libro tiene asentado en la cuenta
+  —depósitos de la caja acreditados y pagos por banco verificados, menos los
+  débitos de cheques rechazados—, no la parte de Multas en el saldo del banco: de
+  las salidas de la cuenta solo se conocen las que el libro registró.
 
 La importación de extractos no cambia: es por cuenta, con su control de
 continuidad, vista previa y movimientos repetidos, y no depende de la caja. Un
@@ -353,24 +370,30 @@ a correr si encuentra un corte cargado.
 
 ### Créditos sin identificar
 
-Debajo de la cuenta, la caja lista los créditos desde su apertura que nadie
-reconoció, del más viejo al más nuevo y de a cincuenta por página (M08): los de
-Aranceles se quedan en la cola, y sin recorrerla los de atrás no se alcanzarían.
-Lo anterior a la apertura no está en la cola: se registra como pago anterior
-desde la ficha de la multa. Son **de la cuenta
-compartida, no una deuda de Multas**: lo que no sea de Multas queda en la cola, sin
-asignarle una caja por descarte. El número del panel sale de la misma consulta, así
-que no cuenta lo ya imputado —la acreditación de un depósito de la caja, un pago
-verificado— ni lo que respalda un pago anterior vigente.
+Están en **Banco › Movimientos**, con el filtro de la cuenta de Multas y «Sin
+identificar» —Inicio los cuenta y lleva ahí—. Son **de la cuenta compartida, no una
+deuda de Multas** (M08): lo que no sea de Multas queda pendiente, sin asignarle una
+caja por descarte. Banking no sabe qué es una multa: cada crédito pendiente le
+pregunta al módulo de la caja de su cuenta qué ofrecer (`BankCreditHandler`).
 
-**Identificar** (`multas.verificar-pagos`) tiene dos caminos:
+- **Desde la apertura de la caja, libre** y con `multas.verificar-pagos`:
+  «Identificar».
+- **Anterior a la apertura**: la fila lo dice y no ofrece identificar. Ya estaba en el
+  saldo que el área traía: se usa como pago anterior desde la ficha de la multa.
 
-- **Alguien lo informó**: la cola ofrece primero los pagos informados del mismo
-  importe. Se verifica ese pago, que conserva su presentación —la que decide el
-  término— y su respaldo. Un pago de una multa de septiembre presentado el 29/09 e
-  identificado el 02/10 queda en término: cuenta la presentación, no la carga.
-- **Nadie lo informó**: se busca la multa por expediente, resolución, acta o
-  carátula y se registra el pago verificado, presentado ese día.
+**Identificar** abre `/multas/creditos/{movimiento}/identificar`, con dos pestañas:
+
+- **Pago de una multa**, por uno de dos caminos:
+  - **Alguien lo informó**: se ofrecen primero los pagos informados del mismo
+    importe. Se verifica ese pago, que conserva su presentación —la que decide el
+    término— y su respaldo. Un pago de una multa de septiembre presentado el 29/09 e
+    identificado el 02/10 queda en término: cuenta la presentación, no la carga.
+  - **Nadie lo informó**: se busca la multa por expediente, resolución, acta o
+    carátula y se registra el pago verificado, presentado ese día.
+- **Depósito de la caja**: los depósitos del mismo importe que esperan al extracto.
+  Confirmarlo acredita ese depósito, como desde los pendientes.
+
+Ya identificado, la pantalla vuelve sola a la lista del banco.
 
 Identificar no crea otro movimiento bancario ni duplica nada: registra por primera
 vez en el libro de Multas el crédito que ya estaba en el extracto, con su
@@ -382,7 +405,10 @@ falla, no queda nada a medias.
 
 ## Rendición mensual · `/multas/rendiciones`
 
-La rendición oficial a la SAF (P02), con el modelo del área: por cada mes cerrado,
+La rendición oficial a la SAF (P02), con el modelo del área. **Vive en el mes del
+calendario de la caja**, al lado del cierre: ahí se genera, se ven sus dos notas y
+sus versiones anteriores. La lista de todos los meses sigue en esta dirección. Por
+cada mes cerrado,
 **dos notas en PDF** —«ingresos de Multas correspondientes al MES DE …» y «depósitos
 FUERA DE TÉRMINO MES DE …»—, con fecha, caja (CC, Trans., Cheque), comprobante,
 carátula, expediente, importe y recibo, el total y el importe en letras. Si la
@@ -421,7 +447,7 @@ el total es la última fila y nunca queda solo en una hoja, y cada hoja lleva
 ## Movimientos del mes · `/multas/movimientos`
 
 Una **consulta operativa, no la rendición oficial** (P02): lo dicen la pantalla y el
-Excel. Va por secciones, cada una con la fecha que filtra y su propio total, **sin
+Excel. Se llega desde el mes del calendario de la caja. Va por secciones, cada una con la fecha que filtra y su propio total, **sin
 total general** (M10):
 
 | Sección | Filtra por |
@@ -452,8 +478,8 @@ filas de cada sección; el Excel, que se arma por cursor, las trae todas.
 Son **las pantallas de Caja de Haberes**, con la caja de Multas y sus permisos
 propios (`multas.caja.*`): cerrar una caja no habilita a cerrar la otra, y los
 botones de cada pantalla se encienden con el permiso de la caja que se mira. Se
-entra desde `/multas/caja`, que enlaza al día, los arqueos, los cierres y el
-calendario, y desde la barra lateral.
+entra desde la barra lateral: la Caja del día y el Calendario, que lleva a los
+cierres, a la rendición y a los movimientos del mes.
 
 Lo que cambia respecto de Haberes:
 
@@ -461,7 +487,7 @@ Lo que cambia respecto de Haberes:
   servidor muestra pesos aunque la dirección pida dólares, y rechaza un arqueo o
   un cierre en dólares.
 - **Sin saldo del sistema anterior**: la apertura de Multas no reserva por cuota.
-  Abrir los libros lleva a `/multas/caja`.
+  Abrir los libros lleva a `/multas/caja/apertura`.
 - **Cada recibo del libro abre su multa.** Los cheques en custodia muestran qué
   multa paga cada uno —el reemplazo, la del cheque original— y un cheque de la
   apertura muestra lo que declaró la apertura. Quien opera la caja sin
@@ -635,7 +661,7 @@ un cheque electrónico** (M02):
   que ser de la cuenta de Multas, desde la apertura de la caja, libre y **por
   el importe entero del pago**: un pago, un crédito, hasta que el área responda P14.
   Al verificar, el pago se aplica, sale el recibo (casilla «Depósito Cta.») y el
-  crédito deja de estar en la cola de la caja.
+  crédito deja de figurar como sin identificar en Banco › Movimientos.
 - **Reconocerlo del extracto**: quien concilia puede marcar «el crédito ya está en
   el extracto» y hacer las dos cosas en un acto, por el importe del crédito. La
   presentación es ese momento: identificar después del último día del mes de la
@@ -716,7 +742,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
-| `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver la cola de pagos por verificar; acreditar o cancelar un depósito de la caja | administrador, contador |
+| `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver los pagos informados en los pendientes; identificar un crédito desde Banco › Movimientos; acreditar o cancelar un depósito de la caja | administrador, contador |
 | `multas.caja.abrir` | Abrir la caja de Multas, una sola vez | administrador |
 | `multas.caja.ver` | Ver la caja del día, los arqueos, los cierres y el calendario de Multas | administrador, contador, administrativo, consulta |
 | `multas.caja.arquear` | Registrar arqueos de Multas | administrador, contador, administrativo |

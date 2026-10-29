@@ -71,17 +71,21 @@ describe('el grupo Multas de la barra', () => {
     it('aparece con la caja del día a quien solo opera la caja', () => {
         expect(multasPara({ 'multas.caja.ver': true })).toEqual([
             'Caja del día',
-            'Cierres de caja',
+            'Calendario',
         ]);
     });
 
-    it('muestra los expedientes y la caja a quien ve multas', () => {
+    it('muestra los expedientes y los pendientes a quien ve multas', () => {
         expect(multasPara({ 'multas.ver': true })).toEqual([
             'Expedientes',
-            'Caja de Multas',
-            'Rendiciones',
-            'Movimientos',
+            'Pendientes',
         ]);
+    });
+
+    it('queda en cuatro entradas para quien ve todo', () => {
+        expect(
+            multasPara({ 'multas.ver': true, 'multas.caja.ver': true }),
+        ).toEqual(['Expedientes', 'Caja del día', 'Pendientes', 'Calendario']);
     });
 
     it('no aparece si no queda ninguna pantalla autorizada', () => {

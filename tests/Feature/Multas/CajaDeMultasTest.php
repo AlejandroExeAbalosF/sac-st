@@ -53,7 +53,7 @@ class CajaDeMultasTest extends TestCase
                 'notes' => 'Arqueo del cajón de Multas',
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.caja.index'));
+            ->assertRedirect(route('multas.caja.dia', ['fecha' => '2026-06-01']));
 
         $apertura = CashBookOpening::for($this->cajaDe(CashBox::MULTAS), Currency::Ars);
         expect($apertura?->bank_account_id)->toBe($cuenta->id)
@@ -61,18 +61,29 @@ class CajaDeMultasTest extends TestCase
             ->and(FundReceipt::query()->where('cash_box_id', $this->cajaDe(CashBox::MULTAS))->sole()->cheque_number)->toBe('12345')
             ->and(DB::table('journal_lines')->where('cash_box_id', $this->cajaDe(CashBox::MULTAS))->where('account_code', 'BANK_ACCOUNT')->exists())->toBeFalse();
 
-        // Los dos números de la cuenta, separados: el del banco y el del libro.
+        // La apertura hecha, con la cuenta con la que opera.
         $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.caja.index'))
+            ->get(route('multas.caja.apertura.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('multas/caja')
+                ->component('multas/apertura')
                 ->where('opening.date', '2026-06-01')
-                ->where('bank.latestStatementBalance', '1580000.00')
-                ->where('bank.bookBalance', '0.00')
-                ->where('bank.unclassifiedCount', 1)
-                ->where('bank.unclassifiedAmount', '80000.00')
+                ->where('bankAccountLabel', $cuenta->label)
                 ->where('canOpen', false));
+
+        // Los dos números de la cuenta, separados: el del banco, en Banco ›
+        // Movimientos; el del libro, en el calendario de la caja.
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('banco.movimientos.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('balances.0.accountId', $cuenta->id)
+                ->where('balances.0.balance', '1580000.00'));
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.caja.calendario', ['anio' => 2026]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('bankLedger.label', 'Reconocido en el libro de Multas')
+                ->where('bankLedger.year', '0.00'));
     }
 
     public function test_the_box_does_not_bring_the_bank_balance_and_needs_its_account(): void
@@ -232,13 +243,21 @@ class CajaDeMultasTest extends TestCase
     {
         [$cuenta, $multa] = $this->escenario(apertura: '2026-06-10');
         $anterior = $this->movimiento($cuenta, '2026-06-05', '500.00');
-        $this->movimiento($cuenta, '2026-06-12', '300.00');
+        $nuevo = $this->movimiento($cuenta, '2026-06-12', '300.00');
 
-        $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.caja.index'))
+        // En Banco › Movimientos solo el posterior a la apertura se identifica.
+        $this->actingAs($this->operador('contador'))
+            ->get(route('banco.movimientos.index', ['cuenta' => $cuenta->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('bank.unclassifiedCount', 1)
-                ->where('bank.unclassifiedAmount', '300.00'));
+                ->where("creditActions.{$nuevo->id}.label", 'Identificar')
+                ->where("creditActions.{$nuevo->id}.href", route('multas.creditos.identificar', $nuevo, absolute: false))
+                ->where("creditActions.{$anterior->id}.label", 'Anterior a la apertura de Multas')
+                ->where("creditActions.{$anterior->id}.href", null));
+
+        // Quien no concilia no identifica: el posterior queda sin acción.
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('banco.movimientos.index', ['cuenta' => $cuenta->id]))
+            ->assertInertia(fn (Assert $page) => $page->missing("creditActions.{$nuevo->id}"));
 
         // El anterior sigue a mano para respaldar un pago anterior.
         $this->actingAs($this->operador())

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Banking\Models\BankStatementImport;
+use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
@@ -305,44 +306,45 @@ Breadcrumbs::for('multas.index', fn (): array => [
     Crumb::make('Multas'),
 ]);
 
-Breadcrumbs::for('multas.caja.index', fn (): array => [
+Breadcrumbs::for('multas.caja.apertura.index', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
-    Crumb::make('Caja'),
+    Crumb::make('Apertura de la caja'),
 ]);
 
-Breadcrumbs::for('multas.rendiciones.index', fn (): array => [
+Breadcrumbs::for('multas.pendientes.index', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
-    Crumb::make('Rendiciones'),
+    Crumb::make('Pendientes'),
 ]);
 
-Breadcrumbs::for('multas.movimientos.index', fn (): array => [
-    Crumb::make('Multas', route('multas.index')),
-    Crumb::make('Movimientos'),
-]);
+// La rendición y los movimientos son de un mes: se llega desde el calendario.
+foreach (['multas.rendiciones.index' => 'Rendiciones', 'multas.movimientos.index' => 'Movimientos del mes'] as $ruta => $titulo) {
+    Breadcrumbs::for($ruta, fn (): array => [
+        Crumb::make('Multas', route('multas.index')),
+        Crumb::make('Calendario', (auth()->user()?->can('multas.caja.ver') ?? false) ? route('multas.caja.calendario') : null),
+        Crumb::make($titulo),
+    ]);
+}
 
 // Las pantallas de caja de Ledger, con la caja de Multas. Quien solo opera
-// la caja (`multas.caja.ver` sin `multas.ver`) ve las migas sin enlace: las
-// dos pantallas de arriba le darían 403.
+// la caja (`multas.caja.ver` sin `multas.ver`) ve la miga de Multas sin
+// enlace: el listado le daría 403.
 foreach ([
     'multas.caja.dia' => 'Caja del día',
     'multas.caja.arqueos.index' => 'Arqueos',
     'multas.caja.cierres.index' => 'Cierres',
     'multas.caja.calendario' => 'Calendario',
 ] as $ruta => $titulo) {
-    Breadcrumbs::for($ruta, function () use ($titulo): array {
-        $veMultas = auth()->user()?->can('multas.ver') ?? false;
-
-        return [
-            Crumb::make('Multas', $veMultas ? route('multas.index') : null),
-            Crumb::make('Caja', $veMultas ? route('multas.caja.index') : null),
-            Crumb::make($titulo),
-        ];
-    });
+    Breadcrumbs::for($ruta, fn (): array => [
+        Crumb::make('Multas', (auth()->user()?->can('multas.ver') ?? false) ? route('multas.index') : null),
+        Crumb::make($titulo),
+    ]);
 }
 
-Breadcrumbs::for('multas.pagos.index', fn (): array => [
-    Crumb::make('Multas', route('multas.index')),
-    Crumb::make('Pagos por verificar'),
+// Identificar un crédito empieza y termina en la lista de movimientos del banco.
+Breadcrumbs::for('multas.creditos.identificar', fn (BankTransaction $transaction): array => [
+    Crumb::make('Banco'),
+    Crumb::make('Movimientos', route('banco.movimientos.index', ['cuenta' => $transaction->bank_account_id, 'estado' => 'pending'])),
+    Crumb::make('Identificar crédito'),
 ]);
 
 Breadcrumbs::for('multas.create', fn (): array => [

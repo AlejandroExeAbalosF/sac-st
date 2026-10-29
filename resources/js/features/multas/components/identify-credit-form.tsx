@@ -1,4 +1,4 @@
-import { Link, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Money from '@/components/money';
@@ -13,23 +13,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
-import FormDialog, {
-    FieldError,
-} from '@/features/multas/components/form-dialog';
+import { FieldError } from '@/features/multas/components/form-dialog';
 import ReceiptFields, {
     receiptPayload,
     SIN_FIRMANTE,
 } from '@/features/multas/components/receipt-fields';
 import { PAYMENT_MEDIUM } from '@/features/multas/labels';
-import { date, dateTime, money } from '@/lib/format';
-import {
-    index as cajaDeMultas,
-    multas as buscarMultas,
-} from '@/routes/multas/caja';
+import { date, dateTime } from '@/lib/format';
+import { multas as buscarMultas } from '@/routes/multas/caja';
 import { verify } from '@/routes/multas/pagos';
 import { store as verificados } from '@/routes/multas/pagos-bancarios/verificados';
 
-type CreditoSinIdentificar = App.Modules.Multas.Data.FineUnidentifiedCreditData;
+type Credito = App.Modules.Multas.Data.FineBankCreditData;
 type Informado = App.Modules.Multas.Data.FinePendingPaymentData;
 type Medio = App.Modules.Multas.Enums.FinePaymentMedium;
 type MultaHallada = {
@@ -41,194 +36,35 @@ type MultaHallada = {
 
 const MEDIOS_POR_BANCO: Medio[] = ['bank_transfer', 'direct_deposit', 'echeq'];
 
-/**
- * Los créditos de la cuenta compartida que nadie identificó (M08).
- *
- * Son de la cuenta, no una deuda de Multas: pueden ser de Aranceles. Lo que no
- * es de Multas queda acá, sin asignarle una caja por descarte. Identificar uno
- * no crea otro movimiento bancario: registra por primera vez en el libro de
- * Multas el crédito que ya estaba en el extracto, con su aplicación y su recibo.
- */
-export default function UnidentifiedCredits({
-    creditos,
-    pagina,
-    ultimaPagina,
-    total,
-    cantidad,
-    puedeIdentificar,
-    firmantes,
-}: {
-    creditos: CreditoSinIdentificar[];
-    /** La página de la cola que se muestra: van de a cincuenta, del más viejo. */
-    pagina: number;
-    ultimaPagina: number;
-    total: string;
-    cantidad: number;
-    puedeIdentificar: boolean;
-    firmantes: Firmante[];
-}) {
-    const [identificando, setIdentificando] =
-        useState<CreditoSinIdentificar | null>(null);
-
-    return (
-        <section className="rounded-lg border bg-card shadow-raised">
-            <header className="border-b px-5 py-4">
-                <h2 className="text-sm font-semibold">
-                    Créditos sin identificar
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                    Lo que entró a la cuenta compartida con Aranceles desde la
-                    apertura de la caja y nadie reconoció todavía. No es una
-                    deuda de Multas: lo que no sea de Multas queda acá.
-                </p>
-            </header>
-
-            {creditos.length === 0 ? (
-                <p className="px-5 py-6 text-center text-sm text-muted-foreground">
-                    No hay créditos sin identificar.
-                </p>
-            ) : (
-                <ul className="divide-y">
-                    {creditos.map((fila) => (
-                        <li
-                            key={fila.credit.id}
-                            className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-sm"
-                        >
-                            <div className="min-w-0 flex-1">
-                                <p className="font-medium">
-                                    {date(fila.credit.date)} ·{' '}
-                                    <Money value={fila.credit.amount} />
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {[
-                                        fila.credit.counterparty,
-                                        fila.credit.operationId &&
-                                            `operación ${fila.credit.operationId}`,
-                                        fila.credit.description,
-                                    ]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                </p>
-                                {fila.reported.length > 0 && (
-                                    <p className="text-xs text-info-strong">
-                                        {fila.reported.length === 1
-                                            ? 'Hay un pago informado de este importe.'
-                                            : `Hay ${fila.reported.length} pagos informados de este importe.`}
-                                    </p>
-                                )}
-                            </div>
-                            {puedeIdentificar && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setIdentificando(fila)}
-                                >
-                                    Identificar
-                                </Button>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {/*
-             * Por páginas y no los primeros cincuenta: los de Aranceles se
-             * quedan en la cola, y sin recorrerla los de atrás no se alcanzan.
-             */}
-            {ultimaPagina > 1 && (
-                <nav
-                    aria-label="Páginas de la cola"
-                    className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3 text-xs text-muted-foreground"
-                >
-                    <span>
-                        Página {pagina} de {ultimaPagina} · {cantidad} créditos
-                        por <Money value={total} />
-                    </span>
-                    <span className="flex gap-2">
-                        <PaginaDeLaCola
-                            destino={pagina - 1}
-                            habilitado={pagina > 1}
-                        >
-                            Anteriores
-                        </PaginaDeLaCola>
-                        <PaginaDeLaCola
-                            destino={pagina + 1}
-                            habilitado={pagina < ultimaPagina}
-                        >
-                            Siguientes
-                        </PaginaDeLaCola>
-                    </span>
-                </nav>
-            )}
-
-            {identificando && (
-                <IdentifyCreditDialog
-                    fila={identificando}
-                    firmantes={firmantes}
-                    onClose={() => setIdentificando(null)}
-                />
-            )}
-        </section>
-    );
-}
-
-/** Otra página de la cola, sin perder el lugar en la pantalla. */
-function PaginaDeLaCola({
-    destino,
-    habilitado,
-    children,
-}: {
-    destino: number;
-    habilitado: boolean;
-    children: React.ReactNode;
-}) {
-    if (!habilitado) {
-        return (
-            <Button size="sm" variant="outline" disabled>
-                {children}
-            </Button>
-        );
-    }
-
-    return (
-        <Button size="sm" variant="outline" asChild>
-            <Link
-                href={cajaDeMultas({ query: { creditos: destino } }).url}
-                only={['creditos']}
-                preserveScroll
-                preserveState
-            >
-                {children}
-            </Link>
-        </Button>
-    );
-}
-
 const NUEVO = 'nuevo';
 
 /**
- * Identificar un crédito por uno de dos caminos.
+ * Identificar un crédito como el pago de una multa, por uno de dos caminos.
  *
  * Si alguien ya lo informó, se verifica ese pago: conserva su presentación
  * —que decide el término— y su respaldo. Crear otro pago el día que se
  * identifica podría dejarlo fuera de término y dejar el informado colgado.
  * Solo si nadie lo informó se busca la multa y se registra el pago.
+ *
+ * Identificar no crea otro movimiento bancario: registra por primera vez en
+ * el libro de Multas el crédito que ya estaba en el extracto, con su
+ * aplicación y su recibo.
  */
-function IdentifyCreditDialog({
-    fila,
+export default function IdentifyCreditForm({
+    credito,
+    informados,
     firmantes,
-    onClose,
 }: {
-    fila: CreditoSinIdentificar;
+    credito: Credito;
+    /** Los pagos informados por el mismo importe: un pago, un crédito. */
+    informados: Informado[];
     firmantes: Firmante[];
-    onClose: () => void;
 }) {
-    const credito = fila.credit;
     const [clave] = useState(
         () => `identificar:${credito.id}:${crypto.randomUUID()}`,
     );
     const [camino, setCamino] = useState<string>(
-        fila.reported[0] ? String(fila.reported[0].payment.id) : NUEVO,
+        informados[0] ? String(informados[0].payment.id) : NUEVO,
     );
     const [multa, setMulta] = useState<MultaHallada | null>(null);
     const [faltaMulta, setFaltaMulta] = useState(false);
@@ -239,15 +75,13 @@ function IdentifyCreditDialog({
     });
     const errores = errors as Record<string, string | undefined>;
 
-    const enviar = () => {
+    const enviar = (e: React.FormEvent) => {
+        e.preventDefault();
         const recibo = receiptPayload(data.talonarioNumber, data.signedById);
 
         if (camino !== NUEVO) {
             transform(() => ({ bankTransactionId: credito.id, ...recibo }));
-            post(verify(Number(camino)).url, {
-                preserveScroll: true,
-                onSuccess: onClose,
-            });
+            post(verify(Number(camino)).url);
 
             return;
         }
@@ -264,32 +98,16 @@ function IdentifyCreditDialog({
             idempotencyKey: clave,
             ...recibo,
         }));
-        post(verificados(multa.id).url, {
-            preserveScroll: true,
-            onSuccess: onClose,
-        });
+        post(verificados(multa.id).url);
     };
 
     return (
-        <FormDialog
-            title="Identificar el crédito"
-            description={
-                <>
-                    Crédito del {date(credito.date)} por {money(credito.amount)}
-                    . Entra al libro de Multas con su recibo; el movimiento del
-                    banco es el mismo.
-                </>
-            }
-            onClose={onClose}
-            onSubmit={enviar}
-            processing={processing}
-            submitLabel="Identificar y emitir recibo"
-        >
+        <form onSubmit={enviar} className="grid gap-4">
             <fieldset className="grid gap-2">
                 <legend className="mb-1 text-sm font-medium">
                     ¿Alguien lo informó?
                 </legend>
-                {fila.reported.map((informado) => (
+                {informados.map((informado) => (
                     <Opcion
                         key={informado.payment.id}
                         valor={String(informado.payment.id)}
@@ -356,7 +174,13 @@ function IdentifyCreditDialog({
             />
             <FieldError message={errores.bankTransactionId} />
             <FieldError message={errores.payment} />
-        </FormDialog>
+
+            <div>
+                <Button type="submit" disabled={processing}>
+                    Identificar y emitir recibo
+                </Button>
+            </div>
+        </form>
     );
 }
 

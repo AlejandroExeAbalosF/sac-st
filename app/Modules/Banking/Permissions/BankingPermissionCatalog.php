@@ -57,7 +57,7 @@ final class BankingPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'banco.movimientos.ignorar',
                 'Marcar movimientos fuera del circuito',
-                'Sacar un movimiento bancario de la cola de pendientes declarando que no pertenece a Haberes.',
+                'Sacar un movimiento bancario de la cola de pendientes declarando que no pertenece a ninguna caja del sistema.',
                 'banco',
                 ['administrador', 'contador'],
                 sensitive: true,

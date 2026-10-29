@@ -24,7 +24,7 @@ type Props = {
         chequeBank: string | null;
     };
     cuenta: string;
-    desde: 'caja' | 'multa';
+    desde: 'pendientes' | 'multa';
 };
 
 /**

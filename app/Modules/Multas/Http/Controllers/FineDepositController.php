@@ -72,8 +72,8 @@ final class FineDepositController extends Controller
                 'chequeBank' => $recepcion?->cheque_bank,
             ],
             'cuenta' => BankAccount::query()->whereKey($cuenta)->value('label'),
-            // A dónde volver: la caja, o la ficha de la multa.
-            'desde' => $request->query('desde') === 'caja' ? 'caja' : 'multa',
+            // A dónde volver: los pendientes de Multas, o la ficha de la multa.
+            'desde' => $request->query('desde') === 'pendientes' ? 'pendientes' : 'multa',
         ]);
     }
 
@@ -95,8 +95,8 @@ final class FineDepositController extends Controller
             'Queda en tránsito hasta que el extracto lo confirme.',
         );
 
-        return $request->input('desde') === 'caja'
-            ? to_route('multas.caja.index')
+        return $request->input('desde') === 'pendientes'
+            ? to_route('multas.pendientes.index', ['pestana' => 'transito'])
             : to_route('multas.show', Fine::showParametersFor($payment->fine_id));
     }
 

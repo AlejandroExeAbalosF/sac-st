@@ -48,16 +48,16 @@ class DepositoDeCobrosDeMultasTest extends TestCase
         $pago = $this->cobrar($multa, '300000.00');
 
         $this->actingAs($this->operador())
-            ->get(route('multas.pagos.deposito.create', [$pago, 'desde' => 'caja']))
+            ->get(route('multas.pagos.deposito.create', [$pago, 'desde' => 'pendientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/depositos/create')
                 ->where('cobro.amount', '300000.00')
                 ->where('cuenta', $this->laCuenta->label)
-                ->where('desde', 'caja'));
+                ->where('desde', 'pendientes'));
 
-        $this->post(route('multas.pagos.deposito.store', $pago), [...$this->ticket(), 'desde' => 'caja'])
+        $this->post(route('multas.pagos.deposito.store', $pago), [...$this->ticket(), 'desde' => 'pendientes'])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('multas.caja.index'));
+            ->assertRedirect(route('multas.pendientes.index', ['pestana' => 'transito']));
 
         // Depositado, ya no hay nada que depositar.
         $this->get(route('multas.pagos.deposito.create', $pago))->assertNotFound();
@@ -71,7 +71,8 @@ class DepositoDeCobrosDeMultasTest extends TestCase
             // Depositar no es recaudar otra vez: la deuda no se mueve.
             ->and($this->saldo($multa, 'debt'))->toBe('1100000.00');
 
-        $this->get(route('multas.caja.index'))->assertInertia(fn (Assert $page) => $page
+        $this->get(route('multas.pendientes.index', ['pestana' => 'transito']))->assertInertia(fn (Assert $page) => $page
+            ->where('tab', 'transito')
             ->has('paraDepositar', 0)
             ->has('enTransito', 1)
             ->where('enTransito.0.payment.deposit.place', 'in_transit'));

@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Support;
 
+use App\Modules\Ledger\Data\CashMonthDocumentData;
+use App\Modules\Ledger\Data\CashMonthLinkData;
+use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Enums\PeriodClosingStatus;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineMonthlyReport;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Access\Authorizable;
 
 /**
@@ -75,6 +81,66 @@ final class FineCashBoxModule implements CashBoxModule
     public function bankColumnNote(): string
     {
         return 'Lo reconocido en el libro de Multas. La cuenta es compartida con Aranceles: no es su saldo.';
+    }
+
+    /** La cuenta es compartida: lo que se muestra es lo que reconoció el libro. */
+    public function bankLedgerLabel(): string
+    {
+        return 'Reconocido en el libro de Multas';
+    }
+
+    /**
+     * La rendición mensual a la SAF (P02): sus dos notas sobre el cierre
+     * vigente del mes, las de versiones anteriores archivadas, y emitirlas
+     * cuando el mes está cerrado y todavía no salieron. Más los movimientos
+     * del mes, que son la consulta operativa del mismo período.
+     */
+    public function monthPanel(CarbonImmutable $month, ?PeriodClosing $closing, ?Authorizable $viewer): CashMonthPanelData
+    {
+        $veMultas = $viewer?->can('multas.ver') ?? false;
+        $informes = $closing === null || ! $veMultas
+            ? collect()
+            : FineMonthlyReport::query()
+                ->with('emitter:id,name')
+                ->where('period_closing_id', $closing->id)
+                ->orderByDesc('closing_version')
+                ->orderBy('kind', 'desc')
+                ->get();
+
+        $cerrado = $closing?->status === PeriodClosingStatus::Closed;
+        $vigentes = $informes->where('closing_version', $closing?->evidence_version);
+
+        $enlaces = [];
+
+        if ($veMultas) {
+            $enlaces[] = new CashMonthLinkData('Movimientos del mes', route('multas.movimientos.index', ['mes' => $month->format('Y-m')], absolute: false));
+            $enlaces[] = new CashMonthLinkData('Todas las rendiciones', route('multas.rendiciones.index', absolute: false));
+        }
+
+        return new CashMonthPanelData(
+            title: 'Rendición a la SAF',
+            documents: array_values($informes->map(fn (FineMonthlyReport $i): CashMonthDocumentData => new CashMonthDocumentData(
+                label: $i->kind === FineMonthlyReport::ON_TIME ? 'En término' : 'Fuera de término',
+                detail: $i->rows_count === 1 ? '1 ingreso' : $i->rows_count.' ingresos',
+                total: Decimal::scale($i->total),
+                version: $i->closing_version,
+                current: $i->closing_version === $closing?->evidence_version,
+                emittedAt: $i->emitted_at->toIso8601String(),
+                emittedBy: $i->emitter?->name,
+                viewUrl: route('multas.rendiciones.view', $i, absolute: false),
+                downloadUrl: route('multas.rendiciones.pdf', $i, absolute: false),
+            ))->all()),
+            emptyText: match (true) {
+                ! $veMultas => 'La rendición la ve quien puede ver multas.',
+                $closing === null => 'Se emite con el mes cerrado.',
+                ! $cerrado => 'El mes está reabierto: la rendición se emite al volver a cerrarlo.',
+                default => 'Sin rendición emitida para este cierre.',
+            },
+            emit: $cerrado && $vigentes->isEmpty() && ($viewer?->can('multas.rendicion.emitir') ?? false)
+                ? new CashMonthLinkData('Generar rendición', route('multas.rendiciones.store', $closing, absolute: false))
+                : null,
+            links: $enlaces,
+        );
     }
 
     /**

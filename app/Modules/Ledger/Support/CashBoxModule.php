@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Ledger\Support;
 
+use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\PeriodClosing;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Access\Authorizable;
 
 /**
@@ -73,4 +75,18 @@ interface CashBoxModule
      * @return array<int, string>
      */
     public function rowLinks(array $receiptIds, ?Authorizable $viewer): array;
+
+    /**
+     * Cómo se llama en el calendario lo que el libro de la caja reconoció en
+     * la cuenta bancaria, por mes y en el año. Nulo si la caja no lo
+     * muestra: con una cuenta propia, el saldo del banco ya lo dice.
+     */
+    public function bankLedgerLabel(): ?string;
+
+    /**
+     * Lo que el módulo agrega al mes del calendario: los papeles de su
+     * cierre mensual, cómo emitirlos y adónde seguir. Nulo si no agrega
+     * nada. `$closing` es el cierre mensual del mes, si existe.
+     */
+    public function monthPanel(CarbonImmutable $month, ?PeriodClosing $closing, ?Authorizable $viewer): ?CashMonthPanelData;
 }

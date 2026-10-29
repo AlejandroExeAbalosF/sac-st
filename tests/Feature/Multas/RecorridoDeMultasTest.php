@@ -126,10 +126,10 @@ class RecorridoDeMultasTest extends TestCase
 
         // El informado en septiembre e identificado en octubre conserva su presentación: en término.
         $this->actingAs($this->operador('contador'))
-            ->get(route('multas.caja.index'))
+            ->get(route('multas.creditos.identificar', $creditoInformado))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('creditos.items.0.credit.id', $creditoInformado->id)
-                ->where('creditos.items.0.reported.0.payment.id', $informado->id));
+                ->where('credit.id', $creditoInformado->id)
+                ->where('reported.0.payment.id', $informado->id));
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.pagos.verify', $informado), ['bankTransactionId' => $creditoInformado->id])
             ->assertSessionHasNoErrors();

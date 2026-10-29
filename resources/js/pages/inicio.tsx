@@ -208,7 +208,7 @@ const GRUPOS_DE_COLAS = [
     {
         title: 'Bloqueos',
         description: 'Falta un dato o una condición para poder continuar.',
-        keys: ['beneficiarios_sin_cbu'],
+        keys: ['beneficiarios_sin_cbu', 'multas_rechazos'],
     },
     {
         title: 'Para resolver',
@@ -221,6 +221,9 @@ const GRUPOS_DE_COLAS = [
             'caja_mes_sin_cerrar',
             'multas_caja_sin_cerrar',
             'multas_caja_mes_sin_cerrar',
+            'multas_pagos_informados',
+            'multas_creditos_sin_identificar',
+            'multas_por_depositar',
         ],
     },
     {
@@ -232,7 +235,11 @@ const GRUPOS_DE_COLAS = [
          * y no en «Para resolver», al revés que los fondos sin identificar,
          * que ya están en la cuenta esperando dueño.
          */
-        keys: ['ordenes_en_saf', 'comprobantes_sin_cruzar'],
+        keys: [
+            'ordenes_en_saf',
+            'comprobantes_sin_cruzar',
+            'multas_en_transito',
+        ],
     },
 ] as const;
 

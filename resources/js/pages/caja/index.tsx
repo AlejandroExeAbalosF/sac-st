@@ -269,15 +269,41 @@ export default function CajaIndex({
                 />
 
                 {/*
-                 * La observación de la apertura vive acá y no solo en su
-                 * pantalla: es la única explicación de dónde salieron los
-                 * tres saldos con los que arrancó la caja, y quien mira el
-                 * día no tiene por qué ir a buscarla a otro lado.
+                 * La apertura, a un clic: lleva al día en que se abrieron
+                 * los libros. Su observación —de dónde salieron los saldos
+                 * con los que arrancó la caja— se lee ese día, que es al que
+                 * explica; en los demás sería ruido.
                  */}
-                {opening?.notes && (
+                {opening !== null && (
                     <p className="text-sm text-muted-foreground">
-                        Libros abiertos el {formatDate(opening.date)}:{' '}
-                        {opening.notes}
+                        {selected.date === opening.date ? (
+                            <>
+                                Libros abiertos este día
+                                {opening.notes
+                                    ? `: ${opening.notes}`
+                                    : '.'}{' '}
+                                {/* La pantalla de la apertura es de quien abre: a los demás les daría 403. */}
+                                {can.open && (
+                                    <Link
+                                        href={enlace(rutas.apertura().url)}
+                                        className="text-primary hover:underline"
+                                    >
+                                        Ver la apertura
+                                    </Link>
+                                )}
+                            </>
+                        ) : (
+                            <Link
+                                href={enlace(
+                                    rutas.dia({
+                                        query: { fecha: opening.date },
+                                    }).url,
+                                )}
+                                className="hover:text-foreground hover:underline"
+                            >
+                                Libros abiertos el {formatDate(opening.date)}
+                            </Link>
+                        )}
                     </p>
                 )}
 

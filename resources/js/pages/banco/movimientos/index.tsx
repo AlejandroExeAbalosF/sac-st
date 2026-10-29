@@ -48,6 +48,21 @@ type Props = {
     canIgnore: boolean;
     canImport: boolean;
     hasAnyTransactions: boolean;
+    /** El último saldo que informó un extracto, por cuenta activa. */
+    balances: {
+        accountId: number;
+        label: string;
+        balance: string | null;
+        date: string | null;
+    }[];
+    /**
+     * Qué se puede hacer con cada crédito pendiente de la página, según el
+     * módulo que lleva la caja de su cuenta: identificarlo, o por qué no.
+     */
+    creditActions: Record<
+        number,
+        { label: string; href: string | null; note: string | null }
+    >;
 };
 
 const TONO: Record<string, StatusTone> = {
@@ -69,9 +84,9 @@ const ETIQUETA: Record<string, string> = {
  *
  * Es la cola de trabajo que hoy se resuelve a mano en las hojas
  * auxiliares del libro banco: los créditos sin identificar, con el CUIT
- * que el sistema encontró dentro del concepto cuando lo había. Desde acá
- * un crédito se convierte en recepción, que es el acto que lo mete en los
- * libros; ponerle dueño viene después, en la recepción misma.
+ * que el sistema encontró dentro del concepto cuando lo había. Un crédito
+ * pendiente de una cuenta con caja se identifica desde acá: el módulo de
+ * esa caja dice cómo (`creditActions`).
  */
 export default function MovimientosIndex({
     transactions,
@@ -80,6 +95,8 @@ export default function MovimientosIndex({
     canIgnore,
     canImport,
     hasAnyTransactions,
+    balances,
+    creditActions,
 }: Props) {
     const [buscar, setBuscar] = useState(filters.buscar ?? '');
     const [ignorando, setIgnorando] = useState<Movimiento | null>(null);
@@ -111,6 +128,34 @@ export default function MovimientosIndex({
                     title="Movimientos bancarios"
                     description={`${transactions.total} movimientos registrados desde los extractos importados.`}
                 />
+
+                {balances.length > 0 && (
+                    <ul
+                        aria-label="Saldo de cada cuenta según el banco"
+                        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                    >
+                        {balances.map((b) => (
+                            <li
+                                key={b.accountId}
+                                className="rounded-lg border bg-card px-4 py-3 shadow-raised"
+                            >
+                                <p className="text-xs tracking-wide text-field-label uppercase">
+                                    {b.label}
+                                </p>
+                                <p className="mt-1 text-lg tabular-nums">
+                                    {b.balance === null
+                                        ? '—'
+                                        : money(b.balance)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {b.date === null
+                                        ? 'Sin saldo informado por un extracto.'
+                                        : `Según el banco, al ${date(b.date)}.`}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
                 <div className="flex flex-wrap items-end gap-3">
                     <form
@@ -266,7 +311,10 @@ export default function MovimientosIndex({
                         ) : null}
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-lg border">
+                    // `contain`: sin él, el ancho de la tabla empuja al
+                    // contenedor de la página y aparece el scroll horizontal
+                    // de toda la pantalla en vez del de la tabla.
+                    <div className="overflow-x-auto rounded-lg border [contain:inline-size]">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50 text-left">
                                 <tr>
@@ -364,6 +412,9 @@ export default function MovimientosIndex({
                                         </td>
                                         <td className="p-2 text-right">
                                             <div className="flex items-center justify-end gap-1">
+                                                <AccionDelCredito
+                                                    accion={creditActions[m.id]}
+                                                />
                                                 {canIgnore &&
                                                     m.reconciliationStatus ===
                                                         'pending' && (
@@ -478,5 +529,36 @@ function DialogoIgnorar({
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * Lo que el módulo de la caja de la cuenta ofrece para un crédito pendiente:
+ * identificarlo en su pantalla, o una nota que dice por qué no desde acá.
+ */
+function AccionDelCredito({
+    accion,
+}: {
+    accion: Props['creditActions'][number] | undefined;
+}) {
+    if (accion === undefined) {
+        return null;
+    }
+
+    if (accion.href === null) {
+        return (
+            <span
+                className="max-w-[14rem] text-left text-xs text-muted-foreground"
+                title={accion.note ?? undefined}
+            >
+                {accion.label}
+            </span>
+        );
+    }
+
+    return (
+        <Button size="sm" variant="outline" asChild>
+            <Link href={accion.href}>{accion.label}</Link>
+        </Button>
     );
 }

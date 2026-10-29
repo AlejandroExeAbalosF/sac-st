@@ -19,6 +19,7 @@ import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import DayActivity from '@/features/caja/components/day-activity';
 import type { DayActivityEntry } from '@/features/caja/components/day-activity';
 import FlujoDelDia from '@/features/caja/components/day-workflow';
+import MonthPanel from '@/features/caja/components/month-panel';
 import { conMoneda } from '@/features/caja/moneda';
 import { useRutasDeCaja } from '@/features/caja/rutas';
 import { businessToday, date as formatDate, money } from '@/lib/format';
@@ -81,6 +82,17 @@ type Props = {
     sheetVersion: string;
     /** Días con movimientos sin cerrar, por mes `YYYY-MM`. */
     pendingDaysByMonth: Record<string, number>;
+    /**
+     * Lo que el libro de la caja reconoció en la cuenta bancaria, por mes
+     * (1 a 12) y en el año. Null si la caja no lo muestra.
+     */
+    bankLedger: {
+        label: string;
+        byMonth: Record<number, string>;
+        year: string;
+    } | null;
+    /** Lo que el módulo de la caja agrega al mes elegido, si agrega algo. */
+    monthPanel: App.Modules.Ledger.Data.CashMonthPanelData | null;
 };
 
 /**
@@ -160,6 +172,8 @@ export default function CajaCalendario({
     suggestedDenominations,
     sheetVersion,
     pendingDaysByMonth,
+    bankLedger,
+    monthPanel,
 }: Props) {
     const rutas = useRutasDeCaja();
     const enMes = selected.month !== null;
@@ -306,6 +320,24 @@ export default function CajaCalendario({
                             <div className="mt-4">
                                 <Leyenda />
                             </div>
+                            {bankLedger && (
+                                <p className="mt-4 text-sm text-muted-foreground">
+                                    {bankLedger.label} en el mes:{' '}
+                                    <Money
+                                        value={
+                                            bankLedger.byMonth[
+                                                selected.month ?? 0
+                                            ] ?? '0.00'
+                                        }
+                                        className="font-medium text-foreground"
+                                    />
+                                </p>
+                            )}
+                            {monthPanel && (
+                                <div className="mt-4">
+                                    <MonthPanel panel={monthPanel} />
+                                </div>
+                            )}
                         </div>
                         <PanelDelDia
                             detalle={dayDetail}
@@ -316,12 +348,25 @@ export default function CajaCalendario({
                         />
                     </div>
                 ) : (
-                    <GrillaDelAnio
-                        months={months}
-                        year={selected.year}
-                        hrefDe={(mes) => ir({ mes })}
-                        can={can}
-                    />
+                    <>
+                        {bankLedger && (
+                            <p className="text-sm text-muted-foreground">
+                                {bankLedger.label} en {selected.year}, hasta
+                                hoy:{' '}
+                                <Money
+                                    value={bankLedger.year}
+                                    className="font-semibold text-foreground"
+                                />
+                            </p>
+                        )}
+                        <GrillaDelAnio
+                            months={months}
+                            year={selected.year}
+                            hrefDe={(mes) => ir({ mes })}
+                            can={can}
+                            reconocido={bankLedger}
+                        />
+                    </>
                 )}
 
                 {!enMes && <Leyenda />}
@@ -429,11 +474,13 @@ function GrillaDelAnio({
     year,
     hrefDe,
     can,
+    reconocido,
 }: {
     months: Mes[];
     year: number;
     hrefDe: (mes: number) => string;
     can: Props['can'];
+    reconocido: Props['bankLedger'];
 }) {
     const rutas = useRutasDeCaja();
 
@@ -472,6 +519,15 @@ function GrillaDelAnio({
                             ? 'Sin movimientos'
                             : `${mes.daysClosed} de ${mes.daysWithMovements} días con movimiento, cerrados`}
                     </p>
+                    {reconocido && !mes.isFuture && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Reconocido en el libro:{' '}
+                            <Money
+                                value={reconocido.byMonth[mes.month] ?? '0.00'}
+                                dimWhenZero
+                            />
+                        </p>
+                    )}
 
                     <div className="mt-3 flex gap-2">
                         {!mes.isFuture && (

@@ -42,10 +42,14 @@ class CreditosYMovimientosDeMultasTest extends TestCase
 
     private BankAccount $laCuenta;
 
-    // ── La cola ──────────────────────────────────────────────────────────
+    // ── Identificar desde Banco › Movimientos ───────────────────────────
 
-    /** La cola es la de la cuenta: sin lo ya usado, y el panel cuenta lo mismo. */
-    public function test_the_queue_lists_only_free_credits_and_the_panel_counts_the_same(): void
+    /**
+     * La lista del banco ofrece identificar solo lo libre: la acreditación
+     * de un depósito de la caja ya está imputada. Identificar es de quien
+     * concilia, y el depósito se reconoce desde la misma pantalla.
+     */
+    public function test_the_bank_list_offers_to_identify_only_free_credits(): void
     {
         $multa = $this->escenario();
         $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
@@ -57,19 +61,43 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             'depositDate' => '2026-09-15', 'ticket' => UploadedFile::fake()->image('ticket.jpg'), 'idempotencyKey' => (string) Str::uuid(),
         ])->assertSessionHasNoErrors();
         $acreditacion = $this->credito('5000.00');
-        $traslado = CashToBankTransfer::query()->sole();
-        $this->actingAs($this->operador('contador'))->post(route('multas.traslados.confirm', $traslado), [
-            'bankTransactionId' => $acreditacion->id, 'idempotencyKey' => (string) Str::uuid(),
-        ])->assertSessionHasNoErrors();
 
-        $this->actingAs($this->operador('consulta'))
-            ->get(route('multas.caja.index'))
+        // El crédito del depósito todavía libre: la pantalla ofrece el depósito de la caja.
+        $this->actingAs($this->operador('contador'))
+            ->get(route('multas.creditos.identificar', $acreditacion))
             ->assertInertia(fn (Assert $page) => $page
-                ->has('creditos.items', 1)
-                ->where('creditos.items.0.credit.id', $libre->id)
-                ->where('bank.unclassifiedCount', 1)
-                ->where('bank.unclassifiedAmount', '7300.00')
-                ->where('canIdentify', false));
+                ->component('multas/identificar-credito')
+                ->where('credit.id', $acreditacion->id)
+                ->where('deposits.0.payment.id', $pago->id)
+                ->has('reported', 0));
+
+        $traslado = CashToBankTransfer::query()->sole();
+        $this->actingAs($this->operador('contador'))
+            ->from(route('multas.creditos.identificar', $acreditacion))
+            ->post(route('multas.traslados.confirm', $traslado), [
+                'bankTransactionId' => $acreditacion->id, 'idempotencyKey' => (string) Str::uuid(),
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('multas.creditos.identificar', $acreditacion));
+
+        // Ya identificado, la pantalla vuelve sola a la lista.
+        $this->actingAs($this->operador('contador'))
+            ->get(route('multas.creditos.identificar', $acreditacion))
+            ->assertRedirect(route('banco.movimientos.index', ['cuenta' => $this->laCuenta->id, 'estado' => 'pending']));
+
+        $this->actingAs($this->operador('contador'))
+            ->get(route('banco.movimientos.index', ['cuenta' => $this->laCuenta->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where("creditActions.{$libre->id}.label", 'Identificar')
+                ->missing("creditActions.{$acreditacion->id}"));
+
+        // Quien no concilia ve la lista sin la acción, y la pantalla le da 403.
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('banco.movimientos.index', ['cuenta' => $this->laCuenta->id]))
+            ->assertInertia(fn (Assert $page) => $page->missing("creditActions.{$libre->id}"));
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.creditos.identificar', $libre))
+            ->assertForbidden();
     }
 
     /**
@@ -91,11 +119,10 @@ class CreditosYMovimientosDeMultasTest extends TestCase
 
         $this->travelTo(CarbonImmutable::parse('2026-10-02 10:00'));
         $this->actingAs($this->operador('contador'))
-            ->get(route('multas.caja.index'))
+            ->get(route('multas.creditos.identificar', $credito))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('creditos.items.0.credit.id', $credito->id)
-                ->where('creditos.items.0.reported.0.payment.id', $informado->id)
-                ->where('canIdentify', true));
+                ->where('credit.id', $credito->id)
+                ->where('reported.0.payment.id', $informado->id));
 
         $this->actingAs($this->operador('contador'))
             ->post(route('multas.pagos.verify', $informado), ['bankTransactionId' => $credito->id])
@@ -108,8 +135,8 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             ->and(FinePaymentReceipt::query()->where('fine_payment_id', $informado->id)->exists())->toBeTrue();
 
         $this->actingAs($this->operador('contador'))
-            ->get(route('multas.caja.index'))
-            ->assertInertia(fn (Assert $page) => $page->has('creditos.items', 0));
+            ->get(route('multas.creditos.identificar', $credito))
+            ->assertRedirect();
     }
 
     /** Un crédito que nadie informó: se busca la multa y se registra el pago, que se presenta hoy. */
@@ -185,8 +212,9 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             ->and(FinePayment::query()->where('medium', 'bank_transfer')->exists())->toBeFalse();
 
         $this->actingAs($this->operador('contador'))
-            ->get(route('multas.caja.index'))
-            ->assertInertia(fn (Assert $page) => $page->where('creditos.items.0.credit.id', $credito->id));
+            ->get(route('multas.creditos.identificar', $credito))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('credit.id', $credito->id));
     }
 
     /** Mirar la cola es de cualquiera que mire la caja; identificar, de quien concilia. */
@@ -269,36 +297,22 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             ->and(array_filter($filas, fn (array $f): bool => str_contains(mb_strtolower((string) $f[0]), 'total general')))->toBe([]);
     }
 
-    /** La cola se recorre entera: los de Aranceles no tapan a los que vienen detrás. */
-    public function test_the_queue_is_paged_so_every_credit_can_be_reached(): void
+    /**
+     * La pantalla es de la cuenta de Multas y de lo que se identifica desde
+     * su apertura: un crédito de otra cuenta no existe acá, y uno anterior a
+     * la apertura vuelve a la lista, que dice cómo se usa.
+     */
+    public function test_the_identify_screen_is_only_for_free_credits_of_the_multas_account(): void
     {
         $this->escenario();
         $this->travelTo(CarbonImmutable::parse('2026-09-20 10:00'));
-
-        for ($i = 1; $i <= 51; $i++) {
-            $ultimo = $this->credito((string) (1000 + $i).'.00', '2026-09-'.str_pad((string) (1 + intdiv($i, 3)), 2, '0', STR_PAD_LEFT));
-        }
+        $otraCuenta = $this->cuenta('310000111222333');
+        $ajeno = $this->movimiento($otraCuenta, '2026-09-20', '700.00');
+        $anterior = $this->movimiento($this->laCuenta, '2026-05-02', '800.00');
 
         $contador = $this->operador('contador');
-
-        $this->actingAs($contador)
-            ->get(route('multas.caja.index'))
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('creditos.items', 50)
-                ->where('creditos.page', 1)
-                ->where('creditos.lastPage', 2)
-                ->where('bank.unclassifiedCount', 51));
-
-        $this->actingAs($contador)
-            ->get(route('multas.caja.index', ['creditos' => 2]))
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('creditos.items', 1)
-                ->where('creditos.items.0.credit.id', $ultimo->id));
-
-        // Una página que ya no existe cae en la última, no en una cola vacía.
-        $this->actingAs($contador)
-            ->get(route('multas.caja.index', ['creditos' => 9]))
-            ->assertInertia(fn (Assert $page) => $page->where('creditos.page', 2)->has('creditos.items', 1));
+        $this->actingAs($contador)->get(route('multas.creditos.identificar', $ajeno))->assertNotFound();
+        $this->actingAs($contador)->get(route('multas.creditos.identificar', $anterior))->assertRedirect();
     }
 
     /** Lo aplicado a la deuda y el excedente van separados, en pantalla y en el Excel. */

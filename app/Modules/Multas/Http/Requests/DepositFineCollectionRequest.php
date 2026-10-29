@@ -30,7 +30,7 @@ final class DepositFineCollectionRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'ticket' => ScannedDocument::rules(required: true),
             'idempotencyKey' => ['required', 'string', 'max:120'],
-            'desde' => ['nullable', 'in:caja,multa'],
+            'desde' => ['nullable', 'in:pendientes,multa'],
         ];
     }
 

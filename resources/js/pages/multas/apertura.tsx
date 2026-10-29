@@ -1,19 +1,11 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    BookOpen,
-    CalendarDays,
-    Landmark,
-    Lock,
-    Scale,
-    Wallet,
-} from 'lucide-react';
+import { BookOpen, Wallet } from 'lucide-react';
 import { useMemo } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
-import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -38,132 +30,61 @@ import type {
     AperturaExistente,
     Cheque,
 } from '@/features/caja/components/opening-parts';
-import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
-import CollectionDeposit from '@/features/multas/components/collection-deposit';
-import UnidentifiedCredits from '@/features/multas/components/unidentified-credits';
-import { PAYMENT_MEDIUM } from '@/features/multas/labels';
-import { businessToday, date, isNonZero } from '@/lib/format';
+import { businessToday } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
-import {
-    calendario as calendarioDeMultas,
-    dia as diaDeMultas,
-} from '@/routes/multas/caja';
+import { dia as diaDeMultas } from '@/routes/multas/caja';
 import { store } from '@/routes/multas/caja/apertura';
-import { index as arqueosDeMultas } from '@/routes/multas/caja/arqueos';
-import { index as cierresDeMultas } from '@/routes/multas/caja/cierres';
 
 type CuentaBancaria = { id: number; label: string };
-type Banco = App.Modules.Multas.Data.FineBankPanelData;
-type Cobro = App.Modules.Multas.Data.FinePendingPaymentData;
-
-type Props = {
-    opening: AperturaExistente | null;
-    bank: Banco | null;
-    bankAccounts: CuentaBancaria[];
-    suggestedDenominations: number[];
-    canOpen: boolean;
-    paraDepositar: Cobro[];
-    enTransito: Cobro[];
-    canDeposit: boolean;
-    canConfirmDeposit: boolean;
-    canViewAttachments: boolean;
-    rechazados: Cobro[];
-    canManageRejections: boolean;
-    canReplaceCheque: boolean;
-    /** Ver la caja del día, los arqueos y los cierres de Multas. */
-    canViewCashDay: boolean;
-    /** Los créditos de la cuenta compartida que nadie identificó, los más viejos. */
-    creditos: {
-        items: App.Modules.Multas.Data.FineUnidentifiedCreditData[];
-        page: number;
-        lastPage: number;
-    };
-    canIdentify: boolean;
-    firmantes: Firmante[];
-};
 
 const EFECTIVO = 'CASH_ON_HAND';
 const CHEQUES = 'CHEQUES_IN_CUSTODY';
 
 /**
- * La caja de Multas: su apertura y la cuenta con la que opera.
+ * La apertura de la caja de Multas: una sola vez, al empezar a operar.
  *
  * Abre como la de Haberes —el efectivo contado por billete y los cheques
  * detallados—, pero **sin saldo bancario**: la cuenta es compartida con
- * Aranceles y su saldo no se reparte. Abierta, muestra los dos números que
- * no se suman nunca: lo que dice el banco de la cuenta entera y lo
- * reconocido en el libro de Multas.
+ * Aranceles y su saldo no se reparte. Hecha, muestra lo declarado y la
+ * cuenta con la que opera; el día a día está en la caja del día, que enlaza
+ * acá desde el día de la apertura.
  */
-export default function CajaDeMultas({
+export default function AperturaDeMultas({
     opening,
-    bank,
+    bankAccountLabel,
     bankAccounts,
     suggestedDenominations,
     canOpen,
-    paraDepositar,
-    enTransito,
-    canDeposit,
-    canConfirmDeposit,
-    canViewAttachments,
-    rechazados,
-    canManageRejections,
-    canReplaceCheque,
-    canViewCashDay,
-    creditos,
-    canIdentify,
-    firmantes,
-}: Props) {
-    const permisos = {
-        canDeposit,
-        canConfirmDeposit,
-        canViewAttachments,
-        canManageRejections,
-        canReplaceCheque,
-    };
-
+}: {
+    opening: AperturaExistente | null;
+    bankAccountLabel: string | null;
+    bankAccounts: CuentaBancaria[];
+    suggestedDenominations: number[];
+    canOpen: boolean;
+}) {
     return (
         <>
-            <Head title="Caja de Multas" />
+            <Head title="Apertura de la caja de Multas" />
 
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Multas"
-                    title="Caja de Multas"
-                    description="El efectivo y los cheques de la caja, y la cuenta bancaria con la que opera."
+                    title="Apertura de la caja"
+                    description="Lo que había en la caja al empezar a operar con el sistema, y la cuenta bancaria con la que opera."
                     actions={
-                        /*
-                         * La caja del día, el arqueo y el cierre de Multas
-                         * son las pantallas de Caja: esta es su puerta.
-                         * Sin apertura no hay día que mirar.
-                         */
-                        opening &&
-                        canViewCashDay && (
-                            <>
-                                <Button variant="outline" asChild>
-                                    <Link href={calendarioDeMultas().url}>
-                                        <CalendarDays className="size-4" />
-                                        Calendario
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <Link href={arqueosDeMultas().url}>
-                                        <Scale className="size-4" />
-                                        Arqueos
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <Link href={cierresDeMultas().url}>
-                                        <Lock className="size-4" />
-                                        Cierres
-                                    </Link>
-                                </Button>
-                                <Button asChild>
-                                    <Link href={diaDeMultas().url}>
-                                        <Wallet className="size-4" />
-                                        Caja del día
-                                    </Link>
-                                </Button>
-                            </>
+                        opening && (
+                            <Button asChild>
+                                <Link
+                                    href={
+                                        diaDeMultas({
+                                            query: { fecha: opening.date },
+                                        }).url
+                                    }
+                                >
+                                    <Wallet className="size-4" />
+                                    Ir al día de la apertura
+                                </Link>
+                            </Button>
                         )
                     }
                 />
@@ -171,41 +92,16 @@ export default function CajaDeMultas({
                 {opening ? (
                     <>
                         <AperturaHecha existing={opening} />
-                        {bank && <PanelBancario banco={bank} />}
-                        {bank && (
-                            <UnidentifiedCredits
-                                creditos={creditos.items}
-                                pagina={creditos.page}
-                                ultimaPagina={creditos.lastPage}
-                                cantidad={bank.unclassifiedCount}
-                                total={bank.unclassifiedAmount}
-                                puedeIdentificar={canIdentify}
-                                firmantes={firmantes}
-                            />
+                        {bankAccountLabel && (
+                            <p className="text-sm text-muted-foreground">
+                                Opera con la cuenta{' '}
+                                <span className="font-medium text-foreground">
+                                    {bankAccountLabel}
+                                </span>
+                                , compartida con Aranceles: su saldo no se suma
+                                a la caja.
+                            </p>
                         )}
-                        <Cobros
-                            titulo="Cobros por depositar"
-                            vacio="No hay cobros en la caja esperando el depósito."
-                            cobros={paraDepositar}
-                            {...permisos}
-                        />
-                        <Cobros
-                            titulo="Depositado, sin acreditar"
-                            vacio="No hay depósitos esperando al extracto."
-                            cobros={enTransito}
-                            {...permisos}
-                        />
-                        {/*
-                         * Un rechazo sigue acá mientras falte algo: el
-                         * reemplazo de la empresa, un hecho del banco o los
-                         * papeles. Con reemplazo y débito pendiente, también.
-                         */}
-                        <Cobros
-                            titulo="Cheques rechazados con algo pendiente"
-                            vacio="No hay cheques rechazados con algo pendiente."
-                            cobros={rechazados}
-                            {...permisos}
-                        />
                     </>
                 ) : canOpen ? (
                     <FormularioDeApertura
@@ -494,163 +390,5 @@ function FormularioDeApertura({
                 </div>
             </form>
         </>
-    );
-}
-
-/**
- * Los dos números de la cuenta, separados y nunca sumados (M08, M12).
- */
-function PanelBancario({ banco }: { banco: Banco }) {
-    return (
-        <section
-            aria-label="Cuenta bancaria"
-            className="rounded-lg border bg-card shadow-raised"
-        >
-            <div className="flex items-center gap-2 border-b px-5 py-3">
-                <Landmark
-                    className="size-4 text-muted-foreground"
-                    aria-hidden="true"
-                />
-                <h2 className="text-sm font-semibold">
-                    {banco.bankAccountLabel}
-                </h2>
-            </div>
-
-            <div className="grid gap-px bg-border sm:grid-cols-2">
-                <div className="bg-card p-5">
-                    <p className="text-xs tracking-wide text-field-label uppercase">
-                        Saldo de la cuenta según el banco
-                    </p>
-                    <p className="mt-1 text-lg">
-                        <Money value={banco.latestStatementBalance} />
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        {banco.latestStatementDate
-                            ? `Último extracto: ${date(banco.latestStatementDate)}. `
-                            : 'Sin extractos importados. '}
-                        Es la cuenta entera, compartida con Aranceles: no es
-                        plata de Multas.
-                    </p>
-                </div>
-
-                <div className="bg-card p-5">
-                    <p className="flex items-center gap-1.5 text-xs tracking-wide text-field-label uppercase">
-                        <Wallet className="size-3.5" aria-hidden="true" />
-                        Reconocido en el libro de Multas
-                    </p>
-                    <p className="mt-1 text-lg font-semibold">
-                        <Money value={banco.bookBalance} />
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        Depósitos acreditados y pagos bancarios verificados de
-                        Multas, menos las salidas registradas en su libro. No
-                        representa una parte del saldo de la cuenta compartida.
-                    </p>
-                    {isNonZero(banco.unclassifiedAmount) && (
-                        <p className="mt-2 text-xs text-warning-strong">
-                            {banco.unclassifiedCount}{' '}
-                            {banco.unclassifiedCount === 1
-                                ? 'crédito desde la apertura sin reconocer'
-                                : 'créditos desde la apertura sin reconocer'}{' '}
-                            por <Money value={banco.unclassifiedAmount} />:
-                            todavía no se sabe de qué caja{' '}
-                            {banco.unclassifiedCount === 1 ? 'es' : 'son'}.
-                        </p>
-                    )}
-                </div>
-            </div>
-        </section>
-    );
-}
-
-/**
- * Los cobros de la caja en un mismo lugar —por depositar, o depositados
- * esperando al extracto—, del más viejo al más nuevo. Cada uno va al banco
- * entero y en su propio depósito (M06).
- */
-function Cobros({
-    titulo,
-    vacio,
-    cobros,
-    canDeposit,
-    canConfirmDeposit,
-    canViewAttachments,
-    canManageRejections,
-    canReplaceCheque,
-}: {
-    titulo: string;
-    vacio: string;
-    cobros: Cobro[];
-    canDeposit: boolean;
-    canConfirmDeposit: boolean;
-    canViewAttachments: boolean;
-    canManageRejections: boolean;
-    canReplaceCheque: boolean;
-}) {
-    return (
-        <section className="rounded-lg border bg-card shadow-raised">
-            <div className="flex items-center justify-between gap-4 border-b px-5 py-3">
-                <h2 className="text-sm font-semibold">{titulo}</h2>
-                <StatusBadge
-                    label={String(cobros.length)}
-                    tone={cobros.length > 0 ? 'action' : 'neutral'}
-                />
-            </div>
-            {cobros.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-muted-foreground">
-                    {vacio}
-                </p>
-            ) : (
-                <ul className="divide-y">
-                    {cobros.map((fila) => (
-                        <li
-                            key={fila.payment.id}
-                            className="grid gap-2 px-5 py-3 text-sm"
-                        >
-                            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                                <Link
-                                    href={fila.fineHref}
-                                    className="font-medium hover:underline"
-                                >
-                                    {fila.fineCaption}
-                                </Link>
-                                <span className="font-mono text-xs text-muted-foreground">
-                                    Expte. {fila.caseLabel}
-                                </span>
-                                <span>
-                                    {PAYMENT_MEDIUM[fila.payment.medium]}
-                                    {(fila.payment.deposit?.chequeNumber ??
-                                        fila.payment.chequeNumber) &&
-                                        ` n.º ${fila.payment.deposit?.chequeNumber ?? fila.payment.chequeNumber}`}{' '}
-                                    · <Money value={fila.payment.amount} />
-                                </span>
-                                <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
-                                    Recibo{' '}
-                                    {fila.payment.talonarioNumber ??
-                                        fila.payment.receiptNumber ??
-                                        '—'}
-                                    {fila.payment.receiptDate &&
-                                        ` del ${date(fila.payment.receiptDate)}`}
-                                </span>
-                            </div>
-                            {fila.payment.deposit && (
-                                <CollectionDeposit
-                                    paymentId={fila.payment.id}
-                                    amount={fila.payment.amount}
-                                    deposito={fila.payment.deposit}
-                                    desde="caja"
-                                    canDeposit={canDeposit}
-                                    canConfirm={canConfirmDeposit}
-                                    canViewAttachments={canViewAttachments}
-                                    isCheque={fila.payment.medium === 'cheque'}
-                                    canManageRejections={canManageRejections}
-                                    canReplaceCheque={canReplaceCheque}
-                                />
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </section>
     );
 }

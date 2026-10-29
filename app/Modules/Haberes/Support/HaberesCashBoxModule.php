@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Support;
 
+use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Excel\CashSheet;
@@ -11,6 +12,7 @@ use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Access\Authorizable;
 
 /**
@@ -52,6 +54,18 @@ final class HaberesCashBoxModule implements CashBoxModule
     }
 
     public function bankColumnNote(): ?string
+    {
+        return null;
+    }
+
+    /** Ninguno: la cuenta es solo de Haberes y su saldo lo dice el banco. */
+    public function bankLedgerLabel(): ?string
+    {
+        return null;
+    }
+
+    /** Nada: el cierre mensual de Haberes no emite papeles propios. */
+    public function monthPanel(CarbonImmutable $month, ?PeriodClosing $closing, ?Authorizable $viewer): ?CashMonthPanelData
     {
         return null;
     }

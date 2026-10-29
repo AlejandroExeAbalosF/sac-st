@@ -60,6 +60,16 @@ class CalendarioDeCajaTest extends TestCase
             );
     }
 
+    /** Haberes no agrega nada al mes ni muestra lo reconocido: su cuenta es propia. */
+    public function test_haberes_no_agrega_panel_al_mes_ni_lo_reconocido(): void
+    {
+        $this->actingAs($this->operador('administrativo'))
+            ->get('/caja/calendario?anio=2026&mes=5')
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('bankLedger', null)
+                ->where('monthPanel', null));
+    }
+
     /**
      * El día del que se viene abre el mes y queda marcado.
      *

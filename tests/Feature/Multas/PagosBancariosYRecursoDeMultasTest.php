@@ -191,14 +191,17 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $this->actingAs($administrativo)
             ->post(route('multas.pagos-bancarios.store', $multa), $this->informe('100.00'))
             ->assertSessionHasNoErrors();
-        $this->get(route('multas.pagos.index'))->assertForbidden();
+        // Quien no concilia ve los pendientes sin la pestaña de informados.
+        $this->get(route('multas.pendientes.index', ['pestana' => 'informados']))
+            ->assertInertia(fn (Assert $page) => $page->where('tab', 'depositar')->has('informados', 0)->where('can.verify', false));
         $this->post(route('multas.pagos.verify', FinePayment::query()->sole()), ['bankTransactionId' => 1])->assertForbidden();
 
         $this->withoutVite();
         $this->actingAs($this->operador('contador'))
-            ->get(route('multas.pagos.index'))
+            ->get(route('multas.pendientes.index'))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('multas/pagos')
+            ->assertInertia(fn (Assert $page) => $page->component('multas/pendientes')
+                ->where('tab', 'informados')
                 ->has('informados', 1)
                 ->where('informados.0.fineCaption', 'CRISTOMAX S.A.S'));
     }

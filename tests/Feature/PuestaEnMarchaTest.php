@@ -51,7 +51,7 @@ class PuestaEnMarchaTest extends TestCase
 
         $this->get(route('inicio'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('setup.2.href', route('multas.caja.index', absolute: false))
+                ->where('setup.2.href', route('multas.caja.apertura.index', absolute: false))
                 ->where('setup.2.blockedBy', null));
     }
 

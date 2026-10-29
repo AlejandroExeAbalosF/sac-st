@@ -20,10 +20,12 @@ use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\CashBankLedger;
 use App\Modules\Ledger\Support\CashCalendar;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Ledger\Support\CashDayTakings;
 use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -49,6 +51,7 @@ final class CashCalendarController extends Controller
         private readonly CashBalance $saldos,
         private readonly CashDayTakings $recaudacion,
         private readonly CashDayActivity $actividad,
+        private readonly CashBankLedger $banco,
     ) {}
 
     public function index(Request $request): Response
@@ -78,6 +81,8 @@ final class CashCalendarController extends Controller
          * marcado alcanza para elegir el mes, que es de donde sale.
          */
         $mes = $this->month($request, $dia);
+        $modulo = $this->cashBoxModule($request);
+        $rotuloDelBanco = $modulo->bankLedgerLabel();
 
         return Inertia::render('caja/calendario', [
             'selected' => [
@@ -99,6 +104,22 @@ final class CashCalendarController extends Controller
             'monthlyClosing' => $mes === null
                 ? null
                 : $this->monthlyClosing((int) $caja->id, $anio, $mes, $moneda),
+            /*
+             * Lo que el libro de la caja reconoció en la cuenta, mes a mes y
+             * en el año, si el módulo lo muestra: con una cuenta compartida
+             * es lo único propio que se puede decir de ella.
+             */
+            'bankLedger' => $rotuloDelBanco === null ? null : [
+                'label' => $rotuloDelBanco,
+                'byMonth' => $porMes = $this->banco->byMonth((int) $caja->id, $anio, $moneda),
+                'year' => array_reduce($porMes, fn (string $total, string $mes): string => Decimal::add($total, $mes), '0.00'),
+            ],
+            /* Lo que el módulo agrega al mes: para Multas, la rendición a la SAF. */
+            'monthPanel' => $mes === null ? null : $modulo->monthPanel(
+                CarbonImmutable::create($anio, $mes, 1),
+                $this->monthlyClosingModel((int) $caja->id, $anio, $mes, $moneda),
+                $request->user(),
+            ),
             /*
              * El arqueo y el cierre del día elegido, las mismas tarjetas que
              * la caja del día. Solo se calculan cuando hay un día marcado
@@ -232,15 +253,20 @@ final class CashCalendarController extends Controller
         int $month,
         Currency $currency,
     ): ?PeriodClosingListItemData {
-        $cierre = PeriodClosing::query()
+        $cierre = $this->monthlyClosingModel($cashBoxId, $year, $month, $currency);
+
+        return $cierre === null ? null : PeriodClosingListItemData::fromModel($cierre);
+    }
+
+    private function monthlyClosingModel(int $cashBoxId, int $year, int $month, Currency $currency): ?PeriodClosing
+    {
+        return PeriodClosing::query()
             ->with(['closedBy', 'reopenedBy'])
             ->where('cash_box_id', $cashBoxId)
             ->where('currency', $currency)
             ->where('period_type', PeriodType::Monthly)
             ->whereDate('period_from', CarbonImmutable::create($year, $month, 1))
             ->first();
-
-        return $cierre === null ? null : PeriodClosingListItemData::fromModel($cierre);
     }
 
     /** Un año razonable, y nunca uno que no existe todavía. */

@@ -8,6 +8,7 @@ use App\Modules\Ledger\Http\Controllers\CashCountController;
 use App\Modules\Ledger\Http\Controllers\PeriodClosingController;
 use App\Modules\Multas\Http\Controllers\FineAppealController;
 use App\Modules\Multas\Http\Controllers\FineAttachmentController;
+use App\Modules\Multas\Http\Controllers\FineBankCreditController;
 use App\Modules\Multas\Http\Controllers\FineBankPaymentController;
 use App\Modules\Multas\Http\Controllers\FineCaseController;
 use App\Modules\Multas\Http\Controllers\FineCashController;
@@ -189,7 +190,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::get('traslados/{transfer}/candidatos', [FineDepositController::class, 'candidates'])->whereNumber('transfer')->name('traslados.candidates');
         Route::post('traslados/{transfer}/acreditar', [FineDepositController::class, 'confirm'])->whereNumber('transfer')->name('traslados.confirm');
         Route::post('traslados/{transfer}/cancelar', [FineDepositController::class, 'cancel'])->whereNumber('transfer')->name('traslados.cancel');
-        Route::get('pagos', [FinePaymentQueueController::class, 'index'])->name('pagos.index');
+        // Un crédito de la cuenta, desde Banco › Movimientos: el pago de una multa o un depósito de la caja.
+        Route::get('creditos/{transaction}/identificar', [FineBankCreditController::class, 'show'])
+            ->whereNumber('transaction')
+            ->name('creditos.identificar');
         Route::post('{fine}/pagos-bancarios/verificados', [FineBankPaymentController::class, 'storeVerified'])
             ->whereNumber('fine')
             ->name('pagos-bancarios.verificados.store');
@@ -211,7 +215,10 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 
         // Como `/haberes/expedientes`: el listado, por expediente o por multa.
         Route::get('expedientes', [FineController::class, 'index'])->name('index');
-        Route::get('caja', [FineCashController::class, 'index'])->name('caja.index');
+        // La apertura de la caja, hecha una sola vez, y lo que se declaró.
+        Route::get('caja/apertura', [FineCashController::class, 'apertura'])->name('caja.apertura.index');
+        // Lo que espera a alguien: pagos informados, cobros camino al banco y rechazos.
+        Route::get('pendientes', [FinePaymentQueueController::class, 'index'])->name('pendientes.index');
         // La consulta operativa de un mes: no es la rendición oficial (P02).
         Route::get('movimientos', [FineMovementController::class, 'index'])->name('movimientos.index');
         Route::get('movimientos/exportar', [FineMovementController::class, 'export'])->name('movimientos.exportar');
@@ -233,8 +240,8 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 |
 | Son las pantallas de caja de Ledger, las mismas de Haberes, con la caja de
 | Multas (`caja:multas`) y sus permisos propios: cerrar una caja no habilita
-| a cerrar la otra. La apertura, la cuenta y los depósitos siguen en
-| `/multas/caja`, que es la puerta de esta caja.
+| a cerrar la otra. La apertura vive en `/multas/caja/apertura`; los
+| depósitos, en los pendientes de Multas.
 */
 Route::middleware(['auth', 'verified', 'caja:multas'])->prefix('multas/caja')->name('multas.caja.')->group(function (): void {
     Route::middleware('can:multas.caja.ver')->group(function (): void {

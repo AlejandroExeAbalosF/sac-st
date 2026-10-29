@@ -9,6 +9,7 @@ use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
+use App\Modules\Banking\Support\BankCreditHandlers;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
 use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
 use App\Modules\Haberes\Support\HaberesCashBoxModule;
@@ -19,6 +20,7 @@ use App\Modules\Ledger\Support\CashBoxModules;
 use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Multas\Audit\MultasAuditCatalog;
 use App\Modules\Multas\Permissions\MultasPermissionCatalog;
+use App\Modules\Multas\Support\FineBankCreditHandler;
 use App\Modules\Multas\Support\FineCashBoxModule;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
@@ -68,6 +70,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CashBoxModules::class, fn ($app): CashBoxModules => new CashBoxModules($app, [
             CashBox::HABERES => HaberesCashBoxModule::class,
             CashBox::MULTAS => FineCashBoxModule::class,
+        ]));
+
+        /*
+         * Quién identifica un crédito pendiente desde Banco › Movimientos.
+         * Banking muestra la lista; cada módulo responde por su cuenta.
+         */
+        $this->app->singleton(BankCreditHandlers::class, fn ($app): BankCreditHandlers => new BankCreditHandlers($app, [
+            FineBankCreditHandler::class,
         ]));
     }
 

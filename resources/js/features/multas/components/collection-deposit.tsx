@@ -47,7 +47,7 @@ export default function CollectionDeposit({
     amount: string;
     deposito: Deposito;
     /** A dónde vuelve la pantalla del depósito. */
-    desde: 'caja' | 'multa';
+    desde: 'pendientes' | 'multa';
     canDeposit: boolean;
     canConfirm: boolean;
     canViewAttachments: boolean;
