@@ -159,35 +159,50 @@ export default function NuevaMulta({
     fijo,
     preseleccion,
 }: Props) {
-    const { data, setData, post, transform, processing, errors } = useForm<{
-        caseNumber: string;
-        caseNotes: string;
-        caseFile: File | null;
-        resolutionId: number | null;
-        resolution: { text: string; issuedOn: string };
-        resolutionFile: File | null;
-        actIds: number[];
-        acts: NuevaActa[];
-        caption: string;
-        personId: number | null;
-        registeredOn: string;
-        amount: string;
-    }>({
-        caseNumber: existente?.originalText ?? '',
-        caseNotes: '',
-        caseFile: null,
-        resolutionId: preseleccion.resolutionId,
-        resolution: { text: '', issuedOn: '' },
-        resolutionFile: null,
-        actIds: preseleccion.actIds,
-        acts: [],
-        caption: '',
-        personId: null,
-        registeredOn: businessToday(),
-        amount: '',
-    });
+    const { data, setData, post, transform, processing, errors, clearErrors } =
+        useForm<{
+            caseNumber: string;
+            caseNotes: string;
+            caseFile: File | null;
+            resolutionId: number | null;
+            resolution: { text: string; issuedOn: string };
+            resolutionFile: File | null;
+            actIds: number[];
+            acts: NuevaActa[];
+            caption: string;
+            personId: number | null;
+            registeredOn: string;
+            amount: string;
+        }>({
+            caseNumber: existente?.originalText ?? '',
+            caseNotes: '',
+            caseFile: null,
+            resolutionId: preseleccion.resolutionId,
+            resolution: { text: '', issuedOn: '' },
+            resolutionFile: null,
+            actIds: preseleccion.actIds,
+            acts: [],
+            caption: '',
+            personId: null,
+            registeredOn: businessToday(),
+            amount: '',
+        });
 
     const errores = errors as Record<string, string | undefined>;
+    const limpiarErrores = clearErrors as (...campos: string[]) => void;
+
+    const actualizarCampo = <K extends keyof typeof data>(
+        campo: K,
+        valor: (typeof data)[K],
+        ...erroresRelacionados: string[]
+    ) => {
+        setData((actual) => ({ ...actual, [campo]: valor }));
+        limpiarErrores(
+            ...(erroresRelacionados.length > 0
+                ? erroresRelacionados
+                : [String(campo)]),
+        );
+    };
 
     const resoluciones =
         existente?.documents.filter((d) => d.kind === 'resolution') ?? [];
@@ -295,13 +310,16 @@ export default function NuevaMulta({
         post(store().url);
     };
 
-    const cambiarActa = (indice: number, cambios: Partial<NuevaActa>) =>
-        setData(
+    const cambiarActa = (indice: number, cambios: Partial<NuevaActa>) => {
+        actualizarCampo(
             'acts',
             data.acts.map((acta, i) =>
                 i === indice ? { ...acta, ...cambios } : acta,
             ),
+            'acts',
+            ...Object.keys(cambios).map((campo) => `acts.${indice}.${campo}`),
         );
+    };
 
     // Si el número escrito ya está cargado, no se crea un expediente: se le agrega la multa.
     const titulo = fijo || existente ? 'Agregar multa' : 'Nuevo expediente';
@@ -347,9 +365,11 @@ export default function NuevaMulta({
                                         className="mt-1 font-mono"
                                         value={data.caseNumber}
                                         onChange={(e) =>
-                                            setData(
+                                            actualizarCampo(
                                                 'caseNumber',
                                                 e.target.value,
+                                                'caseNumber',
+                                                'fineCaseId',
                                             )
                                         }
                                         onBlur={consultarExpediente}
@@ -479,7 +499,7 @@ export default function NuevaMulta({
                                         label="Archivo del expediente"
                                         foto={data.caseFile}
                                         onElegir={(archivo) =>
-                                            setData('caseFile', archivo)
+                                            actualizarCampo('caseFile', archivo)
                                         }
                                         error={errores.caseFile}
                                     />
@@ -523,11 +543,13 @@ export default function NuevaMulta({
                                                 setCargarNueva(
                                                     valor === 'nueva',
                                                 );
-                                                setData(
+                                                actualizarCampo(
                                                     'resolutionId',
                                                     valor === 'nueva'
                                                         ? null
                                                         : Number(valor),
+                                                    'resolutionId',
+                                                    'resolution.text',
                                                 );
                                             }}
                                         >
@@ -588,10 +610,14 @@ export default function NuevaMulta({
                                             className="mt-1 font-mono"
                                             value={data.resolution.text}
                                             onChange={(e) =>
-                                                setData('resolution', {
-                                                    ...data.resolution,
-                                                    text: e.target.value,
-                                                })
+                                                actualizarCampo(
+                                                    'resolution',
+                                                    {
+                                                        ...data.resolution,
+                                                        text: e.target.value,
+                                                    },
+                                                    'resolution.text',
+                                                )
                                             }
                                             placeholder="N°0649/26"
                                             maxLength={120}
@@ -618,9 +644,11 @@ export default function NuevaMulta({
                                             )}
                                             onUse={(cargada) => {
                                                 setCargarNueva(false);
-                                                setData(
+                                                actualizarCampo(
                                                     'resolutionId',
                                                     cargada.id,
+                                                    'resolutionId',
+                                                    'resolution.text',
                                                 );
                                             }}
                                         />
@@ -640,10 +668,15 @@ export default function NuevaMulta({
                                             className="mt-1"
                                             value={data.resolution.issuedOn}
                                             onChange={(e) =>
-                                                setData('resolution', {
-                                                    ...data.resolution,
-                                                    issuedOn: e.target.value,
-                                                })
+                                                actualizarCampo(
+                                                    'resolution',
+                                                    {
+                                                        ...data.resolution,
+                                                        issuedOn:
+                                                            e.target.value,
+                                                    },
+                                                    'resolution.issuedOn',
+                                                )
                                             }
                                             aria-invalid={Boolean(
                                                 errores['resolution.issuedOn'],
@@ -667,7 +700,7 @@ export default function NuevaMulta({
                                             label="Archivo de la resolución"
                                             foto={data.resolutionFile}
                                             onElegir={(archivo) =>
-                                                setData(
+                                                actualizarCampo(
                                                     'resolutionFile',
                                                     archivo,
                                                 )
@@ -705,7 +738,7 @@ export default function NuevaMulta({
                                                             onCheckedChange={(
                                                                 marcada,
                                                             ) =>
-                                                                setData(
+                                                                actualizarCampo(
                                                                     'actIds',
                                                                     marcada ===
                                                                         true
@@ -720,6 +753,8 @@ export default function NuevaMulta({
                                                                                   id !==
                                                                                   acta.id,
                                                                           ),
+                                                                    'actIds',
+                                                                    'acts',
                                                                 )
                                                             }
                                                         />
@@ -950,7 +985,10 @@ export default function NuevaMulta({
                                         className="mt-1 max-w-3xl"
                                         value={data.caption}
                                         onChange={(e) =>
-                                            setData('caption', e.target.value)
+                                            actualizarCampo(
+                                                'caption',
+                                                e.target.value,
+                                            )
                                         }
                                         maxLength={300}
                                         placeholder="Como figura en la resolución"
@@ -976,7 +1014,7 @@ export default function NuevaMulta({
                                             id="personId"
                                             value={data.personId}
                                             onChange={(id) =>
-                                                setData('personId', id)
+                                                actualizarCampo('personId', id)
                                             }
                                             options={[]}
                                             role={null}
@@ -996,7 +1034,7 @@ export default function NuevaMulta({
                                         className="mt-1"
                                         value={data.registeredOn}
                                         onChange={(e) =>
-                                            setData(
+                                            actualizarCampo(
                                                 'registeredOn',
                                                 e.target.value,
                                             )
@@ -1018,7 +1056,7 @@ export default function NuevaMulta({
                                             id="amount"
                                             value={data.amount}
                                             onChange={(valor) =>
-                                                setData('amount', valor)
+                                                actualizarCampo('amount', valor)
                                             }
                                             words="below"
                                             placeholder="0,00"

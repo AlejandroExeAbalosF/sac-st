@@ -41,17 +41,26 @@ type Props = {
  * El número no está entre los campos: ver `UpdateExpediente`.
  */
 export default function EditarExpediente({ expediente, empleadores }: Props) {
-    const { data, setData, patch, transform, processing, errors } = useForm({
-        subject: expediente.subject ?? '',
-        receivedDate: expediente.receivedDate ?? '',
-        employerId: expediente.employerId,
-        employerRepresentative: expediente.employerRepresentative ?? '',
-        declaredTotalAmount: expediente.declaredTotalAmount
-            ? money(expediente.declaredTotalAmount, { symbol: false })
-            : '',
-        externalReference: expediente.externalReference ?? '',
-        notes: expediente.notes ?? '',
-    });
+    const { data, setData, patch, transform, processing, errors, clearErrors } =
+        useForm({
+            subject: expediente.subject ?? '',
+            receivedDate: expediente.receivedDate ?? '',
+            employerId: expediente.employerId,
+            employerRepresentative: expediente.employerRepresentative ?? '',
+            declaredTotalAmount: expediente.declaredTotalAmount
+                ? money(expediente.declaredTotalAmount, { symbol: false })
+                : '',
+            externalReference: expediente.externalReference ?? '',
+            notes: expediente.notes ?? '',
+        });
+
+    const actualizarCampo = <K extends keyof typeof data>(
+        campo: K,
+        valor: (typeof data)[K],
+    ) => {
+        setData((actual) => ({ ...actual, [campo]: valor }));
+        clearErrors(campo);
+    };
 
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,7 +125,10 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                     className="mt-1"
                                     value={data.receivedDate}
                                     onChange={(e) =>
-                                        setData('receivedDate', e.target.value)
+                                        actualizarCampo(
+                                            'receivedDate',
+                                            e.target.value,
+                                        )
                                     }
                                     aria-invalid={Boolean(errors.receivedDate)}
                                 />
@@ -139,7 +151,7 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                         id="declaredTotalAmount"
                                         value={data.declaredTotalAmount}
                                         onChange={(valor) =>
-                                            setData(
+                                            actualizarCampo(
                                                 'declaredTotalAmount',
                                                 valor,
                                             )
@@ -173,7 +185,10 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                         id="employerId"
                                         value={data.employerId}
                                         onChange={(employerId) =>
-                                            setData('employerId', employerId)
+                                            actualizarCampo(
+                                                'employerId',
+                                                employerId,
+                                            )
                                         }
                                         options={empleadores}
                                         role="employer"
@@ -199,7 +214,7 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                     id="employerRepresentative"
                                     value={data.employerRepresentative}
                                     onChange={(employerRepresentative) =>
-                                        setData(
+                                        actualizarCampo(
                                             'employerRepresentative',
                                             employerRepresentative,
                                         )
@@ -228,7 +243,10 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                     className="mt-1 max-w-4xl"
                                     value={data.subject}
                                     onChange={(e) =>
-                                        setData('subject', e.target.value)
+                                        actualizarCampo(
+                                            'subject',
+                                            e.target.value,
+                                        )
                                     }
                                     maxLength={255}
                                     aria-invalid={Boolean(errors.subject)}
@@ -254,7 +272,7 @@ export default function EditarExpediente({ expediente, empleadores }: Props) {
                                     maxLength={2000}
                                     value={data.notes}
                                     onChange={(e) =>
-                                        setData('notes', e.target.value)
+                                        actualizarCampo('notes', e.target.value)
                                     }
                                 />
                             </div>

@@ -68,6 +68,14 @@ export default function UserFormDialog({
         role: 'administrativo',
     });
 
+    const actualizarCampo = <K extends keyof typeof data>(
+        campo: K,
+        valor: (typeof data)[K],
+    ) => {
+        setData((actual) => ({ ...actual, [campo]: valor }));
+        clearErrors(campo);
+    };
+
     useEffect(() => {
         if (!mode) {
             return;
@@ -155,7 +163,7 @@ export default function UserFormDialog({
                                 id="lastName"
                                 value={data.lastName}
                                 onChange={(e) =>
-                                    setData('lastName', e.target.value)
+                                    actualizarCampo('lastName', e.target.value)
                                 }
                                 autoComplete="off"
                                 maxLength={80}
@@ -170,7 +178,7 @@ export default function UserFormDialog({
                                 id="firstName"
                                 value={data.firstName}
                                 onChange={(e) =>
-                                    setData('firstName', e.target.value)
+                                    actualizarCampo('firstName', e.target.value)
                                 }
                                 autoComplete="off"
                                 maxLength={80}
@@ -187,7 +195,7 @@ export default function UserFormDialog({
                                 id="username"
                                 value={data.username}
                                 onChange={(e) =>
-                                    setData('username', e.target.value)
+                                    actualizarCampo('username', e.target.value)
                                 }
                                 className="font-mono"
                                 autoComplete="off"
@@ -210,7 +218,10 @@ export default function UserFormDialog({
                                 id="documentNumber"
                                 value={data.documentNumber}
                                 onChange={(e) =>
-                                    setData('documentNumber', e.target.value)
+                                    actualizarCampo(
+                                        'documentNumber',
+                                        e.target.value,
+                                    )
                                 }
                                 className="font-mono tabular-nums"
                                 inputMode="numeric"
@@ -227,7 +238,7 @@ export default function UserFormDialog({
                                 value={data.role}
                                 disabled={bloqueoRol !== null}
                                 onValueChange={(valor) =>
-                                    setData('role', valor)
+                                    actualizarCampo('role', valor)
                                 }
                             >
                                 {/*
@@ -287,7 +298,9 @@ export default function UserFormDialog({
                             id="email"
                             type="email"
                             value={data.email}
-                            onChange={(e) => setData('email', e.target.value)}
+                            onChange={(e) =>
+                                actualizarCampo('email', e.target.value)
+                            }
                             disabled={bloqueoCorreo !== null}
                             autoComplete="off"
                             placeholder="nombre@salta.gob.ar"
@@ -312,7 +325,7 @@ export default function UserFormDialog({
                             id="position"
                             value={data.position}
                             onChange={(e) =>
-                                setData('position', e.target.value)
+                                actualizarCampo('position', e.target.value)
                             }
                             autoComplete="off"
                             maxLength={120}

@@ -43,9 +43,15 @@ const ESPERA_MS = 450;
  * peor, no mejor.
  */
 export default function CrearExpediente({ empleadores, existente }: Props) {
-    const { errors } = usePage().props as unknown as {
+    const { errors: erroresServidor } = usePage().props as unknown as {
         errors: Record<string, string>;
     };
+    const [erroresEditados, setErroresEditados] = useState<string[]>([]);
+    const errors = Object.fromEntries(
+        Object.entries(erroresServidor).filter(
+            ([campo]) => !erroresEditados.includes(campo),
+        ),
+    ) as Record<string, string>;
 
     const [enviando, setEnviando] = useState(false);
     const [verificando, setVerificando] = useState(false);
@@ -63,8 +69,12 @@ export default function CrearExpediente({ empleadores, existente }: Props) {
         notes: '',
     });
 
-    const actualizar = (cambios: Partial<typeof datos>) =>
+    const actualizar = (cambios: Partial<typeof datos>) => {
         setDatos((d) => ({ ...d, ...cambios }));
+        setErroresEditados((actuales) => [
+            ...new Set([...actuales, ...Object.keys(cambios)]),
+        ]);
+    };
 
     /*
      * Verificación automática, sin botón. Se dispara cuando el operador
@@ -135,7 +145,10 @@ export default function CrearExpediente({ empleadores, existente }: Props) {
                 ...datos,
                 declaredTotalAmount: parseAmount(datos.declaredTotalAmount),
             },
-            { onFinish: () => setEnviando(false) },
+            {
+                onError: () => setErroresEditados([]),
+                onFinish: () => setEnviando(false),
+            },
         );
     };
 
