@@ -225,7 +225,10 @@ export default function BankPaymentDialog({
                     <div className="grid gap-4 sm:grid-cols-2">
                         {!corrige && (
                             <div>
-                                <Label htmlFor="banco-presentado">
+                                <Label
+                                    htmlFor="banco-presentado"
+                                    className="block sm:min-h-8"
+                                >
                                     Presentado el
                                 </Label>
                                 <DateInput
@@ -242,7 +245,10 @@ export default function BankPaymentDialog({
                             </div>
                         )}
                         <div>
-                            <Label htmlFor="banco-pagado">
+                            <Label
+                                htmlFor="banco-pagado"
+                                className="block sm:min-h-8"
+                            >
                                 Pagado el (según el comprobante)
                             </Label>
                             <DateInput
