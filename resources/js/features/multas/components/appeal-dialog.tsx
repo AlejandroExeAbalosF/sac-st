@@ -235,7 +235,10 @@ export default function AppealDialog({
                 <div className="grid gap-4 sm:grid-cols-2">
                     {!corrige && (
                         <div>
-                            <Label htmlFor="recurso-presentado">
+                            <Label
+                                htmlFor="recurso-presentado"
+                                className="block sm:min-h-8"
+                            >
                                 Presentado el
                             </Label>
                             <DateInput
@@ -252,7 +255,10 @@ export default function AppealDialog({
                         </div>
                     )}
                     <div>
-                        <Label htmlFor="recurso-pagado">
+                        <Label
+                            htmlFor="recurso-pagado"
+                            className="block sm:min-h-8"
+                        >
                             Depositado el (según el comprobante)
                         </Label>
                         <DateInput
