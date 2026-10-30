@@ -61,7 +61,7 @@ final class RegisterFineAppeal
         Fine $multa,
         AppealKind $tipo,
         FinePaymentMedium $medio,
-        string $externalReference,
+        ?string $externalReference,
         string $amount,
         string $idempotencyKey,
         ?int $actorId,
@@ -73,7 +73,7 @@ final class RegisterFineAppeal
         ?FinePayment $replaces = null,
         ?string $correctionReason = null,
     ): FinePayment {
-        $referencia = trim($externalReference);
+        $referencia = trim((string) $externalReference) ?: null;
         $importe = Decimal::scale($amount);
         $talonario = trim((string) $talonarioNumber) ?: null;
         $hoy = BusinessDate::today();
@@ -249,7 +249,7 @@ final class RegisterFineAppeal
      */
     private function assertRegistrable(
         FinePaymentMedium $medio,
-        string $referencia,
+        ?string $referencia,
         string $importe,
         ?CarbonImmutable $pagado,
         CarbonImmutable $presentado,
@@ -260,10 +260,6 @@ final class RegisterFineAppeal
             throw ValidationException::withMessages([
                 'medium' => 'El 20 % del recurso se paga en efectivo o por depósito directo.',
             ]);
-        }
-
-        if ($referencia === '') {
-            throw ValidationException::withMessages(['externalReference' => 'Anotá el número del recibo externo que trae el sancionado.']);
         }
 
         if (Decimal::isNegative($importe) || Decimal::equals($importe, '0')) {

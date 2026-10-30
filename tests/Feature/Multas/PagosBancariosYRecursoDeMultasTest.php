@@ -409,6 +409,36 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             ->and($this->saldo($multa, 'debt'))->toBe('1120000.00');
     }
 
+    public function test_an_appeal_can_be_registered_without_an_external_receipt_number(): void
+    {
+        $multa = $this->escenario();
+        $datos = $this->recurso('direct_deposit', '280000.00');
+        unset($datos['externalReference']);
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.recursos.store', $multa), $datos)
+            ->assertSessionHasNoErrors();
+
+        $pago = FinePayment::query()->sole();
+        expect($pago->external_receipt_reference)->toBeNull()
+            ->and($pago->amount)->toBe('280000.00');
+    }
+
+    public function test_a_cash_appeal_without_an_external_number_still_issues_its_own_receipt(): void
+    {
+        $multa = $this->escenario();
+        $datos = $this->recurso('cash', '280000.00');
+        $datos['externalReference'] = '';
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.recursos.store', $multa), $datos)
+            ->assertSessionHasNoErrors();
+
+        $pago = FinePayment::query()->sole();
+        expect($pago->external_receipt_reference)->toBeNull()
+            ->and($pago->paymentReceipt()->exists())->toBeTrue();
+    }
+
     /**
      * U, 21/10/2026: se cobra lo que dice el recibo externo, aunque difiera del
      * 20 % calculado; la diferencia queda a la vista.

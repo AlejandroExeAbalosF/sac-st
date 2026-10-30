@@ -40,7 +40,7 @@ final class FineAppealController extends Controller
             multa: $fine,
             tipo: AppealKind::from((string) $datos['kind']),
             medio: $medio,
-            externalReference: (string) $datos['externalReference'],
+            externalReference: $datos['externalReference'] ?? null,
             amount: (string) $datos['amount'],
             idempotencyKey: (string) $datos['idempotencyKey'],
             actorId: $usuario->id,

@@ -901,8 +901,15 @@ export default function MultaShow({
                                                         '0.00'
                                                     }
                                                 />
-                                                ; recibo externo{' '}
-                                                {pago.externalReceiptReference}.
+                                                {pago.externalReceiptReference && (
+                                                    <>
+                                                        ; recibo externo{' '}
+                                                        {
+                                                            pago.externalReceiptReference
+                                                        }
+                                                    </>
+                                                )}
+                                                .
                                                 {pago.appealDiffers &&
                                                     ' El importe cobrado es el del recibo externo y difiere del 20 % calculado.'}
                                             </p>

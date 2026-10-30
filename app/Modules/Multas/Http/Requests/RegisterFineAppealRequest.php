@@ -22,7 +22,7 @@ final class RegisterFineAppealRequest extends FormRequest
         return [
             'kind' => ['required', 'in:hierarchical,appeal'],
             'medium' => ['required', 'in:cash,direct_deposit'],
-            'externalReference' => ['required', 'string', 'max:120'],
+            'externalReference' => ['nullable', 'string', 'max:120'],
             'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2', 'max:99999999999999999'],
             'replacesPaymentId' => ['nullable', 'integer', 'exists:fine_payments,id'],
             'correctionReason' => ['required_with:replacesPaymentId', 'nullable', 'string', 'min:5', 'max:400'],

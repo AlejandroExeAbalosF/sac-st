@@ -180,7 +180,9 @@ export default function AppealDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                    <Label htmlFor="recurso-externo">Recibo externo N.º</Label>
+                    <Label htmlFor="recurso-externo">
+                        Recibo externo N.º (opcional)
+                    </Label>
                     <Input
                         id="recurso-externo"
                         className="mt-1 font-mono"
