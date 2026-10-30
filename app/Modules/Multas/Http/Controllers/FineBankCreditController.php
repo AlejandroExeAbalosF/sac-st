@@ -42,7 +42,7 @@ final class FineBankCreditController extends Controller
     public function show(Request $request, BankTransaction $transaction): Response|RedirectResponse
     {
         $apertura = $this->creditos->book();
-        abort_if($apertura === null || $transaction->bank_account_id !== $apertura->bank_account_id, 404);
+        abort_if($apertura === null || ! in_array($transaction->bank_account_id, $this->creditos->accounts($apertura), true), 404);
 
         $lista = route('banco.movimientos.index', ['cuenta' => $transaction->bank_account_id, 'estado' => 'pending']);
 

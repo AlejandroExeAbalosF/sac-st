@@ -48,6 +48,10 @@ final class BankingAuditCatalog implements AuditCatalogContributor
                 AuditSeverity::Critical,
             ),
 
+            new AuditActionDefinition('caja.cuenta.habilitada', 'Se habilitó una cuenta para la caja', 'Caja', AuditSeverity::Critical, metadata: ['caja' => 'Caja']),
+            new AuditActionDefinition('caja.cuenta.retirada', 'Se dio de baja una cuenta de la caja', 'Caja', AuditSeverity::Critical, metadata: ['caja' => 'Caja', 'predeterminada' => 'Nueva predeterminada']),
+            new AuditActionDefinition('caja.cuenta.predeterminada', 'Se cambió la cuenta predeterminada de la caja', 'Caja', metadata: ['caja' => 'Caja', 'anterior' => 'Anterior']),
+            new AuditActionDefinition('caja.cuenta.vigencia-cambiada', 'Se cambió desde cuándo vale una cuenta de la caja', 'Caja', AuditSeverity::Critical, metadata: ['caja' => 'Caja', 'reason' => 'Motivo']),
             new AuditActionDefinition('traslado.depositado', 'Se depositó el efectivo en el banco', 'Caja'),
             new AuditActionDefinition('traslado.acreditado', 'Se acreditó el depósito en el extracto', 'Caja'),
             new AuditActionDefinition(

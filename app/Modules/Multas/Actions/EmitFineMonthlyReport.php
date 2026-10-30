@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Actions;
 
+use App\Modules\Banking\Support\CashBoxBankAccounts;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
 use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Models\PeriodClosing;
@@ -38,6 +40,7 @@ final class EmitFineMonthlyReport
         private readonly FineRenditionPdf $pdf,
         private readonly StoreAttachment $adjuntar,
         private readonly RecordAuditEvent $auditar,
+        private readonly CashBoxBankAccounts $vinculos,
     ) {}
 
     /**
@@ -79,6 +82,7 @@ final class EmitFineMonthlyReport
                     'closing_version' => $cierre->evidence_version,
                     'kind' => $kind,
                     'payload' => $filas,
+                    'accounts' => $this->cuentas($filas, (int) $cierre->cash_box_id),
                     'total' => $total,
                     'rows_count' => count($filas),
                     'emitted_by' => $actorId,
@@ -122,5 +126,32 @@ final class EmitFineMonthlyReport
         } finally {
             @unlink($temporal);
         }
+    }
+
+    /**
+     * Las cuentas que cita la nota, congeladas con ella: las de sus filas, en
+     * el orden en que aparecen. Una nota sin filas cita la predeterminada de
+     * la caja al emitirla, para que el texto diga en qué cuenta no hubo nada.
+     *
+     * @param  list<array{accountId: int, account: string}>  $filas
+     * @return list<array{id: int, citation: string}>
+     */
+    private function cuentas(array $filas, int $cajaId): array
+    {
+        $cuentas = [];
+
+        foreach ($filas as $fila) {
+            $cuentas[$fila['accountId']] ??= ['id' => $fila['accountId'], 'citation' => $fila['account']];
+        }
+
+        if ($cuentas === []) {
+            $predeterminada = $this->vinculos->defaultFor($cajaId, Currency::Ars)?->bankAccount;
+
+            if ($predeterminada !== null) {
+                $cuentas[] = ['id' => $predeterminada->id, 'citation' => $predeterminada->document_citation ?? $predeterminada->label];
+            }
+        }
+
+        return array_values($cuentas);
     }
 }

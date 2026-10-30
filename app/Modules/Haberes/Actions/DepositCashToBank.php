@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Actions;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Banking\Support\TransferredCheques;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
@@ -73,6 +74,7 @@ final class DepositCashToBank
         private readonly StoreAttachment $attachments,
         private readonly TransferredCheques $cheques,
         private readonly InstallmentDeposit $deposito,
+        private readonly CashBoxBankAccounts $cuentas,
     ) {}
 
     /**
@@ -124,6 +126,14 @@ final class DepositCashToBank
                 if (BankAccount::query()->whereKey($ticket['bankAccountId'])->value('currency') !== $moneda->value) {
                     throw ValidationException::withMessages([
                         'bankAccountId' => 'La cuenta tiene que estar en la moneda del haber.',
+                    ]);
+                }
+
+                // Con cuentas habilitadas, una de ellas vigente ese día (`cash_transfer_follows_box_accounts`).
+                if ($this->cuentas->hasAny((int) $cajaId)
+                    && ! $this->cuentas->covers((int) $cajaId, (int) $ticket['bankAccountId'], $ticket['depositDate'])) {
+                    throw ValidationException::withMessages([
+                        'bankAccountId' => 'Esa cuenta no está habilitada para la caja en la fecha del depósito.',
                     ]);
                 }
 

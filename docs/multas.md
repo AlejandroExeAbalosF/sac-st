@@ -336,10 +336,53 @@ identifica. Por eso la caja no declara un saldo bancario:
   calculado—, pero **sin saldo bancario** y diciendo con qué cuenta opera. Su
   fecha es la frontera: lo que el extracto trae antes ya estaba en el saldo que el
   área traía y **no entra al libro como cobro**; solo puede respaldar un pago
-  anterior de una multa.
+  anterior de una multa. La cuenta de la apertura es la primera
+  [cuenta de la caja](#cuentas-de-la-caja).
 
 No hay un corte declarado para la cuenta: el saldo del banco lo trae el extracto
 (ver [corte de la cuenta compartida](#sin-corte-de-cuenta)).
+
+<a id="cuentas-de-la-caja"></a>
+
+### Cuentas de la caja · `/multas/caja/cuentas`
+
+La caja puede operar con **más de una cuenta**: sumar una segunda, compartir una con
+otra caja o reemplazar una por otra (decisión del usuario, 29/10/2026). La cuenta de
+la apertura es la primera, predeterminada y **sin fecha de inicio** —«inicio
+histórico desconocido»—; `cash_book_openings.bank_account_id` queda como dato de la
+apertura, y el vínculo lo crea Banking al escuchar `CashBookOpened`, igual que en
+Haberes. Se administran en una pantalla propia, enlazada desde la apertura
+(`multas.caja.cuentas`, administrador); mirarlas es de quien ve la caja.
+
+- **Vigencia efectiva**: desde (vacío = inicio histórico desconocido) hasta la baja,
+  **que incluye ese día**. Separada de quién la cargó y cuándo, que queda en el
+  vínculo y en la auditoría. **Sin fechas futuras**: un cambio de cuenta se carga el
+  día en que empieza.
+- **Una predeterminada por moneda** mientras haya alguna vigente: la que se propone
+  al depositar. Dar de baja la predeterminada pide elegir la nueva, salvo que sea la
+  última: entonces la caja queda sin cuenta para operaciones nuevas.
+- **Depositar** va a una cuenta vigente el día del depósito: la elegida o la
+  predeterminada. El formulario ofrece las vigentes **en la fecha que se carga**, no
+  las de hoy: un depósito hecho antes de una baja se registra después contra la
+  cuenta dada de baja. Con una sola, no se elige.
+- **Identificar**: se ofrecen los créditos de cada cuenta desde la más tardía entre la
+  apertura y su inicio, hasta su baja. **Que se ofrezcan no los hace de Multas**: lo
+  decide quien identifica.
+- **Pago anterior**: lo respalda un crédito anterior a la apertura dentro de la
+  vigencia de una cuenta. Una cuenta que empieza después de la apertura no habilita
+  nada viejo; la de la apertura, sin inicio, sí.
+- **Dar de baja** no borra nada: un depósito en tránsito se acredita, se revierte o se
+  rechaza contra su cuenta, y un crédito llegado mientras valía se identifica después.
+- **Volver a habilitar** una cuenta dada de baja abre **un período nuevo**, que empieza
+  después de la baja (decisión del usuario, 30/10/2026): el tiempo en que no
+  correspondía queda afuera. Los períodos de una cuenta en la caja no se superponen.
+- **Cambiar el inicio** pide motivo y queda auditado: adelantarlo ofrece todos los
+  créditos del período que se suma. Ni el inicio ni la baja pueden dejar afuera lo ya
+  registrado.
+
+La base impone cada regla (`cash_box_bank_accounts` y sus guardas,
+`cash_transfer_follows_box_accounts`, `bank_allocation_follows_box_accounts`,
+`fine_historical_bank_credit`); ver [reglas](multas-reglas.md#cuentas-de-la-caja).
 
 La cuenta se mira en **dos números que no se suman nunca**, cada uno donde se usa:
 
@@ -436,8 +479,14 @@ el total es la última fila y nunca queda solo en una hoja, y cada hoja lleva
   pedirla de nuevo devuelve la misma. Reabrir y volver a cerrar el mes produce otra
   versión; la anterior se conserva. La base exige el cierre mensual vigente y
   cerrado, y no deja cambiar ni borrar una rendición.
-- **Sin relevar:** el número de cuenta impreso («Nº 452680-1 del Bco. Macro», distinto
-  del del recibo), el destinatario y el lugar están en `config/multas.php`; la caja
+- **La cuenta** de cada fila es la del crédito, citada como dice su cuenta bancaria
+  («Cómo se cita en los documentos», en Banco › Cuentas). Al emitir se guardan las
+  cuentas del informe: con una, la nota la nombra en el texto; con varias, dice «las
+  cuentas de esta Secretaría» y agrega la columna «Cuenta». Reimprimir no consulta
+  la configuración ni la predeterminada de hoy. Las emitidas antes guardan la
+  citación que se usaba («Nº 452680-1 del Bco. Macro»).
+- **Sin relevar:** el formato con varias cuentas; la citación de la cuenta, distinta
+  del número del recibo; el destinatario y el lugar están en `config/multas.php`; la caja
   de un cheque acreditado por remesa (P15); un cheque acreditado y después rechazado
   se lista con la marca «cheque rechazado», sin descontarlo. El membrete queda
   reservado hasta que el área entregue el logotipo.
@@ -531,9 +580,12 @@ cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
   total de la multa. Se ve e imprime desde la fila del pago, sobre papel en blanco
   o sobre la hoja del talonario. El del pago que deja la deuda en cero es el
   **cancelatorio**: lista los pagos anteriores, con la fecha que se conoce de cada
-  uno, y separa el excedente. Lo que dice queda congelado, incluida la cuenta de
-  depósito: un ajuste posterior de la multa o un cambio en la cuenta no lo cambian
-  (M09). Una hoja del talonario ya usada se rechaza en el campo.
+  uno, y separa el excedente. La casilla «Depósito Cta.» lleva el número de la
+  cuenta del crédito en un pago por banco; en un cobro en caja, la cuenta solo si la
+  caja tiene una única vigente, y vacía si tiene varias —el depósito guarda la
+  suya—. Lo que dice queda congelado: un ajuste posterior de la multa, un cambio en
+  la cuenta o en la predeterminada no lo cambian (M09). Una hoja del talonario ya
+  usada se rechaza en el campo.
 - **Revisar el recibo**: el cobro va en dos pasos. «Revisar recibo» comprueba los
   datos con las mismas reglas que el cobro —un error se marca en su campo— y
   muestra el recibo tal como va a salir, sobre papel en blanco o sobre la hoja del

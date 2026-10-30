@@ -6,6 +6,8 @@ namespace App\Modules\Multas\Actions;
 
 use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\BankTransactionAllocation;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -26,7 +28,6 @@ use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentApplication;
 use App\Modules\Multas\Models\FinePaymentReceipt;
-use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FinePaymentTimeliness;
 use App\Modules\Multas\Support\FineReceiptSeries;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
@@ -60,7 +61,7 @@ final class ApplyFinePayment
         private readonly PostJournalEntry $asentar,
         private readonly TakeNextDocumentNumber $numerar,
         private readonly FinePaymentTimeliness $termino,
-        private readonly FineBankCredits $banco,
+        private readonly CashBoxBankAccounts $cuentas,
     ) {}
 
     public function handle(
@@ -118,7 +119,7 @@ final class ApplyFinePayment
         ]);
 
         $despues = FineBalance::query()->whereKey($multa->id)->firstOrFail();
-        $papel = $this->componer($multa, $pago, $antes, $despues->obligation, $despues->debt, $fecha, $talonarioNumber, $signedById);
+        $papel = $this->componer($multa, $pago, $antes, $despues->obligation, $despues->debt, $fecha, $talonarioNumber, $signedById, $recepcion);
         $numero = $this->numerar->handle(FineReceiptSeries::CODE);
 
         $recibo = Receipt::query()->create([
@@ -216,6 +217,7 @@ final class ApplyFinePayment
         CarbonImmutable $fecha,
         ?string $talonarioNumber,
         ?int $signedById,
+        ?FundReceipt $recepcion = null,
     ): array {
         ['aplicado' => $aplicado, 'excedente' => $excedente] = $this->reparto($pago->amount, $antes->debt);
         $cancela = Decimal::equals($deudaDespues, '0');
@@ -272,7 +274,7 @@ final class ApplyFinePayment
                  * estaba al emitir: si después se corrige el maestro, la
                  * reimpresión no puede decir otra cosa que el original.
                  */
-                'bankAccountNumber' => $this->cuenta(),
+                'bankAccountNumber' => $this->cuenta($pago, $recepcion, $multa, $fecha),
             ],
         ];
     }
@@ -321,9 +323,30 @@ final class ApplyFinePayment
         return [...$previos->all(), ...$delSistema->all()];
     }
 
-    private function cuenta(): ?string
+    /**
+     * El número de cuenta de la casilla «Depósito Cta.».
+     *
+     * - **Por el banco:** la cuenta del crédito que respalda el pago.
+     * - **En la caja:** la cuenta de la caja solo si hay una única vigente
+     *   ese día. Con varias, todavía no se sabe dónde se va a depositar, y
+     *   el recibo no lo afirma: el depósito guarda su propia cuenta.
+     *
+     * Queda congelado con el recibo: cambiar la predeterminada después no
+     * lo toca.
+     */
+    private function cuenta(FinePayment $pago, ?FundReceipt $recepcion, Fine $multa, CarbonImmutable $fecha): ?string
     {
-        $cuenta = $this->banco->book()?->bank_account_id;
+        if (! $pago->medium->isCounter() && $recepcion !== null) {
+            $cuenta = BankTransactionAllocation::query()
+                ->where('financial_event_id', $recepcion->financial_event_id)
+                ->whereNull('reversal_of_id')
+                ->join('bank_transactions', 'bank_transactions.id', '=', 'bank_transaction_allocations.bank_transaction_id')
+                ->value('bank_transactions.bank_account_id');
+        } else {
+            $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id');
+            $vigentes = $this->cuentas->activeOn($caja, Currency::from($multa->currency), $fecha);
+            $cuenta = $vigentes->count() === 1 ? $vigentes->first()?->bank_account_id : null;
+        }
 
         return $cuenta === null ? null : BankAccount::query()->whereKey($cuenta)->value('account_number');
     }

@@ -19,6 +19,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import { salidaDe } from '@/features/haberes/installment-channel';
 import { ETAPA, TONO_ETAPA } from '@/features/haberes/installment-stage';
@@ -121,7 +122,7 @@ export default function InstallmentCard({
     total: number;
     editable: boolean;
     atenuada: boolean;
-    cuentas: { id: number; label: string }[];
+    cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;

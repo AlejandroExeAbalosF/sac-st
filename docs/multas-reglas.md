@@ -440,6 +440,45 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 - Se guarda el día contra el que se juzgó (`term_ends_on`). **Base:**
   `fine_payment_applications_timeliness_check` lo exige salvo en `undetermined`.
 
+<a id="cuentas-de-la-caja"></a>
+
+## Cuentas de la caja
+
+- `cash_box_bank_accounts`: caja, cuenta, moneda (la de la cuenta), `valid_from`
+  (nulo = inicio histórico desconocido), `valid_until` (incluye ese día),
+  `is_default`, quién y cuándo. Una fila por **período**: una cuenta que vuelve a la
+  caja suma otra. **Base:** los períodos de una cuenta en una caja no se superponen
+  (`cash_box_bank_account_periods`, con candado transaccional); no se borra ni
+  cambia de caja o cuenta; sin fechas futuras; la predeterminada no tiene baja;
+  `UNIQUE` parcial de una predeterminada por caja y moneda, y el constraint trigger
+  diferido `cash_box_has_one_default` exige exactamente una mientras haya alguna
+  vigente.
+- `cash_box_bank_account_window`: cambiar la vigencia de un período no puede dejar
+  afuera depósitos, identificaciones ni antecedentes vigentes que ese período cubría
+  y ningún otro cubre. **Base**; las Actions lo dicen con palabras.
+- Cambiar la vigencia y usar la cuenta se esperan entre sí: comparten el candado
+  transaccional `lock_cash_box_account` (caja y cuenta). Lo toman las guardas del
+  depósito, la identificación y el antecedente antes de leer la vigencia, el trigger
+  de períodos, y la baja y el cambio de inicio antes de revisar los usos. **Base**;
+  lo prueba `CuentasConcurrentesDeMultasTest` con dos procesos.
+- Una cuenta vinculada a una caja, o con la que abrió un libro, no cambia de moneda
+  aunque no tenga movimientos: el vínculo y la apertura tomaron la suya.
+  `freeze_bank_account_currency`. **Base**; `SaveBankAccountRequest` lo explica. Bajo
+  concurrencia lo sostiene la clave foránea compuesta `(bank_account_id, currency)`
+  del vínculo, como la de la apertura; `LinkBankAccountToCashBox` bloquea la cuenta
+  antes de leer su moneda.
+- La primera cuenta de la caja la crea `LinkOpeningBankAccount` (Banking) al escuchar
+  `CashBookOpened` (Ledger), dentro de la transacción de la apertura. **Action.**
+- Un depósito nuevo va a una cuenta de la caja vigente en su fecha:
+  `cash_transfer_follows_box_accounts` (solo al insertar; acreditación, reversión y
+  rechazo siguen contra la cuenta del depósito). **Base.**
+- Identificar un crédito (imputación de una recepción por banco) exige que caiga en
+  la ventana de una cuenta de la caja: `bank_allocation_follows_box_accounts`.
+  **Base.** Una caja sin vínculos no se controla.
+- Un antecedente respaldado por el banco: crédito anterior a la apertura y dentro de
+  la vigencia de una cuenta de la caja (`fine_historical_bank_credit`). **Base.**
+- Administrarlas es de `multas.caja.cuentas`. **Ruta.**
+
 <a id="recibo"></a>
 
 ## Recibo de Multas

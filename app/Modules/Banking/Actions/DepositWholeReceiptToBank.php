@@ -63,6 +63,7 @@ final class DepositWholeReceiptToBank
      *     operationNumber?: string|null,
      *     terminal?: string|null,
      *     notes?: string|null,
+     *     bankAccountId?: int|null,
      * }  $ticket
      *
      * @throws ValidationException
@@ -90,7 +91,7 @@ final class DepositWholeReceiptToBank
                 // Bloqueado: dos depósitos del mismo cobro se serializan, y el segundo lo encuentra trasladado.
                 $recepcion = FundReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
                 $moneda = Currency::from($recepcion->currency);
-                $cuenta = $this->assertDepositable($recepcion, $ticket['depositDate']);
+                $cuenta = $this->assertDepositable($recepcion, $ticket['depositDate'], $ticket['bankAccountId'] ?? null);
 
                 $evento = $this->asentar->handle(
                     type: FinancialEventType::CashDepositedToBank,
@@ -170,7 +171,7 @@ final class DepositWholeReceiptToBank
      *
      * @throws ValidationException
      */
-    private function assertDepositable(FundReceipt $recepcion, CarbonInterface $fecha): int
+    private function assertDepositable(FundReceipt $recepcion, CarbonInterface $fecha, ?int $elegida): int
     {
         if (! $this->cobrosEnteros->appliesTo($recepcion->cash_box_id)) {
             throw ValidationException::withMessages([
@@ -220,11 +221,13 @@ final class DepositWholeReceiptToBank
             ]);
         }
 
-        $cuenta = $this->cobrosEnteros->accountFor((int) $recepcion->cash_box_id, Currency::from($recepcion->currency));
+        $cuenta = $this->cobrosEnteros->depositAccount((int) $recepcion->cash_box_id, Currency::from($recepcion->currency), $elegida, $fecha);
 
         if ($cuenta === null || BankAccount::query()->whereKey($cuenta)->value('currency') !== $recepcion->currency) {
             throw ValidationException::withMessages([
-                'receiptId' => 'El libro de la caja no tiene una cuenta bancaria en la moneda del cobro.',
+                'bankAccountId' => $elegida === null
+                    ? 'La caja no tiene una cuenta habilitada en la moneda del cobro para esa fecha.'
+                    : 'Esa cuenta no está habilitada para la caja en la fecha del depósito.',
             ]);
         }
 

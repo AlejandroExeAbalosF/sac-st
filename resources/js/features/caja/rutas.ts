@@ -14,6 +14,13 @@ import {
     store as cerrar,
 } from '@/routes/caja/cierres';
 import { regenerate } from '@/routes/caja/cierres/sheet';
+import {
+    defaultMethod as predeterminar,
+    index as cuentas,
+    retire as darDeBaja,
+    start as moverInicio,
+    store as habilitar,
+} from '@/routes/caja/cuentas';
 import { index as saldoAnterior } from '@/routes/caja/saldo-anterior';
 import {
     calendario as calendarioDeMultas,
@@ -33,6 +40,13 @@ import {
     store as cerrarEnMultas,
 } from '@/routes/multas/caja/cierres';
 import { regenerate as rehacerEnMultas } from '@/routes/multas/caja/cierres/sheet';
+import {
+    defaultMethod as predeterminarEnMultas,
+    index as cuentasDeMultas,
+    retire as darDeBajaEnMultas,
+    start as moverInicioEnMultas,
+    store as habilitarEnMultas,
+} from '@/routes/multas/caja/cuentas';
 import type { RouteQueryOptions } from '@/wayfinder';
 
 /** Las cajas que tienen pantallas de caja. */
@@ -42,6 +56,7 @@ type Ruta = { url: string };
 type ConQuery = (options?: RouteQueryOptions) => Ruta;
 type ConArqueo = (args: { cashCount: number }) => Ruta;
 type ConCierre = (args: { closing: number }) => Ruta;
+type ConCuenta = (args: { link: number }) => Ruta;
 
 export type RutasDeCaja = {
     /** El rótulo de las pantallas: de qué caja son. */
@@ -65,6 +80,14 @@ export type RutasDeCaja = {
     apertura: () => Ruta;
     /** El saldo del sistema anterior: solo Haberes reserva por cuota. */
     saldoAnterior: (() => Ruta) | null;
+    /** Las cuentas bancarias con las que opera la caja. */
+    cuentas: {
+        index: () => Ruta;
+        store: () => Ruta;
+        retire: ConCuenta;
+        default: ConCuenta;
+        start: ConCuenta;
+    };
 };
 
 const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
@@ -76,6 +99,13 @@ const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
         cierres: { index: cierres, store: cerrar, reopen, sheet, regenerate },
         apertura: aperturaDeHaberes,
         saldoAnterior,
+        cuentas: {
+            index: cuentas,
+            store: habilitar,
+            retire: darDeBaja,
+            default: predeterminar,
+            start: moverInicio,
+        },
     },
     multas: {
         rotulo: 'Caja de Multas',
@@ -96,6 +126,13 @@ const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
         },
         apertura: aperturaDeMultas,
         saldoAnterior: null,
+        cuentas: {
+            index: cuentasDeMultas,
+            store: habilitarEnMultas,
+            retire: darDeBajaEnMultas,
+            default: predeterminarEnMultas,
+            start: moverInicioEnMultas,
+        },
     },
 };
 

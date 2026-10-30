@@ -41,6 +41,7 @@ final class DepositFineCollection
      *     operationNumber?: string|null,
      *     terminal?: string|null,
      *     notes?: string|null,
+     *     bankAccountId?: int|null,
      * }  $ticket
      *
      * @throws ValidationException

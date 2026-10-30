@@ -10,6 +10,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Ledger\Events\CashBookOpened;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
@@ -186,6 +187,8 @@ final class RegisterOpeningBalance
             }
 
             $this->countTheDrawer($billetes, $cashBoxId, $currency, $date, $actorId);
+
+            event(new CashBookOpened($apertura, $actorId));
 
             return $apertura;
         });

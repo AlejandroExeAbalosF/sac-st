@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Multas;
 
 use App\Models\User;
+use App\Modules\Banking\Actions\LinkBankAccountToCashBox;
+use App\Modules\Banking\Actions\SetDefaultCashBoxBankAccount;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\ReopenPeriod;
@@ -202,6 +205,58 @@ class RendicionMensualDeMultasTest extends TestCase
         $this->actingAs($this->operador('administrativo'))
             ->get(route('multas.caja.calendario', ['anio' => 2026, 'mes' => 7]))
             ->assertInertia(fn (Assert $page) => $page->where('monthPanel.emit', null));
+    }
+
+    /**
+     * Con dos cuentas, cada fila dice la suya y el texto no nombra ninguna; el
+     * informe guarda las cuentas con que se emitió y la reimpresión no mira la
+     * configuración de hoy.
+     */
+    public function test_the_report_keeps_its_accounts_and_shows_a_column_with_two(): void
+    {
+        $this->escenario();
+        $this->laCuenta->forceFill(['document_citation' => 'Nº 452680-1 del Bco. Macro'])->save();
+        $otra = $this->cuenta('310000111222333');
+        $otra->forceFill(['document_citation' => 'Nº 777001-2 del Bco. Nación'])->save();
+        app(LinkBankAccountToCashBox::class)->handle($this->cajaDe(CashBox::MULTAS), $otra->id, CarbonImmutable::parse('2026-07-01'), false, $this->quienAbre());
+
+        $deA = $this->movimiento($this->laCuenta, '2026-07-20', '3000.00');
+        $deB = $this->movimiento($otra, '2026-07-21', '5000.00');
+        $this->el('2026-07-28');
+        $this->identificar($deA);
+        $this->identificar($deB);
+        $this->el('2026-08-01');
+        $this->cerrar('2026-07-28', PeriodType::Daily);
+        $julio = $this->cerrar('2026-07-31', PeriodType::Monthly);
+
+        $informe = app(EmitFineMonthlyReport::class)->handle($julio, $this->quienAbre())['on_time'];
+
+        expect(collect($informe->accounts)->pluck('citation')->sort()->values()->all())
+            ->toBe(['Nº 452680-1 del Bco. Macro', 'Nº 777001-2 del Bco. Nación']);
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.rendiciones.view', $informe))
+            ->assertOk()
+            ->assertSee('<th>Cuenta</th>', false)
+            ->assertSee('las cuentas de esta Secretaría')
+            ->assertSee('Nº 777001-2 del Bco. Nación');
+
+        // La nota fuera de término, sin filas, cita la predeterminada de entonces.
+        $tarde = FineMonthlyReport::query()->where('period_closing_id', $julio->id)->where('kind', 'late')->sole();
+        expect($tarde->accounts)->toBe([['id' => $this->laCuenta->id, 'citation' => 'Nº 452680-1 del Bco. Macro']]);
+
+        // Cambiar la cita o la predeterminada después no cambia el papel.
+        $this->laCuenta->forceFill(['document_citation' => 'Cuenta renombrada'])->save();
+        app(SetDefaultCashBoxBankAccount::class)->handle(
+            CashBoxBankAccount::query()->where('bank_account_id', $otra->id)->sole(),
+            $this->quienAbre(),
+        );
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.rendiciones.view', $tarde))
+            ->assertOk()
+            ->assertDontSee('<th>Cuenta</th>', false)
+            ->assertSee('Nº 452680-1 del Bco. Macro')
+            ->assertDontSee('Cuenta renombrada')
+            ->assertDontSee('Nº 777001-2 del Bco. Nación');
     }
 
     /** Reabrir y volver a cerrar el mes da otra versión; la anterior queda. */

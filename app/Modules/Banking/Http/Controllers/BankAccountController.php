@@ -89,6 +89,7 @@ final class BankAccountController extends Controller
             'account_number' => $datos['accountNumber'] ?? null,
             'cbu' => $datos['cbu'] ?? null,
             'alias' => $datos['alias'] ?? null,
+            'document_citation' => $datos['documentCitation'] ?? null,
             'currency' => $datos['currency'],
             'is_active' => (bool) $datos['isActive'],
         ];

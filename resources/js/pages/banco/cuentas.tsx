@@ -39,6 +39,7 @@ type FormValues = {
     accountNumber: string;
     cbu: string;
     alias: string;
+    documentCitation: string;
     currency: string;
     isActive: boolean;
 };
@@ -49,6 +50,7 @@ const VACIO: FormValues = {
     accountNumber: '',
     cbu: '',
     alias: '',
+    documentCitation: '',
     currency: 'ARS',
     isActive: true,
 };
@@ -81,6 +83,7 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                       accountNumber: editando.accountNumber ?? '',
                       cbu: editando.cbu ?? '',
                       alias: editando.alias ?? '',
+                      documentCitation: editando.documentCitation ?? '',
                       currency: editando.currency,
                       isActive: editando.isActive,
                   }
@@ -319,6 +322,32 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                                     placeholder="22 dígitos"
                                 />
                                 <InputError message={form.errors.cbu} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="documentCitation">
+                                    Cómo se cita en los documentos
+                                </Label>
+                                <Input
+                                    id="documentCitation"
+                                    maxLength={120}
+                                    value={form.data.documentCitation}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'documentCitation',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Nº 452680-1 del Bco. Macro"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Como la escribe el área en sus notas. La
+                                    rendición de Multas la cita así; sin texto,
+                                    usa el nombre de la cuenta.
+                                </p>
+                                <InputError
+                                    message={form.errors.documentCitation}
+                                />
                             </div>
 
                             <div className="grid gap-2">

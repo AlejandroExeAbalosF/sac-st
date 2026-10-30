@@ -4,10 +4,20 @@ import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import DepositTicketFields from '@/features/banking/components/deposit-ticket-fields';
 import TicketPhotoPanel, {
     useTicketPhoto,
 } from '@/features/banking/components/ticket-photo-panel';
+import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { businessToday, date, money } from '@/lib/format';
 import { store as depositar } from '@/routes/multas/pagos/deposito';
@@ -23,7 +33,8 @@ type Props = {
         chequeNumber: string | null;
         chequeBank: string | null;
     };
-    cuenta: string;
+    /** Cada período de las cuentas de la caja: se muestran las vigentes en la fecha del depósito. */
+    cuentas: PeriodoDeCuenta[];
     desde: 'pendientes' | 'multa';
 };
 
@@ -32,13 +43,15 @@ type Props = {
  *
  * Es una pantalla y no un diálogo por lo mismo que en Haberes: el operador
  * vuelve del banco con el ticket y lo transcribe mirándolo, con la foto al
- * lado. El importe no se escribe —el cobro va entero— y la cuenta no se
- * elige: es la del libro de la caja.
+ * lado. El importe no se escribe —el cobro va entero—. La cuenta es una de
+ * las habilitadas para la caja en la fecha del depósito, aunque hoy esté
+ * dada de baja: con una sola no se elige; con varias, viene la
+ * predeterminada y se puede cambiar.
  */
 export default function DepositoDeCobro({
     multa,
     cobro,
-    cuenta,
+    cuentas,
     desde,
 }: Props) {
     const {
@@ -61,7 +74,15 @@ export default function DepositoDeCobro({
         ticket: null as File | null,
         idempotencyKey: clave,
         desde,
+        bankAccountId: '',
     });
+
+    const vigentes = useCuentasDelDia(
+        cuentas,
+        form.data.depositDate,
+        form.data.bankAccountId,
+        (id) => form.setData('bankAccountId', id),
+    );
 
     // Los rechazos del Action llegan con la clave del backend.
     const { errors } = usePage().props as unknown as {
@@ -136,14 +157,69 @@ export default function DepositoDeCobro({
                         </dl>
 
                         <div className="grid gap-1">
-                            <p className="text-xs text-field-label">
-                                Cuenta del organismo
-                            </p>
-                            <p className="text-sm">{cuenta}</p>
-                            <p className="text-xs text-muted-foreground">
-                                Es la cuenta con la que opera la caja de Multas:
-                                todo depósito va a ella.
-                            </p>
+                            {vigentes.length === 0 ? (
+                                <>
+                                    <p className="text-xs text-field-label">
+                                        Cuenta del organismo
+                                    </p>
+                                    <p className="text-sm text-warning-strong">
+                                        Ninguna cuenta de la caja vale el{' '}
+                                        {date(form.data.depositDate)}: revisá la
+                                        fecha del ticket.
+                                    </p>
+                                    <InputError
+                                        message={errors?.bankAccountId}
+                                    />
+                                </>
+                            ) : vigentes.length === 1 ? (
+                                <>
+                                    <p className="text-xs text-field-label">
+                                        Cuenta del organismo
+                                    </p>
+                                    <p className="text-sm">
+                                        {vigentes[0].label}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Es la cuenta de la caja de Multas
+                                        vigente ese día: el depósito va a ella.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <Label htmlFor="deposito-cuenta">
+                                        Cuenta del organismo
+                                    </Label>
+                                    <Select
+                                        value={form.data.bankAccountId}
+                                        onValueChange={(v) =>
+                                            form.setData('bankAccountId', v)
+                                        }
+                                    >
+                                        <SelectTrigger id="deposito-cuenta">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {vigentes.map((c) => (
+                                                <SelectItem
+                                                    key={c.id}
+                                                    value={String(c.id)}
+                                                >
+                                                    {c.label}
+                                                    {c.isDefault &&
+                                                        ' (predeterminada)'}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        La del ticket del cajero: la caja tiene
+                                        más de una cuenta habilitada ese día.
+                                    </p>
+                                    <InputError
+                                        message={errors?.bankAccountId}
+                                    />
+                                </>
+                            )}
                         </div>
 
                         <p className="text-xs text-muted-foreground">
@@ -165,7 +241,11 @@ export default function DepositoDeCobro({
                         <div className="flex items-center gap-3">
                             <Button
                                 type="submit"
-                                disabled={form.processing || foto === null}
+                                disabled={
+                                    form.processing ||
+                                    foto === null ||
+                                    vigentes.length === 0
+                                }
                             >
                                 <Landmark className="size-4" />
                                 Registrar el depósito

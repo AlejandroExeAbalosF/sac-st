@@ -9,6 +9,7 @@ declare namespace App {
                     accountNumber: string | null;
                     cbu: string | null;
                     alias: string | null;
+                    documentCitation: string | null;
                     currency: string;
                     isActive: boolean;
                     importCount: number;
@@ -885,7 +886,8 @@ declare namespace App {
                     | 'reabrir'
                     | 'exportar'
                     | 'regenerar-planilla'
-                    | 'abrir';
+                    | 'abrir'
+                    | 'cuentas';
                 export type CashCountScope = 'day' | 'carry';
                 export type CashCountStatus =
                     'draft' | 'reviewed' | 'adjusted' | 'closed';

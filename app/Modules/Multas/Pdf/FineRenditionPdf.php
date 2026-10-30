@@ -80,7 +80,9 @@ final class FineRenditionPdf
                 number_format($emitida->year, 0, ',', '.'),
             ),
             'destinatario' => (array) config('multas.rendicion.destinatario'),
-            'cuenta' => (string) config('multas.rendicion.cuenta'),
+            // Lo guardado al emitir, nunca la configuración de hoy: reimprimir da el mismo papel.
+            'cuenta' => count($informe->accounts) === 1 ? (string) $informe->accounts[0]['citation'] : null,
+            'variasCuentas' => count($informe->accounts) > 1,
             'filas' => $informe->payload,
             'total' => Decimal::format($informe->total),
             'enLetras' => AmountInWords::for($informe->total),

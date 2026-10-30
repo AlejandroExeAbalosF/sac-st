@@ -8,6 +8,7 @@ use App\Listeners\ConfirmPasswordOnLogin;
 use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
+use App\Modules\Banking\Listeners\LinkOpeningBankAccount;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
 use App\Modules\Banking\Support\BankCreditHandlers;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
@@ -15,6 +16,7 @@ use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
 use App\Modules\Haberes\Support\HaberesCashBoxModule;
 use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
+use App\Modules\Ledger\Events\CashBookOpened;
 use App\Modules\Ledger\Permissions\LedgerPermissionCatalog;
 use App\Modules\Ledger\Support\CashBoxModules;
 use App\Modules\Ledger\Support\OpeningDateRule;
@@ -149,6 +151,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureAuthorization();
         $this->configureAuthEventLogging();
+        $this->configureDomainEvents();
         $this->configureNavigation();
     }
 
@@ -247,5 +250,14 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Lockout::class, [RecordAuthEvent::class, 'onLockout']);
         Event::listen(PasswordReset::class, [RecordAuthEvent::class, 'onPasswordReset']);
         Event::listen(TwoFactorAuthenticationFailed::class, [RecordAuthEvent::class, 'onTwoFactorFailed']);
+    }
+
+    /**
+     * Los eventos de dominio que cruzan módulos en la dirección permitida: un
+     * módulo de arriba escucha a uno de abajo, que no sabe quién lo escucha.
+     */
+    protected function configureDomainEvents(): void
+    {
+        Event::listen(CashBookOpened::class, [LinkOpeningBankAccount::class, 'onCashBookOpened']);
     }
 }

@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { BookOpen, Wallet } from 'lucide-react';
+import { BookOpen, Landmark, Wallet } from 'lucide-react';
 import { useMemo } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
@@ -34,6 +34,7 @@ import { businessToday } from '@/lib/format';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { dia as diaDeMultas } from '@/routes/multas/caja';
 import { store } from '@/routes/multas/caja/apertura';
+import { index as cuentasDeLaCaja } from '@/routes/multas/caja/cuentas';
 
 type CuentaBancaria = { id: number; label: string };
 
@@ -73,18 +74,26 @@ export default function AperturaDeMultas({
                     description="Lo que había en la caja al empezar a operar con el sistema, y la cuenta bancaria con la que opera."
                     actions={
                         opening && (
-                            <Button asChild>
-                                <Link
-                                    href={
-                                        diaDeMultas({
-                                            query: { fecha: opening.date },
-                                        }).url
-                                    }
-                                >
-                                    <Wallet className="size-4" />
-                                    Ir al día de la apertura
-                                </Link>
-                            </Button>
+                            <>
+                                <Button variant="outline" asChild>
+                                    <Link href={cuentasDeLaCaja().url}>
+                                        <Landmark className="size-4" />
+                                        Cuentas de la caja
+                                    </Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link
+                                        href={
+                                            diaDeMultas({
+                                                query: { fecha: opening.date },
+                                            }).url
+                                        }
+                                    >
+                                        <Wallet className="size-4" />
+                                        Ir al día de la apertura
+                                    </Link>
+                                </Button>
+                            </>
                         )
                     }
                 />
@@ -94,12 +103,12 @@ export default function AperturaDeMultas({
                         <AperturaHecha existing={opening} />
                         {bankAccountLabel && (
                             <p className="text-sm text-muted-foreground">
-                                Opera con la cuenta{' '}
+                                Abrió con la cuenta{' '}
                                 <span className="font-medium text-foreground">
                                     {bankAccountLabel}
                                 </span>
-                                , compartida con Aranceles: su saldo no se suma
-                                a la caja.
+                                . Con qué cuentas opera hoy está en «Cuentas de
+                                la caja».
                             </p>
                         )}
                     </>

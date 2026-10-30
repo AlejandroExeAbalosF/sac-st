@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Banking;
 
+use App\Modules\Banking\Actions\LinkBankAccountToCashBox;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
+use App\Modules\Shared\Models\CashBox;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -328,6 +330,40 @@ class PantallasDeBancoTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame('USD', $cuenta->refresh()->currency);
+    }
+
+    /**
+     * Una cuenta vinculada a una caja tampoco cambia de moneda, aunque no
+     * tenga movimientos: el vínculo tomó la suya. El formulario lo explica y
+     * la base lo repite.
+     */
+    public function test_no_se_cambia_la_moneda_de_una_cuenta_vinculada_a_una_caja(): void
+    {
+        $cuenta = $this->cuenta();
+        $this->abrirLibrosSinSaldo();
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
+        app(LinkBankAccountToCashBox::class)->handle($caja, $cuenta->id, null, true, $this->quienAbre());
+
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('banco.cuentas.update', $cuenta), [
+                'label' => $cuenta->label,
+                'bankName' => $cuenta->bank_name,
+                'accountNumber' => $cuenta->account_number,
+                'cbu' => null,
+                'alias' => null,
+                'currency' => 'USD',
+                'isActive' => true,
+            ])
+            ->assertSessionHasErrors('currency');
+
+        try {
+            DB::transaction(fn () => DB::table('bank_accounts')->where('id', $cuenta->id)->update(['currency' => 'USD']));
+            $this->fail('La base aceptó cambiar la moneda de una cuenta vinculada.');
+        } catch (QueryException $e) {
+            $this->assertStringContainsString('vinculada a una caja', $e->getMessage());
+        }
+
+        $this->assertSame('ARS', $cuenta->refresh()->currency);
     }
 
     /** Y la base lo impone aunque nadie pase por el formulario. */

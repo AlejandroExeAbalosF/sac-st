@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests\Concerns;
 
+use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Support\BusinessDate;
 use App\Support\Validation\ScannedDocument;
+use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 /**
  * Las reglas del comprobante, compartidas por el alta y la corrección.
@@ -18,6 +24,52 @@ use Illuminate\Validation\Rule;
  */
 trait ValidatesDepositTicket
 {
+    /**
+     * Con cuentas habilitadas para la caja de Haberes, la del ticket tiene que
+     * ser una de ellas y valer el día del depósito. La base lo repite al
+     * identificar el crédito (`bank_allocation_follows_box_accounts`).
+     *
+     * Lo que decide es la vigencia en la caja, no `is_active`: eso dice si la
+     * cuenta recibe extractos nuevos, y un comprobante viejo de una cuenta
+     * que ya no los recibe se sigue registrando. Es el mismo criterio con que
+     * el formulario arma la lista. Sin cuentas habilitadas, la caja no se
+     * controla y vale la regla de siempre: una cuenta activa.
+     *
+     * @param  Closure(string): void  $fail
+     */
+    private function accountServesTheBox(string $attribute, mixed $value, Closure $fail): void
+    {
+        $caja = app(HaberesCashBox::class)->id();
+        $cuentas = app(CashBoxBankAccounts::class);
+        $fecha = $this->input('depositedAt');
+
+        if (! is_numeric($value)) {
+            return;
+        }
+
+        if (! $cuentas->hasAny($caja)) {
+            if (! BankAccount::query()->whereKey((int) $value)->where('is_active', true)->exists()) {
+                $fail('Esa cuenta no está activa.');
+            }
+
+            return;
+        }
+
+        if (! is_string($fecha)) {
+            return;
+        }
+
+        try {
+            $dia = CarbonImmutable::parse($fecha);
+        } catch (Throwable) {
+            return;
+        }
+
+        if (! $cuentas->covers($caja, (int) $value, $dia)) {
+            $fail('Esa cuenta no está habilitada para la caja de Haberes en la fecha del depósito.');
+        }
+    }
+
     /**
      * Lo que el operador copia mirando el papel.
      *
@@ -32,7 +84,8 @@ trait ValidatesDepositTicket
         return [
             'bankAccountId' => [
                 'required', 'integer',
-                Rule::exists('bank_accounts', 'id')->where('is_active', true),
+                Rule::exists('bank_accounts', 'id'),
+                $this->accountServesTheBox(...),
             ],
             /*
              * No se admite una fecha futura: un ticket es el comprobante de

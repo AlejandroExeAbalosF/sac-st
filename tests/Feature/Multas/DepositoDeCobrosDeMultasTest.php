@@ -52,7 +52,7 @@ class DepositoDeCobrosDeMultasTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('multas/depositos/create')
                 ->where('cobro.amount', '300000.00')
-                ->where('cuenta', $this->laCuenta->label)
+                ->where('cuentas', [['id' => $this->laCuenta->id, 'label' => $this->laCuenta->label, 'currency' => 'ARS', 'isDefault' => true, 'validFrom' => null, 'validUntil' => null]])
                 ->where('desde', 'pendientes'));
 
         $this->post(route('multas.pagos.deposito.store', $pago), [...$this->ticket(), 'desde' => 'pendientes'])
@@ -271,7 +271,7 @@ class DepositoDeCobrosDeMultasTest extends TestCase
 
         $this->rechaza('viaja entero', fn () => $this->trasladoCrudo([[$grande, '10000.00']], '10000.00'));
         $this->rechaza('un solo cobro', fn () => $this->trasladoCrudo([[$grande, '20000.00'], [$chico, '5000.00']], '25000.00'));
-        $this->rechaza('cuenta con la que opera', fn () => $this->trasladoCrudo([[$grande, '20000.00']], '20000.00', $otraCuenta->id));
+        $this->rechaza('no está habilitada para esta caja', fn () => $this->trasladoCrudo([[$grande, '20000.00']], '20000.00', $otraCuenta->id));
 
         // Válido: la base lo comprueba al chequear el siguiente.
         $this->trasladoCrudo([[$grande, '20000.00']], '20000.00');

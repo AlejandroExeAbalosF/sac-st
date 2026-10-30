@@ -7,6 +7,7 @@ namespace App\Modules\Multas\Support;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Data\FineBankCreditData;
@@ -16,22 +17,29 @@ use App\Support\Money\Decimal;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Los créditos de la cuenta de Multas que la pantalla ofrece para respaldar
+ * Los créditos de las cuentas de Multas que la pantalla ofrece para respaldar
  * un pago.
+ *
+ * Una cuenta aporta sus créditos dentro de su vigencia en la caja
+ * (`CashBoxBankAccounts`). Que se ofrezcan no los hace de Multas: la cuenta
+ * puede ser compartida, y lo decide quien los identifica.
  *
  * - **Viejos** (`search`): anteriores a la apertura de la caja, para un pago
  *   anterior al sistema. La base repite cada condición
  *   (`fine_historical_bank_credit`).
  * - **Disponibles** (`available`): desde la apertura de la caja, para
  *   verificar un pago por el banco. La base repite las suyas
- *   (`bank_allocation_after_opening`, `fine_payment_application_bank_credit`).
+ *   (`bank_allocation_after_opening`, `bank_allocation_follows_box_accounts`,
+ *   `fine_payment_application_bank_credit`).
  *
  * En los dos casos, sin imputar en ningún libro y sin un pago anterior
  * vigente que los use.
  */
 final class FineBankCredits
 {
-    /** La apertura en pesos de la caja de Multas, con su cuenta, si ya se hizo. */
+    public function __construct(private readonly CashBoxBankAccounts $cuentas) {}
+
+    /** La apertura en pesos de la caja de Multas, si ya se hizo y tiene alguna cuenta habilitada. */
     public function book(): ?CashBookOpening
     {
         $caja = CashBox::query()->where('code', CashBox::MULTAS)->value('id');
@@ -42,7 +50,17 @@ final class FineBankCredits
 
         $apertura = CashBookOpening::for((int) $caja, Currency::Ars);
 
-        return $apertura?->bank_account_id === null ? null : $apertura;
+        return $apertura !== null && $this->cuentas->hasAny((int) $caja) ? $apertura : null;
+    }
+
+    /**
+     * Las cuentas de la caja de Multas que aportan créditos para identificar.
+     *
+     * @return list<int>
+     */
+    public function accounts(CashBookOpening $apertura): array
+    {
+        return $this->cuentas->accountsOf($this->cuentas->identificationWindows((int) $apertura->cash_box_id, Currency::Ars));
     }
 
     /**
@@ -77,8 +95,8 @@ final class FineBankCredits
     }
 
     /**
-     * Lo que entró a la cuenta de la caja desde su apertura y nadie
-     * identificó todavía.
+     * Lo que entró a las cuentas de la caja, dentro de la vigencia de cada
+     * una y desde la apertura, y nadie identificó todavía.
      *
      * Es también la cola de «pendiente de clasificación de caja» (M08): lo
      * anterior a la apertura ya está en el saldo que el área traía y solo
@@ -88,11 +106,9 @@ final class FineBankCredits
      */
     public function pending(CashBookOpening $apertura): Builder
     {
-        return $this->libres(BankTransaction::query()
-            ->where('bank_account_id', $apertura->bank_account_id)
+        return $this->libres($this->cuentas->within(BankTransaction::query()
             ->where('direction', TransactionDirection::Credit->value)
-            ->where('reconciliation_status', ReconciliationStatus::Pending->value)
-            ->where('transaction_date', '>=', $apertura->opened_on->toDateString()));
+            ->where('reconciliation_status', ReconciliationStatus::Pending->value), $this->cuentas->identificationWindows((int) $apertura->cash_box_id, Currency::Ars)));
     }
 
     /**
@@ -128,11 +144,9 @@ final class FineBankCredits
      */
     public function eligible(CashBookOpening $apertura): Builder
     {
-        return $this->libres(BankTransaction::query()
-            ->where('bank_account_id', $apertura->bank_account_id)
+        return $this->libres($this->cuentas->within(BankTransaction::query()
             ->where('direction', TransactionDirection::Credit->value)
-            ->where('transaction_date', '<', $apertura->opened_on->toDateString())
-            ->whereIn('reconciliation_status', [ReconciliationStatus::Pending->value, ReconciliationStatus::Ignored->value]));
+            ->whereIn('reconciliation_status', [ReconciliationStatus::Pending->value, ReconciliationStatus::Ignored->value]), $this->cuentas->historicalWindows((int) $apertura->cash_box_id, Currency::Ars)));
     }
 
     /**

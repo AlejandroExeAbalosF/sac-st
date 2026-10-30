@@ -59,6 +59,11 @@ Breadcrumbs::for('caja.apertura.index', fn (): array => [
     Crumb::make('Apertura'),
 ]);
 
+Breadcrumbs::for('caja.cuentas.index', fn (): array => [
+    Crumb::make('Caja del día', route('caja.dia')),
+    Crumb::make('Cuentas de la caja'),
+]);
+
 Breadcrumbs::for('caja.saldo-anterior.index', fn (): array => [
     Crumb::make('Caja del día', route('caja.dia')),
     Crumb::make('Saldo del sistema anterior'),
@@ -309,6 +314,12 @@ Breadcrumbs::for('multas.index', fn (): array => [
 Breadcrumbs::for('multas.caja.apertura.index', fn (): array => [
     Crumb::make('Multas', route('multas.index')),
     Crumb::make('Apertura de la caja'),
+]);
+
+Breadcrumbs::for('multas.caja.cuentas.index', fn (): array => [
+    Crumb::make('Multas', (auth()->user()?->can('multas.ver') ?? false) ? route('multas.index') : null),
+    Crumb::make('Caja del día', route('multas.caja.dia')),
+    Crumb::make('Cuentas de la caja'),
 ]);
 
 Breadcrumbs::for('multas.pendientes.index', fn (): array => [

@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Banking\Support\CashDepositCreditOptions;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Multas\Actions\CancelFineDeposit;
 use App\Modules\Multas\Actions\ConfirmFineDeposit;
 use App\Modules\Multas\Actions\DepositFineCollection;
@@ -16,7 +17,6 @@ use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Http\Requests\DepositFineCollectionRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
-use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -43,14 +43,15 @@ final class FineDepositController extends Controller
      * lado: como en Haberes, el operador vuelve del banco con el papel y lo
      * copia mirándolo.
      */
-    public function create(Request $request, FinePayment $payment, FineBankCredits $creditos): Response
+    public function create(Request $request, FinePayment $payment, CashBoxBankAccounts $cuentas): Response
     {
         $payment->load(['fine.fineCase', 'application.fundReceipt', 'paymentReceipt.receipt']);
         $deposito = $this->depositos->forPayments([$payment])[$payment->id] ?? null;
-        $cuenta = $creditos->book()?->bank_account_id;
+        // Cada período de las cuentas de la caja: el formulario muestra las vigentes en la fecha del depósito.
+        $opciones = $cuentas->depositOptions($this->depositos->cashBoxId(), Currency::from($payment->fine->currency));
 
-        // Solo lo que sigue en la caja; el Action lo rechazaría igual.
-        abort_if($deposito?->place !== FineCollectionPlace::InCustody || $cuenta === null, 404);
+        // Solo lo que sigue en la caja, de una caja con cuentas; la fecha la juzga el Action.
+        abort_if($deposito?->place !== FineCollectionPlace::InCustody || $opciones === [], 404);
 
         // El cheque vigente de la cadena: el que se deposita, aunque sea un reemplazo.
         $recepcion = $this->depositos->receiptOf($payment);
@@ -71,7 +72,7 @@ final class FineDepositController extends Controller
                 'chequeNumber' => $recepcion?->cheque_number,
                 'chequeBank' => $recepcion?->cheque_bank,
             ],
-            'cuenta' => BankAccount::query()->whereKey($cuenta)->value('label'),
+            'cuentas' => $opciones,
             // A dónde volver: los pendientes de Multas, o la ficha de la multa.
             'desde' => $request->query('desde') === 'pendientes' ? 'pendientes' : 'multa',
         ]);

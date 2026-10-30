@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
 import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { preview } from '@/routes/adjuntos';
@@ -75,7 +76,7 @@ export default function InstallmentIncome({
     puedeAnularPapel,
 }: {
     cuota: Cuota;
-    cuentas: { id: number; label: string }[];
+    cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;
@@ -841,7 +842,7 @@ function Comprobante({
     puedeEditar,
 }: {
     cuota: Cuota;
-    cuentas: { id: number; label: string }[];
+    cuentas: PeriodoDeCuenta[];
     puedeEditar: boolean;
 }) {
     const [abierto, setAbierto] = useState(false);

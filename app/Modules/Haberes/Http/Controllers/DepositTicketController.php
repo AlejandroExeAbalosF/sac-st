@@ -6,8 +6,8 @@ namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Data\BankTransactionListItemData;
-use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Haberes\Actions\DiscardDepositTicket;
 use App\Modules\Haberes\Actions\FindTicketCandidates;
 use App\Modules\Haberes\Actions\LinkDepositTicket;
@@ -27,6 +27,7 @@ use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Pdf\PendingDepositSheet;
+use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\TicketCandidate;
 use App\Modules\Shared\Support\Reason;
@@ -158,26 +159,9 @@ final class DepositTicketController extends Controller
                 'displayNumber' => $expediente->display_number,
                 'employerName' => $expediente->employer?->name,
             ],
-            'accounts' => $this->activeAccounts(),
+            // Cada período, con su vigencia: el formulario muestra las de la fecha del ticket.
+            'accounts' => app(CashBoxBankAccounts::class)->depositOptions(app(HaberesCashBox::class)->id()),
         ]);
-    }
-
-    /**
-     * @return list<array{id: int, label: string, currency: string}>
-     */
-    private function activeAccounts(): array
-    {
-        $cuentas = [];
-
-        foreach (BankAccount::query()->where('is_active', true)->orderBy('label')->get() as $cuenta) {
-            $cuentas[] = [
-                'id' => $cuenta->id,
-                'label' => $cuenta->label,
-                'currency' => $cuenta->currency,
-            ];
-        }
-
-        return $cuentas;
     }
 
     /**

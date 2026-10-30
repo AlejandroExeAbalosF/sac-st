@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Haberes\Actions\AddHaber;
 use App\Modules\Haberes\Actions\CancelHaber;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
@@ -682,11 +683,8 @@ final class HaberController extends Controller
                 ->active()
                 ->orderBy('sort_order')
                 ->get(['id', 'code', 'description']),
-            // Para el modal del comprobante, que deja corregir la cuenta.
-            'cuentas' => BankAccount::query()
-                ->where('is_active', true)
-                ->orderBy('label')
-                ->get(['id', 'label']),
+            // Para el modal del comprobante, que deja corregir la cuenta: las de la caja, con su vigencia.
+            'cuentas' => app(CashBoxBankAccounts::class)->depositOptions(app(HaberesCashBox::class)->id()),
             'extras' => HaberExtraData::fromModel($haber),
             'canEdit' => request()->user()?->can('expedientes.editar') ?? false,
             /*

@@ -38,6 +38,7 @@ final class HaberesCashBoxModule implements CashBoxModule
             CashBoxAbility::Export => 'cierres.exportar',
             CashBoxAbility::RegenerateSheet => 'cierres.regenerar-planilla',
             CashBoxAbility::Open => 'caja.abrir-saldo-inicial',
+            CashBoxAbility::ManageAccounts => 'caja.cuentas',
         };
     }
 

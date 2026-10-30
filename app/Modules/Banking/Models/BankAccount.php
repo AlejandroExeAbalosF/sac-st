@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $account_number
  * @property string|null $cbu
  * @property string|null $alias
+ * @property string|null $document_citation cómo se cita en las notas del área: «Nº 452680-1 del Bco. Macro»
  * @property string $label
  * @property string $currency
  * @property bool $is_active
@@ -29,6 +30,7 @@ final class BankAccount extends Model
         'account_number',
         'cbu',
         'alias',
+        'document_citation',
         'label',
         'currency',
         'is_active',

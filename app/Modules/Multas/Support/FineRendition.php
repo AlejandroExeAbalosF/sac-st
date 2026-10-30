@@ -32,7 +32,10 @@ use Illuminate\Support\Facades\DB;
  * en que se cargan y un mes cerrado no admite asientos con su fecha, así que
  * lo emitido no cambia.
  *
- * @phpstan-type Fila array{date: string, origin: string, voucher: string, caption: string, caseLabel: string, amount: numeric-string, receipt: string, rejected: bool}
+ * Cada fila lleva la cuenta en la que se acreditó y cómo se cita: con más de
+ * una cuenta en el mes, la nota las muestra fila por fila.
+ *
+ * @phpstan-type Fila array{date: string, origin: string, voucher: string, caption: string, caseLabel: string, amount: numeric-string, receipt: string, rejected: bool, accountId: int, account: string}
  */
 final class FineRendition
 {
@@ -64,6 +67,8 @@ final class FineRendition
                 'amount' => Decimal::scale($texto('amount') ?: '0'),
                 'receipt' => $texto('receipt'),
                 'rejected' => (bool) ($pago['rejected'] ?? false),
+                'accountId' => (int) $texto('account_id'),
+                'account' => $texto('account'),
             ];
         }
 
@@ -129,7 +134,9 @@ final class FineRendition
             ->selectRaw('EXISTS (SELECT 1 FROM cheque_rejections r WHERE r.fund_receipt_id = item.fund_receipt_id) AS rejected');
 
         foreach ([$banco, $caja] as $consulta) {
-            $consulta->addSelect([
+            $consulta->join('bank_accounts AS cuenta', 'cuenta.id', '=', 'movimiento.bank_account_id')->addSelect([
+                'cuenta.id AS account_id',
+                DB::raw('COALESCE(cuenta.document_citation, cuenta.label) AS account'),
                 DB::raw("papel.snapshot->>'caption' AS caption"),
                 DB::raw("papel.snapshot->>'caseLabel' AS case_label"),
                 DB::raw('COALESCE(recibo.talonario_number, recibo.formatted_number) AS receipt'),

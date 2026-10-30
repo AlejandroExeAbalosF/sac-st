@@ -189,7 +189,7 @@ class CajaDeMultasTest extends TestCase
         $this->rechaza('credito entero', fn () => $this->antecedenteDirecto($multa, $credito, '400.00'));
         $this->rechaza('la fecha del pago es la del credito', fn () => $this->antecedenteDirecto($multa, $credito, '500.00', '2026-05-21'));
         $this->rechaza('posterior a la apertura', fn () => $this->antecedenteDirecto($multa, $casos['posterior a la apertura'], '1000.00', '2026-06-05'));
-        $this->rechaza('no es de la cuenta', fn () => $this->antecedenteDirecto($multa, $casos['de otra cuenta'], '1000.00'));
+        $this->rechaza('no es de una cuenta de la caja de multas', fn () => $this->antecedenteDirecto($multa, $casos['de otra cuenta'], '1000.00'));
     }
 
     public function test_a_linked_credit_is_not_booked_and_its_date_is_the_banks(): void

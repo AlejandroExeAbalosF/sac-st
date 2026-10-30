@@ -3,13 +3,17 @@
 declare(strict_types=1);
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
+use App\Modules\Banking\Actions\LinkBankAccountToCashBox;
 use App\Modules\Banking\Actions\RejectCheque;
 use App\Modules\Banking\Actions\ReplaceRejectedCheque;
+use App\Modules\Banking\Actions\RetireCashBoxBankAccount;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Support\BusinessDate;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
@@ -50,6 +54,23 @@ try {
             'worker-replace-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done', 'replacement' => $reemplazo->id];
+    } elseif ($input['mode'] === 'link') {
+        // Vincular una cuenta a una caja mientras otro le cambia la moneda.
+        $vinculo = app(LinkBankAccountToCashBox::class)->handle($input['box'], $input['account'], null, false, $input['actor']);
+        $result = ['status' => 'done', 'currency' => $vinculo->currency];
+    } elseif ($input['mode'] === 'raw-link') {
+        // El mismo vínculo escrito directo: la base sola tiene que frenarlo.
+        DB::table('cash_box_bank_accounts')->insert([
+            'cash_box_id' => $input['box'], 'bank_account_id' => $input['account'], 'currency' => 'ARS', 'is_default' => false,
+        ]);
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'retire') {
+        // Dar de baja una cuenta de la caja mientras otro la usa.
+        $vinculo = app(RetireCashBoxBankAccount::class)->handle(
+            CashBoxBankAccount::query()->findOrFail($input['link']), CarbonImmutable::parse($input['until']),
+            $input['newDefault'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'until' => $vinculo->valid_until?->toDateString()];
     } elseif ($input['mode'] === 'raw-deposit') {
         // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.
         DB::transaction(function () use ($input): void {

@@ -62,12 +62,12 @@
     @if ($enTermino)
         Me dirijo a Usted con el objeto de remitirle informe de los ingresos de Multas
         correspondientes al <strong>MES DE {{ $periodo }}</strong>, los que se encuentran
-        acreditados en la cuenta de esta Secretaría <strong>{{ $cuenta }}</strong> según detalle:
+        acreditados en {!! $variasCuentas ? 'las cuentas de esta Secretaría' : 'la cuenta de esta Secretaría <strong>'.e($cuenta).'</strong>' !!} según detalle:
     @else
         Me dirijo a Usted con el objeto de remitirle informe de los ingresos de Multas
         correspondientes a depósitos <strong>FUERA DE TÉRMINO MES DE {{ $periodo }}</strong>,
-        los que se encuentran acreditados en la cuenta de esta Secretaría
-        <strong>{{ $cuenta }}</strong> según el siguiente detalle:
+        los que se encuentran acreditados en {!! $variasCuentas ? 'las cuentas de esta Secretaría' : 'la cuenta de esta Secretaría <strong>'.e($cuenta).'</strong>' !!}
+        según el siguiente detalle:
     @endif
 </p>
 
@@ -81,6 +81,9 @@
             <th>Expte. Nº</th>
             <th>Importe</th>
             <th>Recibo</th>
+            @if ($variasCuentas)
+                <th>Cuenta</th>
+            @endif
         </tr>
     </thead>
     <tbody>
@@ -98,9 +101,12 @@
                 <td class="centro">{{ $fila['caseLabel'] }}</td>
                 <td class="num">$ {{ \App\Support\Money\Decimal::format($fila['amount']) }}</td>
                 <td class="centro">{{ $fila['receipt'] }}</td>
+                @if ($variasCuentas)
+                    <td class="centro">{{ $fila['account'] ?? '' }}</td>
+                @endif
             </tr>
         @empty
-            <tr><td colspan="7" class="vacio">Sin ingresos para informar.</td></tr>
+            <tr><td colspan="{{ $variasCuentas ? 8 : 7 }}" class="vacio">Sin ingresos para informar.</td></tr>
         @endforelse
         <tr class="pie">
             <td colspan="5">
@@ -109,7 +115,7 @@
                 @endif
             </td>
             <td class="num">$ {{ $total }}</td>
-            <td></td>
+            <td @if ($variasCuentas) colspan="2" @endif></td>
         </tr>
     </tbody>
 </table>

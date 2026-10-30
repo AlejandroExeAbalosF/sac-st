@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Banking\Http\Controllers\CashBoxAccountController;
 use App\Modules\Ledger\Http\Controllers\CashCalendarController;
 use App\Modules\Ledger\Http\Controllers\CashController;
 use App\Modules\Ledger\Http\Controllers\CashCountController;
@@ -54,6 +55,21 @@ Route::middleware(['auth', 'verified', 'caja:haberes'])->prefix('caja')->name('c
     Route::middleware('can:caja.abrir-saldo-inicial')->group(function (): void {
         Route::get('apertura', [OpeningBalanceController::class, 'index'])->name('apertura.index');
         Route::post('apertura', [OpeningBalanceController::class, 'store'])->name('apertura.store');
+    });
+
+    /*
+     * Las cuentas bancarias con las que opera la caja: mirarlas es de quien
+     * ve la caja; habilitarlas, darlas de baja o cambiar su vigencia, de
+     * quien las administra.
+     */
+    Route::middleware('can:caja.ver')->group(function (): void {
+        Route::get('cuentas', [CashBoxAccountController::class, 'index'])->name('cuentas.index');
+    });
+    Route::middleware('can:caja.cuentas')->group(function (): void {
+        Route::post('cuentas', [CashBoxAccountController::class, 'store'])->name('cuentas.store');
+        Route::post('cuentas/{link}/baja', [CashBoxAccountController::class, 'retire'])->whereNumber('link')->name('cuentas.retire');
+        Route::post('cuentas/{link}/predeterminada', [CashBoxAccountController::class, 'default'])->whereNumber('link')->name('cuentas.default');
+        Route::post('cuentas/{link}/vigencia', [CashBoxAccountController::class, 'start'])->whereNumber('link')->name('cuentas.start');
     });
 
     Route::middleware('can:caja.arquear')->group(function (): void {

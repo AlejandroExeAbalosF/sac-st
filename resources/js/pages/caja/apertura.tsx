@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Landmark } from 'lucide-react';
 import { useMemo } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
@@ -37,6 +37,7 @@ import { businessToday } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
 import { dia as caja } from '@/routes/caja';
 import { index as apertura, store } from '@/routes/caja/apertura';
+import { index as cuentasDeLaCaja } from '@/routes/caja/cuentas';
 
 type Cuenta = { code: string; label: string };
 
@@ -284,10 +285,19 @@ export default function CajaApertura({
                     title="Apertura de los libros"
                     description="El saldo que ya está en el cajón el día que el sistema arranca."
                     actions={
-                        <SelectorDeMoneda
-                            moneda={selected.currency}
-                            href={(otra) => conMoneda(apertura().url, otra)}
-                        />
+                        <>
+                            {/* Con qué cuentas opera la caja: una pantalla aparte, porque es de Banking. */}
+                            <Button variant="outline" asChild>
+                                <Link href={cuentasDeLaCaja().url}>
+                                    <Landmark className="size-4" />
+                                    Cuentas de la caja
+                                </Link>
+                            </Button>
+                            <SelectorDeMoneda
+                                moneda={selected.currency}
+                                href={(otra) => conMoneda(apertura().url, otra)}
+                            />
+                        </>
                     }
                 />
 

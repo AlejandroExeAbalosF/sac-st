@@ -114,6 +114,15 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador'],
                 sensitive: true,
             ),
+            // Con qué cuentas opera la caja: dónde se deposita y qué créditos se identifican.
+            new PermissionDefinition(
+                'multas.caja.cuentas',
+                'Administrar las cuentas de la caja de Multas',
+                'Habilitar, dar de baja y elegir la predeterminada de las cuentas bancarias con las que opera la caja de Multas, y cambiar desde cuándo vale cada una.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
 
             /*
              * La caja del día, el arqueo y el cierre de Multas (Etapa 6). Son

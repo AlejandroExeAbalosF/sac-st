@@ -73,6 +73,15 @@ final class LedgerPermissionCatalog implements PermissionCatalogContributor
                 ['administrador'],
                 sensitive: true,
             ),
+            // Con qué cuentas opera la caja: dónde se deposita y qué créditos se identifican.
+            new PermissionDefinition(
+                'caja.cuentas',
+                'Administrar las cuentas de la caja',
+                'Habilitar, dar de baja y elegir la predeterminada de las cuentas bancarias con las que opera la caja de Haberes, y cambiar desde cuándo vale cada una.',
+                'caja',
+                ['administrador'],
+                sensitive: true,
+            ),
 
             // Cerrar congela los totales del día y traba las operaciones
             // retroactivas. El rol de contador ya se describe como quien

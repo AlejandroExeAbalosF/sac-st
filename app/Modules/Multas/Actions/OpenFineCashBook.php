@@ -22,9 +22,10 @@ use Illuminate\Validation\ValidationException;
  * - **Sin saldo bancario.** La cuenta de Multas es compartida con
  *   Aranceles, y su saldo no se reparte: cada caja reconoce solo lo que
  *   identifica. Ponerlo acá lo atribuiría entero a Multas.
- * - **Con su cuenta.** El libro dice con qué cuenta opera, y su fecha de
- *   apertura separa un crédito viejo, que va como pago anterior, de un
- *   cobro, que entra al libro.
+ * - **Con su cuenta.** La de la apertura queda como la primera cuenta
+ *   habilitada de la caja, predeterminada; después se pueden sumar o
+ *   retirar otras. La fecha de apertura separa un crédito viejo, que va
+ *   como pago anterior, de un cobro, que entra al libro.
  *
  * Solo en pesos: Multas no cobra en dólares.
  */
@@ -62,6 +63,8 @@ final class OpenFineCashBook
 
         $caja = CashBox::query()->active()->where('code', CashBox::MULTAS)->firstOrFail();
 
+        // La cuenta de la apertura queda como la primera habilitada de la caja
+        // (Banking escucha `CashBookOpened`), en la misma transacción.
         return $this->abrir->handle(
             cashBoxId: (int) $caja->id,
             balances: $balances,

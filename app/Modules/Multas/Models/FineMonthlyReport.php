@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property int $closing_version
  * @property string $kind
  * @property list<array<string, mixed>> $payload
+ * @property list<array{id: int, citation: string}> $accounts las cuentas que cita la nota, guardadas al emitir
  * @property string $total
  * @property int $rows_count
  * @property int|null $attachment_id
@@ -41,7 +42,7 @@ final class FineMonthlyReport extends Model
     protected $table = 'fine_monthly_reports';
 
     protected $fillable = [
-        'period_closing_id', 'closing_version', 'kind', 'payload', 'total', 'rows_count',
+        'period_closing_id', 'closing_version', 'kind', 'payload', 'accounts', 'total', 'rows_count',
         'attachment_id', 'emitted_by', 'emitted_at',
     ];
 
@@ -50,6 +51,7 @@ final class FineMonthlyReport extends Model
     {
         return [
             'payload' => 'array',
+            'accounts' => 'array',
             'total' => 'decimal:2',
             'emitted_at' => 'datetime',
         ];

@@ -420,7 +420,12 @@ final class InicioController extends Controller
                     description: 'Entraron a la cuenta de Multas desde la apertura de la caja y nadie los reconoció',
                     count: $this->creditosDeMultas->pending($apertura)->count(),
                     tone: QueueTone::Action,
-                    href: route('banco.movimientos.index', ['cuenta' => $apertura->bank_account_id, 'estado' => 'pending', 'sentido' => 'credit'], absolute: false),
+                    // Con una sola cuenta, la lista ya filtrada por ella.
+                    href: route('banco.movimientos.index', array_filter([
+                        'cuenta' => count($cuentas = $this->creditosDeMultas->accounts($apertura)) === 1 ? $cuentas[0] : null,
+                        'estado' => 'pending',
+                        'sentido' => 'credit',
+                    ]), absolute: false),
                 );
             }
         }

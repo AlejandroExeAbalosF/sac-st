@@ -31,6 +31,8 @@ final class DepositFineCollectionRequest extends FormRequest
             'ticket' => ScannedDocument::rules(required: true),
             'idempotencyKey' => ['required', 'string', 'max:120'],
             'desde' => ['nullable', 'in:pendientes,multa'],
+            // Sin elegir, la predeterminada de la caja; el Action la valida contra la fecha.
+            'bankAccountId' => ['nullable', 'integer'],
         ];
     }
 
@@ -61,7 +63,7 @@ final class DepositFineCollectionRequest extends FormRequest
     }
 
     /**
-     * @return array{depositDate: CarbonImmutable, depositTime: string|null, operationNumber: string|null, terminal: string|null, notes: string|null}
+     * @return array{depositDate: CarbonImmutable, depositTime: string|null, operationNumber: string|null, terminal: string|null, notes: string|null, bankAccountId: int|null}
      */
     public function ticket(): array
     {
@@ -73,6 +75,7 @@ final class DepositFineCollectionRequest extends FormRequest
             'operationNumber' => $datos['operationNumber'] ?? null,
             'terminal' => $datos['terminal'] ?? null,
             'notes' => $datos['notes'] ?? null,
+            'bankAccountId' => isset($datos['bankAccountId']) ? (int) $datos['bankAccountId'] : null,
         ];
     }
 }

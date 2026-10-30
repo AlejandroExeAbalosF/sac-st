@@ -125,6 +125,36 @@ Detallarlos es opcional, pero la suma tiene que coincidir con el saldo declarado
 de cheques —mismo control cruzado que la base impone al arqueo—. Sin detalle el
 inventario arranca vacío.
 
+<a id="cuentas-de-la-caja"></a>
+
+### Cuentas de la caja · `/caja/cuentas`
+
+Las cuentas bancarias con las que opera la caja, con su vigencia y una
+**predeterminada por moneda** (decisión del usuario, 29/10/2026). La misma pantalla
+existe para Multas (`/multas/caja/cuentas`), con su permiso. Se enlaza desde la
+apertura; mirarla es de `caja.ver` y administrarla, de `caja.cuentas`
+(administrador). Vive en Banking: la apertura es de Ledger, que no conoce las
+cuentas.
+
+- **Migración:** cada cuenta que la caja ya usó —su libro, sus depósitos, sus
+  comprobantes y sus Órdenes— quedó habilitada **sin fecha de inicio** («inicio
+  histórico desconocido»). La predeterminada por moneda: la de la apertura o, si no
+  hay, la más usada. Una cuenta nueva se habilita a mano; la de una apertura nueva,
+  sola, al abrir el libro (`CashBookOpened`).
+- **Vigencia:** desde (vacío = inicio desconocido) hasta la baja, que incluye ese
+  día. Sin fechas futuras. Cambiar el inicio pide motivo; ni el inicio ni la baja
+  pueden dejar afuera lo ya registrado. Una cuenta que vuelve a la caja abre un
+  período nuevo, después de su baja: los períodos no se superponen.
+- **Depositar el efectivo** ofrece las cuentas vigentes **en la fecha del depósito**
+  en la moneda del haber, la predeterminada primero; la base exige una cuenta
+  vigente ese día. **Un comprobante de depósito** tiene que ser de una cuenta de la
+  caja vigente el día del depósito, y su formulario y su corrección ofrecen las de
+  esa fecha. Sin ninguna cuenta habilitada, la caja no se controla: es como
+  operaba antes.
+- **Lo ya hecho sigue:** un traslado en tránsito se acredita contra su cuenta aunque
+  esté dada de baja. La Orden de Pago sigue tomando la cuenta del organismo de donde
+  está la plata, y su débito se valida contra ella.
+
 ### Caja del día · `/caja/dia`
 
 La pantalla principal. Arriba, los saldos; abajo, los movimientos de la jornada y

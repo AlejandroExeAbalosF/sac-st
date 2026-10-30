@@ -17,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import TicketPhotoPanel, {
     useTicketPhoto,
 } from '@/features/banking/components/ticket-photo-panel';
+import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { businessToday, money } from '@/lib/format';
 import { show as haberShow } from '@/routes/haberes/haber';
 import { ticket as registrar } from '@/routes/haberes/installments';
@@ -35,7 +37,8 @@ type Props = {
     };
     haber: { number: number; expedienteId: number; beneficiaryName: string };
     expediente: { displayNumber: string; employerName: string | null };
-    accounts: { id: number; label: string; currency: string }[];
+    /** Cada período de las cuentas de la caja: se muestran las vigentes en la fecha del ticket. */
+    accounts: (PeriodoDeCuenta & { currency: string })[];
 };
 
 /**
@@ -66,7 +69,7 @@ export default function DepositoCreate({
     } = useTicketPhoto();
 
     const form = useForm({
-        bankAccountId: accounts[0]?.id.toString() ?? '',
+        bankAccountId: '',
         depositedAt: '',
         depositedTime: '',
         operationNumber: '',
@@ -94,9 +97,16 @@ export default function DepositoCreate({
      * cuál de las cuentas de la Secretaría entró la plata. Se bloquea
      * cuando no hay nada que elegir, no por rol —con dos cuentas activas,
      * fijarla dejaría sin registrar el depósito que entró en la otra y el
-     * cruce contra el extracto no encontraría nada—.
+     * cruce contra el extracto no encontraría nada—. Son las de la caja
+     * vigentes el día del depósito, aunque hoy estén dadas de baja.
      */
-    const cuentaUnica = accounts.length <= 1;
+    const vigentes = useCuentasDelDia(
+        accounts,
+        form.data.depositedAt,
+        form.data.bankAccountId,
+        (id) => form.setData('bankAccountId', id),
+    );
+    const cuentaUnica = vigentes.length <= 1;
 
     // El comprobante es de algo que ya pasó: el calendario no ofrece el
     // futuro en vez de dejar que lo rechace el servidor.
@@ -337,7 +347,7 @@ export default function DepositoCreate({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {accounts.map((cuenta) => (
+                                    {vigentes.map((cuenta) => (
                                         <SelectItem
                                             key={cuenta.id}
                                             value={cuenta.id.toString()}
@@ -347,9 +357,15 @@ export default function DepositoCreate({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {cuentaUnica ? (
+                            {vigentes.length === 0 ? (
+                                <p className="text-xs text-warning-strong">
+                                    Ninguna cuenta de la caja vale ese día:
+                                    revisá la fecha del comprobante.
+                                </p>
+                            ) : cuentaUnica ? (
                                 <p className="text-xs text-muted-foreground">
-                                    Es la única cuenta activa.
+                                    Es la única cuenta de la caja vigente ese
+                                    día.
                                 </p>
                             ) : (
                                 <InputError

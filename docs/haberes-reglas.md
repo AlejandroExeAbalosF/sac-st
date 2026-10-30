@@ -171,6 +171,26 @@ Evidencia: [canal](../app/Modules/Haberes/Support/PaymentOrderSources.php),
 [pruebas de traslado](../tests/Feature/Haberes/TrasladoDeEfectivoTest.php) y
 [cheques en el traslado](../tests/Feature/Haberes/ChequeEnElTrasladoTest.php).
 
+<a id="cuentas-de-la-caja"></a>
+
+## Cuentas de la caja
+
+- La caja opera con sus cuentas habilitadas (`cash_box_bank_accounts`), vigentes en
+  la fecha del acto. Sin ninguna habilitada, no se controla.
+- Un traslado nuevo va a una cuenta vigente el día del depósito:
+  `cash_transfer_follows_box_accounts`. **Base**; `DepositCashToBank` lo dice con
+  palabras y la pantalla solo ofrece las vigentes en la fecha que se carga.
+- Un comprobante de depósito es de una cuenta vigente el día del depósito:
+  **Request** (`ValidatesDepositTicket`). Decide la vigencia en la caja, no
+  `is_active` —que solo dice si la cuenta recibe extractos nuevos—, igual que la
+  lista del formulario; sin cuentas habilitadas, vale la regla de siempre: activa. Identificar su crédito lo repite la base
+  (`bank_allocation_follows_box_accounts`).
+- La acreditación, la reversión y el débito de una Orden se validan contra la cuenta
+  del traslado o de la Orden, no contra la vigencia. **Base** (sin cambio).
+- Abrir el libro con una cuenta la habilita para la caja (`LinkOpeningBankAccount`,
+  al escuchar `CashBookOpened`). **Action.** Las reglas de períodos y vigencias son
+  las de Multas: ver [`multas-reglas.md#cuentas-de-la-caja`](multas-reglas.md#cuentas-de-la-caja).
+
 <a id="moneda"></a>
 
 ### Moneda de las líneas

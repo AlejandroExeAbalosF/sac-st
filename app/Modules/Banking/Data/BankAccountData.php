@@ -26,6 +26,8 @@ final class BankAccountData extends Data
         public ?string $accountNumber,
         public ?string $cbu,
         public ?string $alias,
+        /** Cómo se cita en los documentos: la rendición de Multas usa este texto. */
+        public ?string $documentCitation,
         public string $currency,
         public bool $isActive,
         public int $importCount,
@@ -51,6 +53,7 @@ final class BankAccountData extends Data
             accountNumber: $account->account_number,
             cbu: $account->cbu,
             alias: $account->alias,
+            documentCitation: $account->document_citation,
             currency: $account->currency,
             isActive: $account->is_active,
             importCount: (int) (self::aggregate($account, 'imports_count') ?? 0),

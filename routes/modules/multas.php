@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Banking\Http\Controllers\CashBoxAccountController;
 use App\Modules\Ledger\Http\Controllers\CashCalendarController;
 use App\Modules\Ledger\Http\Controllers\CashController;
 use App\Modules\Ledger\Http\Controllers\CashCountController;
@@ -244,6 +245,20 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 | depósitos, en los pendientes de Multas.
 */
 Route::middleware(['auth', 'verified', 'caja:multas'])->prefix('multas/caja')->name('multas.caja.')->group(function (): void {
+    /*
+     * Las cuentas bancarias con las que opera la caja: mirarlas es de quien
+     * ve la caja; habilitarlas, darlas de baja o cambiar su vigencia, de
+     * quien las administra.
+     */
+    Route::middleware('can:multas.caja.ver')->group(function (): void {
+        Route::get('cuentas', [CashBoxAccountController::class, 'index'])->name('cuentas.index');
+    });
+    Route::middleware('can:multas.caja.cuentas')->group(function (): void {
+        Route::post('cuentas', [CashBoxAccountController::class, 'store'])->name('cuentas.store');
+        Route::post('cuentas/{link}/baja', [CashBoxAccountController::class, 'retire'])->whereNumber('link')->name('cuentas.retire');
+        Route::post('cuentas/{link}/predeterminada', [CashBoxAccountController::class, 'default'])->whereNumber('link')->name('cuentas.default');
+        Route::post('cuentas/{link}/vigencia', [CashBoxAccountController::class, 'start'])->whereNumber('link')->name('cuentas.start');
+    });
     Route::middleware('can:multas.caja.ver')->group(function (): void {
         Route::get('dia', [CashController::class, 'index'])->name('dia');
         Route::get('arqueos', [CashCountController::class, 'index'])->name('arqueos.index');

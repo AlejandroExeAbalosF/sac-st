@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Banking\Http\Requests;
 
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\CashBoxBankAccount;
+use App\Modules\Ledger\Models\CashBookOpening;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -40,6 +42,8 @@ final class SaveBankAccountRequest extends FormRequest
                 Rule::unique('bank_accounts', 'cbu')->ignore($accountId),
             ],
             'alias' => ['nullable', 'string', 'max:80'],
+            // Cómo la escribe el área en sus notas: la rendición de Multas la cita así.
+            'documentCitation' => ['nullable', 'string', 'max:120'],
             'currency' => [
                 'required', 'string', Rule::in(['ARS', 'USD']),
                 $this->currencyIsFrozen(...),
@@ -49,7 +53,8 @@ final class SaveBankAccountRequest extends FormRequest
     }
 
     /**
-     * La moneda se congela apenas la cuenta tiene movimientos.
+     * La moneda se congela apenas la cuenta tiene movimientos, un vínculo con
+     * una caja o una apertura de libro.
      *
      * Los movimientos no llevan moneda propia: la heredan de la cuenta.
      * Cambiarla acá reinterpretaría todos los importes ya
@@ -71,6 +76,18 @@ final class SaveBankAccountRequest extends FormRequest
                 'La cuenta ya tiene movimientos importados. Cambiar su moneda ahora haría que '
                 .'esos importes se lean en la moneda nueva. Si la cuenta se cargó con la moneda '
                 .'equivocada, revertí sus importaciones antes.'
+            );
+
+            return;
+        }
+
+        // El vínculo con una caja y la apertura de un libro tomaron la moneda de la cuenta.
+        if (CashBoxBankAccount::query()->where('bank_account_id', $account->id)->exists()
+            || CashBookOpening::query()->where('bank_account_id', $account->id)->exists()) {
+            $fail(
+                'La cuenta está vinculada a una caja en '.$account->currency.'. Cambiar su moneda '
+                .'contradiría ese vínculo: si se cargó con la moneda equivocada, cargá la cuenta '
+                .'correcta y habilitala en la caja.'
             );
         }
     }

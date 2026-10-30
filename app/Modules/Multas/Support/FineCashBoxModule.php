@@ -60,6 +60,7 @@ final class FineCashBoxModule implements CashBoxModule
             CashBoxAbility::Export => 'multas.caja.exportar',
             CashBoxAbility::RegenerateSheet => 'multas.caja.regenerar-planilla',
             CashBoxAbility::Open => 'multas.caja.abrir',
+            CashBoxAbility::ManageAccounts => 'multas.caja.cuentas',
         };
     }
 

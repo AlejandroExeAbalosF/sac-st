@@ -7,15 +7,16 @@ namespace App\Modules\Haberes\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
-use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Banking\Support\CashDepositCreditOptions;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentDeposit;
+use App\Modules\Ledger\Enums\Currency;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -83,12 +84,12 @@ final class CashTransferController extends Controller
                 'id' => $expediente->id,
                 'displayNumber' => $expediente->display_number,
             ],
-            // Solo las de la moneda del haber: el depósito no cambia de moneda.
-            'accounts' => BankAccount::query()
-                ->where('is_active', true)
-                ->where('currency', $haber->currency)
-                ->orderBy('label')
-                ->get(['id', 'label', 'currency']),
+            /*
+             * Solo las de la moneda del haber: el depósito no cambia de moneda.
+             * Cada período de las cuentas de la caja, para que el formulario
+             * muestre las vigentes en la fecha del depósito.
+             */
+            'accounts' => app(CashBoxBankAccounts::class)->depositOptions(app(HaberesCashBox::class)->id(), Currency::from($haber->currency)),
         ]);
     }
 

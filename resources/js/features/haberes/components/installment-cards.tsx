@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { compareAmounts, money, sumAmounts } from '@/lib/format';
 import type {
     EgresoProps,
@@ -49,7 +50,7 @@ export default function InstallmentCards({
     /** El ordinal del haber: es lo que va en la direccion. */
     haberNumber: number;
     /** Para el modal del comprobante, que deja corregir la cuenta. */
-    cuentas: { id: number; label: string }[];
+    cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;

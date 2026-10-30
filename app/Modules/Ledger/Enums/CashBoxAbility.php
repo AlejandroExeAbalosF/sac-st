@@ -24,4 +24,5 @@ enum CashBoxAbility: string
     case Export = 'exportar';
     case RegenerateSheet = 'regenerar-planilla';
     case Open = 'abrir';
+    case ManageAccounts = 'cuentas';
 }

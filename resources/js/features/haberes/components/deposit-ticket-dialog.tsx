@@ -23,12 +23,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { date } from '@/lib/format';
 import { preview } from '@/routes/adjuntos';
 import { search as buscarTicket, update as corregir } from '@/routes/depositos';
 
 type Ticket = App.Modules.Haberes.Data.InstallmentTicketData;
-type Cuenta = { id: number; label: string };
 
 const TIPO: Record<App.Modules.Haberes.Enums.DepositKind, string> = {
     cash_deposit: 'Depósito en efectivo',
@@ -56,7 +57,7 @@ export default function DepositTicketDialog({
     onCerrar,
 }: {
     ticket: Ticket;
-    cuentas: Cuenta[];
+    cuentas: PeriodoDeCuenta[];
     puedeEditar: boolean;
     abierto: boolean;
     onCerrar: () => void;
@@ -188,7 +189,7 @@ function Formulario({
     onListo,
 }: {
     ticket: Ticket;
-    cuentas: Cuenta[];
+    cuentas: PeriodoDeCuenta[];
     onListo: () => void;
 }) {
     const inputFoto = useRef<HTMLInputElement>(null);
@@ -205,6 +206,15 @@ function Formulario({
         notes: ticket.notes ?? '',
         photo: null as File | null,
     });
+
+    // Las de la caja vigentes el día del depósito; la que ya tiene el comprobante sigue a mano.
+    const vigentes = useCuentasDelDia(
+        cuentas,
+        form.data.depositedAt,
+        form.data.bankAccountId,
+        (id) => form.setData('bankAccountId', id),
+        ticket.bankAccountId.toString(),
+    );
 
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -289,7 +299,7 @@ function Formulario({
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {cuentas.map((cuenta) => (
+                            {vigentes.map((cuenta) => (
                                 <SelectItem
                                     key={cuenta.id}
                                     value={cuenta.id.toString()}

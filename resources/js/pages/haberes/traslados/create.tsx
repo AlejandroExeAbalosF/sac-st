@@ -16,6 +16,8 @@ import DepositTicketFields from '@/features/banking/components/deposit-ticket-fi
 import TicketPhotoPanel, {
     useTicketPhoto,
 } from '@/features/banking/components/ticket-photo-panel';
+import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { isNonZero, money } from '@/lib/format';
 import { transfer as trasladar } from '@/routes/haberes/installments';
 
@@ -34,7 +36,8 @@ type Props = {
     };
     haber: { id: number; expedienteId: number; beneficiaryName: string };
     expediente: { id: number; displayNumber: string };
-    accounts: { id: number; label: string; currency: string }[];
+    /** Cada período de las cuentas de la caja, en la moneda del haber. */
+    accounts: (PeriodoDeCuenta & { currency: string })[];
 };
 
 /**
@@ -67,7 +70,7 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
     );
 
     const form = useForm({
-        bankAccountId: accounts[0]?.id.toString() ?? '',
+        bankAccountId: '',
         depositDate: '',
         depositTime: '',
         operationNumber: '',
@@ -91,11 +94,19 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
         form.setData('ticket', file);
     };
 
+    // Las cuentas de la caja vigentes el día del depósito, aunque hoy estén dadas de baja.
+    const vigentes = useCuentasDelDia(
+        accounts,
+        form.data.depositDate,
+        form.data.bankAccountId,
+        (id) => form.setData('bankAccountId', id),
+    );
+
     /*
      * La cuenta se bloquea cuando hay una sola: no es una restricción por
      * rol, es que no hay nada que elegir.
      */
-    const cuentaUnica = accounts.length <= 1;
+    const cuentaUnica = vigentes.length <= 1;
 
     /*
      * Solo llegan cuentas de la moneda del haber: el depósito no cambia de
@@ -103,6 +114,7 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
      * el efectivo, y se dice en vez de dejar un selector vacío.
      */
     const sinCuenta = accounts.length === 0;
+    const sinCuentaEseDia = !sinCuenta && vigentes.length === 0;
 
     const enviar = (event: React.FormEvent) => {
         event.preventDefault();
@@ -205,7 +217,7 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                                     <SelectValue placeholder="Elegí la cuenta" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {accounts.map((c) => (
+                                    {vigentes.map((c) => (
                                         <SelectItem
                                             key={c.id}
                                             value={c.id.toString()}
@@ -221,9 +233,15 @@ export default function TrasladoCreate({ cuota, accounts }: Props) {
                                     de este haber. Se da de alta en Banco ›
                                     Cuentas.
                                 </p>
+                            ) : sinCuentaEseDia ? (
+                                <p className="text-xs text-warning-strong">
+                                    Ninguna cuenta de la caja vale ese día:
+                                    revisá la fecha del ticket.
+                                </p>
                             ) : cuentaUnica ? (
                                 <p className="text-xs text-muted-foreground">
-                                    Es la única cuenta activa del organismo.
+                                    Es la única cuenta de la caja vigente ese
+                                    día.
                                 </p>
                             ) : (
                                 <InputError

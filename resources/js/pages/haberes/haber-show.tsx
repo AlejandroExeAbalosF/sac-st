@@ -8,6 +8,7 @@ import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import HaberCancelDialog from '@/features/haberes/components/haber-cancel-dialog';
 import InstallmentCards from '@/features/haberes/components/installment-cards';
@@ -48,7 +49,7 @@ type Props = {
     beneficiario: { name: string; document: string | null };
     etiquetas: EtiquetaOption[];
     /** Cuentas activas, para el modal del comprobante. */
-    cuentas: { id: number; label: string }[];
+    cuentas: PeriodoDeCuenta[];
     canEdit: boolean;
     canCancel: boolean;
     canManageTickets: boolean;

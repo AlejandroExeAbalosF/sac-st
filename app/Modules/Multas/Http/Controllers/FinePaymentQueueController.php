@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Ledger\Enums\Currency;
-use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Data\FinePendingPaymentData;
 use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineDeposits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -34,7 +33,10 @@ final class FinePaymentQueueController extends Controller
     /** Las pestañas, en el orden en que se muestran. */
     public const TABS = ['informados', 'depositar', 'transito', 'rechazos'];
 
-    public function __construct(private readonly FineDeposits $depositos) {}
+    public function __construct(
+        private readonly FineDeposits $depositos,
+        private readonly FineBankCredits $creditos,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -53,9 +55,8 @@ final class FinePaymentQueueController extends Controller
             'rechazados' => $this->filas($this->depositos->paymentsWithPendingRejections()),
             'can' => [
                 'verify' => $concilia,
-                // Depositar exige la caja abierta con su cuenta.
-                'deposit' => ($usuario?->can('multas.depositar') ?? false)
-                    && CashBookOpening::for($this->depositos->cashBoxId(), Currency::Ars)?->bank_account_id !== null,
+                // Depositar exige la caja abierta con alguna cuenta habilitada.
+                'deposit' => ($usuario?->can('multas.depositar') ?? false) && $this->creditos->book() !== null,
                 'confirmDeposit' => $concilia,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
