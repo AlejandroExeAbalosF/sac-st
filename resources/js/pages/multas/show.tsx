@@ -50,6 +50,7 @@ import {
     TIMELINESS,
     partialDate,
 } from '@/features/multas/labels';
+import { acceptsPaymentEvidence } from '@/features/multas/payment-evidence';
 import {
     date,
     dateTime,
@@ -849,7 +850,10 @@ export default function MultaShow({
                                                     </Button>
                                                 )}
                                             {can.reportBank &&
-                                                pago.status !== 'discarded' && (
+                                                pago.status !== 'discarded' &&
+                                                acceptsPaymentEvidence(
+                                                    pago,
+                                                ) && (
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -860,7 +864,10 @@ export default function MultaShow({
                                                             })
                                                         }
                                                     >
-                                                        Comprobante
+                                                        {pago.appealKind !==
+                                                        null
+                                                            ? 'Respaldo del recurso'
+                                                            : 'Comprobante'}
                                                     </Button>
                                                 )}
                                             {pago.receiptId !== null &&
@@ -1230,8 +1237,16 @@ export default function MultaShow({
             {dialogo?.tipo === 'adjuntar-pago' && (
                 <AttachFileDialog
                     url={attachToPayment(dialogo.pago.id).url}
-                    title="Comprobante del pago"
-                    description="La transferencia, la boleta del depósito o el recibo externo del recurso."
+                    title={
+                        dialogo.pago.appealKind !== null
+                            ? 'Respaldo del recurso'
+                            : 'Comprobante del pago'
+                    }
+                    description={
+                        dialogo.pago.appealKind !== null
+                            ? 'El recibo externo u otro papel que respalda el recurso.'
+                            : 'La transferencia o la boleta del depósito realizado por el infractor.'
+                    }
                     onClose={cerrar}
                 />
             )}

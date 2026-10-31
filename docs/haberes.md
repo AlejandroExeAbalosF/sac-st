@@ -72,6 +72,8 @@ registran el dinero identificado; la foto del ticket por sí sola no financia la
 El recibo de ingreso requiere financiación completa y conserva los datos impresos
 en columnas de snapshot. Corregir luego la cuota no reescribe el recibo. El cobro
 de un cheque por mostrador no espera su posterior acreditación bancaria para emitirlo.
+Cuando se informa un número de talonario, se puede adjuntar opcionalmente la foto o
+el PDF de esa hoja; queda en el almacenamiento privado, asociado al recibo emitido.
 
 El listado `/recepciones` sigue teniendo ruta, aunque salió del menú. El alta manual
 de recepciones no está expuesta: las entradas ordinarias nacen del circuito de la cuota.
@@ -166,7 +168,8 @@ orden. Reunirlos deja el egreso listo para validar; **no lo confirma automática
 La validación registra el asiento, marca la cuota pagada y completa la Orden.
 
 El recibo de egreso requiere un egreso confirmado. Las colas y planillas de seguimiento
-están en `/haberes/planillas`.
+están en `/haberes/planillas`. Su número de talonario también admite una foto o PDF
+opcional de la hoja firmada, archivado con el recibo.
 
 Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 

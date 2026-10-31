@@ -124,6 +124,11 @@ simultáneas chocan en la base (`TalonarioSequence::assertFree` y `translate`). 
 número del sistema no se consume y, si la emisión cobraba o entregaba, tampoco queda
 el movimiento de dinero.
 
+La foto o el PDF de la hoja es opcional, pero solo se acepta junto con su número de
+talonario. Se normaliza y guarda como adjunto privado del recibo (`subject_type =
+receipt`, `document_type = talonario_photo`); si la emisión vuelve atrás, el archivo
+también se elimina. **Action y validación HTTP.**
+
 Evidencia: [cobro y emisión](../app/Modules/Haberes/Actions/CollectAndIssueReceipt.php),
 [emisión](../app/Modules/Haberes/Actions/IssueIncomeReceipt.php),
 [recepción desde ticket](../app/Modules/Haberes/Actions/ReceiveAndAllocateTicket.php),

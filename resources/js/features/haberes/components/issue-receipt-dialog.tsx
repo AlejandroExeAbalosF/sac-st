@@ -3,6 +3,7 @@ import { FileText, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -101,6 +102,7 @@ export default function IssueReceiptDialog({
         chequeNumber: '',
         chequeBank: '',
         chequeIssueDate: '',
+        talonarioPhoto: null as File | null,
     });
 
     /*
@@ -167,6 +169,7 @@ export default function IssueReceiptDialog({
                 setTalonario('');
                 setEncabezaTalonario(false);
                 setFirmante('');
+                form.setData('talonarioPhoto', null);
                 onCerrar();
             },
         });
@@ -352,9 +355,16 @@ export default function IssueReceiptDialog({
                                 <Input
                                     id={`talonario-${cuota.id}`}
                                     value={talonario}
-                                    onChange={(e) =>
-                                        setTalonario(e.target.value)
-                                    }
+                                    onChange={(e) => {
+                                        setTalonario(e.target.value);
+
+                                        if (e.target.value.trim() === '') {
+                                            form.setData(
+                                                'talonarioPhoto',
+                                                null,
+                                            );
+                                        }
+                                    }}
                                     placeholder="00071514"
                                     className="font-mono tabular-nums"
                                 />
@@ -365,6 +375,21 @@ export default function IssueReceiptDialog({
                                     value={talonario}
                                     ultimo={ultimoTalonario.income}
                                 />
+
+                                {hayTalonario && (
+                                    <PaperPhotoDropzone
+                                        id={`foto-talonario-${cuota.id}`}
+                                        foto={form.data.talonarioPhoto}
+                                        onElegir={(archivo) =>
+                                            form.setData(
+                                                'talonarioPhoto',
+                                                archivo,
+                                            )
+                                        }
+                                        error={form.errors.talonarioPhoto}
+                                        label="Foto del talonario"
+                                    />
+                                )}
 
                                 {/*
                                  * Cuál de los dos números encabeza el

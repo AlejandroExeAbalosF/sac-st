@@ -8,12 +8,16 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FinancialEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonInterface;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Cobrar por mostrador y entregar el recibo: un solo acto.
@@ -38,6 +42,7 @@ final class CollectAndIssueReceipt
         private readonly RegisterCashPayment $cobrar,
         private readonly IssueIncomeReceipt $emitir,
         private readonly InstallmentFunding $financiacion,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -56,12 +61,45 @@ final class CollectAndIssueReceipt
         ?CarbonInterface $receivedDate = null,
         ?array $cheque = null,
         ?string $notes = null,
+        ?UploadedFile $talonarioPhoto = null,
     ): Receipt {
         $claveDelCobro = $idempotencyKey.':cobro';
 
+        $adjunto = null;
+
+        try {
+            return $this->collect(
+                $installment, $claveDelCobro, $actorId, $talonarioNumber,
+                $signedById, $printsTalonarioNumber, $receivedDate, $cheque,
+                $notes, $talonarioPhoto, $adjunto,
+            );
+        } catch (Throwable $e) {
+            $this->deleteRolledBackFile($adjunto);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @param  array{number: string, bank: string|null, issueDate: string|null}|null  $cheque
+     */
+    private function collect(
+        BeneficiaryInstallment $installment,
+        string $claveDelCobro,
+        ?int $actorId,
+        ?string $talonarioNumber,
+        ?int $signedById,
+        bool $printsTalonarioNumber,
+        ?CarbonInterface $receivedDate,
+        ?array $cheque,
+        ?string $notes,
+        ?UploadedFile $talonarioPhoto,
+        ?Attachment &$adjunto,
+    ): Receipt {
         return DB::transaction(function () use (
             $installment, $claveDelCobro, $actorId, $talonarioNumber,
-            $signedById, $printsTalonarioNumber, $receivedDate, $cheque, $notes
+            $signedById, $printsTalonarioNumber, $receivedDate, $cheque, $notes,
+            $talonarioPhoto, &$adjunto
         ): Receipt {
             /*
              * Un segundo envío del mismo formulario.
@@ -111,8 +149,17 @@ final class CollectAndIssueReceipt
                 talonarioNumber: $talonarioNumber,
                 signedById: $signedById,
                 printsTalonarioNumber: $printsTalonarioNumber,
+                talonarioPhoto: $talonarioPhoto,
+                storedTalonarioPhoto: $adjunto,
             );
         });
+    }
+
+    private function deleteRolledBackFile(?Attachment $adjunto): void
+    {
+        if ($adjunto !== null) {
+            $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+        }
     }
 
     /**

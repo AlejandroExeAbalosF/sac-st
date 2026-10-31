@@ -2,6 +2,7 @@ import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,6 +75,7 @@ export default function CollectPaymentDialog({
         judicial: false,
         judicialReference: '',
         cheque: { number: '', bank: '', issueDate: '' },
+        talonarioPhoto: null as File | null,
     });
 
     const [revision, setRevision] = useState<Revision | null>(null);
@@ -104,6 +106,7 @@ export default function CollectPaymentDialog({
                   }
                 : null,
         idempotencyKey,
+        talonarioPhoto: datos.talonarioPhoto,
     });
 
     /*
@@ -338,14 +341,27 @@ export default function CollectPaymentDialog({
                         value={data.talonarioNumber}
                         maxLength={20}
                         required={atrasado}
-                        onChange={(e) =>
-                            setData('talonarioNumber', e.target.value)
-                        }
+                        onChange={(e) => {
+                            setData('talonarioNumber', e.target.value);
+
+                            if (e.target.value.trim() === '') {
+                                setData('talonarioPhoto', null);
+                            }
+                        }}
                         aria-invalid={Boolean(errors.talonarioNumber)}
                     />
                     <FieldError message={errors.talonarioNumber} />
                 </div>
             </div>
+            {data.talonarioNumber.trim() !== '' && (
+                <PaperPhotoDropzone
+                    id="cobro-foto-talonario"
+                    foto={data.talonarioPhoto}
+                    onElegir={(archivo) => setData('talonarioPhoto', archivo)}
+                    error={errors.talonarioPhoto}
+                    label="Foto del talonario"
+                />
+            )}
             {atrasado && (
                 <p className="text-xs text-muted-foreground">
                     Un cobro de un día anterior se carga desde el recibo de

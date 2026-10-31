@@ -20,6 +20,7 @@ use App\Modules\Haberes\Support\TransferDebitCandidate;
 use App\Modules\Shared\Pdf\ExpenseReceiptPdf;
 use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
+use App\Support\Validation\ScannedDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -68,7 +69,8 @@ final class DisbursementController extends Controller
              * más largo se sale del marco. Un número de talonario real
              * tiene ocho dígitos.
              */
-            'talonarioNumber' => ['nullable', 'string', 'max:20'],
+            'talonarioNumber' => ['nullable', 'string', 'max:20', 'required_with:talonarioPhoto'],
+            'talonarioPhoto' => ScannedDocument::rules(required: false),
             'printsTalonarioNumber' => ['nullable', 'boolean'],
             /*
              * Cuándo se entregó. Puede no ser hoy: el papel se firma en el
@@ -92,6 +94,8 @@ final class DisbursementController extends Controller
             'paymentDate.before_or_equal' => 'La fecha de la entrega no puede ser futura.',
             'paymentDate.after_or_equal' => 'La fecha de la entrega no puede ser anterior al alta de la cuota ('
                 .$installment->created_at->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y').'), que es cuando llegó el expediente.',
+            'talonarioNumber.required_with' => 'Indicá el número del talonario al que pertenece la foto.',
+            ...ScannedDocument::messages('talonarioPhoto', 'La foto del talonario'),
         ]);
 
         $recibo = $pagarYEmitir->handle(
@@ -104,6 +108,7 @@ final class DisbursementController extends Controller
                 ? CarbonImmutable::parse((string) $validado['paymentDate'])
                 : null,
             notes: $validado['notes'] ?? null,
+            talonarioPhoto: $request->file('talonarioPhoto'),
         );
 
         return back()->with(
@@ -270,8 +275,12 @@ final class DisbursementController extends Controller
         DisbursementEligibility $habilitacion,
     ): RedirectResponse {
         $validado = $request->validate([
-            'talonarioNumber' => ['nullable', 'string', 'max:20'],
+            'talonarioNumber' => ['nullable', 'string', 'max:20', 'required_with:talonarioPhoto'],
+            'talonarioPhoto' => ScannedDocument::rules(required: false),
             'printsTalonarioNumber' => ['nullable', 'boolean'],
+        ], [
+            'talonarioNumber.required_with' => 'Indicá el número del talonario al que pertenece la foto.',
+            ...ScannedDocument::messages('talonarioPhoto', 'La foto del talonario'),
         ]);
 
         $recibo = $emitir->handle(
@@ -280,6 +289,7 @@ final class DisbursementController extends Controller
             actorId: $request->user()?->id,
             talonarioNumber: $validado['talonarioNumber'] ?? null,
             printsTalonarioNumber: (bool) ($validado['printsTalonarioNumber'] ?? false),
+            talonarioPhoto: $request->file('talonarioPhoto'),
         );
 
         return back()->with('status', "Recibo de egreso {$recibo->formatted_number} emitido.");

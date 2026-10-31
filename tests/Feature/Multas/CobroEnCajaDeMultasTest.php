@@ -14,12 +14,16 @@ use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Modules\Multas\Support\FinePaymentTimeliness;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\AdjustsFines;
@@ -268,6 +272,61 @@ class CobroEnCajaDeMultasTest extends TestCase
             ->and($recibo->issue_date->toDateString())->toBe($ayer->toDateString())
             ->and($recibo->talonario_number)->toBe('18470')
             ->and($recibo->issue_mode->value)->toBe('offline_talonario');
+    }
+
+    public function test_the_talonario_photo_is_stored_with_the_fine_receipt(): void
+    {
+        Storage::fake('local');
+        $multa = $this->escenario();
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.cobros.store', $multa), [
+                ...$this->cobro('1000.00'),
+                'talonarioNumber' => '18470',
+                'talonarioPhoto' => UploadedFile::fake()->image('talonario-multa.jpg'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $recibo = FinePaymentReceipt::query()->with('receipt')->sole()->receipt;
+        $foto = Attachment::query()->forSubject(AttachmentSubject::Receipt, $recibo->id)->sole();
+
+        expect($foto->document_type)->toBe('talonario_photo')
+            ->and($foto->title)->toBe('Foto del talonario N.º 18470');
+        Storage::disk($foto->storage_disk)->assertExists($foto->object_key);
+    }
+
+    public function test_a_counter_payment_does_not_accept_a_separate_payment_evidence(): void
+    {
+        Storage::fake('local');
+        $multa = $this->escenario();
+        $pago = $this->cobrar($multa, FinePaymentMedium::Cash, '1000.00');
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.pagos.adjuntos.store', $pago), [
+                'file' => UploadedFile::fake()->image('ticket.jpg'),
+            ])
+            ->assertSessionHasErrors([
+                'file' => 'El cobro de caja se respalda con el recibo del sistema. El ticket del cajero se carga al depositarlo.',
+            ]);
+
+        expect(Attachment::query()->count())->toBe(0);
+        Storage::disk('local')->assertDirectoryEmpty('/');
+    }
+
+    public function test_a_talonario_photo_requires_its_number(): void
+    {
+        Storage::fake('local');
+        $multa = $this->escenario();
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.cobros.store', $multa), [
+                ...$this->cobro('1000.00'),
+                'talonarioPhoto' => UploadedFile::fake()->image('sin-numero.jpg'),
+            ])
+            ->assertSessionHasErrors('talonarioNumber');
+
+        expect(FinePayment::query()->count())->toBe(0)
+            ->and(Attachment::query()->count())->toBe(0);
     }
 
     /** Revisión 4a/4b, R3: la misma hoja dos veces es un error del campo, no del sistema. */

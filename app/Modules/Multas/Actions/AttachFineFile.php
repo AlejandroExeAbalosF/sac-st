@@ -15,6 +15,7 @@ use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -43,6 +44,12 @@ final class AttachFineFile
         ?string $title,
         ?int $actorId,
     ): Attachment {
+        if ($sujeto instanceof FinePayment && $sujeto->medium->isCounter() && $sujeto->appeal_kind === null) {
+            throw ValidationException::withMessages([
+                'file' => 'El cobro de caja se respalda con el recibo del sistema. El ticket del cajero se carga al depositarlo.',
+            ]);
+        }
+
         $titulo = trim((string) $title) === '' ? null : trim((string) $title);
         $adjunto = null;
 

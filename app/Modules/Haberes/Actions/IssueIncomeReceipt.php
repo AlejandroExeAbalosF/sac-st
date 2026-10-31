@@ -12,10 +12,14 @@ use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
+use App\Modules\Shared\Enums\AttachmentSource;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\TalonarioSequence;
@@ -23,8 +27,10 @@ use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Emite el recibo de ingreso de una cuota.
@@ -52,6 +58,7 @@ final class IssueIncomeReceipt
         private readonly InstallmentFunding $financiacion,
         private readonly RecordAuditEvent $auditar,
         private readonly TalonarioSequence $talonario,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -70,6 +77,8 @@ final class IssueIncomeReceipt
         ?int $personId = null,
         ?int $signedById = null,
         bool $printsTalonarioNumber = false,
+        ?UploadedFile $talonarioPhoto = null,
+        ?Attachment &$storedTalonarioPhoto = null,
     ): Receipt {
         $installment->loadMissing(['haber.beneficiary', 'haber.expediente.employer']);
 
@@ -119,14 +128,32 @@ final class IssueIncomeReceipt
          */
         $firmante = $signedById === null ? null : User::query()->find($signedById);
 
+        if ($talonarioPhoto !== null && trim((string) $talonarioNumber) === '') {
+            throw ValidationException::withMessages([
+                'talonarioNumber' => 'Indicá el número del talonario al que pertenece la foto.',
+            ]);
+        }
+
+        $adjunto = null;
+
         try {
-            return $this->emitir(
+            $recibo = $this->emitir(
                 $installment, $medio, $recibiDe, $actorId,
                 $talonarioNumber, $issueDate, $firmante, $printsTalonarioNumber,
+                $talonarioPhoto, $adjunto,
             );
-        } catch (UniqueConstraintViolationException $e) {
+            $storedTalonarioPhoto = $adjunto;
+
+            return $recibo;
+        } catch (Throwable $e) {
+            if ($adjunto !== null) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
             // Otro operador cargó la misma hoja en el mismo instante.
-            throw $this->talonario->translate($e, ReceiptType::Income, $this->cajaDeLaSerie(), $talonarioNumber) ?? $e;
+            throw $e instanceof UniqueConstraintViolationException
+                ? ($this->talonario->translate($e, ReceiptType::Income, $this->cajaDeLaSerie(), $talonarioNumber) ?? $e)
+                : $e;
         }
     }
 
@@ -143,10 +170,13 @@ final class IssueIncomeReceipt
         ?CarbonInterface $issueDate,
         ?User $firmante,
         bool $printsTalonarioNumber,
+        ?UploadedFile $talonarioPhoto,
+        ?Attachment &$adjunto,
     ): Receipt {
         return DB::transaction(function () use (
             $installment, $medio, $recibiDe, $actorId,
-            $talonarioNumber, $issueDate, $firmante, $printsTalonarioNumber
+            $talonarioNumber, $issueDate, $firmante, $printsTalonarioNumber,
+            $talonarioPhoto, &$adjunto
         ): Receipt {
             /*
              * El correlativo se toma bajo lock dentro de esta transacción
@@ -201,6 +231,18 @@ final class IssueIncomeReceipt
                 'beneficiary_installment_id' => $installment->id,
                 'amount' => $recibo->amount,
             ], actorId: $actorId);
+
+            if ($talonarioPhoto !== null) {
+                $adjunto = $this->adjuntos->handle(
+                    file: $talonarioPhoto,
+                    subject: AttachmentSubject::Receipt,
+                    subjectId: $recibo->id,
+                    documentType: 'talonario_photo',
+                    userId: $actorId,
+                    title: 'Foto del talonario N.º '.$recibo->talonario_number,
+                    source: AttachmentSource::Scanned,
+                );
+            }
 
             return $recibo;
         });

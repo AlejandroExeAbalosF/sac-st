@@ -15,8 +15,10 @@ use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Shared\Actions\ConfigureDocumentNumbering;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptIssueMode;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
@@ -24,7 +26,9 @@ use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -161,6 +165,28 @@ class ReciboDeIngresoTest extends TestCase
         // Cargado después de escribirse a mano: eso es lo que dice el modo.
         $this->assertSame(ReceiptIssueMode::OfflineTalonario, $recibo->issue_mode);
         $this->assertNotNull($recibo->recorded_at);
+    }
+
+    /** La foto opcional queda archivada con el recibo que usó esa hoja. */
+    public function test_la_foto_del_talonario_queda_asociada_al_recibo_de_ingreso(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaFinanciada();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.receipt', $cuota), [
+                'talonarioNumber' => '00071514',
+                'talonarioPhoto' => UploadedFile::fake()->image('talonario.jpg'),
+                'idempotencyKey' => 'recibo-con-foto',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $recibo = Receipt::query()->where('talonario_number', '00071514')->sole();
+        $foto = Attachment::query()->forSubject(AttachmentSubject::Receipt, $recibo->id)->sole();
+
+        $this->assertSame('talonario_photo', $foto->document_type);
+        $this->assertSame('Foto del talonario N.º 00071514', $foto->title);
+        Storage::disk($foto->storage_disk)->assertExists($foto->object_key);
     }
 
     /**

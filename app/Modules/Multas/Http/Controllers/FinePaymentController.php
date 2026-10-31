@@ -34,6 +34,7 @@ final class FinePaymentController extends Controller
             ...$this->cobro($datos),
             'idempotencyKey' => (string) $datos['idempotencyKey'],
             'actorId' => $request->user()?->id,
+            'talonarioPhoto' => $request->file('talonarioPhoto'),
         ]);
 
         $recibo = $pago->paymentReceipt()->with('receipt')->first()?->receipt;

@@ -573,7 +573,8 @@ cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
   pago judicial**, se marca y se anota el expediente judicial.
 - **Fecha**: hoy. Un cobro de un día anterior se carga con el número del **recibo
   de talonario** que se entregó ese día: ese papel respalda la fecha de
-  presentación.
+  presentación. Con cualquier número de talonario se puede adjuntar, de manera
+  opcional, una foto o PDF de la hoja; queda archivado en privado con el recibo.
 - **Recibo**: de la serie de Multas (`0210/…`, configurable en Numeración),
   «recibí de» la carátula de la multa, con su concepto —pago parcial o
   cancelatorio de la multa por su resolución—, el expediente administrativo y el
@@ -749,6 +750,12 @@ multa y en la auditoría.
 - **Una multa admite un solo recurso.** Con uno registrado, la ficha no ofrece otro y
   el sistema lo rechaza. Un intento descartado no cuenta.
 - Un depósito de recurso mal cargado se **corrige** como cualquier informado.
+
+En la ficha, «Comprobante» se ofrece solo para pagos bancarios. Los cobros
+ordinarios en efectivo o cheque ya se respaldan con el recibo del sistema, y el
+ticket que se obtiene al llevar esa recaudación al banco pertenece a «Depositar».
+Los recursos conservan su carga separada como «Respaldo del recurso», incluso si
+se cobraron en efectivo, porque documenta el recibo externo del trámite.
 
 ---
 

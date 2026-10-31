@@ -504,6 +504,13 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 - Una hoja del talonario se usa una sola vez por caja, aunque el recibo se haya
   anulado. **Base:** `receipts_talonario_number_unique`. **Action:** lo dice en el
   campo, también si dos cobros simultáneos chocan en la base.
+- La foto o PDF de la hoja es opcional y exige su número de talonario. Se guarda
+  como adjunto privado del recibo (`receipt` / `talonario_photo`) dentro del mismo
+  acto; si el cobro vuelve atrás, el archivo se elimina. **Action y validación HTTP.**
+- Un cobro ordinario de caja no admite un adjunto genérico del pago: lo respalda
+  el recibo del sistema, y el ticket del cajero pertenece al depósito posterior.
+  Los pagos bancarios y los recursos sí admiten su comprobante o respaldo.
+  **Action:** `AttachFineFile`.
 
 <a id="banco"></a>
 

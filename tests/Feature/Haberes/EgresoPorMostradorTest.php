@@ -14,14 +14,18 @@ use App\Modules\Haberes\Models\HaberManagementLabel;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
@@ -344,6 +348,24 @@ class EgresoPorMostradorTest extends TestCase
 
         $this->assertSame(1, $this->recibosDeEgreso()->count());
         $this->assertSame(0, Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->count());
+    }
+
+    /** La foto de la hoja firmada queda con el recibo de egreso. */
+    public function test_la_foto_del_talonario_queda_asociada_al_recibo_de_egreso(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaCobrada();
+
+        $this->entregar($cuota, [
+            'talonarioNumber' => '00076397',
+            'talonarioPhoto' => UploadedFile::fake()->image('talonario-egreso.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $recibo = $this->recibosDeEgreso()->where('talonario_number', '00076397')->sole();
+        $foto = Attachment::query()->forSubject(AttachmentSubject::Receipt, $recibo->id)->sole();
+
+        $this->assertSame('talonario_photo', $foto->document_type);
+        Storage::disk($foto->storage_disk)->assertExists($foto->object_key);
     }
 
     public function test_la_fecha_de_la_entrega_no_puede_ser_futura(): void

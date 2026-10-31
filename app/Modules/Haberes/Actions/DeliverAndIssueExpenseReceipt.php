@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonInterface;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Pagar por mostrador y hacer firmar el recibo: un solo acto.
@@ -35,6 +39,7 @@ final class DeliverAndIssueExpenseReceipt
     public function __construct(
         private readonly DeliverToBeneficiary $entregar,
         private readonly IssueExpenseReceipt $emitir,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -48,10 +53,40 @@ final class DeliverAndIssueExpenseReceipt
         bool $printsTalonarioNumber = false,
         ?CarbonInterface $paymentDate = null,
         ?string $notes = null,
+        ?UploadedFile $talonarioPhoto = null,
+    ): Receipt {
+        $adjunto = null;
+
+        try {
+            return $this->deliver(
+                $installment, $idempotencyKey, $actorId, $talonarioNumber,
+                $printsTalonarioNumber, $paymentDate, $notes, $talonarioPhoto,
+                $adjunto,
+            );
+        } catch (Throwable $e) {
+            if ($adjunto !== null) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            throw $e;
+        }
+    }
+
+    private function deliver(
+        BeneficiaryInstallment $installment,
+        string $idempotencyKey,
+        ?int $actorId,
+        ?string $talonarioNumber,
+        bool $printsTalonarioNumber,
+        ?CarbonInterface $paymentDate,
+        ?string $notes,
+        ?UploadedFile $talonarioPhoto,
+        ?Attachment &$adjunto,
     ): Receipt {
         return DB::transaction(function () use (
             $installment, $idempotencyKey, $actorId, $talonarioNumber,
-            $printsTalonarioNumber, $paymentDate, $notes
+            $printsTalonarioNumber, $paymentDate, $notes, $talonarioPhoto,
+            &$adjunto
         ): Receipt {
             /*
              * Un segundo envío del mismo formulario.
@@ -87,6 +122,8 @@ final class DeliverAndIssueExpenseReceipt
                 actorId: $actorId,
                 talonarioNumber: $talonarioNumber,
                 printsTalonarioNumber: $printsTalonarioNumber,
+                talonarioPhoto: $talonarioPhoto,
+                storedTalonarioPhoto: $adjunto,
             );
         });
     }

@@ -59,6 +59,7 @@ use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
+use App\Support\Validation\ScannedDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -194,7 +195,8 @@ final class HaberController extends Controller
              * sale del recibo. Un numero de talonario real tiene ocho
              * digitos.
              */
-            'talonarioNumber' => ['nullable', 'string', 'max:20'],
+            'talonarioNumber' => ['nullable', 'string', 'max:20', 'required_with:talonarioPhoto'],
+            'talonarioPhoto' => ScannedDocument::rules(required: false),
             /*
              * Cual de los dos numeros encabeza el papel. Se guarda con el
              * recibo: la reimpresion tiene que salir igual que el
@@ -234,6 +236,8 @@ final class HaberController extends Controller
             'receivedDate.before_or_equal' => 'La fecha del pago no puede ser futura.',
             'receivedDate.after_or_equal' => 'La fecha del pago no puede ser anterior al alta de la cuota ('
                 .$installment->created_at->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y').'), que es cuando llego el expediente.',
+            'talonarioNumber.required_with' => 'Indicá el número del talonario al que pertenece la foto.',
+            ...ScannedDocument::messages('talonarioPhoto', 'La foto del talonario'),
         ]);
 
         $cobra = $cobrarYEmitir->cobraAlEmitir($installment);
@@ -271,6 +275,7 @@ final class HaberController extends Controller
                 'issueDate' => $validado['chequeIssueDate'] ?? null,
             ] : null,
             notes: $validado['notes'] ?? null,
+            talonarioPhoto: $request->file('talonarioPhoto'),
         );
 
         return back()->with('status', "Recibo de ingreso {$recibo->formatted_number} emitido.");

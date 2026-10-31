@@ -12,15 +12,21 @@ use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Enums\AttachmentSource;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * El cobro de una multa en la caja: efectivo o cheque (M02).
@@ -41,6 +47,7 @@ final class CollectFinePayment
         private readonly RecordAuditEvent $auditar,
         private readonly TalonarioSequence $talonarios,
         private readonly ApplyFinePayment $aplicar,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -103,6 +110,7 @@ final class CollectFinePayment
         ?string $judicialReference = null,
         ?string $talonarioNumber = null,
         ?int $signedById = null,
+        ?UploadedFile $talonarioPhoto = null,
     ): FinePayment {
         $importe = Decimal::scale($amount);
         $hoy = BusinessDate::today();
@@ -110,11 +118,31 @@ final class CollectFinePayment
         $talonario = trim((string) $talonarioNumber) ?: null;
         $judicial = trim((string) $judicialReference) ?: null;
 
+        if ($talonarioPhoto !== null && $talonario === null) {
+            throw ValidationException::withMessages([
+                'talonarioNumber' => 'Indicá el número del talonario al que pertenece la foto.',
+            ]);
+        }
+
         $this->assertCollectable($medio, $importe, $fecha, $hoy, $talonario, $judicial, $cheque);
 
+        $adjunto = null;
+
         try {
-            return $this->collect($multa, $medio, $importe, $idempotencyKey, $actorId, $fecha, $hoy, $cheque, $judicial, $talonario, $signedById);
-        } catch (UniqueConstraintViolationException $e) {
+            return $this->collect(
+                $multa, $medio, $importe, $idempotencyKey, $actorId, $fecha,
+                $hoy, $cheque, $judicial, $talonario, $signedById,
+                $talonarioPhoto, $adjunto,
+            );
+        } catch (Throwable $e) {
+            if ($adjunto !== null) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            if (! $e instanceof UniqueConstraintViolationException) {
+                throw $e;
+            }
+
             // El mismo clic dos veces a la vez: el que llegó tarde devuelve el que ganó.
             $yaCobrado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
 
@@ -145,9 +173,13 @@ final class CollectFinePayment
         ?string $judicial,
         ?string $talonario,
         ?int $signedById,
+        ?UploadedFile $talonarioPhoto,
+        ?Attachment &$adjunto,
     ): FinePayment {
         return DB::transaction(function () use (
-            $multa, $medio, $importe, $idempotencyKey, $actorId, $fecha, $hoy, $cheque, $judicial, $talonario, $signedById
+            $multa, $medio, $importe, $idempotencyKey, $actorId, $fecha, $hoy,
+            $cheque, $judicial, $talonario, $signedById, $talonarioPhoto,
+            &$adjunto
         ): FinePayment {
             $yaCobrado = FinePayment::query()->where('idempotency_key', $idempotencyKey)->first();
 
@@ -183,6 +215,18 @@ final class CollectFinePayment
             ]);
 
             $comprobante = $this->recibir->handle($pago, $fecha, $cheque, $talonario, $signedById, $actorId);
+
+            if ($talonarioPhoto !== null) {
+                $adjunto = $this->adjuntos->handle(
+                    file: $talonarioPhoto,
+                    subject: AttachmentSubject::Receipt,
+                    subjectId: $comprobante->receipt_id,
+                    documentType: 'talonario_photo',
+                    userId: $actorId,
+                    title: 'Foto del talonario N.º '.$talonario,
+                    source: AttachmentSource::Scanned,
+                );
+            }
 
             $this->auditar->handle(
                 'multa.pago-cobrado',
