@@ -26,6 +26,28 @@ import { download } from '@/routes/adjuntos';
 
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
 
+const MESES = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+];
+
+function nombreDelMes(fecha: string): string {
+    const [anio, mes] = fecha.split('-').map(Number);
+    const nombre = MESES[mes - 1];
+
+    return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} de ${anio}`;
+}
+
 /*
  * Los diálogos que operan sobre un cierre ya hecho.
  *
@@ -301,6 +323,7 @@ export function DialogoCierre({
     cerrar,
     selected,
     pendingDaysByMonth,
+    tipoFijo = false,
 }: {
     /** El tipo y la fecha con los que abre: un día nuevo, o una fila reabierta. */
     inicial: { date: string; periodType: string };
@@ -308,6 +331,8 @@ export function DialogoCierre({
     selected: { cashBoxId: number; currency: string };
     /** Días con movimientos sin cerrar, por mes `YYYY-MM`. */
     pendingDaysByMonth: Record<string, number>;
+    /** El flujo ya eligió el período y no corresponde ofrecer otro. */
+    tipoFijo?: boolean;
 }) {
     /*
      * `period` y `status` no son campos del formulario, así que no entran en
@@ -332,6 +357,8 @@ export function DialogoCierre({
         currency: selected.currency,
         notes: '',
     });
+    const mensualFijo = tipoFijo && inicial.periodType === 'monthly';
+    const mes = nombreDelMes(form.data.date);
 
     /*
      * Solo tiene sentido para el cierre mensual: en el diario, el día que
@@ -353,7 +380,11 @@ export function DialogoCierre({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Cerrar período</DialogTitle>
+                    <DialogTitle>
+                        {mensualFijo
+                            ? `Cerrar ${mes.toLowerCase()}`
+                            : 'Cerrar período'}
+                    </DialogTitle>
                     <DialogDescription>
                         Los totales se calculan desde el libro y quedan
                         congelados. A partir de ahí el período no admite
@@ -375,41 +406,58 @@ export function DialogoCierre({
                     }}
                     className="grid gap-4"
                 >
-                    <div className="grid gap-2">
-                        <Label htmlFor="periodType">Período</Label>
-                        <Select
-                            value={form.data.periodType}
-                            onValueChange={(valor) =>
-                                form.setData('periodType', valor)
-                            }
-                        >
-                            <SelectTrigger id="periodType">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="daily">Diario</SelectItem>
-                                <SelectItem value="monthly">Mensual</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError message={form.errors.periodType} />
-                    </div>
+                    {mensualFijo ? (
+                        <div className="grid gap-2">
+                            <Label>Período</Label>
+                            <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+                                {mes}
+                            </p>
+                            <InputError message={form.errors.periodType} />
+                            <InputError message={form.errors.date} />
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="periodType">Período</Label>
+                                <Select
+                                    value={form.data.periodType}
+                                    onValueChange={(valor) =>
+                                        form.setData('periodType', valor)
+                                    }
+                                >
+                                    <SelectTrigger id="periodType">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="daily">
+                                            Diario
+                                        </SelectItem>
+                                        <SelectItem value="monthly">
+                                            Mensual
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={form.errors.periodType} />
+                            </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="date">
-                            {form.data.periodType === 'monthly'
-                                ? 'Un día del mes a cerrar'
-                                : 'Día a cerrar'}
-                        </Label>
-                        <DateInput
-                            id="date"
-                            max={hoy}
-                            value={form.data.date}
-                            onChange={(e) =>
-                                form.setData('date', e.target.value)
-                            }
-                        />
-                        <InputError message={form.errors.date} />
-                    </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="date">
+                                    {form.data.periodType === 'monthly'
+                                        ? 'Un día del mes a cerrar'
+                                        : 'Día a cerrar'}
+                                </Label>
+                                <DateInput
+                                    id="date"
+                                    max={hoy}
+                                    value={form.data.date}
+                                    onChange={(e) =>
+                                        form.setData('date', e.target.value)
+                                    }
+                                />
+                                <InputError message={form.errors.date} />
+                            </div>
+                        </>
+                    )}
 
                     <div className="grid gap-2">
                         <Label htmlFor="notes">Observaciones</Label>
@@ -459,7 +507,7 @@ export function DialogoCierre({
                         form="form-cierre"
                         disabled={form.processing}
                     >
-                        Cerrar
+                        {mensualFijo ? 'Cerrar mes' : 'Cerrar'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

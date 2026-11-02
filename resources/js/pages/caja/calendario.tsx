@@ -381,6 +381,7 @@ export default function CajaCalendario({
                     cerrar={() => setCerrandoMes(false)}
                     selected={selected}
                     pendingDaysByMonth={pendingDaysByMonth}
+                    tipoFijo
                 />
             )}
         </EnMoneda>
