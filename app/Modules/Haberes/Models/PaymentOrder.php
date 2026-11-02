@@ -170,6 +170,13 @@ final class PaymentOrder extends Model
         return $this->belongsTo(Receipt::class, 'expense_receipt_id');
     }
 
+    /** El último intento de pago respaldado por esta Orden. */
+    /** @return HasOne<Disbursement, $this> */
+    public function disbursement(): HasOne
+    {
+        return $this->hasOne(Disbursement::class, 'payment_order_id')->latestOfMany();
+    }
+
     /** La nota que la acompaña. Es una sola: lo impone un índice único. */
     /** @return HasOne<Pase, $this> */
     public function pase(): HasOne

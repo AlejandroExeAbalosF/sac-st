@@ -13,19 +13,18 @@ namespace App\Modules\Haberes\Pdf;
  *    `payment_order_funding_sources` y en la vista previa de los renglones
  *    todavía sin congelar. Que las dos entren por el mismo lugar es lo que
  *    garantiza que la vista previa muestre el papel que se va a imprimir.
- * 2. **Las cuentas del organismo preimpresas**, con la marca en la que
- *    corresponde. El formulario las trae listadas y se cruza la que se
- *    usó; el sistema pone la cruz donde está el dinero.
+ * 2. **La cuenta del organismo involucrada en la Orden**. Como el sistema
+ *    genera el formulario sobre papel blanco, no lista alternativas ni
+ *    imprime una marca de selección que ya no aporta información.
  */
 final readonly class PaymentOrderPrintData
 {
     /**
      * @param  list<PaymentOrderDepositRow>  $depositos
-     * @param  list<array{label: string, accountNumber: string|null, marked: bool}>  $cuentas
      */
     public function __construct(
         public array $depositos = [],
-        public array $cuentas = [],
+        public ?string $cuenta = null,
         /** Ya formateado: `2.892.402,00`. */
         public string $total = '0,00',
         /** El renglón «BANCO»: el del organismo donde está el dinero. */

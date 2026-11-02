@@ -15,6 +15,7 @@ use App\Modules\Haberes\Actions\CompletePaymentOrderData;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\EditPaymentOrderDetails;
 use App\Modules\Haberes\Actions\IssuePaymentOrder;
+use App\Modules\Haberes\Actions\LinkTransferDebit;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\UnlockInstallmentEdit;
 use App\Modules\Haberes\Actions\UpdateInstallment;
@@ -443,6 +444,23 @@ class OrdenDePagoTest extends TestCase
         $this->assertStringContainsString('RECIBO EGRESO N', $papel);
     }
 
+    /** El número de la operación aparece al identificar el débito del pago. */
+    public function test_el_pie_imprime_la_operacion_del_egreso_identificado(): void
+    {
+        $cuota = $this->cuotaLista();
+        $orden = app(IssuePaymentOrder::class)->handle($cuota, $this->eleccion());
+        $debito = $this->debitoDe($orden->amount, $orden->order_date->copy()->addDay()->toDateString());
+
+        $antes = app(PaymentOrderPdf::class)->preview($orden)->render();
+        $this->assertStringContainsString('OPERACIÓN N°', $antes);
+        $this->assertStringNotContainsString('EGRESO-778899', $antes);
+
+        app(LinkTransferDebit::class)->handle($cuota, $debito, $this->operador()->id);
+
+        $despues = app(PaymentOrderPdf::class)->preview($orden->refresh())->render();
+        $this->assertStringContainsString('EGRESO-778899', $despues);
+    }
+
     /**
      * El `OBS` no se puede escribir aparte de la foja.
      *
@@ -803,6 +821,13 @@ class OrdenDePagoTest extends TestCase
     {
         $cuota = $this->cuotaLista();
         $orden = app(IssuePaymentOrder::class)->handle($cuota, $this->eleccion());
+        BankAccount::query()->create([
+            'label' => 'Otra cuenta activa que no interviene',
+            'bank_name' => 'Otro banco',
+            'account_number' => '99999999',
+            'currency' => 'ARS',
+            'is_active' => true,
+        ]);
 
         $papel = app(PaymentOrderPdf::class)->preview($orden->refresh())->render();
         $documento = app(PaymentOrderPdf::class)->render($orden);
@@ -833,9 +858,10 @@ class OrdenDePagoTest extends TestCase
 
         $this->assertStringContainsString('B° San Jorge Mza 54', $papel);
         $this->assertStringContainsString('387-6004216', $papel);
-        // La cuenta del organismo lleva la cruz.
+        // Solo aparece la cuenta involucrada: no las alternativas ni una cruz redundante.
         $this->assertStringContainsString(self::CUENTA_ORGANISMO, $papel);
-        $this->assertStringContainsString('XXX', $papel);
+        $this->assertStringNotContainsString('99999999', $papel);
+        $this->assertStringNotContainsString('XXX', $papel);
         // El renglón del cuadro de depósitos.
         $this->assertStringContainsString('995979830', $papel);
         $this->assertStringContainsString('Se observa en expte.', $papel);
@@ -1386,6 +1412,22 @@ class OrdenDePagoTest extends TestCase
             'direction' => TransactionDirection::Credit,
             'operation_id' => '83690105',
             'description' => 'Deposito en efectivo',
+            'fingerprint' => hash('sha256', uniqid('', true)),
+        ]);
+    }
+
+    private function debitoDe(string $importe, string $fecha): BankTransaction
+    {
+        $cuenta = $this->cuentaDelOrganismo();
+
+        return BankTransaction::query()->create([
+            'bank_account_id' => $cuenta->id,
+            'first_seen_import_id' => $this->importacion($cuenta)->id,
+            'transaction_date' => $fecha,
+            'amount' => $importe,
+            'direction' => TransactionDirection::Debit,
+            'operation_id' => 'EGRESO-778899',
+            'description' => 'Transferencia al beneficiario',
             'fingerprint' => hash('sha256', uniqid('', true)),
         ]);
     }

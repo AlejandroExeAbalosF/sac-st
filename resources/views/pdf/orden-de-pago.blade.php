@@ -200,7 +200,7 @@
          */
         .campos .rotulo { width: 29mm; white-space: nowrap; }
 
-        .datos-banco { margin-top: 28mm; }
+        .datos-banco { margin-top: 36mm; }
 
         /*
          * **La columna de los importes llega hasta el marco.**
@@ -347,28 +347,15 @@
                 </tr>
             </table>
 
-            {{--
-                Las cuentas del organismo, una debajo de la otra con su
-                casilla, y la cruz en la que tiene el dinero. La marca la
-                pone el sistema: sabe de dónde vino cada peso de esta Orden.
-            --}}
-            <table class="interna" style="margin-top: 1mm;">
-                @foreach ($extra->cuentas as $i => $cuenta)
+            {{-- La Orden ya eligió la cuenta: no se imprimen alternativas ni una cruz redundante. --}}
+            @if ($extra->cuenta !== null)
+                <table class="interna" style="margin-top: 1mm;">
                     <tr>
-                        <td class="rotulo" style="width: 29mm; white-space: nowrap;">
-                            {{ $i === 0 ? 'CTA N°' : '' }}
-                        </td>
-                        <td class="valor" style="width: 40mm; padding: 0.6mm 0 !important;">
-                            {{ $cuenta['accountNumber'] ?? $cuenta['label'] }}
-                        </td>
-                        <td style="width: 23mm; padding: 0.6mm 0 !important;">
-                            <div class="caja">{{ $cuenta['marked'] ? 'XXX' : '&nbsp;' }}</div>
-                        </td>
-                        {{-- Absorbe lo que sobra: sin esto la casilla se iba al borde. --}}
-                        <td></td>
+                        <td class="rotulo" style="width: 29mm; white-space: nowrap;">CTA N°</td>
+                        <td class="valor" style="padding: 0.6mm 0 !important;">{{ $extra->cuenta }}</td>
                     </tr>
-                @endforeach
-            </table>
+                </table>
+            @endif
         </td>
 
         <td class="sin-borde-izquierdo pegado-abajo columna-importes" style="width: 29%;">
@@ -393,7 +380,7 @@
                 la línea que separa las franjas pasa entre ellas — por eso
                 esa línea no cruza esta columna.
             --}}
-            <table class="interna cuadro-derecha" style="margin-top: 19.8mm;">
+            <table class="interna cuadro-derecha" style="margin-top: 11.8mm;">
                 <tr>
                     <td class="rotulo" style="width: 19mm;">IMPORTE</td>
                     <td class="cuadro-importe sin-base">$ {{ $importe }}</td>
@@ -513,7 +500,7 @@
             </table>
 
             {{-- En blanco: la firma el Tesorero cuando corresponde. --}}
-            <div class="firma" style="margin: 23mm 2.5mm 0 0;">FIRMA DEL TESORERO</div>
+            <div class="firma" style="margin: 43mm 2.5mm 0 0;">FIRMA DEL TESORERO</div>
         </td>
     </tr>
 
@@ -521,9 +508,9 @@
         El pie del egreso.
 
         «RECIBO EGRESO N°» lo completa el sistema en cuanto el recibo
-        existe, y sale vacío hasta entonces: al imprimir la Orden para
-        remitirla, el egreso todavía no se validó y no hay número que
-        poner.
+        existe, y «OPERACIÓN N°» cuando el usuario identifica el débito
+        del pago en el extracto bancario. Los dos salen vacíos mientras no
+        exista su respaldo.
 
         «REGISTRO» y «FECHA» **se siguen firmando a mano**, y no es un
         pendiente: son renglones de firma —una línea punteada con su
@@ -565,6 +552,15 @@
                     </td>
                     <td></td>
                 </tr>
+                <tr>
+                    <td class="rotulo" style="width: 32mm; white-space: nowrap; padding-top: 1.5mm;">
+                        OPERACIÓN N°
+                    </td>
+                    <td style="width: 45mm; padding-top: 1.5mm;">
+                        <div class="caja">{{ $operacionDeEgreso ?? '' }}&nbsp;</div>
+                    </td>
+                    <td></td>
+                </tr>
             </table>
 
             {{--
@@ -574,7 +570,7 @@
                 está la casilla del recibo arriba, «REGISTRO» quedaba cuatro
                 milímetros más abajo que «FECHA».
             --}}
-            <table class="interna" style="margin-top: 27mm;">
+            <table class="interna" style="margin-top: 19mm;">
                 <tr>
                     <td style="width: 71%;">
                         <div class="firma" style="margin: 0 12mm;">REGISTRO</div>

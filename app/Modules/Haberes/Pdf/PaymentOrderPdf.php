@@ -77,7 +77,7 @@ final class PaymentOrderPdf
      */
     private function datos(PaymentOrder $order, ?array $renglones): array
     {
-        $order->loadMissing('expenseReceipt');
+        $order->loadMissing(['expenseReceipt', 'disbursement.bankTransaction']);
 
         return [
             'orden' => $order,
@@ -97,6 +97,13 @@ final class PaymentOrderPdf
              * todavía no existe.
              */
             'reciboDeEgreso' => $this->numeroDelReciboDeEgreso($order),
+            /*
+             * La operación con la que el banco identifica el pago al
+             * beneficiario. Aparece en cuanto el usuario reconoce el
+             * débito del extracto y sigue ahí después de validarlo.
+             * Antes de ese cruce, el renglón queda vacío.
+             */
+            'operacionDeEgreso' => $order->disbursement?->bankTransaction?->operation_id,
             /*
              * El número completo con su serie: `0030/00000003`.
              *
@@ -153,7 +160,10 @@ final class PaymentOrderPdf
 
         return new PaymentOrderPrintData(
             depositos: $depositos,
-            cuentas: $this->cuentasDelOrganismo($order),
+            cuenta: FormAccountNumber::acortar(
+                $cuentaDelOrganismo?->account_number,
+                FormAccountNumber::EN_LA_FICHA,
+            ),
             total: Decimal::format($total),
             banco: $cuentaDelOrganismo?->bank_name,
             fechaBanco: $depositos[0]->fecha ?? null,
@@ -232,44 +242,5 @@ final class PaymentOrderPdf
             ],
             $renglones,
         );
-    }
-
-    /**
-     * Las cuentas que el formulario lista, con la cruz en la que va.
-     *
-     * El papel del área las trae preimpresas y alguien cruza la que
-     * corresponde. Acá se listan las cuentas activas del organismo y la
-     * marca la pone el sistema, que sabe en cuál está el dinero.
-     *
-     * La cuenta congelada de la Orden va primero aunque hoy esté inactiva:
-     * un documento emitido no puede perder la casilla que tenía marcada
-     * porque después alguien dio de baja esa cuenta.
-     *
-     * @return list<array{label: string, accountNumber: string|null, marked: bool}>
-     */
-    private function cuentasDelOrganismo(PaymentOrder $order): array
-    {
-        $filas = BankAccount::query()
-            ->where(function ($query) use ($order): void {
-                $query->where('is_active', true)
-                    ->orWhere('id', $order->organism_bank_account_id);
-            })
-            ->orderBy('id')
-            ->get(['id', 'label', 'account_number']);
-
-        $cuentas = [];
-
-        foreach ($filas as $fila) {
-            $cuentas[] = [
-                'label' => $fila->label,
-                'accountNumber' => FormAccountNumber::acortar(
-                    $fila->account_number,
-                    FormAccountNumber::EN_LA_FICHA,
-                ),
-                'marked' => $fila->id === $order->organism_bank_account_id,
-            ];
-        }
-
-        return $cuentas;
     }
 }
