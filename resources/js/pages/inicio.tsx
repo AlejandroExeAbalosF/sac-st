@@ -1,18 +1,34 @@
 import { Deferred, Head, Link } from '@inertiajs/react';
-import { ArrowRight, FileText, Gavel } from 'lucide-react';
+import {
+    ArrowRight,
+    FileSpreadsheet,
+    FileText,
+    Gavel,
+    Plus,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import PageHeader from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import HomeSearch from '@/features/inicio/components/home-search';
 import SetupChecklist from '@/features/inicio/components/setup-checklist';
 import { BlockUnavailable } from '@/features/inicio/components/skeletons';
 import { date } from '@/lib/format';
+import { create as importarExtracto } from '@/routes/banco/extractos';
+import { create as nuevoExpediente } from '@/routes/expedientes';
+import { create as nuevaMulta } from '@/routes/multas';
 
 type WorkQueue = App.Modules.Shared.Data.WorkQueueData;
 
 type Props = {
     operationalDate: string;
-    can: { verHaberes: boolean; verMultas: boolean };
+    can: {
+        verHaberes: boolean;
+        verMultas: boolean;
+        crearExpediente: boolean;
+        crearMulta: boolean;
+        importarExtracto: boolean;
+    };
     setup: App.Modules.Shared.Data.SetupStepData[] | null;
     queues?: WorkQueue[];
 };
@@ -46,6 +62,13 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
                                     description="Expedientes, pagos y caja diaria"
                                     href="/haberes/inicio"
                                     icon={FileText}
+                                    createHref={
+                                        can.crearExpediente
+                                            ? nuevoExpediente().url
+                                            : undefined
+                                    }
+                                    createLabel="Registrar haberes"
+                                    createHint="Creá el expediente y agregá sus haberes."
                                     queues={(queues ?? []).filter(
                                         (queue) =>
                                             !queue.key.startsWith('multas_'),
@@ -58,6 +81,13 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
                                     description="Cobros, depósitos y caja diaria"
                                     href="/multas/inicio"
                                     icon={Gavel}
+                                    createHref={
+                                        can.crearMulta
+                                            ? nuevaMulta().url
+                                            : undefined
+                                    }
+                                    createLabel="Nueva multa"
+                                    createHint="Registrá una multa para iniciar su cobro."
                                     queues={(queues ?? []).filter((queue) =>
                                         queue.key.startsWith('multas_'),
                                     )}
@@ -65,6 +95,36 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
                             )}
                         </div>
                     </Deferred>
+                    {can.importarExtracto && (
+                        <section className="mt-5 flex flex-col gap-4 rounded-lg border bg-muted/30 p-5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <FileSpreadsheet
+                                    className="mt-0.5 size-5 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                />
+                                <div>
+                                    <h2 className="font-semibold">
+                                        Extractos bancarios
+                                    </h2>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Cargá el resumen del banco para
+                                        identificar fondos y conciliar
+                                        movimientos.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="shrink-0"
+                            >
+                                <Link href={importarExtracto().url}>
+                                    Cargar extracto
+                                    <ArrowRight aria-hidden="true" />
+                                </Link>
+                            </Button>
+                        </section>
+                    )}
                 </HomeSearch>
             </div>
         </>
@@ -77,23 +137,25 @@ function CashBoxEntry({
     href,
     icon: Icon,
     queues,
+    createHref,
+    createLabel,
+    createHint,
 }: {
     name: string;
     description: string;
     href: string;
     icon: LucideIcon;
     queues: WorkQueue[];
+    createHref?: string;
+    createLabel: string;
+    createHint: string;
 }) {
     const pending = queues.filter(
         (queue) => queue.count !== null && queue.count > 0,
     );
 
     return (
-        <Link
-            href={href}
-            prefetch
-            className="group flex min-h-64 flex-col rounded-lg border bg-card p-6 shadow-raised transition-[border-color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transform-none"
-        >
+        <section className="flex min-h-64 flex-col rounded-lg border bg-card p-6 shadow-raised">
             <div className="flex items-start gap-4">
                 <span
                     className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
@@ -109,10 +171,6 @@ function CashBoxEntry({
                         {description}
                     </p>
                 </div>
-                <ArrowRight
-                    className="ml-auto size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1"
-                    aria-hidden="true"
-                />
             </div>
 
             <div className="mt-7 flex flex-1 flex-col gap-3 border-t pt-5">
@@ -142,10 +200,30 @@ function CashBoxEntry({
                 )}
             </div>
 
-            <span className="mt-5 text-sm font-semibold text-primary">
-                Ver inicio de {name}
-            </span>
-        </Link>
+            <div className="mt-6 border-t pt-5">
+                <div className="flex flex-wrap items-center gap-3">
+                    {createHref && (
+                        <Button asChild>
+                            <Link href={createHref}>
+                                <Plus aria-hidden="true" />
+                                {createLabel}
+                            </Link>
+                        </Button>
+                    )}
+                    <Button asChild variant="ghost">
+                        <Link href={href} prefetch>
+                            Ver inicio de {name}
+                            <ArrowRight aria-hidden="true" />
+                        </Link>
+                    </Button>
+                </div>
+                {createHref && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                        {createHint}
+                    </p>
+                )}
+            </div>
+        </section>
     );
 }
 

@@ -119,6 +119,7 @@ final class InicioController extends Controller
                 'verVolumen' => $verExpedientes,
                 'verColas' => $verBanco || $verExpedientes || $verCierres || $user->can('multas.caja.cerrar') || $user->can('multas.ver'),
                 'crearExpediente' => $user->can('expedientes.crear'),
+                'crearMulta' => $user->can('multas.registrar'),
                 'importarExtracto' => $user->can('banco.extractos.importar'),
             ],
 
