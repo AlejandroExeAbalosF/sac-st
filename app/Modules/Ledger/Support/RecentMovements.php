@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
  * Lo último que se movió en el sistema.
  *
  * El tablero no lo usa para cuadrar nada —para eso está la caja del día—
- * sino para contestar «¿qué pasó desde ayer?». Por eso no filtra por caja
- * ni por fecha, y por eso incluye los asientos revertidos: una reversión
+ * sino para contestar «¿qué pasó desde ayer?». Cada inicio puede filtrar por
+ * caja; incluye los asientos revertidos: una reversión
  * es exactamente el tipo de novedad que alguien quiere ver.
  *
  * Los borradores quedan afuera. Un asiento en `draft` todavía no ocurrió.
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 final class RecentMovements
 {
     /** @return list<MovementRowData> */
-    public function latest(int $limit = 8, Currency $currency = Currency::Ars): array
+    public function latest(int $limit = 8, Currency $currency = Currency::Ars, ?int $cashBoxId = null): array
     {
         /*
          * El importe sale de una subconsulta y no de un `join` con
@@ -39,6 +39,7 @@ final class RecentMovements
             ->where('journal_lines.currency', $currency->value);
 
         $filas = DB::table('financial_events')
+            ->when($cashBoxId !== null, fn ($query) => $query->where('financial_events.cash_box_id', $cashBoxId))
             ->leftJoin('cash_boxes', 'cash_boxes.id', '=', 'financial_events.cash_box_id')
             ->whereIn('financial_events.status', [
                 FinancialEventStatus::Posted->value,
@@ -55,13 +56,14 @@ final class RecentMovements
                 'financial_events.status',
                 'financial_events.description',
                 'cash_boxes.name AS cash_box_name',
+                'cash_boxes.code AS cash_box_code',
             ])
             ->selectSub($importe, 'total')
             ->get();
 
         return array_values($filas
             ->map(function (object $fila): MovementRowData {
-                /** @var object{public_id: string, event_type: string, event_date: string, posted_at: string, status: string, description: ?string, cash_box_name: ?string, total: string} $fila */
+                /** @var object{public_id: string, event_type: string, event_date: string, posted_at: string, status: string, description: ?string, cash_box_name: ?string, cash_box_code: ?string, total: string} $fila */
                 $tipo = FinancialEventType::from($fila->event_type);
                 $fecha = Carbon::parse($fila->event_date)->toDateString();
 
@@ -75,7 +77,7 @@ final class RecentMovements
                     description: $fila->description,
                     cashBoxName: $fila->cash_box_name,
                     isReversed: $fila->status === FinancialEventStatus::Reversed->value,
-                    href: route('caja.dia', ['fecha' => $fecha], absolute: false),
+                    href: route($fila->cash_box_code === 'multas' ? 'multas.caja.dia' : 'caja.dia', ['fecha' => $fecha], absolute: false),
                 );
             })
             ->all());

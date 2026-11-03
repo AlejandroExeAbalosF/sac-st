@@ -15,6 +15,13 @@ Route::get('/', fn () => redirect()->route(auth()->check() ? 'inicio' : 'login')
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('inicio', InicioController::class)->name('inicio');
+    Route::get('inicio/buscar', [InicioController::class, 'buscar'])
+        ->middleware('throttle:120,1')
+        ->name('inicio.buscar');
+    Route::get('haberes/inicio', [InicioController::class, 'haberes'])->name('inicio.haberes');
+    Route::get('multas/inicio', [InicioController::class, 'multas'])->name('inicio.multas');
+    Route::redirect('inicio/haberes', '/haberes/inicio');
+    Route::redirect('inicio/multas', '/multas/inicio');
 });
 
 /*

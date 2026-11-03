@@ -44,6 +44,16 @@ Breadcrumbs::for('inicio', fn (): array => [
     Crumb::make('Inicio'),
 ]);
 
+Breadcrumbs::for('inicio.haberes', fn (): array => [
+    Crumb::make('Inicio', route('inicio')),
+    Crumb::make('Haberes'),
+]);
+
+Breadcrumbs::for('inicio.multas', fn (): array => [
+    Crumb::make('Inicio', route('inicio')),
+    Crumb::make('Multas'),
+]);
+
 Breadcrumbs::for('personas.index', fn (): array => [
     Crumb::make('Personas'),
 ]);

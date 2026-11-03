@@ -66,6 +66,7 @@ export const navGroups: NavGroup[] = [
             { title: 'Inicio', href: inicio(), icon: LayoutGrid },
             {
                 title: 'Haberes',
+                href: '/haberes/inicio',
                 icon: FileText,
                 children: [
                     { title: 'Expedientes', href: haberes(), icon: FileText },
@@ -116,6 +117,7 @@ export const navGroups: NavGroup[] = [
              */
             {
                 title: 'Multas',
+                href: '/multas/inicio',
                 icon: Gavel,
                 children: [
                     /*

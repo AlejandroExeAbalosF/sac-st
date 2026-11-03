@@ -29,6 +29,7 @@ use App\Modules\Ledger\Support\CashMonthsPendingClosing;
 use App\Modules\Ledger\Support\RecentMovements;
 use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineDeposits;
@@ -40,6 +41,7 @@ use App\Modules\Shared\Enums\QueueTone;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -71,8 +73,8 @@ use Inertia\Response;
  */
 final class InicioController extends Controller
 {
-    /** La caja de Haberes, resuelta una sola vez por respuesta. */
-    private ?CashBox $caja = null;
+    /** @var array<string, CashBox> Cajas resueltas una sola vez por respuesta. */
+    private array $cajas = [];
 
     public function __construct(
         private readonly CashBalance $saldos,
@@ -111,6 +113,8 @@ final class InicioController extends Controller
             'can' => [
                 'verCaja' => $verCaja,
                 'verExpedientes' => $verExpedientes,
+                'verHaberes' => true,
+                'verMultas' => $user->can('multas.ver') || $user->can('multas.caja.ver'),
                 'verMovimientos' => $verCaja,
                 'verVolumen' => $verExpedientes,
                 'verColas' => $verBanco || $verExpedientes || $verCierres || $user->can('multas.caja.cerrar') || $user->can('multas.ver'),
@@ -158,6 +162,149 @@ final class InicioController extends Controller
             'movements' => Inertia::defer(
                 fn (): array => $verCaja ? $this->movimientos->latest() : [],
                 'movimientos',
+                rescue: true,
+            ),
+        ]);
+    }
+
+    public function haberes(Request $request): Response
+    {
+        return $this->cashBoxHome($request, CashBox::HABERES);
+    }
+
+    public function multas(Request $request): Response
+    {
+        return $this->cashBoxHome($request, CashBox::MULTAS);
+    }
+
+    public function buscar(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        $data = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+        ]);
+        $term = trim((string) ($data['q'] ?? ''));
+
+        if (mb_strlen($term) < 2) {
+            return response()->json(['query' => $term, 'total' => 0, 'groups' => []]);
+        }
+
+        $groups = [];
+
+        if ($user->can('expedientes.ver')) {
+            $query = Expediente::query()->buscar($term);
+            $total = (clone $query)->count();
+            $results = $query
+                ->with(['employer:id,name', 'haberes.beneficiary:id,name'])
+                ->latest('id')
+                ->limit(6)
+                ->get()
+                ->map(fn (Expediente $expediente): array => [
+                    'id' => 'haberes-'.$expediente->id,
+                    'title' => $expediente->display_number,
+                    'description' => $expediente->subject ?: ($expediente->employer?->name ?? 'Sin carátula'),
+                    'context' => collect([
+                        $expediente->employer?->name,
+                        ...$expediente->haberes->pluck('beneficiary.name')->all(),
+                    ])->filter()->unique()->join(' · '),
+                    'status' => $expediente->status->label(),
+                    'href' => route('expedientes.show', $expediente, absolute: false),
+                ])
+                ->all();
+
+            $groups[] = [
+                'key' => 'haberes',
+                'label' => 'Haberes',
+                'total' => $total,
+                'moreHref' => route('expedientes.index', ['q' => $term], absolute: false),
+                'results' => $results,
+            ];
+        }
+
+        if ($user->can('multas.ver')) {
+            $query = Fine::query()->buscar($term);
+            $total = (clone $query)->count();
+            $results = $query
+                ->with(['fineCase', 'person:id,name'])
+                ->latest('id')
+                ->limit(6)
+                ->get()
+                ->map(fn (Fine $fine): array => [
+                    'id' => 'multas-'.$fine->id,
+                    'title' => 'Expte. '.$fine->fineCase->label().' · Multa '.$fine->fine_number,
+                    'description' => $fine->caption,
+                    'context' => $fine->person?->name ?? '',
+                    'status' => 'Multa',
+                    'href' => route('multas.show', $fine->showParameters(), absolute: false),
+                ])
+                ->all();
+
+            $groups[] = [
+                'key' => 'multas',
+                'label' => 'Multas',
+                'total' => $total,
+                'moreHref' => route('multas.index', ['q' => $term, 'vista' => 'multas'], absolute: false),
+                'results' => $results,
+            ];
+        }
+
+        return response()->json([
+            'query' => $term,
+            'total' => collect($groups)->sum('total'),
+            'groups' => $groups,
+        ]);
+    }
+
+    private function cashBoxHome(Request $request, string $code): Response
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        if ($code === CashBox::MULTAS) {
+            abort_unless($user->can('multas.ver') || $user->can('multas.caja.ver'), 403);
+        }
+
+        $fecha = BusinessDate::today();
+        $verCaja = $code === CashBox::HABERES
+            ? $user->can('caja.ver')
+            : $user->can('multas.caja.ver');
+
+        return Inertia::render('inicio/caja', [
+            'movements' => Inertia::defer(
+                fn (): array => $verCaja ? $this->movimientos->latest(cashBoxId: (int) $this->cashBox($code)->id) : [],
+                'movimientos',
+                rescue: true,
+            ),
+            'setup' => array_values(array_filter(
+                $this->setup($user) ?? [],
+                fn (SetupStepData $step): bool => $step->key === 'cuentas' || str_starts_with($step->key, 'apertura_'.$code),
+            )),
+            'recentAccess' => $user->loginEvents()->limit(5)->get()->map(RecentAccessData::fromEvent(...))->all(),
+            'box' => [
+                'code' => $code,
+                'name' => $code === CashBox::HABERES ? 'Haberes' : 'Multas',
+            ],
+            'operationalDate' => $fecha->toDateString(),
+            'can' => [
+                'verCaja' => $verCaja,
+                'verExpedientes' => $code === CashBox::HABERES
+                    ? $user->can('expedientes.ver')
+                    : $user->can('multas.ver'),
+                'crearExpediente' => $code === CashBox::HABERES
+                    ? $user->can('expedientes.crear')
+                    : $user->can('multas.registrar'),
+                'importarExtracto' => $user->can('banco.extractos.importar'),
+            ],
+            'queues' => Inertia::defer(
+                fn (): array => $this->queues($fecha, $user, $code),
+                'colas',
+                rescue: true,
+            ),
+            'cashDay' => Inertia::defer(
+                fn (): ?CashDayStatusData => $verCaja ? $this->cashDay($fecha, $code) : null,
+                'caja',
                 rescue: true,
             ),
         ]);
@@ -240,133 +387,137 @@ final class InicioController extends Controller
      *
      * @return list<WorkQueueData>
      */
-    private function queues(CarbonImmutable $fecha, User $user): array
+    private function queues(CarbonImmutable $fecha, User $user, ?string $circuit = null): array
     {
         $colas = [];
 
-        /*
-         * Las dos caras del mismo cruce, y por eso van juntas y en este
-         * orden: el papel llega con el expediente, el movimiento aparece
-         * después cuando se importa el extracto.
-         *
-         * El comprobante sin cruzar no tenía cola, y era el único estado
-         * pendiente del circuito que nadie miraba: quien cargó ocho
-         * comprobantes de ocho expedientes distintos no tenía forma de
-         * barrerlos salvo acordándose de cada uno.
-         */
-        if ($user->can('depositos.ver')) {
-            $colas[] = WorkQueueData::resuelta(
-                key: 'comprobantes_sin_cruzar',
-                title: 'Comprobantes sin cruzar',
-                description: 'Depósitos que trajo el expediente, esperando que el crédito aparezca en el extracto',
-                count: DepositTicket::query()->waiting()->count(),
-                href: route(
-                    'depositos.index',
-                    ['estado' => DepositTicketStatus::Waiting->value],
-                    absolute: false,
-                ),
-            );
-        }
-
-        if ($user->can('banco.extractos.ver')) {
-            $colas[] = WorkQueueData::resuelta(
-                key: 'fondos_sin_identificar',
-                title: 'Fondos sin identificar',
-                description: 'Créditos del banco que todavía nadie identificó, de cualquier cuenta',
-                count: BankTransaction::query()->sinIdentificar()->count(),
-                tone: QueueTone::Action,
-                href: route(
-                    'banco.movimientos.index',
-                    ['estado' => 'pending', 'sentido' => 'credit'],
-                    absolute: false,
-                ),
-            );
-        }
-
-        if ($user->can('expedientes.ver')) {
-            $ordenes = $this->colasDeOrdenes->resolve();
-
-            $colas[] = WorkQueueData::resuelta(
-                key: 'cuotas_sin_orden',
-                title: 'Cuotas financiadas sin Orden',
-                description: 'Tienen el dinero adentro y ya se les puede emitir la Orden de Pago',
-                count: $ordenes->withoutOrder,
-                tone: QueueTone::Action,
-                samples: $ordenes->withoutOrderSamples,
-                hasMore: $ordenes->hasMore,
-            );
-            $colas[] = WorkQueueData::resuelta(
-                key: 'ordenes_en_saf',
-                title: 'Órdenes remitidas al SAF',
-                description: 'Esperando el informe de transferencia',
-                count: PaymentOrder::query()->enSaf()->count(),
-            );
-            $colas[] = WorkQueueData::resuelta(
-                key: 'egresos_por_validar',
-                title: 'Egresos por validar',
-                description: 'Informe y débito presentes; falta la validación del contador',
-                count: Disbursement::query()->porValidar()->count(),
-                tone: QueueTone::Action,
-                /*
-                 * La cola contaba sin llevar a ningún lado: ahora hay
-                 * pantalla. Va a la lista completa de transferencias sin
-                 * confirmar —no solo a las listas para validar— porque quien
-                 * viene a validar es el mismo que tiene que ver qué quedó
-                 * trabado esperando al banco.
-                 */
-                href: route('planillas.index', ['cola' => 'transferencias'], absolute: false),
-            );
-            $colas[] = WorkQueueData::resuelta(
-                key: 'beneficiarios_sin_cbu',
-                title: 'Fondos en banco sin CBU',
-                description: 'No se puede emitir la Orden hasta verificar la cuenta',
-                count: $ordenes->withoutBankAccount,
-                tone: QueueTone::Blocked,
-                samples: $ordenes->withoutBankAccountSamples,
-                hasMore: $ordenes->hasMore,
-            );
-        }
-
-        if ($user->can('cierres.ver')) {
-            $caja = (int) $this->cashBox()->id;
-
-            $colas[] = WorkQueueData::resuelta(
-                key: 'caja_sin_cerrar',
-                title: 'Días de caja sin cerrar',
-                description: 'Días anteriores con movimientos que todavía no se cerraron',
-                // Sin moneda: un día sin cerrar en dólares empuja igual que uno en pesos.
-                count: $this->diasSinCerrar->count($caja, $fecha),
-                tone: QueueTone::Action,
-                href: $this->closingsLink(
-                    pesos: $this->diasSinCerrar->count($caja, $fecha, Currency::Ars),
-                    dolares: $this->diasSinCerrar->count($caja, $fecha, Currency::Usd),
-                ),
-            );
+        if ($circuit !== CashBox::MULTAS) {
 
             /*
-             * El mes terminado que nadie cerró.
+             * Las dos caras del mismo cruce, y por eso van juntas y en este
+             * orden: el papel llega con el expediente, el movimiento aparece
+             * después cuando se importa el extracto.
              *
-             * Cerrar el mes no es automático ni debería serlo --es un acto
-             * contable, no un vencimiento de calendario-- pero tampoco
-             * puede depender de que alguien se acuerde. Va como cola
-             * propia y no sumado a la de días: son dos trabajos
-             * distintos, y el mensual exige que los días ya estén
-             * cerrados, así que este número se lleva a cero después del
-             * otro.
+             * El comprobante sin cruzar no tenía cola, y era el único estado
+             * pendiente del circuito que nadie miraba: quien cargó ocho
+             * comprobantes de ocho expedientes distintos no tenía forma de
+             * barrerlos salvo acordándose de cada uno.
              */
-            $colas[] = WorkQueueData::resuelta(
-                key: 'caja_mes_sin_cerrar',
-                title: 'Meses sin cerrar',
-                description: 'Meses terminados con movimientos que todavía no se cerraron',
-                // Sin moneda: un mes sin cerrar en dólares tiene que
-                // empujar igual que uno en pesos.
-                count: $this->mesesSinCerrar->count($caja, $fecha),
-                tone: QueueTone::Action,
-                href: $this->closingsLink(
-                    pesos: $this->mesesSinCerrar->count($caja, $fecha, Currency::Ars),
-                    dolares: $this->mesesSinCerrar->count($caja, $fecha, Currency::Usd),
-                ),
-            );
+            if ($user->can('depositos.ver')) {
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'comprobantes_sin_cruzar',
+                    title: 'Comprobantes sin cruzar',
+                    description: 'Depósitos que trajo el expediente, esperando que el crédito aparezca en el extracto',
+                    count: DepositTicket::query()->waiting()->count(),
+                    href: route(
+                        'depositos.index',
+                        ['estado' => DepositTicketStatus::Waiting->value],
+                        absolute: false,
+                    ),
+                );
+            }
+
+            if ($user->can('banco.extractos.ver')) {
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'fondos_sin_identificar',
+                    title: 'Fondos sin identificar',
+                    description: 'Créditos del banco que todavía nadie identificó, de cualquier cuenta',
+                    count: BankTransaction::query()->sinIdentificar()->count(),
+                    tone: QueueTone::Action,
+                    href: route(
+                        'banco.movimientos.index',
+                        ['estado' => 'pending', 'sentido' => 'credit'],
+                        absolute: false,
+                    ),
+                );
+            }
+
+            if ($user->can('expedientes.ver')) {
+                $ordenes = $this->colasDeOrdenes->resolve();
+
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'cuotas_sin_orden',
+                    title: 'Cuotas financiadas sin Orden',
+                    description: 'Tienen el dinero adentro y ya se les puede emitir la Orden de Pago',
+                    count: $ordenes->withoutOrder,
+                    tone: QueueTone::Action,
+                    samples: $ordenes->withoutOrderSamples,
+                    hasMore: $ordenes->hasMore,
+                );
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'ordenes_en_saf',
+                    title: 'Órdenes remitidas al SAF',
+                    description: 'Esperando el informe de transferencia',
+                    count: PaymentOrder::query()->enSaf()->count(),
+                );
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'egresos_por_validar',
+                    title: 'Egresos por validar',
+                    description: 'Informe y débito presentes; falta la validación del contador',
+                    count: Disbursement::query()->porValidar()->count(),
+                    tone: QueueTone::Action,
+                    /*
+                     * La cola contaba sin llevar a ningún lado: ahora hay
+                     * pantalla. Va a la lista completa de transferencias sin
+                     * confirmar —no solo a las listas para validar— porque quien
+                     * viene a validar es el mismo que tiene que ver qué quedó
+                     * trabado esperando al banco.
+                     */
+                    href: route('planillas.index', ['cola' => 'transferencias'], absolute: false),
+                );
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'beneficiarios_sin_cbu',
+                    title: 'Fondos en banco sin CBU',
+                    description: 'No se puede emitir la Orden hasta verificar la cuenta',
+                    count: $ordenes->withoutBankAccount,
+                    tone: QueueTone::Blocked,
+                    samples: $ordenes->withoutBankAccountSamples,
+                    hasMore: $ordenes->hasMore,
+                );
+            }
+
+            if ($user->can('cierres.ver')) {
+                $caja = (int) $this->cashBox()->id;
+
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'caja_sin_cerrar',
+                    title: 'Días de caja sin cerrar',
+                    description: 'Días anteriores con movimientos que todavía no se cerraron',
+                    // Sin moneda: un día sin cerrar en dólares empuja igual que uno en pesos.
+                    count: $this->diasSinCerrar->count($caja, $fecha),
+                    tone: QueueTone::Action,
+                    href: $this->closingsLink(
+                        pesos: $this->diasSinCerrar->count($caja, $fecha, Currency::Ars),
+                        dolares: $this->diasSinCerrar->count($caja, $fecha, Currency::Usd),
+                    ),
+                );
+
+                /*
+                 * El mes terminado que nadie cerró.
+                 *
+                 * Cerrar el mes no es automático ni debería serlo --es un acto
+                 * contable, no un vencimiento de calendario-- pero tampoco
+                 * puede depender de que alguien se acuerde. Va como cola
+                 * propia y no sumado a la de días: son dos trabajos
+                 * distintos, y el mensual exige que los días ya estén
+                 * cerrados, así que este número se lleva a cero después del
+                 * otro.
+                 */
+                $colas[] = WorkQueueData::resuelta(
+                    key: 'caja_mes_sin_cerrar',
+                    title: 'Meses sin cerrar',
+                    description: 'Meses terminados con movimientos que todavía no se cerraron',
+                    // Sin moneda: un mes sin cerrar en dólares tiene que
+                    // empujar igual que uno en pesos.
+                    count: $this->mesesSinCerrar->count($caja, $fecha),
+                    tone: QueueTone::Action,
+                    href: $this->closingsLink(
+                        pesos: $this->mesesSinCerrar->count($caja, $fecha, Currency::Ars),
+                        dolares: $this->mesesSinCerrar->count($caja, $fecha, Currency::Usd),
+                    ),
+                );
+            }
+
         }
 
         /*
@@ -374,7 +525,7 @@ final class InicioController extends Controller
          * permiso: son colas de quien la cierra. Solo en pesos, porque
          * Multas no cobra en dólares.
          */
-        if ($user->can('multas.caja.cerrar')) {
+        if ($circuit !== CashBox::HABERES && $user->can('multas.caja.cerrar')) {
             $multas = (int) CashBox::query()->active()->where('code', CashBox::MULTAS)->valueOrFail('id');
 
             $colas[] = WorkQueueData::resuelta(
@@ -401,7 +552,7 @@ final class InicioController extends Controller
          * los pendientes; los créditos sin identificar, a la lista del banco
          * con la cuenta de Multas.
          */
-        if ($user->can('multas.verificar-pagos')) {
+        if ($circuit !== CashBox::HABERES && $user->can('multas.verificar-pagos')) {
             $colas[] = WorkQueueData::resuelta(
                 key: 'multas_pagos_informados',
                 title: 'Pagos de multas por verificar',
@@ -430,7 +581,7 @@ final class InicioController extends Controller
             }
         }
 
-        if ($user->can('multas.ver')) {
+        if ($circuit !== CashBox::HABERES && $user->can('multas.ver')) {
             $colas[] = WorkQueueData::resuelta(
                 key: 'multas_por_depositar',
                 title: 'Cobros de Multas por depositar',
@@ -482,9 +633,9 @@ final class InicioController extends Controller
      * calculara lo suyo, el día que las dos discrepen nadie sabría cuál
      * creer.
      */
-    private function cashDay(CarbonImmutable $fecha): CashDayStatusData
+    private function cashDay(CarbonImmutable $fecha, string $code = CashBox::HABERES): CashDayStatusData
     {
-        $caja = $this->cashBox();
+        $caja = $this->cashBox($code);
         $id = (int) $caja->id;
         /*
          * El panel muestra un saldo, y son dos libros. Queda en pesos
@@ -529,7 +680,7 @@ final class InicioController extends Controller
                 ->whereNot('status', CashCountStatus::Draft)
                 ->count(),
             closingStatus: $cierre?->status->value,
-            href: route('caja.dia', absolute: false),
+            href: route($code === CashBox::MULTAS ? 'multas.caja.dia' : 'caja.dia', absolute: false),
         );
     }
 
@@ -561,11 +712,11 @@ final class InicioController extends Controller
      * Se resuelve una sola vez: las colas y el estado del día la piden por
      * separado y llegan en la misma respuesta diferida.
      */
-    private function cashBox(): CashBox
+    private function cashBox(string $code = CashBox::HABERES): CashBox
     {
-        return $this->caja ??= CashBox::query()
+        return $this->cajas[$code] ??= CashBox::query()
             ->active()
-            ->where('code', CashBox::HABERES)
+            ->where('code', $code)
             ->firstOrFail();
     }
 }

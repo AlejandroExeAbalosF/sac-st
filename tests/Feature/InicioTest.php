@@ -73,6 +73,48 @@ class InicioTest extends TestCase
         $this->get(route('inicio'))->assertRedirect(route('login'));
     }
 
+    public function test_el_buscador_del_inicio_encuentra_expedientes_de_haberes(): void
+    {
+        $this->seedHaberes();
+
+        $this->actingAs($this->operador())
+            ->getJson(route('inicio.buscar', ['q' => 'CIACSA']))
+            ->assertOk()
+            ->assertJsonPath('query', 'CIACSA')
+            ->assertJsonPath('groups.0.key', 'haberes')
+            ->assertJsonPath('groups.0.label', 'Haberes')
+            ->assertJsonPath('groups.0.results.0.context', 'CIACSA · García, Claudio Adrián')
+            ->assertJsonPath('groups.0.results.0.href', '/haberes/expedientes/1/0030064-125957-2026-0')
+            ->assertJsonPath('total', 1);
+    }
+
+    public function test_el_buscador_del_inicio_espera_al_menos_dos_caracteres(): void
+    {
+        $this->actingAs($this->operador())
+            ->getJson(route('inicio.buscar', ['q' => 'a']))
+            ->assertOk()
+            ->assertExactJson([
+                'query' => 'a',
+                'total' => 0,
+                'groups' => [],
+            ]);
+    }
+
+    public function test_los_movimientos_del_inicio_se_filtran_por_caja(): void
+    {
+        $this->seed(CashBoxSeeder::class);
+        $haberes = CashBox::query()->where('code', CashBox::HABERES)->firstOrFail();
+        $multas = CashBox::query()->where('code', CashBox::MULTAS)->firstOrFail();
+        $this->asentarMovimiento($haberes, '2026-09-07', 'Movimiento de Haberes');
+
+        $movimientos = app(RecentMovements::class)->latest(cashBoxId: (int) $multas->id);
+
+        $this->assertSame([], $movimientos);
+        $propios = app(RecentMovements::class)->latest(cashBoxId: (int) $haberes->id);
+        $this->assertCount(1, $propios);
+        $this->assertSame('Movimiento de Haberes', $propios[0]->description);
+    }
+
     public function test_la_ruta_vieja_del_tablero_ya_no_existe(): void
     {
         $this->actingAs($this->operador())
@@ -371,40 +413,20 @@ class InicioTest extends TestCase
     |---------------------------------------------------------------------
     */
 
-    /**
-     * Ninguna cola se calcula para no dibujarse.
-     *
-     * `GRUPOS_DE_COLAS` en `inicio.tsx` es una lista blanca: la pantalla
-     * recorre los grupos y filtra las colas por clave, así que una clave
-     * que no figura en ninguno **desaparece sin que nada falle**. Las
-     * props viajan, el test de props pasa y el tablero no la muestra.
-     *
-     * Pasó con dos a la vez —«Comprobantes sin cruzar» y «Meses sin
-     * cerrar»—, y ninguna de las dos prueba que las contaba se enteró.
-     */
-    public function test_toda_cola_del_tablero_tiene_donde_dibujarse(): void
+    public function test_cada_inicio_recibe_solo_las_colas_de_su_circuito(): void
     {
         $this->seed(CashBoxSeeder::class);
+        $usuario = $this->operador('contador');
 
-        $pantalla = (string) file_get_contents(resource_path('js/pages/inicio.tsx'));
-        $desde = strpos($pantalla, 'const GRUPOS_DE_COLAS = [');
-        $hasta = strpos($pantalla, '] as const;', $desde === false ? 0 : $desde);
+        $haberes = $this->recargaParcialDeCaja($usuario, 'inicio.haberes');
+        $multas = $this->recargaParcialDeCaja($usuario, 'inicio.multas');
 
-        $this->assertIsInt($desde, 'No se encontró `GRUPOS_DE_COLAS` en inicio.tsx.');
-        $this->assertIsInt($hasta);
+        $clavesHaberes = collect($haberes->json('props.queues'))->pluck('key');
+        $clavesMultas = collect($multas->json('props.queues'))->pluck('key');
 
-        $grupos = substr($pantalla, $desde, $hasta - $desde);
-        $claves = $this->clavesDeColas();
-
-        $this->assertNotEmpty($claves);
-
-        foreach ($claves as $clave) {
-            $this->assertStringContainsString(
-                "'{$clave}'",
-                $grupos,
-                "La cola «{$clave}» se calcula y no está en ningún grupo de inicio.tsx: no se dibuja.",
-            );
-        }
+        $this->assertNotEmpty($clavesHaberes);
+        $this->assertTrue($clavesHaberes->every(fn (string $key): bool => ! str_starts_with($key, 'multas_')));
+        $this->assertTrue($clavesMultas->every(fn (string $key): bool => str_starts_with($key, 'multas_')));
     }
 
     /**
@@ -659,6 +681,24 @@ class InicioTest extends TestCase
                 'X-Inertia' => 'true',
                 'X-Inertia-Partial-Component' => 'inicio',
                 'X-Inertia-Partial-Data' => $only,
+                'X-Inertia-Version' => $version,
+            ])
+            ->assertOk();
+    }
+
+    private function recargaParcialDeCaja(User $usuario, string $ruta): TestResponse
+    {
+        $version = $this->actingAs($usuario)
+            ->get(route($ruta))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('inicio/caja'))
+            ->viewData('page')['version'];
+
+        return $this->actingAs($usuario)
+            ->get(route($ruta), [
+                'X-Inertia' => 'true',
+                'X-Inertia-Partial-Component' => 'inicio/caja',
+                'X-Inertia-Partial-Data' => 'queues',
                 'X-Inertia-Version' => $version,
             ])
             ->assertOk();

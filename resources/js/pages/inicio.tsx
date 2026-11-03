@@ -1,292 +1,180 @@
-import { Deferred, Head } from '@inertiajs/react';
-import GlobalSearch from '@/components/global-search';
+import { Deferred, Head, Link } from '@inertiajs/react';
+import { ArrowRight, FileText, Gavel } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import PageHeader from '@/components/page-header';
-import CashBoxSummary from '@/features/inicio/components/cash-box-summary';
-import CashDayCard from '@/features/inicio/components/cash-day-card';
-import QueueCard from '@/features/inicio/components/queue-card';
-import QuickActions from '@/features/inicio/components/quick-actions';
-import RecentAccessList from '@/features/inicio/components/recent-access';
-import RecentMovements from '@/features/inicio/components/recent-movements';
+import { Skeleton } from '@/components/ui/skeleton';
+import HomeSearch from '@/features/inicio/components/home-search';
 import SetupChecklist from '@/features/inicio/components/setup-checklist';
-import {
-    BlockUnavailable,
-    CashBoxSummarySkeleton,
-    CashDaySkeleton,
-    ListSkeleton,
-    QueueGridSkeleton,
-} from '@/features/inicio/components/skeletons';
+import { BlockUnavailable } from '@/features/inicio/components/skeletons';
 import { date } from '@/lib/format';
+
+type WorkQueue = App.Modules.Shared.Data.WorkQueueData;
 
 type Props = {
     operationalDate: string;
-    can: {
-        verCaja: boolean;
-        verMovimientos: boolean;
-        verVolumen: boolean;
-        verColas: boolean;
-        crearExpediente: boolean;
-        importarExtracto: boolean;
-        verExpedientes: boolean;
-    };
-    recentAccess: App.Modules.Shared.Data.RecentAccessData[];
-    /** Mientras falte algo para operar; `null` cuando ya está todo. */
+    can: { verHaberes: boolean; verMultas: boolean };
     setup: App.Modules.Shared.Data.SetupStepData[] | null;
-
-    /*
-     * Diferidas. Llegan `undefined` en la primera respuesta y por eso son
-     * opcionales: el tipo dice la verdad sobre lo que hay en pantalla
-     * mientras el esqueleto está puesto, y `<Deferred>` se encarga de que
-     * el bloque no se renderice hasta que el dato exista.
-     */
-    queues?: App.Modules.Shared.Data.WorkQueueData[];
-    cashDay?: App.Modules.Ledger.Data.CashDayStatusData | null;
-    cashBoxes?: App.Modules.Shared.Data.CashBoxSummaryData[];
-    movements?: App.Modules.Ledger.Data.MovementRowData[];
+    queues?: WorkQueue[];
 };
 
-/**
- * El tablero de inicio.
- *
- * El orden de la pantalla es el de las preguntas de la mañana: dónde
- * busco, cuánto hay en la caja, qué me está esperando, qué arranco, qué
- * pasó. Lo que es contexto de jefatura —el volumen por caja— va al pie:
- * responde una pregunta legítima que las colas no responden, pero no es
- * lo que hace falta para trabajar.
- */
-export default function Inicio({
-    operationalDate,
-    can,
-    recentAccess,
-    setup,
-    queues,
-    cashDay,
-    cashBoxes,
-    movements,
-}: Props) {
+/** Portada breve que deriva al operador al circuito correcto. */
+export default function Inicio({ operationalDate, can, setup, queues }: Props) {
     return (
         <>
             <Head title="Inicio" />
-
-            <div className="flex flex-col gap-8 p-4 sm:p-6">
+            <div className="flex w-full flex-col gap-8 p-4 sm:p-6">
                 <PageHeader
-                    title="Panel administrativo"
-                    eyebrow={`Fecha operativa · ${date(operationalDate)} · Caja Haberes`}
-                    description="Lo que espera que alguien haga algo, en el orden del circuito."
+                    title="Inicio"
+                    eyebrow={`Fecha operativa · ${date(operationalDate)}`}
+                    description="Elegí una caja para ver su estado y el trabajo que necesita atención."
                 />
 
                 {setup && <SetupChecklist steps={setup} />}
 
-                <GlobalSearch disabled={!can.verExpedientes} />
-
-                {can.verCaja && (
+                <HomeSearch>
                     <Deferred
-                        data="cashDay"
-                        fallback={<CashDaySkeleton />}
+                        data="queues"
+                        fallback={<CashBoxesSkeleton />}
                         rescue={
-                            <BlockUnavailable what="el estado de la caja" />
+                            <BlockUnavailable what="el estado de las cajas" />
                         }
                     >
-                        {cashDay ? <CashDayCard day={cashDay} /> : <></>}
+                        <div className="grid gap-5 lg:grid-cols-2">
+                            {can.verHaberes && (
+                                <CashBoxEntry
+                                    name="Haberes"
+                                    description="Expedientes, pagos y caja diaria"
+                                    href="/haberes/inicio"
+                                    icon={FileText}
+                                    queues={(queues ?? []).filter(
+                                        (queue) =>
+                                            !queue.key.startsWith('multas_'),
+                                    )}
+                                />
+                            )}
+                            {can.verMultas && (
+                                <CashBoxEntry
+                                    name="Multas"
+                                    description="Cobros, depósitos y caja diaria"
+                                    href="/multas/inicio"
+                                    icon={Gavel}
+                                    queues={(queues ?? []).filter((queue) =>
+                                        queue.key.startsWith('multas_'),
+                                    )}
+                                />
+                            )}
+                        </div>
                     </Deferred>
-                )}
-
-                {can.verColas && (
-                    <section aria-labelledby="colas">
-                        <div className="mb-4 max-w-2xl">
-                            <h2
-                                id="colas"
-                                className="text-xs font-semibold tracking-wide text-primary uppercase"
-                            >
-                                Trabajo del circuito
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Primero los bloqueos; después, lo que se puede
-                                resolver y lo que sigue su curso.
-                            </p>
-                        </div>
-                        <Deferred
-                            data="queues"
-                            fallback={<QueueGridSkeleton />}
-                            rescue={
-                                <BlockUnavailable what="las colas de trabajo" />
-                            }
-                        >
-                            <QueueGroups queues={queues ?? []} />
-                        </Deferred>
-                    </section>
-                )}
-
-                <section aria-labelledby="acciones">
-                    <h2
-                        id="acciones"
-                        className="mb-2 text-xs font-semibold tracking-wide text-primary uppercase"
-                    >
-                        Empezar algo
-                    </h2>
-                    <QuickActions can={can} />
-                </section>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {can.verMovimientos && (
-                        <section
-                            aria-labelledby="movimientos"
-                            className="overflow-hidden rounded-lg border bg-card shadow-raised"
-                        >
-                            <div className="flex items-center gap-2 border-b px-5 py-4">
-                                <h2
-                                    id="movimientos"
-                                    className="text-sm font-semibold"
-                                >
-                                    Movimientos registrados recientemente
-                                </h2>
-                                <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
-                                    fecha de carga y fecha operativa
-                                </span>
-                            </div>
-                            <Deferred
-                                data="movements"
-                                fallback={<ListSkeleton rows={5} />}
-                                rescue={
-                                    <BlockUnavailable what="los movimientos" />
-                                }
-                            >
-                                <RecentMovements movements={movements ?? []} />
-                            </Deferred>
-                        </section>
-                    )}
-
-                    <section
-                        aria-labelledby="accesos"
-                        className="overflow-hidden rounded-lg border bg-card shadow-raised"
-                    >
-                        <div className="flex items-center gap-2 border-b px-5 py-4">
-                            <h2 id="accesos" className="text-sm font-semibold">
-                                Tu actividad reciente
-                            </h2>
-                            <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
-                                últimos 5 accesos de tu cuenta
-                            </span>
-                        </div>
-                        <RecentAccessList events={recentAccess} />
-                    </section>
-                </div>
-
-                {can.verVolumen && (
-                    <section aria-labelledby="cajas">
-                        <h2
-                            id="cajas"
-                            className="mb-2 text-xs font-semibold tracking-wide text-primary uppercase"
-                        >
-                            Volumen por caja
-                        </h2>
-                        <Deferred
-                            data="cashBoxes"
-                            fallback={<CashBoxSummarySkeleton />}
-                            rescue={
-                                <BlockUnavailable what="el volumen por caja" />
-                            }
-                        >
-                            <CashBoxSummary boxes={cashBoxes ?? []} />
-                        </Deferred>
-                    </section>
-                )}
+                </HomeSearch>
             </div>
         </>
     );
 }
 
-type WorkQueue = App.Modules.Shared.Data.WorkQueueData;
-
-/**
- * Los grupos, y qué cola va en cada uno.
- *
- * Es una lista blanca: una cola que el servidor calcula y que no figura
- * acá **no se dibuja, y nada avisa**. Pasó con dos.
- * `test_toda_cola_del_tablero_tiene_donde_dibujarse` lo vigila.
- */
-const GRUPOS_DE_COLAS = [
-    {
-        title: 'Bloqueos',
-        description: 'Falta un dato o una condición para poder continuar.',
-        keys: ['beneficiarios_sin_cbu', 'multas_rechazos'],
-    },
-    {
-        title: 'Para resolver',
-        description: 'Casos que ya admiten una acción del área.',
-        keys: [
-            'fondos_sin_identificar',
-            'cuotas_sin_orden',
-            'egresos_por_validar',
-            'caja_sin_cerrar',
-            'caja_mes_sin_cerrar',
-            'multas_caja_sin_cerrar',
-            'multas_caja_mes_sin_cerrar',
-            'multas_pagos_informados',
-            'multas_creditos_sin_identificar',
-            'multas_por_depositar',
-        ],
-    },
-    {
-        title: 'En seguimiento',
-        description: 'Casos que avanzaron y esperan una respuesta externa.',
-        /*
-         * El comprobante espera al extracto, no a alguien del área: hasta
-         * que el crédito no aparece no hay nada que cruzar. Por eso va acá
-         * y no en «Para resolver», al revés que los fondos sin identificar,
-         * que ya están en la cuenta esperando dueño.
-         */
-        keys: [
-            'ordenes_en_saf',
-            'comprobantes_sin_cruzar',
-            'multas_en_transito',
-        ],
-    },
-] as const;
-
-function QueueGroups({ queues }: { queues: WorkQueue[] }) {
-    if (queues.length === 0) {
-        return (
-            <p className="rounded-lg border border-dashed bg-muted/40 px-5 py-8 text-center text-sm text-muted-foreground">
-                No tenés colas de trabajo habilitadas para tus permisos.
-            </p>
-        );
-    }
+function CashBoxEntry({
+    name,
+    description,
+    href,
+    icon: Icon,
+    queues,
+}: {
+    name: string;
+    description: string;
+    href: string;
+    icon: LucideIcon;
+    queues: WorkQueue[];
+}) {
+    const pending = queues.filter(
+        (queue) => queue.count !== null && queue.count > 0,
+    );
 
     return (
-        <div className="space-y-6">
-            {GRUPOS_DE_COLAS.map((group) => {
-                const items = queues.filter((queue) =>
-                    group.keys.some((key) => key === queue.key),
-                );
+        <Link
+            href={href}
+            prefetch
+            className="group flex min-h-64 flex-col rounded-lg border bg-card p-6 shadow-raised transition-[border-color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transform-none"
+        >
+            <div className="flex items-start gap-4">
+                <span
+                    className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
+                    aria-hidden="true"
+                >
+                    <Icon className="size-5" />
+                </span>
+                <div className="min-w-0">
+                    <h2 className="text-xl font-semibold tracking-tight">
+                        {name}
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {description}
+                    </p>
+                </div>
+                <ArrowRight
+                    className="ml-auto size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1"
+                    aria-hidden="true"
+                />
+            </div>
 
-                if (items.length === 0) {
-                    return null;
-                }
-
-                return (
-                    <section
-                        key={group.title}
-                        aria-labelledby={`grupo-${group.keys[0]}`}
-                    >
-                        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <h3
-                                id={`grupo-${group.keys[0]}`}
-                                className="text-sm font-semibold"
+            <div className="mt-7 flex flex-1 flex-col gap-3 border-t pt-5">
+                <p className="text-sm font-medium">
+                    {pending.length === 0
+                        ? 'Sin tareas pendientes'
+                        : pending.length === 1
+                          ? '1 frente requiere atención'
+                          : `${pending.length} frentes requieren atención`}
+                </p>
+                {pending.length > 0 && (
+                    <ul className="flex flex-col gap-2">
+                        {pending.slice(0, 3).map((queue) => (
+                            <li
+                                key={queue.key}
+                                className="flex items-baseline gap-3 text-sm text-muted-foreground"
                             >
-                                {group.title}
-                            </h3>
-                            <p className="text-xs text-muted-foreground">
-                                {group.description}
-                            </p>
+                                <span className="min-w-6 font-semibold text-foreground tabular-nums">
+                                    {queue.count}
+                                </span>
+                                <span className="line-clamp-1">
+                                    {queue.title}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
+            <span className="mt-5 text-sm font-semibold text-primary">
+                Ver inicio de {name}
+            </span>
+        </Link>
+    );
+}
+
+function CashBoxesSkeleton() {
+    return (
+        <div
+            className="grid gap-5 lg:grid-cols-2"
+            role="status"
+            aria-label="Cargando cajas"
+        >
+            {[0, 1].map((item) => (
+                <div
+                    key={item}
+                    className="min-h-64 rounded-lg border bg-card p-6"
+                >
+                    <div className="flex gap-4">
+                        <Skeleton className="size-10 rounded-md" />
+                        <div className="flex-1">
+                            <Skeleton className="h-6 w-28" />
+                            <Skeleton className="mt-2 h-4 w-56" />
                         </div>
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                            {items.map((queue) => (
-                                <QueueCard key={queue.key} queue={queue} />
-                            ))}
-                        </div>
-                    </section>
-                );
-            })}
+                    </div>
+                    <div className="mt-7 border-t pt-5">
+                        <Skeleton className="h-4 w-44" />
+                        <Skeleton className="mt-4 h-4 w-64" />
+                        <Skeleton className="mt-3 h-4 w-52" />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

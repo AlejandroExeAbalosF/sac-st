@@ -110,10 +110,9 @@ function ItemSimple({ item, activo }: { item: NavItem; activo: Activo }) {
 /**
  * Un ítem que agrupa a sus hermanas.
  *
- * El título es el disparador del acordeón y no un enlace: la primera
- * sub-pantalla —«Expedientes» en Haberes— es la que lleva a donde iría el
- * título, así que hacerlo también navegar duplicaría el destino y volvería
- * ambiguo qué hace un clic. Arranca abierto si alguna hija está activa, para
+ * Cuando el módulo tiene un inicio propio, el título navega a él y la flecha
+ * queda como control separado del acordeón. Los grupos sin portada conservan
+ * todo el renglón como disparador. Arranca abierto si alguna hija está activa, para
  * que no haya que desplegarlo cada vez que se entra a una de ellas, o si el
  * usuario lo dejó abierto antes de recargar (ver `sidebar-state`). La hija
  * activa gana sobre lo guardado: nunca se pierde de vista dónde se está.
@@ -125,13 +124,17 @@ function ItemSimple({ item, activo }: { item: NavItem; activo: Activo }) {
  */
 function ItemConHijos({ item }: { item: NavItem }) {
     const hijos = item.children ?? [];
-    const { currentUrl } = useCurrentUrl();
+    const { currentUrl, isCurrentUrl } = useCurrentUrl();
     const { component, props } = usePage();
     const activa = activeChild(hijos, currentUrl, component);
     const algunaActiva = activa !== undefined;
+    const inicioActivo = item.href ? isCurrentUrl(item.href) : false;
     const { sidebarSections } = props;
     const [abierto, setAbierto] = useState(
-        () => algunaActiva || sidebarSections.includes(item.title),
+        () =>
+            algunaActiva ||
+            inicioActivo ||
+            sidebarSections.includes(item.title),
     );
 
     const alternar = (open: boolean) => {
@@ -147,16 +150,41 @@ function ItemConHijos({ item }: { item: NavItem }) {
             className="group/collapsible"
         >
             <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                    <SidebarMenuButton
-                        tooltip={{ children: item.title }}
-                        isActive={algunaActiva}
-                    >
-                        {item.icon && <item.icon />}
-                        <span>{item.title}</span>
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                </CollapsibleTrigger>
+                {item.href ? (
+                    <div className="flex items-center gap-0.5">
+                        <SidebarMenuButton
+                            asChild
+                            tooltip={{ children: item.title }}
+                            isActive={algunaActiva || inicioActivo}
+                            className="min-w-0 flex-1"
+                        >
+                            <Link href={item.href} prefetch>
+                                {item.icon && <item.icon />}
+                                <span>{item.title}</span>
+                            </Link>
+                        </SidebarMenuButton>
+                        <CollapsibleTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label={`${abierto ? 'Contraer' : 'Desplegar'} ${item.title}`}
+                                className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground transition-colors group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+                            >
+                                <ChevronRight className="size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            </button>
+                        </CollapsibleTrigger>
+                    </div>
+                ) : (
+                    <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                            tooltip={{ children: item.title }}
+                            isActive={algunaActiva}
+                        >
+                            {item.icon && <item.icon />}
+                            <span>{item.title}</span>
+                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                )}
 
                 <CollapsibleContent>
                     <SidebarMenuSub>
