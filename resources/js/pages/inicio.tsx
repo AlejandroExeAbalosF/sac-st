@@ -59,7 +59,6 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
                             {can.verHaberes && (
                                 <CashBoxEntry
                                     name="Haberes"
-                                    description="Expedientes, pagos y caja diaria"
                                     href="/haberes/inicio"
                                     icon={FileText}
                                     createHref={
@@ -78,7 +77,6 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
                             {can.verMultas && (
                                 <CashBoxEntry
                                     name="Multas"
-                                    description="Cobros, depósitos y caja diaria"
                                     href="/multas/inicio"
                                     icon={Gavel}
                                     createHref={
@@ -133,7 +131,6 @@ export default function Inicio({ operationalDate, can, setup, queues }: Props) {
 
 function CashBoxEntry({
     name,
-    description,
     href,
     icon: Icon,
     queues,
@@ -142,7 +139,6 @@ function CashBoxEntry({
     createHint,
 }: {
     name: string;
-    description: string;
     href: string;
     icon: LucideIcon;
     queues: WorkQueue[];
@@ -155,75 +151,79 @@ function CashBoxEntry({
     );
 
     return (
-        <section className="flex min-h-64 flex-col rounded-lg border bg-card p-6 shadow-raised">
-            <div className="flex items-start gap-4">
-                <span
-                    className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
-                    aria-hidden="true"
+        <div className="flex flex-col gap-4">
+            {createHref && (
+                <Link
+                    href={createHref}
+                    className="group flex min-h-48 items-center justify-between gap-4 overflow-hidden rounded-xl bg-primary p-6 text-primary-foreground shadow-raised transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none motion-reduce:transform-none sm:p-8"
                 >
-                    <Icon className="size-5" />
-                </span>
-                <div className="min-w-0">
-                    <h2 className="text-xl font-semibold tracking-tight">
-                        {name}
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {description}
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Nueva carga</p>
+                        <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+                            {name}
+                        </h2>
+                        <p className="mt-2 max-w-64 text-sm leading-relaxed">
+                            {createHint}
+                        </p>
+                        <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold">
+                            {createLabel}
+                            <ArrowRight
+                                className="size-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none"
+                                aria-hidden="true"
+                            />
+                        </span>
+                    </div>
+                    <span className="relative shrink-0" aria-hidden="true">
+                        <Icon className="size-16 stroke-1 sm:size-24" />
+                        <span className="absolute -right-2 -bottom-2 flex size-8 items-center justify-center rounded-full bg-primary-foreground text-primary sm:size-10">
+                            <Plus className="size-5" />
+                        </span>
+                    </span>
+                </Link>
+            )}
+            <section
+                aria-label={`Pendientes de ${name}`}
+                className="flex flex-1 flex-col rounded-lg border bg-card p-6 shadow-raised"
+            >
+                <div className="flex flex-1 flex-col gap-3">
+                    <p className="text-sm font-medium">
+                        {pending.length === 0
+                            ? 'Sin tareas pendientes'
+                            : pending.length === 1
+                              ? '1 frente requiere atención'
+                              : `${pending.length} frentes requieren atención`}
                     </p>
+                    {pending.length > 0 && (
+                        <ul className="flex flex-col gap-2">
+                            {pending.slice(0, 3).map((queue) => (
+                                <li
+                                    key={queue.key}
+                                    className="flex items-baseline gap-3 text-sm text-muted-foreground"
+                                >
+                                    <span className="min-w-6 font-semibold text-foreground tabular-nums">
+                                        {queue.count}
+                                    </span>
+                                    <span className="line-clamp-1">
+                                        {queue.title}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
-            </div>
 
-            <div className="mt-7 flex flex-1 flex-col gap-3 border-t pt-5">
-                <p className="text-sm font-medium">
-                    {pending.length === 0
-                        ? 'Sin tareas pendientes'
-                        : pending.length === 1
-                          ? '1 frente requiere atención'
-                          : `${pending.length} frentes requieren atención`}
-                </p>
-                {pending.length > 0 && (
-                    <ul className="flex flex-col gap-2">
-                        {pending.slice(0, 3).map((queue) => (
-                            <li
-                                key={queue.key}
-                                className="flex items-baseline gap-3 text-sm text-muted-foreground"
-                            >
-                                <span className="min-w-6 font-semibold text-foreground tabular-nums">
-                                    {queue.count}
-                                </span>
-                                <span className="line-clamp-1">
-                                    {queue.title}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            <div className="mt-6 border-t pt-5">
-                <div className="flex flex-wrap items-center gap-3">
-                    {createHref && (
-                        <Button asChild>
-                            <Link href={createHref}>
-                                <Plus aria-hidden="true" />
-                                {createLabel}
+                <div className="mt-6 border-t pt-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Button asChild variant="ghost">
+                            <Link href={href} prefetch>
+                                Ver inicio de {name}
+                                <ArrowRight aria-hidden="true" />
                             </Link>
                         </Button>
-                    )}
-                    <Button asChild variant="ghost">
-                        <Link href={href} prefetch>
-                            Ver inicio de {name}
-                            <ArrowRight aria-hidden="true" />
-                        </Link>
-                    </Button>
+                    </div>
                 </div>
-                {createHref && (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                        {createHint}
-                    </p>
-                )}
-            </div>
-        </section>
+            </section>
+        </div>
     );
 }
 
