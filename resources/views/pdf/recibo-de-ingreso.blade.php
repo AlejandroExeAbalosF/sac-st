@@ -57,7 +57,12 @@
         }
 
         .hoja { position: relative; width: 210mm; height: 148mm; }
-        .marco { position: absolute; inset: 7mm; border: 0.35mm solid #111; }
+        .marco {
+            position: absolute;
+            inset: 7mm;
+            border: 0.35mm solid #111;
+            border-radius: 2mm;
+        }
 
         .campo { position: absolute; }
         .rotulo { font-size: 8pt; }
@@ -180,8 +185,6 @@
 
         <div class="campo rotulo" style="left: 11mm; top: 124mm;">Obs:</div>
         <div class="campo linea" style="left: 22mm; top: 129mm; width: 68mm;"></div>
-
-        <div class="campo" style="left: 5mm; top: 128mm; font-size: 6pt; color: #555;">F.010</div>
 
         <div class="campo pie-firma" style="left: 118mm; top: 135mm; width: 76mm;">
             <div style="border-top: 0.3mm solid #111; padding-top: 0.6mm;">Firma y Aclaración</div>

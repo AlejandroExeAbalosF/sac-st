@@ -231,6 +231,8 @@ class PantallaDelReciboTest extends TestCase
         $previa->assertOk();
         $previa->assertSee(Decimal::format($cuota->importeEsperado()));
         $previa->assertDontSee('$ 0,00');
+        $previa->assertDontSee('F.010');
+        $previa->assertSee('border-radius: 2mm', false);
     }
 
     /**
