@@ -620,8 +620,10 @@ cada cobro de caja dónde está la plata.
 - **Depositar** (permiso `multas.depositar`): una pantalla para transcribir el
   ticket del cajero —fecha, hora, operación, terminal— con la **foto obligatoria**
   al lado, como en Haberes. El importe no se escribe: es el cobro entero. La
-  cuenta no se elige: es la del libro de la caja. La fecha no puede ser futura ni
-  anterior al cobro. El cheque sale de custodia; el efectivo, de la caja; los dos
+  cuenta es una de las [cuentas de la caja](#cuentas-de-la-caja) vigentes en la
+  fecha del depósito: con una sola no se elige; con varias, viene la
+  predeterminada y se puede cambiar. La fecha no puede ser futura ni anterior al
+  cobro. El cheque sale de custodia; el efectivo, de la caja; los dos
   quedan en tránsito.
 - **Acreditar** (`multas.verificar-pagos`): se busca el crédito del extracto, como
   en Haberes, y se confirma. Tiene que ser un **crédito entero y sin otro uso**: el
