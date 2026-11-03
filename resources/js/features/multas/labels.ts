@@ -58,6 +58,7 @@ export const DEBT_STATUS: Record<
     partial: { label: 'Con pagos parciales', tone: 'progress' },
     cancelled: { label: 'Cancelada', tone: 'done' },
     without_effect: { label: 'Sin efecto', tone: 'neutral' },
+    in_appeal: { label: 'En recurso', tone: 'progress' },
 };
 
 export const HISTORICAL_KIND: Record<HistoricalKind, string> = {
@@ -94,6 +95,17 @@ export const PAYMENT_STATUS: Record<
 export const APPEAL_KIND: Record<AppealKind, string> = {
     hierarchical: 'Recurso jerárquico',
     appeal: 'Apelación',
+};
+
+/** El trámite del recurso: en trámite congela la multa hasta el veredicto. */
+export const APPEAL_STATUS: Record<
+    App.Modules.Multas.Enums.FineAppealStatus,
+    string
+> = {
+    open: 'En trámite',
+    upheld: 'Prosperó',
+    rejected: 'No prosperó',
+    dropped: 'Cayó',
 };
 
 /** Si se presentó antes o después del cierre del mes de la multa (M08). */

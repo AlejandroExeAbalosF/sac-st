@@ -507,14 +507,13 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
 
     /**
      * La corrección de un recurso es otro depósito con la misma presentación:
-     * no se convierte en un cobro en efectivo ni trae otra fecha. Y no pide
-     * saldo: otro pago pudo haber cancelado la multa.
+     * no se convierte en un cobro en efectivo ni trae otra fecha, y el trámite
+     * sigue siendo el mismo.
      */
     public function test_an_appeal_correction_stays_a_deposit_with_its_presentation(): void
     {
         $multa = $this->escenario();
         $anterior = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '28000.00');
-        app(CollectFinePayment::class)->handle($multa, FinePaymentMedium::Cash, '1400000.00', (string) Str::uuid(), $this->quienAbre());
         $correccion = fn (string $medio): array => [
             ...$this->recurso($medio, '280000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'El recibo externo dice 280.000',
         ];
@@ -532,17 +531,17 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
 
         expect($corregido->status)->toBe(FinePaymentStatus::Reported)
             ->and($corregido->presented_at?->format('Y-m-d H:i:s.u'))->toBe($anterior->presented_at?->format('Y-m-d H:i:s.u'))
-            ->and($this->saldo($multa, 'debt'))->toBe('0.00');
+            ->and($corregido->fine_appeal_id)->toBe($anterior->fine_appeal_id);
     }
 
-    /** La base: dos recursos vigentes de la misma multa no entran. */
+    /** La base: dos pagos vigentes del mismo recurso no entran. */
     public function test_the_database_keeps_a_single_appeal_per_fine(): void
     {
         $multa = $this->escenario();
-        $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '280000.00');
+        $recurso = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '280000.00')->fine_appeal_id;
 
         $this->rechaza('fine_payments_one_appeal_per_fine', fn () => DB::table('fine_payments')->insert(
-            $this->filaDeRecurso($multa, base: '1400000.00', exigido: '280000.00'),
+            [...$this->filaDeRecurso($multa, base: '1400000.00', exigido: '280000.00'), 'fine_appeal_id' => $recurso],
         ));
     }
 

@@ -13,6 +13,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Multas\Models\FineDocument;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
@@ -52,6 +53,7 @@ final class AdjustFineDebt
         private readonly AttachFineDocument $registrarDocumento,
         private readonly ReconcileFineExcess $reclasificar,
         private readonly RecordAuditEvent $auditar,
+        private readonly FineAppeals $recursos,
     ) {}
 
     public function handle(
@@ -72,6 +74,7 @@ final class AdjustFineDebt
         return DB::transaction(function () use ($multa, $nueva, $expectedObligation, $effectiveOn, $documento, $reason, $actorId): FineDebtEntry {
             // Dos ajustes simultáneos no leen la misma obligación.
             Fine::query()->whereKey($multa->id)->lockForUpdate()->first();
+            $this->recursos->assertAmountEditable($multa, 'newAmount');
 
             $multa->loadMissing('fineCase');
 

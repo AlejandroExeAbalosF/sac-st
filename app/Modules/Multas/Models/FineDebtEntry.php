@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property FineReasonCode|null $reason_code
  * @property string|null $reason
  * @property int|null $reversal_of_id
+ * @property int|null $fine_appeal_id El recurso que prosperó, en la reducción de su veredicto.
  * @property FineProvenance $provenance
  * @property int|null $created_by
  * @property Carbon|null $created_at
@@ -53,6 +54,7 @@ final class FineDebtEntry extends Model
         'reason_code',
         'reason',
         'reversal_of_id',
+        'fine_appeal_id',
         'provenance',
         'created_by',
     ];
@@ -79,7 +81,8 @@ final class FineDebtEntry extends Model
     public function isAmountCorrection(): bool
     {
         return in_array($this->kind, [FineDebtEntryKind::Increase, FineDebtEntryKind::Reduction], true)
-            && $this->fine_document_id === null;
+            && $this->fine_document_id === null
+            && $this->fine_appeal_id === null;
     }
 
     /**

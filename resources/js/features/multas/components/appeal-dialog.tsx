@@ -38,8 +38,8 @@ type Pago = App.Modules.Multas.Data.FinePaymentData;
  * Se cobra lo que dice el recibo externo que trae el sancionado: la
  * liquidación la hace otra oficina. El sistema muestra el 20 % que calcula
  * sobre el importe vigente, sin centavos, como referencia; si difieren, se
- * cobra igual y la diferencia queda a la vista. Una multa admite un solo
- * recurso.
+ * cobra igual y la diferencia queda a la vista. El recurso es el primer
+ * pago de la multa, y registrarlo la congela hasta el veredicto.
  *
  * En efectivo se cobra en el acto; por depósito directo queda informado, y su
  * presentación —con respaldo, si fue un día anterior— decide el término (M08).
@@ -122,6 +122,8 @@ export default function AppealDialog({
                     Se cobra el importe del recibo externo. Como referencia, el
                     20 % de {money(base)}, sin centavos, es{' '}
                     <strong>{money(required)}</strong>.
+                    {!corrige &&
+                        ' Hasta resolverlo, la multa no admite otros pagos ni cambios de importe.'}
                 </>
             }
             onClose={onClose}

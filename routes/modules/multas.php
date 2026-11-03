@@ -151,6 +151,8 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         // La vista previa va antes del cobro y con el mismo permiso: es el anticipo del recibo.
         Route::get('{fine}/cobros/previsualizar', [FinePaymentController::class, 'preview'])->whereNumber('fine')->name('cobros.preview');
         Route::post('{fine}/cobros', [FinePaymentController::class, 'store'])->whereNumber('fine')->name('cobros.store');
+        // El veredicto del recurso lo da quien cobra.
+        Route::post('{fine}/recursos/resolver', [FineAppealController::class, 'resolve'])->whereNumber('fine')->name('recursos.resolve');
     });
 
     /*

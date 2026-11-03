@@ -97,16 +97,17 @@ Dos lecturas del mismo material, como el listado de Haberes: la pestaña
 
 Busca por lo que trae quien viene a pagar: número de expediente («169607/24»
 encuentra «169607/2024-0»), de resolución, de acta, o la carátula. Filtra por
-deuda (con o sin) y por año de registro.
+deuda (con, sin o en recurso) y por año de registro.
 
 - **Multas**: una fila por multa, con el importe vigente, el saldo y la situación:
-  pendiente, con pagos parciales, cancelada o sin efecto, y si tiene excedente.
+  pendiente, con pagos parciales, cancelada, sin efecto o en recurso, y si tiene
+  excedente.
 - **Expedientes**: una fila por expediente, con las carátulas de sus multas,
   cuántas tiene y cuántas deben, el importe vigente y el saldo sumados —uno por
   moneda: pesos y dólares no se suman en una cifra— y si debe o no. Un expediente
   aparece si **alguna** de sus multas coincide con la búsqueda o se registró en el
   año pedido; en cambio, «sin deuda» quiere decir que **ninguna** de sus multas
-  debe.
+  debe, y «en recurso», que alguna tiene su recurso en trámite.
 
 **Exportar a Excel**, solo en la pestaña Multas, baja lo que está filtrado,
 entero y sin paginar: una fila por multa con expediente, carátula, persona, documentos de origen, fecha de registro,
@@ -749,9 +750,36 @@ multa y en la auditoría.
   queda informado y se verifica como cualquier pago por banco. El depósito puede
   haberse presentado antes de cargarlo: se indica el día y su respaldo, y eso
   decide el término.
-- **Una multa admite un solo recurso.** Con uno registrado, la ficha no ofrece otro y
-  el sistema lo rechaza. Un intento descartado no cuenta.
+- **El recurso es el primer pago de la multa** (decisión del área, 03/11/2026): se
+  ofrece solo si la multa tiene deuda y ningún pago ni antecedente, y no tiene otro
+  recurso. Un intento descartado no cuenta.
 - Un depósito de recurso mal cargado se **corrige** como cualquier informado.
+
+**El trámite.** Registrar el recurso deja la multa **«En recurso»** hasta el
+veredicto, aunque el depósito todavía no esté verificado:
+
+- **Se congela lo económico:** no admite otro cobro, pago por banco ni pago
+  anterior, ni ajustes, correcciones o reversiones del importe.
+- **Sigue lo demás:** el depósito del recurso se verifica, se corrige o se
+  descarta; el efectivo se deposita y se acredita; se vinculan documentos —también
+  una resolución que llegue— y se adjuntan archivos.
+- **Cae** si se descarta su depósito informado mientras está en trámite: la multa se
+  descongela y admite otro recurso.
+
+**Resolver recurso** (`multas.cobrar`, sin resolución obligatoria):
+
+| Veredicto | Qué pasa con la multa |
+|---|---|
+| **Prosperó** | Queda **Cancelada** con lo cobrado según el recibo externo, no con el 20 % calculado. Si eso es menos que el importe, una reducción citando el recurso lo lleva a lo cobrado; si alcanza o sobra, no hay reducción y el excedente queda a la vista. Exige el 20 % cobrado o verificado. Nada se devuelve y el importe ya no se modifica. |
+| **No prosperó** | Se descongela: lo pagado queda a cuenta y el resto se cobra por cualquier medio. Si después se descarta su depósito informado, el veredicto se conserva y no hay otro recurso. |
+
+El veredicto se elige a propósito —no viene marcado— y no se deshace desde la
+pantalla; si el recurso o su pago cambiaron mientras estaba abierto el diálogo, se
+rechaza y hay que revisar la multa. El depósito de un recurso ya resuelto no se
+corrige: solo se descarta. Quedan **pendientes, sin relevar**:
+anular un recurso cobrado en efectivo (P13), revertir un veredicto y vincular el
+recurso con la resolución que lo resuelve. El listado de multas filtra «En
+recurso».
 
 En la ficha, «Comprobante» se ofrece solo para pagos bancarios. Los cobros
 ordinarios en efectivo o cheque ya se respaldan con el recibo del sistema, y el
@@ -800,7 +828,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.ajustar` | Ajustar y revertir; desvincular documentos; corregir datos ya cargados; validar o descartar pagos anteriores | administrador, contador |
 | `multas.reemplazar-origen` | Reemplazar la resolución de origen cargada por error | administrador |
 | `multas.corregir-importe` | Corregir un importe mal cargado sin resolución, y revertir esa corrección | administrador |
-| `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso | administrador, administrativo |
+| `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso y resolverlo | administrador, administrativo |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver los pagos informados en los pendientes; identificar un crédito desde Banco › Movimientos; acreditar o cancelar un depósito de la caja | administrador, contador |

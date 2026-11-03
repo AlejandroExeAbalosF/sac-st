@@ -24,7 +24,7 @@ final class FineIndexRequest extends FormRequest
     {
         return [
             'q' => ['nullable', 'string', 'max:120'],
-            'estado' => ['nullable', 'in:con-deuda,sin-deuda'],
+            'estado' => ['nullable', 'in:con-deuda,sin-deuda,en-recurso'],
             'anio' => ['nullable', 'integer', 'between:1990,2100'],
             'page' => ['nullable', 'integer', 'min:1'],
             'vista' => ['nullable', 'in:expedientes,multas'],

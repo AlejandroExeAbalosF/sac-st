@@ -11,6 +11,7 @@ use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -37,6 +38,7 @@ final class ReportFineBankPayment
     public function __construct(
         private readonly DiscardFinePayment $descartar,
         private readonly RecordAuditEvent $auditar,
+        private readonly FineAppeals $recursos,
     ) {}
 
     /**
@@ -78,6 +80,7 @@ final class ReportFineBankPayment
             }
 
             $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
+            $this->recursos->assertNotFrozen($multa, 'amount');
 
             if ($replaces !== null) {
                 if ($replaces->fine_id !== $multa->id || $replaces->appeal_kind !== null) {

@@ -238,6 +238,16 @@ final class Fine extends Model
     }
 
     /**
+     * Los trámites del recurso: a lo sumo uno que no cayó.
+     *
+     * @return HasMany<FineAppeal, $this>
+     */
+    public function appeals(): HasMany
+    {
+        return $this->hasMany(FineAppeal::class);
+    }
+
+    /**
      * @return HasMany<FineIdentifierRevision, $this>
      */
     public function revisions(): HasMany

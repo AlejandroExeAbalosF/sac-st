@@ -54,7 +54,7 @@ final class FineBalanceData extends Data
             historicalPaid: $saldo->historical_paid,
             debt: $saldo->debt,
             excess: $saldo->excess,
-            status: FineDebtStatus::of($saldo->obligation, $saldo->debt),
+            status: FineDebtStatus::of($saldo->obligation, $saldo->debt, $saldo->appeal_status),
             pendingRegularization: $saldo->pending_regularization,
         );
     }

@@ -27,6 +27,7 @@ use App\Modules\Multas\Models\FineCase;
 use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseListQuery;
@@ -217,7 +218,7 @@ final class FineController extends Controller
      * El expediente va en la firma aunque no se use: la ruta lo trae antes que
      * la multa, y es el que acota la búsqueda de la multa por su número.
      */
-    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos): Response
+    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos, FineAppeals $recursos): Response
     {
         $fine->load([
             'fineCase',
@@ -243,6 +244,10 @@ final class FineController extends Controller
         $verifica = $usuario?->can('multas.verificar-pagos') ?? false;
         $emiteRecibos = $cobra || $verifica;
         $cajaAbierta = $this->cajaAbierta($fine);
+        $recurso = $recursos->current($fine);
+        $pagoDelRecurso = $recurso === null ? null : $fine->payments->first(
+            fn (FinePayment $pago): bool => $pago->fine_appeal_id === $recurso->id && $pago->status !== FinePaymentStatus::Discarded,
+        );
 
         return Inertia::render('multas/show', [
             'multa' => FineDetailData::fromModel(
@@ -272,16 +277,22 @@ final class FineController extends Controller
             'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),
             /*
              * El 20 % para recurrir, calculado sobre el importe vigente de hoy
-             * (M07). Es el anticipo de la pantalla: el que vale lo calcula el
-             * Action, con la multa bloqueada.
+             * (M07), y el trámite. Es el anticipo de la pantalla: lo que vale
+             * lo decide el Action, con la multa bloqueada.
              */
             'recurso' => [
                 'base' => $fine->balance->obligation ?? '0.00',
                 'required' => AppealAmount::required($fine->balance->obligation ?? '0'),
-                // Una multa admite un solo recurso: con uno vigente no se ofrece otro.
-                'registered' => $fine->payments->contains(
-                    fn (FinePayment $pago): bool => $pago->appeal_kind !== null && $pago->status !== FinePaymentStatus::Discarded,
-                ),
+                // El recurso es el primer pago: con deuda, sin pagos ni otro recurso que no haya caído.
+                'allowed' => $recurso === null
+                    && ! Decimal::equals($fine->balance->debt ?? '0', '0')
+                    && ! $recursos->hasPayments($fine),
+                // El recurso y el pago que se ven: el veredicto se da sobre estos.
+                'id' => $recurso?->id,
+                'paymentId' => $pagoDelRecurso?->id,
+                'status' => $recurso?->status,
+                'paidAmount' => $pagoDelRecurso?->amount,
+                'paymentApplied' => $pagoDelRecurso?->status === FinePaymentStatus::Applied,
             ],
             /*
              * Quienes pueden firmar el recibo, con su cargo, como en Haberes.
@@ -309,6 +320,7 @@ final class FineController extends Controller
                 // El rechazo y lo que trae el extracto, de quien concilia; el reemplazo, de la caja.
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
                 'replaceCheque' => $cobra,
+                'resolveAppeal' => $cobra,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 // Corregir el importe sin resolución, y revertir esa corrección.
                 'correctAmount' => $usuario?->can('multas.corregir-importe') ?? false,

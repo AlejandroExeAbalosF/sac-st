@@ -201,6 +201,20 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['tipo' => 'Recurso', 'medio' => 'Medio', 'base' => 'Base', 'exigido' => '20 % calculado', 'externo' => 'Recibo externo', 'importe' => 'Importe del recibo externo', 'recibo' => 'Recibo', 'corrige' => 'Corrección'],
             ),
             new AuditActionDefinition(
+                'multa.recurso-resuelto',
+                'Se resolvió el recurso de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['veredicto' => 'Veredicto', 'cobrado' => 'Cobrado', 'reduccion' => 'Reducción de la obligación'],
+            ),
+            new AuditActionDefinition(
+                'multa.recurso-caido',
+                'Cayó el recurso de la multa al descartarse su depósito',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['amount' => 'Importe', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.comprobante-de-pago-agregado',
                 'Se adjuntó el comprobante de un pago de la multa',
                 'Multas',

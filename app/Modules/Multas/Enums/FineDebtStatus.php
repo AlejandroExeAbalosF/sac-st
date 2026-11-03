@@ -13,6 +13,9 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
  * No se guarda en ninguna columna: sale de la obligación y lo pagado cada
  * vez que se mira. El excedente no es un estado sino un dato aparte —una
  * multa cancelada puede tenerlo o no—, y la pantalla lo muestra al lado.
+ *
+ * Un recurso en trámite le gana al saldo: la multa está congelada hasta el
+ * veredicto, deba lo que deba.
  */
 #[TypeScript]
 enum FineDebtStatus: string
@@ -21,9 +24,14 @@ enum FineDebtStatus: string
     case Partial = 'partial';
     case Cancelled = 'cancelled';
     case WithoutEffect = 'without_effect';
+    case InAppeal = 'in_appeal';
 
-    public static function of(string $obligation, string $debt): self
+    public static function of(string $obligation, string $debt, ?FineAppealStatus $appeal = null): self
     {
+        if ($appeal === FineAppealStatus::Open) {
+            return self::InAppeal;
+        }
+
         if (Decimal::equals($obligation, '0')) {
             return self::WithoutEffect;
         }
@@ -42,6 +50,7 @@ enum FineDebtStatus: string
             self::Partial => 'Con pagos parciales',
             self::Cancelled => 'Cancelada',
             self::WithoutEffect => 'Sin efecto',
+            self::InAppeal => 'En recurso',
         };
     }
 }

@@ -1059,6 +1059,7 @@ declare namespace App {
                     effectivePrecision: App.Modules.Multas.Enums.DatePrecision;
                     documentLabel: string | null;
                     isCorrection: boolean;
+                    isAppealVerdict: boolean;
                     reason: string | null;
                     reversalOfId: number | null;
                     reversedById: number | null;
@@ -1199,12 +1200,18 @@ declare namespace App {
                 export type AppealKind = 'hierarchical' | 'appeal';
                 export type DatePrecision = 'day' | 'month' | 'unknown';
                 export type FineActType = 'LAB' | 'HYS';
+                export type FineAppealStatus =
+                    'open' | 'upheld' | 'rejected' | 'dropped';
                 export type FineCollectionPlace =
                     'in_custody' | 'in_transit' | 'in_bank' | 'rejected';
                 export type FineDebtEntryKind =
                     'constitution' | 'increase' | 'reduction' | 'reversal';
                 export type FineDebtStatus =
-                    'pending' | 'partial' | 'cancelled' | 'without_effect';
+                    | 'pending'
+                    | 'partial'
+                    | 'cancelled'
+                    | 'without_effect'
+                    | 'in_appeal';
                 export type FineDocumentKind = 'resolution' | 'act' | 'other';
                 export type FineDocumentRole =
                     'origin' | 'modification' | 'ratification' | 'support';

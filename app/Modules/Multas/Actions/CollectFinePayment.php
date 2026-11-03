@@ -11,6 +11,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSource;
@@ -48,6 +49,7 @@ final class CollectFinePayment
         private readonly TalonarioSequence $talonarios,
         private readonly ApplyFinePayment $aplicar,
         private readonly StoreAttachment $adjuntos,
+        private readonly FineAppeals $recursos,
     ) {}
 
     /**
@@ -188,6 +190,7 @@ final class CollectFinePayment
             }
 
             $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
+            $this->recursos->assertNotFrozen($multa, 'amount');
             $this->assertHasDebt($multa);
 
             /*

@@ -10,6 +10,7 @@ use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -32,12 +33,14 @@ final class ReverseFineDebtEntry
     public function __construct(
         private readonly ReconcileFineExcess $reclasificar,
         private readonly RecordAuditEvent $auditar,
+        private readonly FineAppeals $recursos,
     ) {}
 
     public function handle(FineDebtEntry $ajuste, Reason $reason, ?int $actorId): FineDebtEntry
     {
         return DB::transaction(function () use ($ajuste, $reason, $actorId): FineDebtEntry {
             $multa = Fine::query()->whereKey($ajuste->fine_id)->lockForUpdate()->firstOrFail();
+            $this->recursos->assertAmountEditable($multa, 'reason');
 
             if (in_array($ajuste->kind, [FineDebtEntryKind::Constitution, FineDebtEntryKind::Reversal], true)) {
                 throw ValidationException::withMessages([

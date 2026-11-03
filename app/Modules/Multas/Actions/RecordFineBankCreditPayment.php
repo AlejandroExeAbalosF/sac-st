@@ -11,6 +11,7 @@ use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Support\Money\Decimal;
@@ -35,6 +36,7 @@ final class RecordFineBankCreditPayment
 {
     public function __construct(
         private readonly FineBankCredits $creditos,
+        private readonly FineAppeals $recursos,
         private readonly RecordAuditEvent $auditar,
     ) {}
 
@@ -44,6 +46,9 @@ final class RecordFineBankCreditPayment
     public function handle(Fine $multa, int $bankTransactionId, string $evidence, ?int $actorId): FineHistoricalMovement
     {
         return DB::transaction(function () use ($multa, $bankTransactionId, $evidence, $actorId): FineHistoricalMovement {
+            $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
+            $this->recursos->assertAcceptsHistorical($multa, 'bankTransactionId');
+
             $apertura = $this->creditos->book();
 
             if ($apertura === null) {

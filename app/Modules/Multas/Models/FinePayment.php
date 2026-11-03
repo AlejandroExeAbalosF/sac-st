@@ -41,6 +41,7 @@ use Illuminate\Support\Carbon;
  * @property numeric-string|null $appeal_base_amount
  * @property numeric-string|null $appeal_required_amount
  * @property string|null $external_receipt_reference
+ * @property int|null $fine_appeal_id El trámite del recurso, si el pago es su condición.
  * @property int|null $discarded_by
  * @property Carbon|null $discarded_at
  * @property FineReasonCode|null $discard_reason_code
@@ -75,6 +76,7 @@ final class FinePayment extends Model
         'appeal_kind',
         'appeal_base_amount',
         'appeal_required_amount',
+        'fine_appeal_id',
         'external_receipt_reference',
         'discarded_by',
         'discarded_at',

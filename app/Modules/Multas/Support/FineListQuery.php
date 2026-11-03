@@ -43,6 +43,7 @@ final class FineListQuery
             ->buscar($filtros['q'])
             ->when($filtros['estado'] === 'con-deuda', fn (Builder $query) => $query->where('fine_balances.debt', '>', 0))
             ->when($filtros['estado'] === 'sin-deuda', fn (Builder $query) => $query->where('fine_balances.debt', '=', 0))
+            ->when($filtros['estado'] === 'en-recurso', fn (Builder $query) => $query->where('fine_balances.appeal_status', 'open'))
             ->when($filtros['anio'] !== null, fn (Builder $query) => $query->whereYear('fines.registered_on', (int) $filtros['anio']))
             ->orderByRaw(self::ORDEN.' DESC')
             ->orderByDesc('fines.id');

@@ -43,6 +43,7 @@ final class FineCaseListQuery
             ->groupBy('fines.fine_case_id')
             ->select('fines.fine_case_id')
             ->selectRaw('COUNT(*) FILTER (WHERE fine_balances.debt > 0) AS fines_with_debt')
+            ->selectRaw("COUNT(*) FILTER (WHERE fine_balances.appeal_status = 'open') AS fines_in_appeal")
             ->selectRaw("MAX(COALESCE(fines.registered_on, '-infinity'::date)) AS last_registered_on");
 
         return FineCase::query()
@@ -50,6 +51,7 @@ final class FineCaseListQuery
             ->joinSub($resumen, 'resumen', 'resumen.fine_case_id', '=', 'fine_cases.id')
             ->when($filtros['estado'] === 'con-deuda', fn (Builder $query) => $query->where('resumen.fines_with_debt', '>', 0))
             ->when($filtros['estado'] === 'sin-deuda', fn (Builder $query) => $query->where('resumen.fines_with_debt', 0))
+            ->when($filtros['estado'] === 'en-recurso', fn (Builder $query) => $query->where('resumen.fines_in_appeal', '>', 0))
             ->with(['fines.person:id,name', 'fines.balance'])
             ->orderByDesc('resumen.last_registered_on')
             ->orderByDesc('fine_cases.id');

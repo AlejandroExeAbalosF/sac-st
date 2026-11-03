@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Actions;
 
 use App\Modules\Multas\Enums\AppealKind;
+use App\Modules\Multas\Enums\FineAppealStatus;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineAppeal;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
+use App\Modules\Multas\Support\FineAppeals;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\CashBox;
@@ -34,8 +37,10 @@ use Illuminate\Validation\ValidationException;
  * —sin centavos, con la base congelada— como referencia; si difieren, el
  * cobro sigue y la diferencia queda a la vista.
  *
- * **Una multa admite un solo recurso.** Un segundo se rechaza; un intento
- * descartado no cuenta.
+ * **El recurso es el primer pago de la multa** (U, 03/11/2026): se recurre
+ * una multa con deuda, sin pagos ni antecedentes vivos y sin otro recurso
+ * que no haya caído. Registrarlo abre el trámite, que congela la multa
+ * hasta el veredicto (`ResolveFineAppeal`). Un intento descartado no cuenta.
  *
  * Solo en efectivo, que se cobra en el acto, o por depósito directo, que
  * queda informado hasta verificarlo contra el extracto. El depósito puede
@@ -43,13 +48,14 @@ use Illuminate\Validation\ValidationException;
  * presentación —con su respaldo— decide el término (M08).
  *
  * Un depósito informado que se cargó mal se corrige: el anterior se descarta
- * con su motivo y el nuevo apunta a él.
+ * con su motivo y el nuevo apunta a él, dentro del mismo trámite.
  */
 final class RegisterFineAppeal
 {
     public function __construct(
         private readonly ReceiveFinePaymentAtCounter $recibir,
         private readonly DiscardFinePayment $descartar,
+        private readonly FineAppeals $recursos,
         private readonly TalonarioSequence $talonarios,
         private readonly RecordAuditEvent $auditar,
     ) {}
@@ -99,29 +105,19 @@ final class RegisterFineAppeal
 
                 $multa = Fine::query()->whereKey($multa->id)->lockForUpdate()->firstOrFail();
 
+                // Una corrección no pide saldo ni abre otro trámite: completa los datos de un depósito que ya existe.
                 if ($replaces !== null) {
-                    $this->reemplazar($multa, $replaces, $correctionReason, $actorId);
-                }
-
-                $saldo = FineBalance::query()->whereKey($multa->id)->firstOrFail();
-
-                // Una corrección no pide saldo: completa los datos de un depósito que ya existe.
-                if ($replaces === null && Decimal::equals($saldo->debt, '0')) {
-                    throw ValidationException::withMessages(['amount' => 'La multa no tiene saldo pendiente: no hay recurso que pagar.']);
-                }
-
-                $anterior = FinePayment::query()
-                    ->where('fine_id', $multa->id)
-                    ->whereNotNull('appeal_kind')
-                    ->where('status', '<>', FinePaymentStatus::Discarded)
-                    ->first();
-
-                if ($anterior !== null) {
-                    throw ValidationException::withMessages([
-                        'kind' => 'La multa ya tiene un recurso registrado: una multa admite uno solo. Si aquel se cargó mal, corregilo o descartalo.',
+                    $recurso = $this->reemplazar($multa, $replaces, $correctionReason, $actorId);
+                } else {
+                    $this->recursos->assertAppealable($multa);
+                    $recurso = FineAppeal::query()->create([
+                        'fine_id' => $multa->id,
+                        'status' => FineAppealStatus::Open,
+                        'created_by' => $actorId,
                     ]);
                 }
 
+                $saldo = FineBalance::query()->whereKey($multa->id)->firstOrFail();
                 $base = $saldo->obligation;
                 $ahora = CarbonImmutable::now();
                 $delDia = $presentado->isSameDay($hoy);
@@ -147,6 +143,7 @@ final class RegisterFineAppeal
                     'appeal_kind' => $tipo,
                     'appeal_base_amount' => $base,
                     'appeal_required_amount' => AppealAmount::required($base),
+                    'fine_appeal_id' => $recurso->id,
                     'external_receipt_reference' => $referencia,
                     'replaces_fine_payment_id' => $replaces?->id,
                     'idempotency_key' => $idempotencyKey,
@@ -178,7 +175,7 @@ final class RegisterFineAppeal
             }
 
             // Dos recursos de la misma multa a la vez: la base frenó al segundo.
-            if (str_contains($e->getMessage(), 'fine_payments_one_appeal_per_fine')) {
+            if (str_contains($e->getMessage(), 'fine_payments_one_appeal_per_fine') || str_contains($e->getMessage(), 'fine_appeals_one_per_fine')) {
                 throw ValidationException::withMessages(['kind' => 'La multa ya tiene un recurso registrado: una multa admite uno solo.']);
             }
 
@@ -190,11 +187,12 @@ final class RegisterFineAppeal
 
     /**
      * Una corrección: el recurso informado que se cargó mal se descarta con su
-     * motivo, en la misma transacción que registra el corregido.
+     * motivo, en la misma transacción que registra el corregido, y el trámite
+     * sigue abierto con el pago nuevo.
      *
      * @throws ValidationException
      */
-    private function reemplazar(Fine $multa, FinePayment $anterior, ?string $motivo, ?int $actorId): void
+    private function reemplazar(Fine $multa, FinePayment $anterior, ?string $motivo, ?int $actorId): FineAppeal
     {
         if ($anterior->fine_id !== $multa->id || $anterior->appeal_kind === null) {
             throw ValidationException::withMessages(['replacesPaymentId' => 'Se corrige un recurso de esta misma multa.']);
@@ -204,7 +202,17 @@ final class RegisterFineAppeal
             throw ValidationException::withMessages(['replacesPaymentId' => 'Ese pago ya no está informado: lo que ya se aplicó tiene recibo y no se corrige así.']);
         }
 
-        $this->descartar->handle($anterior, new Reason(FineReasonCode::ReplacedByCorrection, $motivo), $actorId);
+        $recurso = FineAppeal::query()->whereKey($anterior->fine_appeal_id)->first();
+
+        if ($recurso?->status !== FineAppealStatus::Open) {
+            throw ValidationException::withMessages([
+                'replacesPaymentId' => 'El recurso ya se resolvió: su depósito informado no se corrige, se descarta si no correspondía.',
+            ]);
+        }
+
+        $this->descartar->handle($anterior, new Reason(FineReasonCode::ReplacedByCorrection, $motivo), $actorId, keepAppeal: true);
+
+        return $recurso;
     }
 
     /**

@@ -209,6 +209,9 @@ export default function MultasIndex({
                                 <SelectItem value="sin-deuda">
                                     Sin deuda
                                 </SelectItem>
+                                <SelectItem value="en-recurso">
+                                    En recurso
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

@@ -170,6 +170,10 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
   importe original, modificación para un ajuste. **Base:**
   `fine_debt_entries_coherent` y `fine_debt_entries_cite_active_link`.
 - Los movimientos no se editan ni se borran. **Base:** `forbid_mutation()`.
+- Con el recurso en trámite, o después de que prosperó, no entra ningún movimiento
+  de importe salvo la reducción del veredicto ([recurso](#recurso)). **Base:**
+  `fine_debt_entries_follow_appeal`; **Action:** `FineAppeals::assertAmountEditable`
+  en `AdjustFineDebt` y `ReverseFineDebtEntry`.
 
 <a id="saldo"></a>
 
@@ -288,8 +292,9 @@ es la parte del excedente hecha de plata que está en el libro.
   el instante de la carga, lleva respaldo. **Base:** CHECK.
 - El recurso del 20 %: base = obligación vigente al registrarlo, congelada; el
   20 % calculado = `trunc(base × 0,20, 0)` queda como referencia; el importe del
-  pago es el del recibo externo; solo efectivo o depósito directo; uno por multa.
-  **Base:** CHECK, índice único parcial y `fine_payments_guard`. Detalle en
+  pago es el del recibo externo; solo efectivo o depósito directo; uno por multa,
+  como primer pago, y congela la multa hasta su veredicto. **Base:** CHECK, índices
+  únicos parciales, `fine_payments_guard` y las guardas del trámite. Detalle en
   [recurso](#recurso).
 - `fine_payment_applications`: una por pago y una por recepción. El importe es la
   recepción entera, de la caja de Multas, en la moneda de la multa y por el mismo
@@ -539,12 +544,62 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
   `fine_payments_guard` (base congelada). **Action:** `RegisterFineAppeal` con
   `AppealAmount`. Una diferencia no frena el cobro (U, 21/10/2026).
 - Solo efectivo o depósito directo, nunca de origen judicial. **Base:** CHECK.
-- Una multa, un recurso vigente (no descartado). **Base:** índice único parcial
-  `fine_payments_one_appeal_per_fine`; **Action:** mensaje en el campo, también ante
-  dos registros simultáneos.
 - El depósito del recurso conserva su presentación anterior con respaldo; el
   efectivo se presenta en el momento. **Base:** CHECK
   `fine_payments_presentation_check`; **Action:** mensaje en el campo.
+
+**El trámite** (`fine_appeals`, decisión del área del 03/11/2026). El pago es la
+condición; el trámite, lo que pasa con la multa hasta el veredicto: `open` (en
+trámite), `upheld` (prosperó), `rejected` (no prosperó), `dropped` (cayó).
+
+- Se recurre una multa con deuda, sin pagos ni antecedentes vivos —uno descartado
+  no cuenta— y sin otro recurso que no haya caído. **Base:** `fine_appeals_guard`
+  (bloquea la multa) e índice único `fine_appeals_one_per_fine`; **Action:**
+  `FineAppeals::assertAppealable`, que suma esto al control de saldo, también ante
+  dos registros simultáneos.
+- El pago de recurso cita su trámite, siempre de la misma multa, y un trámite tiene
+  un solo pago vivo. **Base:** FK compuesta `fine_payments_appeal_fk`,
+  `fine_payments_appeal_link_check` e índice `fine_payments_one_appeal_per_fine`.
+- Una corrección queda en el mismo trámite que el pago que reemplaza, y solo con el
+  trámite abierto. **Base:** `fine_payments_follow_appeal`; **Action:**
+  `RegisterFineAppeal`.
+- **Congelamiento.** Con el trámite abierto no entra otro pago ni un antecedente,
+  ni un movimiento de importe. Siguen la verificación, la corrección y el descarte
+  del depósito del recurso, el depósito y la acreditación del efectivo, los
+  documentos, el reemplazo de la resolución de origen (no cambia el importe) y la
+  revisión de la carátula. **Base:** `fine_payments_follow_appeal`,
+  `fine_historical_follow_appeal` y `fine_debt_entries_follow_appeal`, cada una
+  con la multa bloqueada; **Action:** `FineAppeals::assertNotFrozen` en
+  `CollectFinePayment`, `ReportFineBankPayment`, `RecordFineBankCreditPayment` y
+  `RecordFineHistoricalMovement`.
+- **Caída.** Descartar el depósito de un trámite abierto lo hace caer; la multa se
+  descongela y admite otro recurso. **Base:** `fine_appeal_consistent` (diferido:
+  abierto exige exactamente un pago vivo; caído, ninguno); **Action:**
+  `DiscardFinePayment`.
+- **Prosperó.** Exige el pago aplicado y deja la deuda en cero con lo cobrado según
+  el recibo externo. Si eso es menos que la obligación, una reducción con
+  `fine_appeal_id`, sin documento y motivo `appeal_admitted`, la lleva exactamente
+  a lo cobrado; si alcanza o sobra, no hay reducción y el excedente queda. Esa
+  reducción es una por trámite y no se revierte, y después no entra ningún otro
+  movimiento de importe ni un antecedente. **Base:** `fine_debt_entries_follow_appeal`,
+  `fine_debt_entries_reason_check`, `fine_debt_entries_appeal_fk`,
+  `fine_debt_entries_one_per_appeal` y `fine_appeal_consistent`; **Action:**
+  `ResolveFineAppeal`.
+- **No prosperó.** La multa se descongela y lo pagado queda a cuenta. Si después se
+  descarta su depósito informado, el veredicto se conserva y no se admite otro
+  recurso. **Base:** `fine_appeal_consistent` (a lo sumo un pago vivo) y
+  `fine_appeals_one_per_fine`.
+- El veredicto se da una vez y no cambia; el trámite no se borra. **Base:**
+  `fine_appeals_guard`. Lo da quien tiene `multas.cobrar` (ruta).
+- El veredicto se da sobre el recurso y el pago que vio quien resuelve: si el
+  recurso cayó y se registró otro, o una corrección cambió el pago, se rechaza y
+  se pide revisar la multa. **Solo Action:** `ResolveFineAppeal` compara los ids
+  que trae el formulario con los vigentes, con la multa bloqueada.
+- La multa en trámite figura «En recurso» (`FineDebtStatus::InAppeal`), deba lo que
+  deba. **Base:** `fine_balances.appeal_status`.
+- **Pendientes, no relevados:** anular un recurso cobrado en efectivo (P13: es
+  anular un cobro con recibo), revertir un veredicto y vincular el recurso con la
+  resolución que lo resuelve.
 
 <a id="correccion"></a>
 
@@ -563,4 +618,5 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
   **Base:** el corregido nace informado; **Action:** mensaje en el campo.
 - Corregir no pide saldo pendiente: no mueve plata, completa los datos de un
   depósito que ya existe. Si otro pago canceló la multa, lo que sobre se reconoce
-  como excedente al verificarlo. **Solo Action.**
+  como excedente al verificarlo. **Solo Action.** Un recurso, en cambio, se corrige
+  solo mientras su trámite está abierto ([recurso](#recurso)).

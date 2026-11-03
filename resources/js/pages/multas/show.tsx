@@ -34,6 +34,7 @@ import HistoricalMovementDialog from '@/features/multas/components/historical-mo
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
 import ReplaceOriginDialog from '@/features/multas/components/replace-origin-dialog';
+import ResolveAppealDialog from '@/features/multas/components/resolve-appeal-dialog';
 import ReviewHistoricalDialog from '@/features/multas/components/review-historical-dialog';
 import ReviseDateDialog from '@/features/multas/components/revise-date-dialog';
 import ReviseFineDialog from '@/features/multas/components/revise-fine-dialog';
@@ -44,6 +45,7 @@ import {
     DOCUMENT_ROLE,
     HISTORICAL_KIND,
     APPEAL_KIND,
+    APPEAL_STATUS,
     HISTORICAL_STATUS,
     PAYMENT_MEDIUM,
     PAYMENT_STATUS,
@@ -88,9 +90,20 @@ type Props = {
     creditosDelBanco?: Credito[];
     /** Los créditos libres posteriores a la apertura; llegan al buscar. */
     creditosDisponibles?: Credito[];
-    /** El 20 % del importe vigente, sin centavos (M07). */
-    /** El 20 % calculado como referencia, y si la multa ya tiene su recurso. */
-    recurso: { base: string; required: string; registered: boolean };
+    /**
+     * El 20 % calculado como referencia (M07), si la multa admite recurso y
+     * el trámite del que tiene, con lo que se cobró por él.
+     */
+    recurso: {
+        base: string;
+        required: string;
+        allowed: boolean;
+        id: number | null;
+        paymentId: number | null;
+        status: App.Modules.Multas.Enums.FineAppealStatus | null;
+        paidAmount: string | null;
+        paymentApplied: boolean;
+    };
     firmantes: Firmante[];
     /** La clave del cobro: un doble clic no cobra dos veces. */
     cobroKey: string;
@@ -108,6 +121,7 @@ type Props = {
         confirmDeposit: boolean;
         manageRejections: boolean;
         replaceCheque: boolean;
+        resolveAppeal: boolean;
     };
 };
 
@@ -116,6 +130,7 @@ type Dialogo =
     | { tipo: 'cobrar' }
     | { tipo: 'banco' }
     | { tipo: 'recurso' }
+    | { tipo: 'resolver-recurso' }
     | { tipo: 'verificar'; pago: Pago }
     | { tipo: 'descartar-pago'; pago: Pago }
     | { tipo: 'corregir-pago'; pago: Pago }
@@ -169,6 +184,12 @@ export default function MultaShow({
         precision: App.Modules.Multas.Enums.DatePrecision,
     ): boolean => can.adjust || (can.register && precision !== 'day');
     const estado = DEBT_STATUS[multa.balance.status];
+    /*
+     * En recurso la multa no admite otros pagos ni cambios de importe; si
+     * prosperó, el importe tampoco se mueve. La base lo repite.
+     */
+    const enRecurso = recurso.status === 'open';
+    const importeCerrado = enRecurso || recurso.status === 'upheld';
     const vigentes = vigenteTrasCadaMovimiento(multa.debtEntries);
     const pagado = multa.balance.paid;
 
@@ -255,6 +276,11 @@ export default function MultaShow({
                                 devuelve ni se acredita solo.
                             </p>
                         )}
+                        {recurso.status !== null && !enRecurso && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Recurso: {APPEAL_STATUS[recurso.status]}.
+                            </p>
+                        )}
                         {/*
                          * El rechazo no vuelve a deber la multa: el pago y su
                          * recibo siguen (M03). Lo que falta se muestra aparte,
@@ -274,6 +300,24 @@ export default function MultaShow({
                         )}
                     </div>
                 </section>
+
+                {enRecurso && (
+                    <p className="flex gap-2 rounded-md border border-info-strong/30 bg-info-soft p-3 text-sm text-info-strong">
+                        <Gavel
+                            className="mt-0.5 size-4 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <span>
+                            <strong className="font-medium">
+                                Multa en recurso.
+                            </strong>{' '}
+                            Hasta resolverlo no admite otros pagos ni cambios de
+                            importe. El depósito del recurso se verifica, se
+                            corrige o se descarta como cualquier informado; si
+                            se descarta, el recurso cae.
+                        </span>
+                    </p>
+                )}
 
                 <section className="rounded-lg border bg-card p-5 shadow-raised">
                     <h2 className="text-sm font-semibold">Datos</h2>
@@ -524,16 +568,19 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Obligación">
-                        {(can.adjust || can.correctAmount) && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDialogo({ tipo: 'ajustar' })}
-                            >
-                                <Scale aria-hidden="true" />
-                                Ajustar
-                            </Button>
-                        )}
+                        {(can.adjust || can.correctAmount) &&
+                            !importeCerrado && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setDialogo({ tipo: 'ajustar' })
+                                    }
+                                >
+                                    <Scale aria-hidden="true" />
+                                    Ajustar
+                                </Button>
+                            )}
                     </Encabezado>
                     {/* `relative`: el rótulo `sr-only` del encabezado es absoluto y, sin un
                         contenedor posicionado, escapa del recorte y ensancha la página. */}
@@ -606,11 +653,13 @@ export default function MultaShow({
                                                             : undefined
                                                     }
                                                 >
-                                                    {movimiento.isCorrection
-                                                        ? `Corrección de importe (${DEBT_KIND[movimiento.kind].toLowerCase()})`
-                                                        : DEBT_KIND[
-                                                              movimiento.kind
-                                                          ]}
+                                                    {movimiento.isAppealVerdict
+                                                        ? 'Reducción por el recurso que prosperó'
+                                                        : movimiento.isCorrection
+                                                          ? `Corrección de importe (${DEBT_KIND[movimiento.kind].toLowerCase()})`
+                                                          : DEBT_KIND[
+                                                                movimiento.kind
+                                                            ]}
                                                 </span>
                                                 {revertido && (
                                                     <span className="ml-2 text-xs text-muted-foreground">
@@ -630,9 +679,14 @@ export default function MultaShow({
                                                 )}
                                             </td>
                                             <td className="py-2.5 pr-5 text-xs">
-                                                {movimiento.documentLabel ?? (
-                                                    <EmptyValue>—</EmptyValue>
-                                                )}
+                                                {movimiento.documentLabel ??
+                                                    (movimiento.isAppealVerdict ? (
+                                                        'Veredicto del recurso'
+                                                    ) : (
+                                                        <EmptyValue>
+                                                            —
+                                                        </EmptyValue>
+                                                    ))}
                                             </td>
                                             <td className="py-2.5 pr-5 text-right whitespace-nowrap">
                                                 {movimiento.kind !==
@@ -684,6 +738,8 @@ export default function MultaShow({
                                                 {(movimiento.isCorrection
                                                     ? can.correctAmount
                                                     : can.adjust) &&
+                                                    !importeCerrado &&
+                                                    !movimiento.isAppealVerdict &&
                                                     !revertido &&
                                                     (movimiento.kind ===
                                                         'increase' ||
@@ -713,7 +769,19 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Pagos">
-                        {isNonZero(multa.balance.debt) && (
+                        {enRecurso && can.resolveAppeal && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                    setDialogo({ tipo: 'resolver-recurso' })
+                                }
+                            >
+                                <Gavel aria-hidden="true" />
+                                Resolver recurso
+                            </Button>
+                        )}
+                        {isNonZero(multa.balance.debt) && !enRecurso && (
                             <div className="flex flex-wrap justify-end gap-2">
                                 {can.collect && (
                                     <Button
@@ -740,7 +808,7 @@ export default function MultaShow({
                                     </Button>
                                 )}
                                 {(can.collect || can.reportBank) &&
-                                    !recurso.registered && (
+                                    recurso.allowed && (
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -834,8 +902,11 @@ export default function MultaShow({
                                                         </Button>
                                                     </>
                                                 )}
+                                            {/* El depósito de un recurso resuelto ya no se corrige: solo se descarta. */}
                                             {pago.status === 'reported' &&
-                                                can.reportBank && (
+                                                can.reportBank &&
+                                                (pago.appealKind === null ||
+                                                    enRecurso) && (
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -996,7 +1067,7 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Pagos anteriores al sistema">
-                        {can.register && (
+                        {can.register && !importeCerrado && (
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -1191,6 +1262,18 @@ export default function MultaShow({
                     onClose={cerrar}
                 />
             )}
+            {dialogo?.tipo === 'resolver-recurso' &&
+                recurso.id !== null &&
+                recurso.paymentId !== null && (
+                    <ResolveAppealDialog
+                        fineId={multa.id}
+                        appealId={recurso.id}
+                        paymentId={recurso.paymentId}
+                        paidAmount={recurso.paidAmount}
+                        paymentApplied={recurso.paymentApplied}
+                        onClose={cerrar}
+                    />
+                )}
             {dialogo?.tipo === 'verificar' && (
                 <VerifyPaymentDialog
                     pago={dialogo.pago}

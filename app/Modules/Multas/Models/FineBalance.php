@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Models;
 
+use App\Modules\Multas\Enums\FineAppealStatus;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property numeric-string $excess
  * @property numeric-string $operational_excess
  * @property numeric-string $pending_regularization Cheques rechazados sin reemplazo, por su importe entero (M03).
+ * @property FineAppealStatus|null $appeal_status El recurso que no cayó, si hay.
  */
 final class FineBalance extends Model
 {
@@ -44,6 +46,7 @@ final class FineBalance extends Model
             'excess' => 'decimal:2',
             'operational_excess' => 'decimal:2',
             'pending_regularization' => 'decimal:2',
+            'appeal_status' => FineAppealStatus::class,
         ];
     }
 }

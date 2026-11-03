@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Actions;
 
+use App\Modules\Multas\Enums\FineAppealStatus;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineAppeal;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
@@ -19,6 +21,10 @@ use Illuminate\Validation\ValidationException;
  * Nunca tocó la deuda ni tuvo recibo, así que descartarlo no mueve nada:
  * queda a la vista con quién lo descartó y por qué. También lo usa la
  * corrección de un informado, antes de registrar el corregido.
+ *
+ * Descartar el depósito de un recurso en trámite lo hace **caer**: la multa
+ * se descongela y admite otro. En una corrección el trámite sigue, con el
+ * pago nuevo. Si el recurso ya tiene veredicto, el veredicto se conserva.
  */
 final class DiscardFinePayment
 {
@@ -27,9 +33,9 @@ final class DiscardFinePayment
     /**
      * @throws ValidationException
      */
-    public function handle(FinePayment $pago, Reason $motivo, ?int $actorId): FinePayment
+    public function handle(FinePayment $pago, Reason $motivo, ?int $actorId, bool $keepAppeal = false): FinePayment
     {
-        return DB::transaction(function () use ($pago, $motivo, $actorId): FinePayment {
+        return DB::transaction(function () use ($pago, $motivo, $actorId, $keepAppeal): FinePayment {
             $multa = Fine::query()->whereKey($pago->fine_id)->lockForUpdate()->firstOrFail();
             $pago = FinePayment::query()->whereKey($pago->id)->lockForUpdate()->firstOrFail();
 
@@ -52,6 +58,19 @@ final class DiscardFinePayment
                 'amount' => $pago->amount,
                 ...$motivo->auditMetadata(),
             ], actorId: $actorId);
+
+            $recurso = $pago->fine_appeal_id === null || $keepAppeal
+                ? null
+                : FineAppeal::query()->whereKey($pago->fine_appeal_id)->lockForUpdate()->first();
+
+            if ($recurso?->status === FineAppealStatus::Open) {
+                $recurso->forceFill(['status' => FineAppealStatus::Dropped])->save();
+
+                $this->auditar->handle('multa.recurso-caido', $multa, metadata: [
+                    'amount' => $pago->amount,
+                    ...$motivo->auditMetadata(),
+                ], actorId: $actorId);
+            }
 
             return $pago;
         });

@@ -12,6 +12,11 @@ use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\RegisterFineAppeal;
+use App\Modules\Multas\Enums\AppealKind;
+use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Models\Fine;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
@@ -71,6 +76,23 @@ try {
             $input['newDefault'], $input['actor'],
         );
         $result = ['status' => 'done', 'until' => $vinculo->valid_until?->toDateString()];
+    } elseif ($input['mode'] === 'appeal') {
+        // Registrar el recurso de una multa mientras otro la cobra.
+        $pago = app(RegisterFineAppeal::class)->handle(
+            Fine::query()->findOrFail($input['fine']), AppealKind::Hierarchical, FinePaymentMedium::Cash, null,
+            $input['amount'], 'worker-appeal-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'appeal' => $pago->fine_appeal_id];
+    } elseif ($input['mode'] === 'raw-appeal') {
+        // El mismo trámite abierto directo: la base sola tiene que frenarlo.
+        DB::table('fine_appeals')->insert(['fine_id' => $input['fine'], 'status' => 'open', 'created_at' => now(), 'updated_at' => now()]);
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'collect') {
+        // Cobrar en la caja una multa mientras otro registra su recurso.
+        $pago = app(CollectFinePayment::class)->handle(
+            Fine::query()->findOrFail($input['fine']), FinePaymentMedium::Cash, $input['amount'], 'worker-collect-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'payment' => $pago->id];
     } elseif ($input['mode'] === 'raw-deposit') {
         // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.
         DB::transaction(function () use ($input): void {
