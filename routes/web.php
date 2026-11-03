@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Auth\InitialPasswordController;
 use App\Http\Controllers\InicioController;
+use Illuminate\Routing\RedirectController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,8 +21,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('inicio.buscar');
     Route::get('haberes/inicio', [InicioController::class, 'haberes'])->name('inicio.haberes');
     Route::get('multas/inicio', [InicioController::class, 'multas'])->name('inicio.multas');
-    Route::redirect('inicio/haberes', '/haberes/inicio');
-    Route::redirect('inicio/multas', '/multas/inicio');
+
+    // Solo en GET: `Route::redirect` responde a todos los verbos, DELETE incluido.
+    Route::get('inicio/haberes', RedirectController::class)
+        ->defaults('destination', '/haberes/inicio')
+        ->defaults('status', 302);
+    Route::get('inicio/multas', RedirectController::class)
+        ->defaults('destination', '/multas/inicio')
+        ->defaults('status', 302);
 });
 
 /*

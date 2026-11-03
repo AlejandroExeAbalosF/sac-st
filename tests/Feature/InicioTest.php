@@ -76,6 +76,7 @@ class InicioTest extends TestCase
     public function test_el_buscador_del_inicio_encuentra_expedientes_de_haberes(): void
     {
         $this->seedHaberes();
+        $expediente = Expediente::query()->whereHas('employer', fn ($empleador) => $empleador->where('name', 'CIACSA'))->sole();
 
         $this->actingAs($this->operador())
             ->getJson(route('inicio.buscar', ['q' => 'CIACSA']))
@@ -84,7 +85,7 @@ class InicioTest extends TestCase
             ->assertJsonPath('groups.0.key', 'haberes')
             ->assertJsonPath('groups.0.label', 'Haberes')
             ->assertJsonPath('groups.0.results.0.context', 'CIACSA · García, Claudio Adrián')
-            ->assertJsonPath('groups.0.results.0.href', '/haberes/expedientes/1/0030064-125957-2026-0')
+            ->assertJsonPath('groups.0.results.0.href', "/haberes/expedientes/{$expediente->id}/0030064-125957-2026-0")
             ->assertJsonPath('total', 1);
     }
 

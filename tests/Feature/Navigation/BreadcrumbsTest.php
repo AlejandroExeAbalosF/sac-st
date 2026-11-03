@@ -35,6 +35,9 @@ const RUTAS_SIN_PANTALLA = [
     'password.confirmation',
     'primer-ingreso',
 
+    // El buscador del inicio responde JSON a la paleta: no dibuja una pantalla.
+    'inicio.buscar',
+
     // Archivos.
     'adjuntos.download',
     'adjuntos.preview',

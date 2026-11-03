@@ -205,7 +205,7 @@ final class InicioController extends Controller
                 ->map(fn (Expediente $expediente): array => [
                     'id' => 'haberes-'.$expediente->id,
                     'title' => $expediente->display_number,
-                    'description' => $expediente->subject ?: ($expediente->employer?->name ?? 'Sin carátula'),
+                    'description' => $expediente->subject ?: ($expediente->employer->name ?? 'Sin carátula'),
                     'context' => collect([
                         $expediente->employer?->name,
                         ...$expediente->haberes->pluck('beneficiary.name')->all(),
@@ -236,7 +236,7 @@ final class InicioController extends Controller
                     'id' => 'multas-'.$fine->id,
                     'title' => 'Expte. '.$fine->fineCase->label().' · Multa '.$fine->fine_number,
                     'description' => $fine->caption,
-                    'context' => $fine->person?->name ?? '',
+                    'context' => $fine->person->name ?? '',
                     'status' => 'Multa',
                     'href' => route('multas.show', $fine->showParameters(), absolute: false),
                 ])
