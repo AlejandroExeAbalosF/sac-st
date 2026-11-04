@@ -10,6 +10,7 @@ use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\PeriodClosingStatus;
+use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
@@ -68,6 +69,11 @@ final class FineCashBoxModule implements CashBoxModule
     public function currencies(): array
     {
         return [Currency::Ars];
+    }
+
+    public function countDenominations(Currency $currency): array
+    {
+        return CashCountLine::suggestedDenominations($currency);
     }
 
     public function chequeColumns(): array

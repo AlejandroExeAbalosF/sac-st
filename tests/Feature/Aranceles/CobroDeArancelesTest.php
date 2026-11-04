@@ -21,18 +21,24 @@ use App\Modules\Aranceles\Models\FeeChargeFunding;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Pdf\FeeReceiptPdf;
+use App\Modules\Aranceles\Support\FeeChargeFunds;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\CashToBankTransferItem;
+use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
+use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Ledger\Support\CashDayTakings;
@@ -47,8 +53,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
@@ -680,7 +688,7 @@ class CobroDeArancelesTest extends TestCase
         $cobro = $this->cobrar();
 
         $this->actingAs($this->operador('contador'))
-            ->post(route('aranceles.cobros.corregir', $cobro), [])
+            ->post(route('aranceles.cobros.corregir.edit', $cobro), [])
             ->assertForbidden();
     }
 
@@ -842,6 +850,228 @@ class CobroDeArancelesTest extends TestCase
             cashBoxId: $this->caja,
             actorId: $this->admin->id,
         ), 'no corresponden a ningún pago');
+    }
+
+    // ── Arqueo, cierre y planilla ───────────────────────────────────────
+
+    /** @param array<int, int> $billetes */
+    private function cerrarHoy(array $billetes): PeriodClosing
+    {
+        $arqueo = app(RecordCashCount::class)->handle(
+            cashBoxId: $this->caja,
+            countedOn: BusinessDate::today(),
+            denominations: $billetes,
+            actorId: $this->admin->id,
+        );
+        app(ReviewCashCount::class)->handle($arqueo, $this->admin->id);
+
+        return app(ClosePeriod::class)->handle($this->caja, BusinessDate::today(), actorId: $this->admin->id);
+    }
+
+    /** Sin cheques en la caja: cuenta, cierra y baja la planilla, con lo contado en su cuadro. */
+    public function test_the_cash_box_counts_closes_and_exports_small_amounts(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+        $this->cobrar();
+
+        $cierre = $this->cerrarHoy([200 => 1, 20 => 1]);
+
+        $this->assertSame('220.00', $cierre->closing_cash);
+
+        $this->actingAs($this->admin)->get(route('aranceles.caja.cierres.sheet', $cierre))->assertRedirect();
+
+        $adjunto = $cierre->refresh()->sheetAttachment;
+        $hoja = IOFactory::load(Storage::disk('local')->path($adjunto->object_key))
+            ->getSheetByName('REVERSO '.BusinessDate::today()->format('dmy'))?->toArray(null, false, false) ?? [];
+        $fila = array_values(array_filter($hoja, fn (array $f): bool => (float) $f[1] === 20.0))[0] ?? [];
+
+        $this->assertSame([1.0, 20.0, 20.0], array_map(floatval(...), array_slice($fila, 0, 3)));
+    }
+
+    /** Las tasas chicas se pueden contar, sin sumarle filas a las otras cajas. */
+    public function test_the_count_offers_what_small_fees_need_only_in_this_box(): void
+    {
+        $this->abrir();
+
+        $this->actingAs($this->admin)->get(route('aranceles.caja.dia'))->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->contains(1) && collect($d)->contains(20)));
+
+        $this->actingAs($this->admin)->get(route('caja.dia'))->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->min() === 50));
+    }
+
+    // ── El libro del día, cuando se anula otro día ──────────────────────
+
+    /** @return array{income: list<array<string, mixed>>, expense: list<array<string, mixed>>} */
+    private function libroDe(CarbonImmutable $dia): array
+    {
+        return app(CashDayBook::class)->entries($this->caja, $dia, $dia);
+    }
+
+    /** @param array{income: list<array<string, mixed>>, expense: list<array<string, mixed>>} $libro @return list<array{string, string}> */
+    private function ingresos(array $libro): array
+    {
+        return array_map(fn (array $f): array => [$f['number'], $f['cash']], $libro['income']);
+    }
+
+    public function test_voiding_another_day_keeps_the_row_and_shows_the_reversal_on_its_day(): void
+    {
+        $this->abrir();
+        $ayer = BusinessDate::today()->subDay();
+        $cobro = $this->cobrar([$this->linea(12)], $ayer, 'T-1');
+
+        app(VoidFeeCollection::class)->handle($cobro, $this->motivo(), $this->admin->id);
+
+        $this->assertSame([['T-1', '300.00']], $this->ingresos($this->libroDe($ayer)));
+        $this->assertSame([['Anulación del recibo T-1', '-300.00']], $this->ingresos($this->libroDe(BusinessDate::today())));
+    }
+
+    /** El mismo día no hay nada que explicar: ni el recibo ni la reversión. */
+    public function test_voiding_the_same_day_leaves_no_rows(): void
+    {
+        $this->abrir();
+        $cobro = $this->cobrar([$this->linea(12)]);
+
+        app(VoidFeeCollection::class)->handle($cobro, $this->motivo(), $this->admin->id);
+
+        $this->assertSame([], $this->ingresos($this->libroDe(BusinessDate::today())));
+    }
+
+    /** Lo cargado mal se corrige otro día: cada día explica su movimiento y el cierre suma lo mismo. */
+    public function test_correcting_the_amount_another_day_adds_up_with_the_closing(): void
+    {
+        $this->abrir();
+        $ayer = BusinessDate::today()->subDay();
+        $cobro = $this->cobrar([$this->linea(14, ['amount' => '250', 'reasonCode' => 'more_accepted'])], $ayer, 'T-1');
+
+        app(CorrectFeeCharge::class)->handle($cobro, 'AG Max SRL', null, [$this->linea(14), $this->linea(25, ['quantity' => 2])], $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true);
+
+        $hoy = $this->libroDe(BusinessDate::today());
+
+        $this->assertSame([['T-1', '250.00']], $this->ingresos($this->libroDe($ayer)));
+        $this->assertSame([
+            [$this->numeroVigente(FeeChargeCorrection::query()->where('corrected_charge_id', $cobro->id)->value('new_charge_id')), '220.00'],
+            ['Anulación del recibo T-1', '-250.00'],
+        ], $this->ingresos($hoy));
+
+        $cierre = $this->cerrarHoy([200 => 1, 20 => 1]);
+
+        $this->assertSame('250.00', $cierre->opening_cash);
+        $this->assertSame('-30.00', $cierre->received_cash);
+        $this->assertSame('220.00', $cierre->closing_cash);
+    }
+
+    /** Si el dinero sigue en la caja, el renglón de ese día es el del recibo nuevo; no se duplica. */
+    public function test_correcting_twice_shows_one_row_for_the_money_that_came_in(): void
+    {
+        $this->abrir();
+        $ayer = BusinessDate::today()->subDay();
+        $cobro = $this->cobrar(null, $ayer, 'T-1');
+        $mismoImporte = [$this->linea(14), $this->linea(25, ['amount' => '100', 'reasonCode' => 'more_accepted'])];
+
+        $segundo = app(CorrectFeeCharge::class)->handle($cobro, 'AG Max SRL', null, $mismoImporte, $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true);
+        $numeroSegundo = $this->numeroVigente($segundo->id);
+
+        $this->assertSame([[$numeroSegundo, '220.00']], $this->ingresos($this->libroDe($ayer)));
+        $this->assertSame([], $this->ingresos($this->libroDe(BusinessDate::today())));
+
+        app(CorrectFeeCharge::class)->handle($segundo, 'AG Max SRL', null, [$this->linea(14)], $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true);
+
+        $this->assertSame([[$numeroSegundo, '220.00']], $this->ingresos($this->libroDe($ayer)));
+        $this->assertSame(['Anulación del recibo '.$numeroSegundo, '-220.00'], $this->ingresos($this->libroDe(BusinessDate::today()))[1]);
+    }
+
+    private function numeroVigente(int|string|null $cobro): string
+    {
+        return (string) FeeChargeReceipt::query()
+            ->where('fee_charge_id', $cobro)
+            ->latest('id')
+            ->firstOrFail()
+            ->receipt
+            ->formatted_number;
+    }
+
+    // ── Lo que cambia el total, en la base ──────────────────────────────
+
+    public function test_the_database_rejects_a_new_line_on_a_paid_charge(): void
+    {
+        $this->abrir();
+        $cobro = $this->cobrar();
+        $renglon = (array) DB::table('fee_charge_items')->where('fee_charge_id', $cobro->id)->first();
+        unset($renglon['id']);
+
+        $this->assertLaBaseRechaza(function () use ($renglon): void {
+            DB::table('fee_charge_items')->insert([...$renglon, 'line_number' => 3]);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        }, 'cobro pagado');
+    }
+
+    /** Aunque se vincule más dinero en la misma transacción: el recibo sigue diciendo otro total. */
+    public function test_the_database_rejects_a_paid_charge_whose_receipt_is_for_another_total(): void
+    {
+        $this->abrir();
+        $cobro = $this->cobrar();
+        $renglon = (array) DB::table('fee_charge_items')->where('fee_charge_id', $cobro->id)->first();
+        unset($renglon['id']);
+        $recepcion = app(RegisterCashFundReceipt::class)->handle(
+            amount: (string) $renglon['original_amount'],
+            idempotencyKey: 'otra-recepcion',
+            cashBoxId: $this->caja,
+            receivedDate: BusinessDate::today(),
+            medium: PaymentMedium::Cash,
+            actorId: $this->admin->id,
+            notes: 'Más dinero',
+            currency: Currency::Ars,
+        );
+
+        $this->assertLaBaseRechaza(function () use ($cobro, $renglon, $recepcion): void {
+            DB::table('fee_charge_items')->insert([...$renglon, 'line_number' => 3]);
+            app(FeeChargeFunds::class)->apply($cobro, $recepcion, (string) $renglon['original_amount'], BusinessDate::today(), $this->admin->id);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        }, 'recibo vigente por su total');
+    }
+
+    public function test_the_database_rejects_a_new_line_on_a_voided_charge(): void
+    {
+        $this->abrir();
+        $cobro = $this->cobrar();
+        $renglon = (array) DB::table('fee_charge_items')->where('fee_charge_id', $cobro->id)->first();
+        unset($renglon['id']);
+
+        app(VoidFeeCollection::class)->handle($cobro, $this->motivo(), $this->admin->id);
+
+        $this->assertLaBaseRechaza(
+            fn () => DB::table('fee_charge_items')->insert([...$renglon, 'line_number' => 3]),
+            'anulado no recibe renglones',
+        );
+    }
+
+    // ── Lo que ve quien corrige ─────────────────────────────────────────
+
+    /** La pantalla calcula con la misma fecha de tarifa que el servidor. */
+    public function test_the_correction_form_gets_the_original_pricing_date(): void
+    {
+        $this->abrir();
+        $ayer = BusinessDate::today()->subDay();
+        $cobro = $this->cobrar(null, $ayer, 'T-1');
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.corregir.edit', $cobro))->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('corrects.pricingDate', $ayer->toDateString()));
+    }
+
+    /** Un CUIT quitado en el reemplazo no vuelve, ni en el listado ni al corregir. */
+    public function test_a_cuit_removed_by_a_replacement_stays_removed(): void
+    {
+        $this->abrir();
+        $cobro = app(CollectFeeInCash::class)->handle('Empresa', '30710442892', [$this->linea(14)], 'con-cuit', $this->admin->id, null, null, null, true);
+
+        app(ReplaceFeeReceipt::class)->handle($cobro, 'Empresa', null, [], $this->motivo(FeeReasonCode::WrongPayer), null, $this->admin->id);
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.payerCuit', null));
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.corregir.edit', $cobro))->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('corrects.payerCuit', null));
     }
 
     public function test_decimal_multiplies_and_takes_percentages_without_float(): void

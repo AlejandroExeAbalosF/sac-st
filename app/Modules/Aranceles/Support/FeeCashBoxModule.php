@@ -8,6 +8,7 @@ use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use Carbon\CarbonImmutable;
@@ -38,6 +39,17 @@ final class FeeCashBoxModule implements CashBoxModule
     public function currencies(): array
     {
         return [Currency::Ars];
+    }
+
+    /**
+     * Las tasas son chicas —$ 85, $ 120, $ 3 el folio—: sin billetes y monedas
+     * menores a $ 50 el cajón no se podría contar. Cuáles circulan en la caja
+     * **no está relevado** y queda a confirmar con el área. Un importe con
+     * centavos, como el del 0,07 %, queda como diferencia explicada.
+     */
+    public function countDenominations(Currency $currency): array
+    {
+        return [...CashCountLine::suggestedDenominations($currency), 20, 10, 5, 2, 1];
     }
 
     public function chequesInCustody(PeriodClosing $closing): array

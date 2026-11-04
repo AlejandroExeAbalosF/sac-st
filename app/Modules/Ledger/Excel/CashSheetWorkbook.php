@@ -278,7 +278,17 @@ final class CashSheetWorkbook
                 $contadas[$denominacion] = ($contadas[$denominacion] ?? 0) + (int) $linea->quantity;
             }
 
-            foreach (CashCountLine::suggestedDenominations($arqueo->currency) as $denominacion) {
+            /*
+             * Lo contado siempre tiene su fila, aunque no esté preimpresa: si
+             * no, el cuadro dejaría de sumar lo que dice la evidencia.
+             */
+            $denominaciones = array_unique([
+                ...CashCountLine::suggestedDenominations($arqueo->currency),
+                ...array_map(intval(...), array_keys($contadas)),
+            ]);
+            rsort($denominaciones);
+
+            foreach ($denominaciones as $denominacion) {
                 $fila++;
                 $cantidad = $contadas[(string) $denominacion] ?? 0;
 

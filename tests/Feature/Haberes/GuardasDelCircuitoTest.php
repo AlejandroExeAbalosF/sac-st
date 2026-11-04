@@ -19,9 +19,11 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
+use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,6 +218,35 @@ class GuardasDelCircuitoTest extends TestCase
     {
         $this->expectExceptionMessageMatches('/ningún cobro ni recibo/u');
         $this->anular($this->cuotaEnEfectivo());
+    }
+
+    /** Anulado otro día: el ingreso sigue en su fecha y la reversión aparece en la suya. */
+    public function test_anular_otro_dia_deja_cada_dia_explicando_su_movimiento(): void
+    {
+        $hoy = BusinessDate::today();
+        $ayer = $hoy->subDay();
+
+        $cuota = $this->cuotaEnEfectivo();
+        app(CollectAndIssueReceipt::class)->handle(
+            installment: $cuota,
+            idempotencyKey: 'cobro-de-ayer',
+            actorId: $this->operador()->id,
+            talonarioNumber: '72190',
+            printsTalonarioNumber: true,
+            receivedDate: $ayer,
+        );
+        $recibo = Receipt::query()->firstOrFail();
+
+        $this->anular($cuota->refresh());
+
+        $caja = (int) $recibo->cash_box_id;
+        $libro = app(CashDayBook::class);
+        $delDia = $libro->entries($caja, $hoy, $hoy)['income'];
+
+        $this->assertSame([$recibo->id], array_column($libro->entries($caja, $ayer, $ayer)['income'], 'receiptId'));
+        $this->assertCount(1, $delDia);
+        $this->assertSame('Anulación del recibo '.($recibo->talonario_number ?? $recibo->formatted_number), $delDia[0]['number']);
+        $this->assertSame('-'.$recibo->amount, $delDia[0]['cash']);
     }
 
     /*

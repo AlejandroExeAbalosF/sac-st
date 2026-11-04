@@ -8,6 +8,7 @@ use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Excel\CashSheet;
+use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBoxModule;
 use App\Modules\Ledger\Support\ChequeCustodyAt;
@@ -46,6 +47,11 @@ final class HaberesCashBoxModule implements CashBoxModule
     public function currencies(): array
     {
         return [Currency::Ars, Currency::Usd];
+    }
+
+    public function countDenominations(Currency $currency): array
+    {
+        return CashCountLine::suggestedDenominations($currency);
     }
 
     /** Las de la planilla del área, que son las de siempre. */

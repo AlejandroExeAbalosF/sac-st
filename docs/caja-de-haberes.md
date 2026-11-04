@@ -160,6 +160,12 @@ cuentas.
 La pantalla principal. Arriba, los saldos; abajo, los movimientos de la jornada y
 el flujo del día: contar, revisar, cerrar, bajar la planilla, reabrir.
 
+**Un recibo anulado otro día** sigue en la fecha en que entró el dinero, y su reversión aparece
+como «Anulación del recibo N», restando en el bloque de ingresos: es donde el cierre la suma, así
+el detalle explica el total de cada día. Vale para las tres cajas. Anulado el mismo día no aparece
+ninguno de los dos. Cómo lo asienta el área en papel **no está relevado**. Los cierres ya
+congelados no cambian: la fila nueva aparece en la pantalla y en los cierres que se hagan desde ahora.
+
 Lista también **los asientos que movieron el día**, con su rótulo, su importe y el
 día en que se revirtió si se revirtió. Es lo único que explica una jornada donde
 el libro cambió y no hay comprobante que lo respalde —una reversión, por ejemplo—.
@@ -410,7 +416,8 @@ Regenerar no le pregunta al módulo de hoy cómo era el formato. La evidencia de
 `schema 1`, anterior a que Multas cerrara, es toda de Haberes y se lee con sus
 columnas de siempre. La base acepta las dos, con la versión como número entero,
 y en la nueva exige cada columna con clave y encabezado de texto no vacíos, sin
-claves repetidas, y la aclaración de banco (texto o nula).
+claves repetidas, y la aclaración de banco (texto o nula). La lista de columnas
+puede estar vacía solo si la evidencia no trae cheques: es el caso de Aranceles.
 
 Al cerrar tarde, la custodia se determina a la fecha del período, considerando
 recepciones, depósitos, rechazos, entregas y reversiones. No se copia el estado actual del

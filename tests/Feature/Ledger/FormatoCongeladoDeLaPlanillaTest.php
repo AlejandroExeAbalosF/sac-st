@@ -92,7 +92,9 @@ class FormatoCongeladoDeLaPlanillaTest extends TestCase
         unset($sinNota['bankColumnNote']);
 
         $rotos = [
-            'sin columnas' => [...$payload, 'chequeColumns' => []],
+            // Una caja sin cheques cierra sin columnas; un cheque sin columnas no se dibuja.
+            'con cheques y sin columnas' => [...$payload, 'chequeColumns' => [], 'cheques' => [['number' => '1']]],
+            'sin decir si tiene cheques' => array_diff_key([...$payload, 'chequeColumns' => []], ['cheques' => true]),
             'sin la aclaración de banco' => $sinNota,
             'de un formato desconocido' => [...$payload, 'schema' => 3],
             // El lector espera el entero: la base no puede aceptar lo que después no se lee.

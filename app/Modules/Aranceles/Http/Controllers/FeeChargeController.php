@@ -259,10 +259,12 @@ final class FeeChargeController extends Controller
         return new FeeChargeListItemData(
             id: $cobro->id,
             payerName: $papel['payerName'] ?? $cobro->payer_name,
-            payerCuit: $papel['payerCuit'] ?? $cobro->payer_cuit,
+            // Un CUIT quitado en el reemplazo es nulo en el papel: no vuelve el original.
+            payerCuit: $papel === null ? $cobro->payer_cuit : ($papel['payerCuit'] ?? null),
             medium: $cobro->medium,
             status: $cobro->status,
             paidOn: $cobro->paid_on?->toDateString(),
+            pricingDate: $cobro->pricing_date->toDateString(),
             total: Decimal::scale((string) $cobro->balance?->total),
             lines: array_values($cobro->items->map(fn (FeeChargeItem $i): FeeChargeLineData => new FeeChargeLineData(
                 feeTypeId: $i->fee_type_id,

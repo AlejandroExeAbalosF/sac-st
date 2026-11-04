@@ -16,7 +16,6 @@ use App\Modules\Ledger\Excel\CashSheetWorkbook;
 use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Models\CashCount;
-use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
@@ -141,7 +140,7 @@ final class CashCalendarController extends Controller
              * mirar: las denominaciones del arqueo y la versión del
              * dibujo de la planilla.
              */
-            'suggestedDenominations' => CashCountLine::suggestedDenominations($moneda),
+            'suggestedDenominations' => $this->cashBoxModule($request)->countDenominations($moneda),
             'sheetVersion' => CashSheetWorkbook::VERSION,
             /*
              * Los días con movimientos sin cerrar, por mes. El diálogo de

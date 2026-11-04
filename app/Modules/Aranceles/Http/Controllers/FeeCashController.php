@@ -7,10 +7,10 @@ namespace App\Modules\Aranceles\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Aranceles\Actions\OpenFeeCashBook;
 use App\Modules\Aranceles\Http\Requests\OpenFeeCashBookRequest;
+use App\Modules\Aranceles\Support\FeeCashBoxModule;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
-use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Support\OpeningLines;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Ui\Toast;
@@ -23,7 +23,10 @@ use Inertia\Response;
 /** La apertura de la caja de Aranceles: una sola vez, sin saldo bancario. */
 final class FeeCashController extends Controller
 {
-    public function __construct(private readonly OpeningLines $lineas) {}
+    public function __construct(
+        private readonly OpeningLines $lineas,
+        private readonly FeeCashBoxModule $modulo,
+    ) {}
 
     public function apertura(Request $request): Response
     {
@@ -48,7 +51,7 @@ final class FeeCashController extends Controller
                 ->get()
                 ->map(fn (BankAccount $cuenta): array => ['id' => $cuenta->id, 'label' => $cuenta->label])
                 ->all()),
-            'suggestedDenominations' => CashCountLine::suggestedDenominations(Currency::Ars),
+            'suggestedDenominations' => $this->modulo->countDenominations(Currency::Ars),
             'canOpen' => $request->user()?->can('aranceles.caja.abrir') ?? false,
         ]);
     }

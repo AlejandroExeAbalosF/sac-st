@@ -17,7 +17,6 @@ use App\Modules\Ledger\Excel\CashSheetWorkbook;
 use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Models\CashCount;
-use App\Modules\Ledger\Models\CashCountLine;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\PeriodClosing;
 use App\Modules\Ledger\Support\CashBalance;
@@ -169,7 +168,7 @@ final class CashController extends Controller
              * pueda cargar desde acá sin ir a la otra pantalla: la jornada
              * termina en esta caja, no en la lista de arqueos.
              */
-            'suggestedDenominations' => CashCountLine::suggestedDenominations($moneda),
+            'suggestedDenominations' => $this->cashBoxModule($request)->countDenominations($moneda),
             'can' => [
                 'open' => $this->canOnCashBox($request, CashBoxAbility::Open),
                 'count' => $this->canOnCashBox($request, CashBoxAbility::Count),

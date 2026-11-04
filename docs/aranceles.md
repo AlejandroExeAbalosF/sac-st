@@ -58,6 +58,11 @@ Son las pantallas de caja de siempre, con la caja de Aranceles y permisos propio
   sobre el mismo evento de apertura, sin asiento nuevo: no es recaudación ni respalda un
   cobro, y es lo que va a permitir depositarlo.
 - **Serie:** los recibos numeran con `0110`, configurable en Numeración.
+- **Arqueo:** además de los billetes de las otras cajas ofrece 20, 10, 5, 2 y 1, porque las tasas
+  son chicas. Qué denominaciones circulan **no está relevado**. Un importe con centavos no se
+  puede contar y queda como diferencia explicada, hasta que el área diga cómo se rinde.
+- **Cierre y planilla:** sin columnas de cheques ni inventario. **Base:**
+  `closing_evidence_matches_version` admite la lista vacía solo si la evidencia no trae cheques.
 
 <a id="cobro"></a>
 
@@ -84,7 +89,9 @@ una sola transacción.
 Los asientos son los de Multas: `funds_received` (D efectivo / C sin identificar) y
 `funds_applied` (D sin identificar / C recaudado). **Base:** `fee_charge_funding_coherent`
 impide usar una recepción de otra caja, de otro medio, revertida o que supere su importe;
-`fee_charge_settled` exige que un cobro pagado tenga su total vinculado y un recibo vigente;
+`fee_charge_settled` exige que un cobro pagado tenga su total vinculado y un recibo vigente por
+ese total, y se comprueba también al agregar un renglón o un ajuste;
+`fee_charge_items_not_on_voided` impide agregar renglones a un cobro anulado;
 `funding_allocations_not_from_aranceles` impide financiar cuotas de Haberes.
 
 <a id="recibo"></a>
@@ -117,3 +124,7 @@ vinculado a él (`fee_charge_corrections`) y usa la fecha de tarifa del original
 corregir usan la fecha de hoy, y no se pueden con el día de hoy cerrado. Un reemplazo conserva
 la fecha y los hechos del recibo original: la recaudación no cambia de día ni de mes.
 Una devolución de dinero no existe todavía: no se resuelve anulando.
+
+**En el libro del día,** anular o corregir el importe otro día deja el recibo en la fecha en que
+entró el dinero y agrega una fila «Anulación del recibo N» que resta en la fecha de la reversión.
+Con el mismo importe el dinero no se mueve: el renglón de ese día pasa a ser el del recibo nuevo.

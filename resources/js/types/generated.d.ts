@@ -20,6 +20,7 @@ declare namespace App {
                     readonly medium: App.Modules.Aranceles.Enums.FeeChargeMedium;
                     readonly status: App.Modules.Aranceles.Enums.FeeChargeStatus;
                     readonly paidOn: string | null;
+                    readonly pricingDate: string;
                     readonly total: string;
                     readonly lines: App.Modules.Aranceles.Data.FeeChargeLineData[];
                     readonly receiptId: number | null;

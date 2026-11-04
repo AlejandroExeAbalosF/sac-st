@@ -114,7 +114,8 @@ export default function NuevoCobro({
         string | undefined
     >;
     const atrasado = form.data.receivedOn < hoy;
-    const fecha = corrects ? hoy : form.data.receivedOn;
+    // La corrección conserva la tarifa del cobro original, como en el servidor.
+    const fecha = corrects ? corrects.pricingDate : form.data.receivedOn;
     const importes = form.data.lineas.map((l) =>
         importeDeLinea(l, feeTypes, fecha),
     );

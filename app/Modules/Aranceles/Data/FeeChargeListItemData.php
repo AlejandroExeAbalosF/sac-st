@@ -22,6 +22,8 @@ final readonly class FeeChargeListItemData
         public FeeChargeMedium $medium,
         public FeeChargeStatus $status,
         public ?string $paidOn,
+        /** Con qué tarifa se calcula: la corrección conserva la del cobro original. */
+        public string $pricingDate,
         public string $total,
         public array $lines,
         public ?int $receiptId,

@@ -36,6 +36,15 @@ interface CashBoxModule
     public function currencies(): array;
 
     /**
+     * Lo que la pantalla ofrece para contar el cajón de esta caja, en esa
+     * moneda. Una caja de importes chicos necesita denominaciones que las otras
+     * no usan, y su planilla no tiene por qué cargar con esas filas.
+     *
+     * @return list<int>
+     */
+    public function countDenominations(Currency $currency): array;
+
+    /**
      * El inventario del reverso: los cheques que estaban en el cajón al
      * terminar el período, con las columnas que declara `chequeColumns()` y
      * además `number`, `bank`, `date` y `amount`.

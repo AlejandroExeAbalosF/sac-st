@@ -10,6 +10,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -41,6 +42,10 @@ use Illuminate\Support\Facades\DB;
  * rechazo en tránsito o ya acreditado no mueve ninguna de las tres y no
  * tiene fila; uno en el cajón baja los cheques. El rótulo va en `number`,
  * que es la columna que el papel usa para identificar cada renglón.
+ *
+ * Lo mismo la reversión de un recibo anulado otro día: entre lo que dice el
+ * saldo inicial y lo que dice el total del día tiene que haber una fila que lo
+ * explique. Cómo lo asienta el área en papel **no está relevado**.
  *
  * @phpstan-type Fila array{number: string, receiptId: int|null, eventId: int|null, installmentId: int|null, cash: numeric-string, cheques: numeric-string, bank: numeric-string}
  */
@@ -79,6 +84,10 @@ final class CashDayBook
              * Salvo el cheque rechazado que se anuló: su recepción no se revierte,
              * porque el cheque sí entró y salió con el rechazo. Sin este renglón,
              * el egreso del rechazo quedaría sin su ingreso.
+             *
+             * Y salvo el que se anuló otro día: ese día el dinero figuró, y el
+             * total del día lo cuenta. Sigue en su fecha y la reversión aparece
+             * en la suya (`laterVoids`).
              */
             ->where(function ($query): void {
                 // Uno reemplazado tampoco: su lugar lo ocupa el reemplazante.
@@ -88,6 +97,35 @@ final class CashDayBook
                             ->from('fund_receipts AS cheque')
                             ->join('cheque_rejections AS rechazo', 'rechazo.fund_receipt_id', '=', 'cheque.id')
                             ->whereColumn('cheque.financial_event_id', 'pivote.financial_event_id');
+                    })
+                    ->orWhere(function ($anulado): void {
+                        $anulado->where('receipts.status', 'voided')
+                            ->whereExists(function ($reversion): void {
+                                $reversion->selectRaw('1')
+                                    ->from('financial_events AS reversion')
+                                    ->join('journal_lines AS linea', 'linea.financial_event_id', '=', 'reversion.id')
+                                    ->where(function ($vinculo): void {
+                                        $this->documentsTheMoneyOf($vinculo, 'reversion.reversal_of_id');
+                                    })
+                                    ->whereColumn('reversion.event_date', '>', 'financial_events.event_date')
+                                    ->whereIn('reversion.status', [
+                                        FinancialEventStatus::Posted->value,
+                                        FinancialEventStatus::Reversed->value,
+                                    ])
+                                    ->whereIn('linea.account_code', $this->locationAccounts());
+                            })
+                            /*
+                             * Si después de anularlo se emitió otro sobre el mismo
+                             * dinero, el renglón de ese día es el del otro.
+                             */
+                            ->whereNotExists(function ($posterior): void {
+                                $posterior->selectRaw('1')
+                                    ->from('receipt_financial_events AS otro_pivote')
+                                    ->join('receipts AS otro', 'otro.id', '=', 'otro_pivote.receipt_id')
+                                    ->whereColumn('otro_pivote.financial_event_id', 'pivote.financial_event_id')
+                                    ->whereColumn('otro.id', '>', 'receipts.id')
+                                    ->whereColumn('otro.created_at', '>=', 'receipts.voided_at');
+                            });
                     });
             })
             ->select([
@@ -134,6 +172,106 @@ final class CashDayBook
 
         foreach ($this->chequeIncidents($cashBoxId, $from, $to, $currency) as $bloque => $filasDelHecho) {
             array_push($libro[$bloque], ...$filasDelHecho);
+        }
+
+        foreach ($this->laterVoids($cashBoxId, $from, $to, $currency) as $bloque => $filasDelHecho) {
+            array_push($libro[$bloque], ...$filasDelHecho);
+        }
+
+        return $libro;
+    }
+
+    /** @return list<string> Las cuentas de las tres columnas de la planilla. */
+    private function locationAccounts(): array
+    {
+        return [
+            LedgerAccount::CashOnHand->value,
+            LedgerAccount::ChequesInCustody->value,
+            LedgerAccount::BankAccount->value,
+        ];
+    }
+
+    /**
+     * Si `pivote` documenta el dinero de ese asiento: lo cita directamente, como
+     * en Multas y Aranceles, o cita la asignación financiada con esa recepción.
+     */
+    private function documentsTheMoneyOf(Builder $query, string $evento): void
+    {
+        $query->whereColumn('pivote.financial_event_id', $evento)
+            ->orWhereExists(function ($asignada) use ($evento): void {
+                $asignada->selectRaw('1')
+                    ->from('funding_allocations AS asignacion')
+                    ->join('fund_receipts AS recepcion', 'recepcion.id', '=', 'asignacion.fund_receipt_id')
+                    ->whereColumn('asignacion.allocation_event_id', 'pivote.financial_event_id')
+                    ->whereColumn('recepcion.financial_event_id', $evento);
+            });
+    }
+
+    /**
+     * Las reversiones de recibos anulados después del día en que entró el dinero.
+     *
+     * Van en el bloque del recibo y restando, porque es como las suma el cierre:
+     * una reversión pertenece al renglón del hecho que revierte. Si se anula el
+     * mismo día no hay fila: el recibo tampoco aparece y el día neto da cero.
+     *
+     * @return array{income: list<Fila>, expense: list<Fila>}
+     */
+    private function laterVoids(int $cashBoxId, CarbonInterface $from, CarbonInterface $to, Currency $currency): array
+    {
+        // El recibo anulado que documentaba ese dinero, y el último si hubo varios.
+        $recibo = fn () => DB::table('receipts AS recibo')
+            ->join('receipt_financial_events AS pivote', 'pivote.receipt_id', '=', 'recibo.id')
+            ->where(function ($vinculo): void {
+                $this->documentsTheMoneyOf($vinculo, 'original.id');
+            })
+            ->where('recibo.status', 'voided')
+            ->orderByDesc('recibo.id')
+            ->limit(1);
+
+        $filas = DB::table('financial_events AS reversion')
+            ->join('financial_events AS original', 'original.id', '=', 'reversion.reversal_of_id')
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'reversion.id')
+            ->where('journal_lines.cash_box_id', $cashBoxId)
+            ->where('journal_lines.currency', $currency->value)
+            ->whereIn('journal_lines.account_code', $this->locationAccounts())
+            ->whereIn('reversion.status', [
+                FinancialEventStatus::Posted->value,
+                FinancialEventStatus::Reversed->value,
+            ])
+            ->whereDate('reversion.event_date', '>=', $from)
+            ->whereDate('reversion.event_date', '<=', $to)
+            ->whereColumn('reversion.event_date', '>', 'original.event_date')
+            ->groupBy('reversion.id', 'original.id')
+            ->select('reversion.id')
+            ->selectSub($recibo()->selectRaw('COALESCE(recibo.talonario_number, recibo.formatted_number)'), 'number')
+            ->selectSub($recibo()->select('recibo.receipt_type'), 'receipt_type')
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS cash', [LedgerAccount::CashOnHand->value])
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS cheques', [LedgerAccount::ChequesInCustody->value])
+            ->selectRaw('SUM(CASE WHEN journal_lines.account_code = ? THEN journal_lines.debit - journal_lines.credit ELSE 0 END) AS bank', [LedgerAccount::BankAccount->value])
+            ->orderBy('reversion.id')
+            ->get();
+
+        $libro = ['income' => [], 'expense' => []];
+
+        foreach ($filas as $fila) {
+            // La reversión de algo que no tuvo recibo no tiene fila en este libro.
+            if ($fila->number === null) {
+                continue;
+            }
+
+            $ingreso = $fila->receipt_type === 'income';
+            // Un ingreso revertido acredita la cuenta; un egreso revertido, la debita.
+            $importe = fn (string $neto): string => Decimal::scale($ingreso ? $neto : Decimal::sub('0', $neto));
+
+            $libro[$ingreso ? 'income' : 'expense'][] = [
+                'number' => sprintf('Anulación del recibo %s', $fila->number),
+                'receiptId' => null,
+                'eventId' => (int) $fila->id,
+                'installmentId' => null,
+                'cash' => $importe((string) $fila->cash),
+                'cheques' => $importe((string) $fila->cheques),
+                'bank' => $importe((string) $fila->bank),
+            ];
         }
 
         return $libro;

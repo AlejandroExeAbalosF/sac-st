@@ -16,6 +16,7 @@ use App\Modules\Ledger\Enums\PeriodType;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Multas\Actions\AdjustFineDebt;
 use App\Modules\Multas\Actions\CollectFinePayment;
@@ -92,6 +93,28 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
 
         $nuevo = $this->cobrar($multa, '400000.00');
         expect($this->reciboDe($nuevo)->formatted_number)->not->toBe($recibo->formatted_number);
+    }
+
+    /** Anulado otro día: el ingreso sigue en su fecha y la reversión aparece en la suya. */
+    public function test_voiding_another_day_keeps_the_day_book_explaining_each_day(): void
+    {
+        $multa = $this->escenario();
+        $hoy = BusinessDate::today();
+        $ayer = $hoy->subDay();
+        $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id');
+
+        $this->travelTo($ayer->setTime(12, 0));
+        $pago = $this->cobrar($multa, '400000.00');
+        $numero = $this->reciboDe($pago)->talonario_number ?? $this->reciboDe($pago)->formatted_number;
+        $this->travelBack();
+
+        $this->anular($pago);
+
+        $libro = app(CashDayBook::class);
+
+        expect(array_column($libro->entries($caja, $ayer, $ayer)['income'], 'cash'))->toBe(['400000.00'])
+            ->and(array_column($libro->entries($caja, $hoy, $hoy)['income'], 'cash'))->toBe(['-400000.00'])
+            ->and($libro->entries($caja, $hoy, $hoy)['income'][0]['number'])->toBe('Anulación del recibo '.$numero);
     }
 
     /** Un segundo envío del mismo formulario no vuelve a revertir. */
