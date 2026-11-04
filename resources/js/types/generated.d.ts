@@ -1176,6 +1176,9 @@ declare namespace App {
                     externalReceiptReference: string | null;
                     appealDiffers: boolean;
                     discardReason: string | null;
+                    voidReason: string | null;
+                    voidedAt: string | null;
+                    voidable: boolean;
                     replacesPaymentId: number | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
                     deposit: App.Modules.Multas.Data.FineDepositData | null;
@@ -1222,7 +1225,7 @@ declare namespace App {
                     | 'direct_deposit'
                     | 'echeq';
                 export type FinePaymentStatus =
-                    'reported' | 'applied' | 'discarded';
+                    'reported' | 'applied' | 'discarded' | 'voided';
                 export type FineProvenance = 'manual' | 'import';
                 export type FineReasonAct =
                     | 'adjustment'
@@ -1232,7 +1235,9 @@ declare namespace App {
                     | 'link_revocation'
                     | 'correction'
                     | 'historical_rejection'
-                    | 'origin_replacement';
+                    | 'origin_replacement'
+                    | 'collection_void'
+                    | 'verdict_reversal';
                 export type FineReasonCode =
                     | 'data_entry_error'
                     | 'duplicate'
@@ -1245,6 +1250,7 @@ declare namespace App {
                     | 'not_credited'
                     | 'no_evidence'
                     | 'replaced_by_correction'
+                    | 'appeal_verdict_reverted'
                     | 'other';
                 export type FineRevisionKind = 'completion' | 'correction';
                 export type FineTimeliness =

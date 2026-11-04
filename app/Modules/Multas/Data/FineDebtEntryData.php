@@ -29,7 +29,7 @@ final class FineDebtEntryData extends Data
         public ?string $documentLabel,
         /** Un aumento o una reducción sin resolución: corrige un importe mal cargado. */
         public bool $isCorrection,
-        /** La reducción del recurso que prosperó: no se revierte. */
+        /** La reducción de un veredicto, o su reversión: solo se mueve revirtiendo el veredicto. */
         public bool $isAppealVerdict,
         public ?string $reason,
         public ?int $reversalOfId,
@@ -54,7 +54,7 @@ final class FineDebtEntryData extends Data
             effectivePrecision: $movimiento->effective_precision,
             documentLabel: $movimiento->document?->label(),
             isCorrection: $movimiento->isAmountCorrection(),
-            isAppealVerdict: $movimiento->fine_appeal_id !== null,
+            isAppealVerdict: $movimiento->fine_appeal_verdict_id !== null,
             reason: Reason::text($movimiento->reason_code, $movimiento->reason),
             reversalOfId: $movimiento->reversal_of_id,
             reversedById: $movimiento->reversedBy?->id,

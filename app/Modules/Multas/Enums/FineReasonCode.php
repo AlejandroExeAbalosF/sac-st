@@ -30,6 +30,8 @@ enum FineReasonCode: string implements ReasonCode
     case NoEvidence = 'no_evidence';
     /** Lo pone el sistema: el pago informado se reemplazó por su corrección. */
     case ReplacedByCorrection = 'replaced_by_correction';
+    /** Lo pone el sistema: la reversión de la reducción de un veredicto. */
+    case AppealVerdictReverted = 'appeal_verdict_reverted';
     case Other = 'other';
 
     public function label(): string
@@ -46,6 +48,7 @@ enum FineReasonCode: string implements ReasonCode
             self::NotCredited => 'No se acreditó en el banco',
             self::NoEvidence => 'Sin respaldo que lo pruebe',
             self::ReplacedByCorrection => 'Reemplazado por su corrección',
+            self::AppealVerdictReverted => 'Se revirtió el veredicto',
             self::Other => 'Otro',
         };
     }

@@ -10,6 +10,7 @@ use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\PresentationPrecision;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -115,6 +116,33 @@ final class FinePayment extends Model
     public function fine(): BelongsTo
     {
         return $this->belongsTo(Fine::class);
+    }
+
+    /**
+     * Los que siguen en pie: ni descartados ni anulados.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeLive(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', [FinePaymentStatus::Discarded, FinePaymentStatus::Voided]);
+    }
+
+    /**
+     * @return BelongsTo<FineAppeal, $this>
+     */
+    public function appeal(): BelongsTo
+    {
+        return $this->belongsTo(FineAppeal::class, 'fine_appeal_id');
+    }
+
+    /**
+     * @return HasOne<FinePaymentVoid, $this>
+     */
+    public function voiding(): HasOne
+    {
+        return $this->hasOne(FinePaymentVoid::class);
     }
 
     /**

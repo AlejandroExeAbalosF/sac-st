@@ -27,6 +27,8 @@ enum FineReasonAct: string implements ReasonAct
     case Correction = 'correction';
     case HistoricalRejection = 'historical_rejection';
     case OriginReplacement = 'origin_replacement';
+    case CollectionVoid = 'collection_void';
+    case VerdictReversal = 'verdict_reversal';
 
     /**
      * @return list<FineReasonCode>
@@ -42,6 +44,8 @@ enum FineReasonAct: string implements ReasonAct
             self::Correction => [FineReasonCode::DataEntryError, FineReasonCode::MisreadPaper, FineReasonCode::Other],
             self::HistoricalRejection => [FineReasonCode::NoEvidence, FineReasonCode::Duplicate, FineReasonCode::WrongFine, FineReasonCode::DataEntryError, FineReasonCode::Other],
             self::OriginReplacement => [FineReasonCode::WrongDocument, FineReasonCode::DataEntryError, FineReasonCode::Other],
+            self::CollectionVoid => [FineReasonCode::DataEntryError, FineReasonCode::WrongFine, FineReasonCode::Duplicate, FineReasonCode::Other],
+            self::VerdictReversal => [FineReasonCode::DataEntryError, FineReasonCode::Other],
         };
     }
 

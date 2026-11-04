@@ -13,16 +13,22 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\DepositFineCollection;
 use App\Modules\Multas\Actions\RegisterFineAppeal;
+use App\Modules\Multas\Actions\VoidFineCollection;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\RawCashDeposit;
 
@@ -93,6 +99,39 @@ try {
             Fine::query()->findOrFail($input['fine']), FinePaymentMedium::Cash, $input['amount'], 'worker-collect-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done', 'payment' => $pago->id];
+    } elseif ($input['mode'] === 'void') {
+        // Anular un cobro mientras otro lo deposita.
+        app(VoidFineCollection::class)->handle(
+            FinePayment::query()->findOrFail($input['payment']), new Reason(FineReasonCode::DataEntryError, 'Worker'), $input['actor'],
+        );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'deposit') {
+        // Depositar un cobro mientras otro lo anula.
+        app(DepositFineCollection::class)->handle(
+            FinePayment::query()->findOrFail($input['payment']), ['depositDate' => BusinessDate::today()],
+            UploadedFile::fake()->image('ticket.jpg'), 'worker-deposit-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'raw-void') {
+        // La fila de anulación sin pasar por el Action: la base sola tiene que frenarla.
+        DB::transaction(function () use ($input): void {
+            $pago = FinePayment::query()->findOrFail($input['payment']);
+            $aplicacion = $pago->application()->firstOrFail();
+            $recepcion = $aplicacion->fundReceipt()->firstOrFail();
+            $revertir = fn (int $evento): int => (int) DB::table('financial_events')->insertGetId([
+                'public_id' => (string) Str::ulid(), 'cash_box_id' => $recepcion->cash_box_id, 'event_type' => 'reversal',
+                'event_date' => BusinessDate::today()->toDateString(), 'status' => 'posted', 'idempotency_key' => (string) Str::uuid(),
+                'reversal_of_id' => $evento, 'reversal_reason' => 'Worker', 'created_by' => $input['actor'], 'posted_by' => $input['actor'],
+                'posted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            DB::table('fine_payment_voids')->insert([
+                'fine_payment_id' => $pago->id, 'fine_id' => $pago->fine_id, 'reason_code' => 'data_entry_error',
+                'application_reversal_event_id' => $revertir($aplicacion->application_event_id),
+                'receipt_reversal_event_id' => $revertir($recepcion->financial_event_id),
+            ]);
+        });
+        $result = ['status' => 'done'];
     } elseif ($input['mode'] === 'raw-deposit') {
         // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.
         DB::transaction(function () use ($input): void {

@@ -572,34 +572,79 @@ trámite), `upheld` (prosperó), `rejected` (no prosperó), `dropped` (cayó).
   con la multa bloqueada; **Action:** `FineAppeals::assertNotFrozen` en
   `CollectFinePayment`, `ReportFineBankPayment`, `RecordFineBankCreditPayment` y
   `RecordFineHistoricalMovement`.
-- **Caída.** Descartar el depósito de un trámite abierto lo hace caer; la multa se
-  descongela y admite otro recurso. **Base:** `fine_appeal_consistent` (diferido:
-  abierto exige exactamente un pago vivo; caído, ninguno); **Action:**
-  `DiscardFinePayment`.
-- **Prosperó.** Exige el pago aplicado y deja la deuda en cero con lo cobrado según
-  el recibo externo. Si eso es menos que la obligación, una reducción con
-  `fine_appeal_id`, sin documento y motivo `appeal_admitted`, la lleva exactamente
-  a lo cobrado; si alcanza o sobra, no hay reducción y el excedente queda. Esa
-  reducción es una por trámite y no se revierte, y después no entra ningún otro
-  movimiento de importe ni un antecedente. **Base:** `fine_debt_entries_follow_appeal`,
-  `fine_debt_entries_reason_check`, `fine_debt_entries_appeal_fk`,
-  `fine_debt_entries_one_per_appeal` y `fine_appeal_consistent`; **Action:**
+- **Caída.** Descartar el depósito de un trámite abierto, o anular su cobro, lo hace
+  caer; la multa se descongela y admite otro recurso. **Base:**
+  `fine_appeal_consistent` (diferido: abierto exige exactamente un pago vivo; caído,
+  ninguno); **Action:** `DiscardFinePayment` y `VoidFineCollection`.
+- **Un veredicto exige el pago aplicado**, en los dos sentidos: el 20 % cobrado o
+  verificado, con su recibo. **Base:** `fine_appeal_consistent` (resuelto: un pago
+  vivo y aplicado, y el veredicto vigente del mismo tipo); **Action:**
   `ResolveFineAppeal`.
-- **No prosperó.** La multa se descongela y lo pagado queda a cuenta. Si después se
-  descarta su depósito informado, el veredicto se conserva y no se admite otro
-  recurso. **Base:** `fine_appeal_consistent` (a lo sumo un pago vivo) y
-  `fine_appeals_one_per_fine`.
-- El veredicto se da una vez y no cambia; el trámite no se borra. **Base:**
-  `fine_appeals_guard`. Lo da quien tiene `multas.cobrar` (ruta).
-- El veredicto se da sobre el recurso y el pago que vio quien resuelve: si el
-  recurso cayó y se registró otro, o una corrección cambió el pago, se rechaza y
-  se pide revisar la multa. **Solo Action:** `ResolveFineAppeal` compara los ids
-  que trae el formulario con los vigentes, con la multa bloqueada.
+- **Prosperó.** Deja la deuda en cero con lo cobrado según el recibo externo. Si eso
+  es menos que la obligación, una reducción con `fine_appeal_verdict_id`, sin
+  documento y motivo `appeal_admitted`, la lleva exactamente a lo cobrado; si alcanza
+  o sobra, no hay reducción y el excedente queda. Hay una reducción por veredicto, y
+  mientras esté vigente no entra ningún otro movimiento de importe ni un antecedente.
+  **Base:** `fine_debt_entries_follow_appeal`, `fine_debt_entries_reason_check`,
+  `fine_debt_entries_verdict_fk`, `fine_debt_entries_one_per_verdict` y
+  `fine_appeal_consistent`; **Action:** `ResolveFineAppeal`.
+- **No prosperó.** La multa se descongela, lo pagado queda a cuenta y no se admite
+  otro recurso. **Base:** `fine_appeals_one_per_fine`.
+- **El veredicto es una fila** (`fine_appeal_verdicts`): a lo sumo uno vigente por
+  recurso, y de una fila solo se completa su reversión, una vez. `fine_appeals.status`
+  es el estado actual. El trámite y el veredicto no se borran. **Base:**
+  `fine_appeal_verdicts_one_current`, `fine_appeal_verdicts_guard`,
+  `fine_appeals_guard` (transiciones) y `fine_appeal_verdicts_appeal_fk`. Lo da y lo
+  revierte quien tiene `multas.cobrar` (ruta).
+- **Revertir un veredicto** vuelve el recurso a trámite y congela la multa; si
+  prosperó con reducción, una reversión con el mismo veredicto y motivo
+  `appeal_verdict_reverted` la deshace, y solo así. Exige que desde el veredicto no
+  haya otros pagos vivos, antecedentes vivos ni movimientos de importe sin deshacer.
+  **Base:** `fine_appeal_consistent` (con `debt_entries_until_id`, que escribe la base,
+  y `fine_amount_moved_since`), `fine_debt_entries_follow_appeal`; **Action:**
+  `RevertFineAppealVerdict`, con un mensaje por cada operación que bloquea.
+- El veredicto se da y se revierte sobre lo que se vio: si el recurso cayó y se
+  registró otro, una corrección cambió el pago o el veredicto ya no es el vigente, se
+  rechaza y se pide revisar la multa. **Solo Action:** `ResolveFineAppeal` y
+  `RevertFineAppealVerdict` comparan los ids que trae el formulario con los vigentes,
+  con la multa bloqueada.
 - La multa en trámite figura «En recurso» (`FineDebtStatus::InAppeal`), deba lo que
   deba. **Base:** `fine_balances.appeal_status`.
-- **Pendientes, no relevados:** anular un recurso cobrado en efectivo (P13: es
-  anular un cobro con recibo), revertir un veredicto y vincular el recurso con la
-  resolución que lo resuelve.
+- **Pendiente, no relevado:** vincular el recurso con la resolución que lo resuelve.
+
+<a id="anulacion"></a>
+
+## Anulación de un cobro
+
+- Se anula un cobro de la caja, en efectivo o con cheque, ya aplicado y que **sigue en
+  la caja**: sin traslado vigente y sin rechazo en la cadena de su cheque. **Base:**
+  `fine_payment_voids_coherent`, que bloquea la multa y la recepción, la misma fila que
+  toma un depósito (`transfer_follows_box_policy`); **Action:** `VoidFineCollection`,
+  que toma el mismo bloqueo antes de comprobarlo.
+- Una recepción anulada no viaja al banco. **Base:** `fine_transfer_items_not_voided`;
+  **Action:** `DepositWholeReceiptToBank`.
+- Se escribe en este orden, en una transacción: las dos reversiones del libro, la fila
+  de `fine_payment_voids`, la recepción revertida, el recibo anulado y el pago `voided`.
+  **Base:** `fund_receipts_keep_fine_applications` (es BEFORE UPDATE: la anulación ya
+  tiene que estar) y `fine_payment_voids_coherent` (los dos eventos revierten la
+  aplicación y la recepción de ese cobro).
+- Al confirmar, un pago `voided` tiene su aplicación, su anulación y el recibo anulado;
+  uno `applied`, su aplicación y el recibo vigente. El recibo de un pago vigente no se
+  anula por su cuenta. **Base:** `fine_payment_settled`, `fine_payment_voids_settled` y
+  `receipts_multas_voided_with_payment`.
+- `voided` es final, y la anulación no se edita ni se borra. **Base:**
+  `fine_payments_guard` y `fine_payment_voids_append_only`.
+- El saldo no cuenta un cobro anulado, y el excedente que mandó ya salió del libro con
+  su reversión; si lo pagado cambió, lo que sobraba de otro cobro se reclasifica en el
+  mismo acto. **Base:** `fine_balances` y `fine_excess_settled`; **Action:**
+  `ReconcileFineExcess`.
+- El motivo sale de la lista del acto. **Base:** `fine_payment_voids_reason_check`.
+- Un recurso con veredicto no deja anular su cobro: primero se revierte. **Base:**
+  `fine_appeal_consistent`; **Action:** `VoidFineCollection`.
+- **P13 queda parcialmente resuelto.** Pendientes: el cambio de medio después de un
+  rechazo y la corrección de un pago bancario verificado.
+- **No relevado con el área:** la lista de motivos, quién anula, que un recurso resuelto
+  exija revertir el veredicto antes de anular su cobro y las condiciones para revertir.
 
 <a id="correccion"></a>
 

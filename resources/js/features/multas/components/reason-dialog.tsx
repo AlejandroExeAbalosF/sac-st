@@ -15,6 +15,7 @@ export default function ReasonDialog({
     description,
     url,
     submitLabel,
+    extra,
     onClose,
 }: {
     act: Acto;
@@ -22,11 +23,14 @@ export default function ReasonDialog({
     description: string;
     url: string;
     submitLabel: string;
+    /** Lo que se estaba mirando: el Action rechaza si cambió. */
+    extra?: Record<string, number>;
     onClose: () => void;
 }) {
     const { data, setData, post, processing, errors } = useForm({
         reasonCode: '' as Codigo | '',
         reason: '',
+        ...extra,
     });
 
     return (

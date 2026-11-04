@@ -18,6 +18,8 @@ enum FinePaymentStatus: string
     case Reported = 'reported';
     case Applied = 'applied';
     case Discarded = 'discarded';
+    /** Un cobro de la caja cuyo dinero nunca entró: conserva su aplicación y su recibo, anulado. */
+    case Voided = 'voided';
 
     public function label(): string
     {
@@ -25,6 +27,7 @@ enum FinePaymentStatus: string
             self::Reported => 'Informado',
             self::Applied => 'Aplicado',
             self::Discarded => 'Descartado',
+            self::Voided => 'Anulado',
         };
     }
 }

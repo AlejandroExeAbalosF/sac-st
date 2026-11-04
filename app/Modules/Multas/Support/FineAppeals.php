@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Support;
 
 use App\Modules\Multas\Enums\FineAppealStatus;
-use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineAppeal;
@@ -103,7 +102,7 @@ final class FineAppeals
     /** Lo que impide recurrir: un pago o un antecedente que no se descartó. */
     public function hasPayments(Fine $multa): bool
     {
-        return $multa->payments()->where('status', '<>', FinePaymentStatus::Discarded)->exists()
+        return $multa->payments()->live()->exists()
             || $multa->historicalMovements()->where('status', '<>', HistoricalMovementStatus::Rejected)->exists();
     }
 }

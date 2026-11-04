@@ -208,8 +208,22 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['veredicto' => 'Veredicto', 'cobrado' => 'Cobrado', 'reduccion' => 'Reducción de la obligación'],
             ),
             new AuditActionDefinition(
+                'multa.veredicto-revertido',
+                'Se revirtió el veredicto del recurso de la multa',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['veredicto' => 'Veredicto', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
+                'multa.cobro-anulado',
+                'Se anuló un cobro de la caja de Multas y su recibo',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.recurso-caido',
-                'Cayó el recurso de la multa al descartarse su depósito',
+                'Cayó el recurso de la multa al descartarse o anularse su pago',
                 'Multas',
                 AuditSeverity::Critical,
                 metadata: ['amount' => 'Importe', 'reason' => 'Motivo'],

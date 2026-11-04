@@ -7,12 +7,14 @@ namespace App\Modules\Multas\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\RegisterFineAppeal;
 use App\Modules\Multas\Actions\ResolveFineAppeal;
+use App\Modules\Multas\Actions\RevertFineAppealVerdict;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FineAppealStatus;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Http\Requests\RegisterFineAppealRequest;
 use App\Modules\Multas\Http\Requests\ResolveFineAppealRequest;
+use App\Modules\Multas\Http\Requests\RevertFineAppealVerdictRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Support\Ui\Toast;
@@ -24,7 +26,7 @@ use Illuminate\Http\RedirectResponse;
  *
  * En efectivo lo registra quien cobra; por depósito directo, también quien
  * concilia. Se cobra el importe del recibo externo. El veredicto lo da
- * quien cobra: la ruta exige `multas.cobrar`.
+ * quien cobra, y también lo revierte: las rutas exigen `multas.cobrar`.
  */
 final class FineAppealController extends Controller
 {
@@ -79,6 +81,15 @@ final class FineAppealController extends Controller
             $recurso->status === FineAppealStatus::Upheld ? 'El recurso prosperó: la multa quedó cancelada.' : 'El recurso no prosperó.',
             $recurso->status === FineAppealStatus::Upheld ? null : 'La multa vuelve a admitir pagos por el resto.',
         );
+
+        return back();
+    }
+
+    public function revert(RevertFineAppealVerdictRequest $request, Fine $fine, RevertFineAppealVerdict $revertir): RedirectResponse
+    {
+        $revertir->handle($fine, (int) $request->validated('verdictId'), $request->reason(), $request->user()?->id);
+
+        Toast::success('Veredicto revertido.', 'El recurso vuelve a estar en trámite y la multa, congelada.');
 
         return back();
     }

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Multas\Models;
 
-use App\Models\User;
 use App\Modules\Multas\Enums\FineAppealStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -18,13 +18,11 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $fine_id
  * @property FineAppealStatus $status
- * @property Carbon|null $resolved_at
- * @property int|null $resolved_by
  * @property int|null $created_by
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Fine $fine
- * @property-read User|null $resolver
+ * @property-read FineAppealVerdict|null $currentVerdict
  */
 final class FineAppeal extends Model
 {
@@ -33,8 +31,6 @@ final class FineAppeal extends Model
     protected $fillable = [
         'fine_id',
         'status',
-        'resolved_at',
-        'resolved_by',
         'created_by',
     ];
 
@@ -45,7 +41,6 @@ final class FineAppeal extends Model
     {
         return [
             'status' => FineAppealStatus::class,
-            'resolved_at' => 'datetime',
         ];
     }
 
@@ -58,11 +53,13 @@ final class FineAppeal extends Model
     }
 
     /**
-     * @return BelongsTo<User, $this>
+     * El veredicto vigente; los revertidos quedan en la tabla.
+     *
+     * @return HasOne<FineAppealVerdict, $this>
      */
-    public function resolver(): BelongsTo
+    public function currentVerdict(): HasOne
     {
-        return $this->belongsTo(User::class, 'resolved_by');
+        return $this->hasOne(FineAppealVerdict::class)->whereNull('reverted_at');
     }
 
     /**

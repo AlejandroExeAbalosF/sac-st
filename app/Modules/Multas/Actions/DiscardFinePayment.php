@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  *
  * Descartar el depósito de un recurso en trámite lo hace **caer**: la multa
  * se descongela y admite otro. En una corrección el trámite sigue, con el
- * pago nuevo. Si el recurso ya tiene veredicto, el veredicto se conserva.
+ * pago nuevo. Con veredicto no hay qué descartar: exige el pago aplicado.
  */
 final class DiscardFinePayment
 {

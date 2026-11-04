@@ -6,8 +6,10 @@ namespace App\Modules\Multas\Support;
 
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Generator;
@@ -32,6 +34,11 @@ use InvalidArgumentException;
  * pero ese dinero no salió de la caja, y contarlo lo sumaría dos veces el
  * día que se vuelva a depositar. La sección informa aparte cuánto quedó
  * fuera de su total.
+ *
+ * **Un cobro anulado no desaparece de su mes**: ese día el recibo existió y el
+ * libro lo registró, y un mes ya cerrado no cambia. Sigue sumando, marcado, y
+ * la anulación es una fila propia, en negativo y con su fecha: cada total dice
+ * lo asentado en ese mes, y anulado en el mismo mes da cero.
  *
  * @phpstan-type Fila array{date: string, receipt: string, caseLabel: string, caption: string, detail: string, amount: numeric-string, counted: bool}
  */
@@ -107,7 +114,7 @@ final class FineMovements
 
         return match ($section) {
             // Lo que entró en la caja: la recepción original, no su reemplazo.
-            'cobros' => $this->conMulta(DB::table('fund_receipts AS cheque'))
+            'cobros' => $this->conAnulacion($this->conMulta(DB::table('fund_receipts AS cheque')), 'receipt_reversal_event_id')
                 ->where('cheque.cash_box_id', $caja)
                 ->where('cheque.origin', 'received')
                 ->whereIn('cheque.medium', ['cash', 'cheque'])
@@ -115,9 +122,17 @@ final class FineMovements
                 ->addSelect([
                     'cheque.received_date AS fecha', 'cheque.id AS orden', 'cheque.amount AS importe',
                     'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
-                ]),
+                ])
+                ->unionAll(
+                    $this->anulaciones('receipt_reversal_event_id', $desde, $hasta)
+                        ->join('fund_receipts AS cheque', 'cheque.id', '=', 'aplicacion.fund_receipt_id')
+                        ->addSelect([
+                            'revertido.event_date AS fecha', 'cheque.id AS orden', DB::raw('-cheque.amount AS importe'),
+                            'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
+                        ]),
+                ),
 
-            'aplicaciones' => $this->conPapel(DB::table('fine_payment_applications AS aplicacion'))
+            'aplicaciones' => $this->conAnulacion($this->conPapel(DB::table('fine_payment_applications AS aplicacion')), 'application_reversal_event_id')
                 ->join('financial_events AS aplicada', 'aplicada.id', '=', 'aplicacion.application_event_id')
                 ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
                 ->whereBetween('aplicada.event_date', [$desde, $hasta])
@@ -126,9 +141,18 @@ final class FineMovements
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.applied_amount AS importe',
                     'pago.medium AS medio', 'aplicacion.timeliness AS termino',
                     'aplicacion.excess_amount AS excedente', $cuenta,
-                ]),
+                ])
+                ->unionAll(
+                    $this->anulaciones('application_reversal_event_id', $desde, $hasta)
+                        ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
+                        ->addSelect([
+                            'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.applied_amount AS importe'),
+                            'pago.medium AS medio', 'aplicacion.timeliness AS termino',
+                            'aplicacion.excess_amount AS excedente', $cuenta,
+                        ]),
+                ),
 
-            'excedentes' => $this->conPapel(DB::table('fine_payment_applications AS aplicacion'))
+            'excedentes' => $this->conAnulacion($this->conPapel(DB::table('fine_payment_applications AS aplicacion')), 'application_reversal_event_id')
                 ->join('financial_events AS aplicada', 'aplicada.id', '=', 'aplicacion.application_event_id')
                 ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
                 ->where('aplicacion.excess_amount', '>', 0)
@@ -136,7 +160,16 @@ final class FineMovements
                 ->addSelect([
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.excess_amount AS importe',
                     'pago.medium AS medio', 'aplicacion.amount AS pagado', $cuenta,
-                ]),
+                ])
+                ->unionAll(
+                    $this->anulaciones('application_reversal_event_id', $desde, $hasta)
+                        ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
+                        ->where('aplicacion.excess_amount', '>', 0)
+                        ->addSelect([
+                            'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.excess_amount AS importe'),
+                            'pago.medium AS medio', 'aplicacion.amount AS pagado', $cuenta,
+                        ]),
+                ),
 
             'depositos' => $this->conMulta(
                 DB::table('cash_to_bank_transfers AS traslado')
@@ -202,6 +235,36 @@ final class FineMovements
         ));
     }
 
+    /** Marca lo anulado: el día de la reversión de este hecho, si la hubo. */
+    private function conAnulacion(Builder $query, string $evento): Builder
+    {
+        return $query
+            ->leftJoin('fine_payment_voids AS anulacion', 'anulacion.fine_payment_id', '=', 'aplicacion.fine_payment_id')
+            ->leftJoin('financial_events AS revertido', 'revertido.id', '=', 'anulacion.'.$evento)
+            ->addSelect([
+                'revertido.event_date AS anulado_el',
+                DB::raw('FALSE AS es_anulacion'),
+                DB::raw('NULL::varchar AS motivo_codigo'),
+                DB::raw('NULL::text AS motivo_detalle'),
+            ]);
+    }
+
+    /** Las anulaciones del mes, como filas propias: las mismas columnas, con la fecha de la reversión. */
+    private function anulaciones(string $evento, string $desde, string $hasta): Builder
+    {
+        return $this->conPapel(
+            DB::table('fine_payment_voids AS anulacion')
+                ->join('fine_payment_applications AS aplicacion', 'aplicacion.fine_payment_id', '=', 'anulacion.fine_payment_id')
+                ->join('financial_events AS revertido', 'revertido.id', '=', 'anulacion.'.$evento)
+                ->whereBetween('revertido.event_date', [$desde, $hasta]),
+        )->addSelect([
+            DB::raw('NULL::date AS anulado_el'),
+            DB::raw('TRUE AS es_anulacion'),
+            'anulacion.reason_code AS motivo_codigo',
+            'anulacion.reason AS motivo_detalle',
+        ]);
+    }
+
     /** El recibo de la aplicación, con lo que congeló de la multa. */
     private function conPapel(Builder $query): Builder
     {
@@ -246,6 +309,18 @@ final class FineMovements
             ])),
             default => null,
         };
+
+        if ($texto('es_anulacion') === '1' || ($datos['es_anulacion'] ?? false) === true) {
+            $detalle = implode(' · ', array_filter([
+                'Anulación del cobro',
+                Reason::text(FineReasonCode::tryFrom($texto('motivo_codigo')), $texto('motivo_detalle') ?: null),
+            ]));
+        } elseif ($texto('anulado_el') !== '') {
+            $detalle = implode(' · ', array_filter([
+                (string) $detalle,
+                'anulado el '.CarbonImmutable::parse($texto('anulado_el'))->format('d/m/Y'),
+            ]));
+        }
 
         return [
             'date' => CarbonImmutable::parse($texto('fecha'))->toDateString(),

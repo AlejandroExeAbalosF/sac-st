@@ -606,7 +606,21 @@ Un ajuste de la obligación, su reversión o validar un pago anterior pueden
 cambiar cuánto de lo ya cobrado es excedente: el sistema lo reclasifica en el mismo
 acto, sin mover dinero.
 
-Anular un pago o cambiar su medio (P13) no está habilitado.
+<a id="anular-cobro"></a>
+
+**Anular un cobro** (`multas.anular-cobros`): para un cobro de la caja cuyo dinero
+nunca entró, por ejemplo un importe mal tipeado. Solo mientras siga en la caja: sin
+depósito vigente y sin cheque rechazado. Pide motivo. Revierte la aplicación y la
+recepción con fecha de hoy, la deuda vuelve, y el recibo queda anulado **con su
+número**, que no se reutiliza; la hoja del talonario sigue usada. El cobro queda a la
+vista como «Anulado», con el motivo. Si el día de hoy está cerrado, no se puede.
+
+En **Movimientos**, el cobro sigue en su mes, marcado «anulado el …» y sumando: ese
+día el recibo existió y el libro lo registró, y los cierres anteriores no cambian. La
+anulación es una fila propia, en negativo y con su fecha.
+
+Lo depositado o verificado no se anula así. Sigue pendiente (P13) el cambio de medio
+después de un rechazo y la corrección de un pago bancario verificado.
 
 <a id="deposito"></a>
 
@@ -728,7 +742,8 @@ un cheque electrónico** (M02):
   corrige. Se puede corregir aunque otro pago ya haya cancelado la multa; lo que
   sobre queda como excedente al verificarlo. Un depósito de recurso se corrige
   como depósito: si se pagó en efectivo, se descarta y se cobra en la caja. Lo ya
-  aplicado tiene recibo y no se corrige así: anular un pago está pendiente (P13).
+  aplicado tiene recibo y no se corrige así: un cobro de la caja [se anula](#anular-cobro);
+  corregir un pago bancario verificado está pendiente (P13).
 - **Descartar** (`multas.verificar-pagos`): un informado que no corresponde, con su
   motivo. Nunca tocó el saldo.
 
@@ -766,20 +781,34 @@ veredicto, aunque el depósito todavía no esté verificado:
 - **Cae** si se descarta su depósito informado mientras está en trámite: la multa se
   descongela y admite otro recurso.
 
-**Resolver recurso** (`multas.cobrar`, sin resolución obligatoria):
+**Resolver recurso** (`multas.cobrar`, sin resolución obligatoria) aparece recién con
+el 20 % **cobrado o verificado y su recibo emitido**: en efectivo, al cobrar; por
+depósito, al verificar. No trae ningún veredicto marcado.
 
 | Veredicto | Qué pasa con la multa |
 |---|---|
-| **Prosperó** | Queda **Cancelada** con lo cobrado según el recibo externo, no con el 20 % calculado. Si eso es menos que el importe, una reducción citando el recurso lo lleva a lo cobrado; si alcanza o sobra, no hay reducción y el excedente queda a la vista. Exige el 20 % cobrado o verificado. Nada se devuelve y el importe ya no se modifica. |
-| **No prosperó** | Se descongela: lo pagado queda a cuenta y el resto se cobra por cualquier medio. Si después se descarta su depósito informado, el veredicto se conserva y no hay otro recurso. |
+| **Prosperó** | Queda **Cancelada** con lo cobrado según el recibo externo, no con el 20 % calculado. Si eso es menos que el importe, una reducción citando el veredicto lo lleva a lo cobrado; si alcanza o sobra, no hay reducción y el excedente queda a la vista. Nada se devuelve y el importe ya no se modifica. |
+| **No prosperó** | Se descongela: lo pagado queda a cuenta y el resto se cobra por cualquier medio. No admite otro recurso. |
 
-El veredicto se elige a propósito —no viene marcado— y no se deshace desde la
-pantalla; si el recurso o su pago cambiaron mientras estaba abierto el diálogo, se
-rechaza y hay que revisar la multa. El depósito de un recurso ya resuelto no se
-corrige: solo se descarta. Quedan **pendientes, sin relevar**:
-anular un recurso cobrado en efectivo (P13), revertir un veredicto y vincular el
-recurso con la resolución que lo resuelve. El listado de multas filtra «En
-recurso».
+El veredicto se da sobre el recurso y el pago que muestra la pantalla; si cambiaron
+mientras estaba abierto el diálogo, se rechaza y hay que revisar la multa. El depósito
+de un recurso ya resuelto no se corrige. Un importe distinto se fija después con
+«Ajustar por resolución».
+
+<a id="revertir-veredicto"></a>
+
+**Revertir veredicto** (`multas.cobrar`), para uno cargado por error. Pide motivo. El
+recurso vuelve a estar en trámite y la multa, congelada; si prosperó con reducción, se
+revierte esa reducción. El veredicto queda en la tabla, con quién lo dio y quién lo
+revirtió, y el recurso se puede resolver de nuevo. Como vuelve a congelar la multa, no
+se puede si desde el veredicto hubo otros pagos, antecedentes o movimientos de importe:
+el mensaje dice cuál y qué hacer (anular el cobro, descartar el informado, rechazar el
+antecedente, revertir el ajuste). Un pago ya depositado o verificado, o un antecedente
+validado, todavía no tienen corrección: en esos casos el veredicto no se revierte por
+ahora. El cobro de un recurso con veredicto no se anula: primero se revierte.
+
+Sigue pendiente, sin relevar, vincular el recurso con la resolución que lo resuelve. El
+listado de multas filtra «En recurso».
 
 En la ficha, «Comprobante» se ofrece solo para pagos bancarios. Los cobros
 ordinarios en efectivo o cheque ya se respaldan con el recibo del sistema, y el
@@ -829,6 +858,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.reemplazar-origen` | Reemplazar la resolución de origen cargada por error | administrador |
 | `multas.corregir-importe` | Corregir un importe mal cargado sin resolución, y revertir esa corrección | administrador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso y resolverlo | administrador, administrativo |
+| `multas.anular-cobros` | Anular un cobro de la caja que sigue sin depositar. Sensible: administrador y contador |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver los pagos informados en los pendientes; identificar un crédito desde Banco › Movimientos; acreditar o cancelar un depósito de la caja | administrador, contador |

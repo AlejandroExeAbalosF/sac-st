@@ -153,6 +153,11 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('{fine}/cobros', [FinePaymentController::class, 'store'])->whereNumber('fine')->name('cobros.store');
         // El veredicto del recurso lo da quien cobra.
         Route::post('{fine}/recursos/resolver', [FineAppealController::class, 'resolve'])->whereNumber('fine')->name('recursos.resolve');
+        Route::post('{fine}/recursos/revertir', [FineAppealController::class, 'revert'])->whereNumber('fine')->name('recursos.revert');
+    });
+
+    Route::middleware('can:multas.anular-cobros')->group(function (): void {
+        Route::post('pagos/{payment}/anular', [FinePaymentController::class, 'void'])->whereNumber('payment')->name('pagos.void');
     });
 
     /*

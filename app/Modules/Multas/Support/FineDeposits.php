@@ -237,6 +237,23 @@ final class FineDeposits
     }
 
     /**
+     * Si el dinero de esta recepción sigue en la caja: sin depósito vigente y
+     * sin cheque rechazado en su cadena.
+     */
+    public function isAtTheCounter(FundReceipt $recepcion): bool
+    {
+        $depositada = CashToBankTransfer::query()
+            ->join('cash_to_bank_transfer_items as i', 'i.cash_to_bank_transfer_id', '=', 'cash_to_bank_transfers.id')
+            ->where('i.fund_receipt_id', $recepcion->id)
+            ->where('cash_to_bank_transfers.status', '<>', CashTransferStatus::Cancelled)
+            ->exists();
+
+        return ! $depositada && ! ChequeRejection::query()
+            ->whereRaw('fund_receipt_root(fund_receipt_id) = ?', [$recepcion->id])
+            ->exists();
+    }
+
+    /**
      * Los rechazos de la cadena de cada raíz, del primero al último.
      *
      * @param  list<int>  $raices

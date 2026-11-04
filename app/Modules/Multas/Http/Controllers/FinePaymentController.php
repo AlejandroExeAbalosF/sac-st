@@ -6,9 +6,12 @@ namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\VoidFineCollection;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Http\Requests\CollectFinePaymentRequest;
+use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
 use App\Modules\Multas\Pdf\FineReceiptPdf;
 use App\Modules\Shared\Models\Receipt;
@@ -19,7 +22,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
- * Cobrar una multa en la caja, y mirar o imprimir su recibo.
+ * Cobrar una multa en la caja, anular ese cobro, y mirar o imprimir su recibo.
  *
  * El recibo de Multas no pasa por el visor de Haberes: tiene su propio
  * formulario y dice lo que decía la multa al emitirlo.
@@ -40,6 +43,16 @@ final class FinePaymentController extends Controller
         $recibo = $pago->paymentReceipt()->with('receipt')->first()?->receipt;
 
         Toast::success('Cobrado.', $recibo === null ? null : 'Se emitió el recibo '.$recibo->formatted_number.'.');
+
+        return back();
+    }
+
+    /** El dinero nunca entró: revierte el cobro y anula el recibo, que conserva su número. */
+    public function void(ReasonRequest $request, FinePayment $payment, VoidFineCollection $anular): RedirectResponse
+    {
+        $anular->handle($payment, $request->reason(), $request->user()?->id);
+
+        Toast::success('Cobro anulado.', 'El recibo quedó anulado y su número no se reutiliza.');
 
         return back();
     }

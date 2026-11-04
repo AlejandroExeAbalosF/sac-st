@@ -12,6 +12,7 @@ use App\Modules\Multas\Enums\FineProvenance;
 use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineAppeal;
+use App\Modules\Multas\Models\FineAppealVerdict;
 use App\Modules\Multas\Models\FineBalance;
 use App\Modules\Multas\Models\FineDebtEntry;
 use App\Modules\Shared\Actions\RecordAuditEvent;
@@ -29,16 +30,14 @@ use InvalidArgumentException;
  *   una reducción que cita el recurso la lleva exactamente a lo cobrado; si
  *   alcanza o sobra, no hay reducción y el excedente queda a la vista
  *   (M05). Nada se devuelve, y desde ahí el importe no se mueve.
- * - **No prosperó:** la multa se descongela y lo pagado queda a cuenta. Un
- *   depósito todavía informado sigue en su cola.
+ * - **No prosperó:** la multa se descongela y lo pagado queda a cuenta.
  *
- * No exige resolución: si llega una, se carga aparte en la multa. Revertir
- * un veredicto no está relevado.
+ * Los dos exigen el 20 % cobrado o verificado, con su recibo. No exige
+ * resolución: si llega una, se carga aparte en la multa.
  *
- * El veredicto no se deshace, así que se da sobre el recurso y el pago que
- * vio quien resuelve: si mientras tanto el recurso cayó y se registró otro,
- * o una corrección cambió el pago, se rechaza en vez de resolver lo que
- * nadie miró.
+ * Se da sobre el recurso y el pago que vio quien resuelve: si mientras tanto
+ * el recurso cayó y se registró otro, o una corrección cambió el pago, se
+ * rechaza en vez de resolver lo que nadie miró.
  */
 final class ResolveFineAppeal
 {
@@ -66,7 +65,7 @@ final class ResolveFineAppeal
                 throw ValidationException::withMessages(['verdict' => 'La multa no tiene un recurso en trámite.']);
             }
 
-            $pago = $recurso->payments()->where('status', '<>', FinePaymentStatus::Discarded)->sole();
+            $pago = $recurso->payments()->live()->sole();
 
             if ($recurso->id !== $expectedAppealId || $pago->id !== $expectedPaymentId) {
                 throw ValidationException::withMessages([
@@ -74,13 +73,21 @@ final class ResolveFineAppeal
                 ]);
             }
 
-            if ($veredicto === FineAppealStatus::Upheld && $pago->status !== FinePaymentStatus::Applied) {
+            if ($pago->status !== FinePaymentStatus::Applied) {
                 throw ValidationException::withMessages([
-                    'verdict' => 'El 20 % todavía no se verificó: el recurso prospera con lo cobrado.',
+                    'verdict' => 'El 20 % todavía no se verificó: el recurso se resuelve con el pago cobrado y su recibo.',
                 ]);
             }
 
-            $recurso->forceFill(['status' => $veredicto, 'resolved_at' => now(), 'resolved_by' => $actorId])->save();
+            $fila = FineAppealVerdict::query()->create([
+                'fine_appeal_id' => $recurso->id,
+                'fine_id' => $multa->id,
+                'verdict' => $veredicto,
+                'resolved_at' => now(),
+                'resolved_by' => $actorId,
+            ]);
+
+            $recurso->forceFill(['status' => $veredicto])->save();
 
             $saldo = FineBalance::query()->whereKey($multa->id)->firstOrFail();
             $cobrado = Decimal::add($saldo->operational_paid, $saldo->historical_paid);
@@ -97,7 +104,7 @@ final class ResolveFineAppeal
                     'effective_on' => BusinessDate::today()->toDateString(),
                     'effective_precision' => DatePrecision::Day,
                     'reason_code' => FineReasonCode::AppealAdmitted,
-                    'fine_appeal_id' => $recurso->id,
+                    'fine_appeal_verdict_id' => $fila->id,
                     'provenance' => FineProvenance::Manual,
                     'created_by' => $actorId,
                 ]);

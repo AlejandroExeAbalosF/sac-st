@@ -74,6 +74,16 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 'multas',
                 ['administrador', 'administrativo'],
             ),
+            // Deja sin respaldo un recibo ya entregado: como `recibos.anular` en
+            // Haberes, no lo alcanza quien cobra todos los días.
+            new PermissionDefinition(
+                'multas.anular-cobros',
+                'Anular cobros de multas',
+                'Anular un cobro de la caja que sigue sin depositar: el dinero nunca entró. Revierte sus asientos y anula el recibo, que conserva su número.',
+                'multas',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
             // Llevar al banco lo cobrado: cambia de lugar, no de dueño. Lo hace
             // quien atiende la caja, como en Haberes (`caja.trasladar`).
             new PermissionDefinition(

@@ -68,8 +68,9 @@ import { store as attachToDocument } from '@/routes/multas/documentos/adjuntos';
 import { store as revokeLink } from '@/routes/multas/documentos/anulacion';
 import { show as showCase } from '@/routes/multas/expedientes';
 import { store as reviseEntryDate } from '@/routes/multas/movimientos/revisiones';
-import { discard } from '@/routes/multas/pagos';
+import { discard, voidMethod } from '@/routes/multas/pagos';
 import { store as attachToPayment } from '@/routes/multas/pagos/adjuntos';
+import { revert } from '@/routes/multas/recursos';
 
 type Multa = App.Modules.Multas.Data.FineDetailData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
@@ -103,6 +104,9 @@ type Props = {
         status: App.Modules.Multas.Enums.FineAppealStatus | null;
         paidAmount: string | null;
         paymentApplied: boolean;
+        verdictId: number | null;
+        verdictByName: string | null;
+        verdictAt: string | null;
     };
     firmantes: Firmante[];
     /** La clave del cobro: un doble clic no cobra dos veces. */
@@ -122,6 +126,8 @@ type Props = {
         manageRejections: boolean;
         replaceCheque: boolean;
         resolveAppeal: boolean;
+        revertVerdict: boolean;
+        voidCollection: boolean;
     };
 };
 
@@ -131,6 +137,8 @@ type Dialogo =
     | { tipo: 'banco' }
     | { tipo: 'recurso' }
     | { tipo: 'resolver-recurso' }
+    | { tipo: 'revertir-veredicto'; veredicto: number }
+    | { tipo: 'anular-cobro'; pago: Pago }
     | { tipo: 'verificar'; pago: Pago }
     | { tipo: 'descartar-pago'; pago: Pago }
     | { tipo: 'corregir-pago'; pago: Pago }
@@ -278,7 +286,12 @@ export default function MultaShow({
                         )}
                         {recurso.status !== null && !enRecurso && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Recurso: {APPEAL_STATUS[recurso.status]}.
+                                Recurso: {APPEAL_STATUS[recurso.status]}
+                                {recurso.verdictAt &&
+                                    ` el ${dateTime(recurso.verdictAt)}`}
+                                {recurso.verdictByName &&
+                                    `, por ${recurso.verdictByName}`}
+                                .
                             </p>
                         )}
                         {/*
@@ -312,9 +325,10 @@ export default function MultaShow({
                                 Multa en recurso.
                             </strong>{' '}
                             Hasta resolverlo no admite otros pagos ni cambios de
-                            importe. El depósito del recurso se verifica, se
+                            importe. Se resuelve con el 20 % cobrado o
+                            verificado. El depósito del recurso se verifica, se
                             corrige o se descarta como cualquier informado; si
-                            se descarta, el recurso cae.
+                            se descarta, o se anula su cobro, el recurso cae.
                         </span>
                     </p>
                 )}
@@ -654,7 +668,10 @@ export default function MultaShow({
                                                     }
                                                 >
                                                     {movimiento.isAppealVerdict
-                                                        ? 'Reducción por el recurso que prosperó'
+                                                        ? movimiento.kind ===
+                                                          'reversal'
+                                                            ? 'Reversión del veredicto del recurso'
+                                                            : 'Reducción por el recurso que prosperó'
                                                         : movimiento.isCorrection
                                                           ? `Corrección de importe (${DEBT_KIND[movimiento.kind].toLowerCase()})`
                                                           : DEBT_KIND[
@@ -769,16 +786,33 @@ export default function MultaShow({
 
                 <section className="rounded-lg border bg-card shadow-raised">
                     <Encabezado titulo="Pagos">
-                        {enRecurso && can.resolveAppeal && (
+                        {/* El veredicto se da con el 20 % cobrado o verificado, y su recibo. */}
+                        {enRecurso &&
+                            recurso.paymentApplied &&
+                            can.resolveAppeal && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setDialogo({ tipo: 'resolver-recurso' })
+                                    }
+                                >
+                                    <Gavel aria-hidden="true" />
+                                    Resolver recurso
+                                </Button>
+                            )}
+                        {recurso.verdictId !== null && can.revertVerdict && (
                             <Button
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() =>
-                                    setDialogo({ tipo: 'resolver-recurso' })
+                                    setDialogo({
+                                        tipo: 'revertir-veredicto',
+                                        veredicto: recurso.verdictId as number,
+                                    })
                                 }
                             >
-                                <Gavel aria-hidden="true" />
-                                Resolver recurso
+                                Revertir veredicto
                             </Button>
                         )}
                         {isNonZero(multa.balance.debt) && !enRecurso && (
@@ -902,6 +936,21 @@ export default function MultaShow({
                                                         </Button>
                                                     </>
                                                 )}
+                                            {pago.voidable &&
+                                                can.voidCollection && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'anular-cobro',
+                                                                pago,
+                                                            })
+                                                        }
+                                                    >
+                                                        Anular cobro
+                                                    </Button>
+                                                )}
                                             {/* El depósito de un recurso resuelto ya no se corrige: solo se descarta. */}
                                             {pago.status === 'reported' &&
                                                 can.reportBank &&
@@ -922,6 +971,7 @@ export default function MultaShow({
                                                 )}
                                             {can.reportBank &&
                                                 pago.status !== 'discarded' &&
+                                                pago.status !== 'voided' &&
                                                 acceptsPaymentEvidence(
                                                     pago,
                                                 ) && (
@@ -1001,6 +1051,16 @@ export default function MultaShow({
                                         {pago.discardReason && (
                                             <p className="w-full text-xs text-muted-foreground">
                                                 Descartado: {pago.discardReason}
+                                            </p>
+                                        )}
+                                        {pago.voidReason && (
+                                            <p className="w-full text-xs text-muted-foreground">
+                                                Anulado
+                                                {pago.voidedAt &&
+                                                    ` el ${dateTime(pago.voidedAt)}`}
+                                                : {pago.voidReason}. El dinero
+                                                nunca entró y el recibo quedó
+                                                anulado, con su número.
                                             </p>
                                         )}
                                         {pago.deposit && (
@@ -1270,7 +1330,6 @@ export default function MultaShow({
                         appealId={recurso.id}
                         paymentId={recurso.paymentId}
                         paidAmount={recurso.paidAmount}
-                        paymentApplied={recurso.paymentApplied}
                         onClose={cerrar}
                     />
                 )}
@@ -1279,6 +1338,27 @@ export default function MultaShow({
                     pago={dialogo.pago}
                     creditos={creditosDisponibles}
                     firmantes={firmantes}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'revertir-veredicto' && (
+                <ReasonDialog
+                    act="verdict_reversal"
+                    title="Revertir el veredicto"
+                    description="El recurso vuelve a estar en trámite y la multa, congelada. Si prosperó, se revierte la reducción que la canceló. El veredicto queda a la vista, con quién lo dio."
+                    url={revert(multa.id).url}
+                    submitLabel="Revertir veredicto"
+                    extra={{ verdictId: dialogo.veredicto }}
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'anular-cobro' && (
+                <ReasonDialog
+                    act="collection_void"
+                    title="Anular el cobro"
+                    description="Es para un cobro cuyo dinero nunca entró: revierte los asientos, la deuda vuelve y el recibo queda anulado. Su número no se reutiliza. Si el cobro es el del recurso en trámite, el recurso cae."
+                    url={voidMethod(dialogo.pago.id).url}
+                    submitLabel="Anular cobro"
                     onClose={cerrar}
                 />
             )}

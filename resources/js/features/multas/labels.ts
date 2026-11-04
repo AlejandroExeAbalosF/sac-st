@@ -90,6 +90,7 @@ export const PAYMENT_STATUS: Record<
     reported: { label: 'Informado', tone: 'action' },
     applied: { label: 'Aplicado', tone: 'done' },
     discarded: { label: 'Descartado', tone: 'neutral' },
+    voided: { label: 'Anulado', tone: 'neutral' },
 };
 
 export const APPEAL_KIND: Record<AppealKind, string> = {

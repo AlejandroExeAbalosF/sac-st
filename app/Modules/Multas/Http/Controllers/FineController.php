@@ -237,6 +237,8 @@ final class FineController extends Controller
             'payments.application.fundReceipt',
             'payments.paymentReceipt.receipt',
             'payments.creator:id,name',
+            'payments.voiding',
+            'payments.appeal',
         ]);
 
         $usuario = $request->user();
@@ -244,9 +246,9 @@ final class FineController extends Controller
         $verifica = $usuario?->can('multas.verificar-pagos') ?? false;
         $emiteRecibos = $cobra || $verifica;
         $cajaAbierta = $this->cajaAbierta($fine);
-        $recurso = $recursos->current($fine);
+        $recurso = $recursos->current($fine)?->load('currentVerdict.resolver:id,name');
         $pagoDelRecurso = $recurso === null ? null : $fine->payments->first(
-            fn (FinePayment $pago): bool => $pago->fine_appeal_id === $recurso->id && $pago->status !== FinePaymentStatus::Discarded,
+            fn (FinePayment $pago): bool => $pago->fine_appeal_id === $recurso->id && ! in_array($pago->status, [FinePaymentStatus::Discarded, FinePaymentStatus::Voided], true),
         );
 
         return Inertia::render('multas/show', [
@@ -293,6 +295,10 @@ final class FineController extends Controller
                 'status' => $recurso?->status,
                 'paidAmount' => $pagoDelRecurso?->amount,
                 'paymentApplied' => $pagoDelRecurso?->status === FinePaymentStatus::Applied,
+                // El veredicto vigente: revertirlo se pide sobre este.
+                'verdictId' => $recurso?->currentVerdict?->id,
+                'verdictByName' => $recurso?->currentVerdict?->resolver?->name,
+                'verdictAt' => $recurso?->currentVerdict?->resolved_at->toIso8601String(),
             ],
             /*
              * Quienes pueden firmar el recibo, con su cargo, como en Haberes.
@@ -321,6 +327,8 @@ final class FineController extends Controller
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
                 'replaceCheque' => $cobra,
                 'resolveAppeal' => $cobra,
+                'revertVerdict' => $cobra,
+                'voidCollection' => $usuario?->can('multas.anular-cobros') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 // Corregir el importe sin resolución, y revertir esa corrección.
                 'correctAmount' => $usuario?->can('multas.corregir-importe') ?? false,

@@ -43,7 +43,7 @@ final class ReconcileFineExcess
         }
 
         $asentado = Decimal::add(
-            (string) (FinePaymentApplication::query()->where('fine_id', $multa->id)->sum('excess_amount') ?: '0'),
+            (string) (FinePaymentApplication::query()->where('fine_id', $multa->id)->whereNotExists(fn ($anulacion) => $anulacion->from('fine_payment_voids AS v')->whereColumn('v.fine_payment_id', 'fine_payment_applications.fine_payment_id'))->sum('excess_amount') ?: '0'),
             (string) (FineExcessReclassification::query()->where('fine_id', $multa->id)->sum('amount') ?: '0'),
         );
         $calculado = (string) FineBalance::query()->whereKey($multa->id)->value('operational_excess');

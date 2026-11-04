@@ -6,6 +6,8 @@ namespace App\Modules\Multas\Data;
 
 use App\Models\User;
 use App\Modules\Multas\Enums\AppealKind;
+use App\Modules\Multas\Enums\FineAppealStatus;
+use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineTimeliness;
@@ -63,6 +65,11 @@ final class FinePaymentData extends Data
         /** El importe del recibo externo no es el 20 % calculado. */
         public bool $appealDiffers,
         public ?string $discardReason,
+        /** El motivo de la anulación y su fecha. */
+        public ?string $voidReason,
+        public ?string $voidedAt,
+        /** Un cobro que sigue en la caja, sin depósito ni rechazo, y sin veredicto en su recurso. */
+        public bool $voidable,
         /** El informado que este corrige. */
         public ?int $replacesPaymentId,
         /** @var list<FineAttachmentData> */
@@ -72,7 +79,7 @@ final class FinePaymentData extends Data
     ) {}
 
     /**
-     * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt` y `creator`.
+     * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt`, `creator`, `voiding` y `appeal`.
      *
      * @param  list<FineAttachmentData>  $adjuntos
      */
@@ -111,6 +118,12 @@ final class FinePaymentData extends Data
             externalReceiptReference: $pago->external_receipt_reference,
             appealDiffers: $pago->appeal_required_amount !== null && ! Decimal::equals($pago->amount, $pago->appeal_required_amount),
             discardReason: Reason::text($pago->discard_reason_code, $pago->discard_reason),
+            voidReason: $pago->voiding === null ? null : Reason::text($pago->voiding->reason_code, $pago->voiding->reason),
+            voidedAt: $pago->voiding?->voided_at?->toIso8601String(),
+            voidable: $pago->status === FinePaymentStatus::Applied
+                && $deposito?->place === FineCollectionPlace::InCustody
+                && $deposito->rejections === []
+                && ($pago->appeal === null || $pago->appeal->status === FineAppealStatus::Open),
             replacesPaymentId: $pago->replaces_fine_payment_id,
             attachments: $adjuntos,
             deposit: $deposito,

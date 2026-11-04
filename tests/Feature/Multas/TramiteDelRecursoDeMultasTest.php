@@ -206,7 +206,7 @@ class TramiteDelRecursoDeMultasTest extends TestCase
             ->post(route('multas.recursos.resolve', $multa), $this->veredicto($multa, 'upheld'))
             ->assertSessionHasNoErrors();
 
-        $reduccion = FineDebtEntry::query()->whereNotNull('fine_appeal_id')->sole();
+        $reduccion = FineDebtEntry::query()->whereNotNull('fine_appeal_verdict_id')->sole();
         expect($reduccion->amount)->toBe('1120001.00')
             ->and($reduccion->reason_code)->toBe(FineReasonCode::AppealAdmitted)
             ->and(FineAppeal::query()->sole()->status)->toBe(FineAppealStatus::Upheld)
@@ -222,7 +222,7 @@ class TramiteDelRecursoDeMultasTest extends TestCase
 
         $this->resolver($multa, FineAppealStatus::Upheld);
 
-        expect(FineDebtEntry::query()->whereNotNull('fine_appeal_id')->exists())->toBeFalse()
+        expect(FineDebtEntry::query()->whereNotNull('fine_appeal_verdict_id')->exists())->toBeFalse()
             ->and($this->saldo($multa, 'debt'))->toBe('0.00')
             ->and($this->saldo($multa, 'excess'))->toBe('100000.00')
             ->and($this->estado($multa))->toBe(FineDebtStatus::Cancelled);
@@ -243,7 +243,7 @@ class TramiteDelRecursoDeMultasTest extends TestCase
         $multa = $this->escenario();
         $this->recurrir($multa, FinePaymentMedium::Cash, '280000.00');
         $this->resolver($multa, FineAppealStatus::Upheld);
-        $reduccion = FineDebtEntry::query()->whereNotNull('fine_appeal_id')->sole();
+        $reduccion = FineDebtEntry::query()->whereNotNull('fine_appeal_verdict_id')->sole();
 
         $this->rechazaElAction('newAmount', fn () => $this->corregirImporte($multa, '1400000.00'));
         $this->rechazaElAction('reason', fn () => app(ReverseFineDebtEntry::class)->handle(
@@ -271,17 +271,21 @@ class TramiteDelRecursoDeMultasTest extends TestCase
     }
 
     /** No prosperó y después se descarta su depósito informado: el veredicto se conserva. */
-    public function test_discarding_the_deposit_of_a_rejected_appeal_keeps_the_verdict(): void
+    /** Los dos veredictos exigen el 20 % cobrado o verificado; la base repite la regla. */
+    public function test_a_verdict_needs_the_payment_applied(): void
     {
         $multa = $this->escenario();
         $pago = $this->recurrir($multa, FinePaymentMedium::DirectDeposit, '280000.00');
-        $this->resolver($multa, FineAppealStatus::Rejected);
 
-        $this->descartar($pago);
+        $this->rechazaElAction('verdict', fn () => $this->resolver($multa, FineAppealStatus::Rejected));
+        $this->rechazaElAction('verdict', fn () => $this->resolver($multa, FineAppealStatus::Upheld));
 
-        expect(FineAppeal::query()->sole()->status)->toBe(FineAppealStatus::Rejected)
-            ->and($this->saldo($multa, 'debt'))->toBe('1400000.00');
-        $this->rechazaElAction('kind', fn () => $this->recurrir($multa, FinePaymentMedium::Cash, '280000.00'));
+        $this->rechazaLaBase('con su pago cobrado o verificado', function () use ($multa, $pago): void {
+            $this->veredictoDirecto($multa, (int) $pago->fine_appeal_id, 'rejected');
+            DB::table('fine_appeals')->where('id', $pago->fine_appeal_id)->update(['status' => 'rejected']);
+        });
+
+        expect(FineAppeal::query()->sole()->status)->toBe(FineAppealStatus::Open);
     }
 
     /** Un formulario viejo no resuelve el recurso que se registró después de que el suyo cayó. */
@@ -371,8 +375,9 @@ class TramiteDelRecursoDeMultasTest extends TestCase
         ));
         // Con el recurso ya resuelto, la reducción que lo cita en otra multa llega hasta la clave foránea.
         $this->resolver($multa, FineAppealStatus::Upheld);
-        $this->rechazaLaBase('fine_debt_entries_appeal_fk', fn () => DB::table('fine_debt_entries')->insert(
-            [...$this->filaDeReduccion($otra, '1400000.00'), 'fine_appeal_id' => $recurso, 'reason' => null, 'reason_code' => 'appeal_admitted'],
+        $veredicto = (int) DB::table('fine_appeal_verdicts')->where('fine_appeal_id', $recurso)->value('id');
+        $this->rechazaLaBase('fine_debt_entries_verdict_fk', fn () => DB::table('fine_debt_entries')->insert(
+            [...$this->filaDeReduccion($otra, '1400000.00'), 'fine_appeal_verdict_id' => $veredicto, 'reason' => null, 'reason_code' => 'appeal_admitted'],
         ));
     }
 
@@ -381,25 +386,34 @@ class TramiteDelRecursoDeMultasTest extends TestCase
     {
         $multa = $this->escenario();
         $recurso = $this->recurrir($multa, FinePaymentMedium::Cash, '280000.00')->fine_appeal_id;
-        $reduccion = fn (string $importe): array => [
-            ...$this->filaDeReduccion($multa, $importe), 'fine_appeal_id' => $recurso, 'reason' => null, 'reason_code' => 'appeal_admitted',
+        $reduccion = fn (int $veredicto, string $importe): array => [
+            ...$this->filaDeReduccion($multa, $importe), 'fine_appeal_verdict_id' => $veredicto, 'reason' => null, 'reason_code' => 'appeal_admitted',
         ];
 
-        $this->rechazaLaBase('solo un recurso que prosperó', fn () => DB::table('fine_debt_entries')->insert($reduccion('1120000.00')));
-
-        $this->rechazaLaBase('lleva la multa a lo cobrado', function () use ($recurso, $reduccion): void {
-            DB::table('fine_appeals')->where('id', $recurso)->update(['status' => 'upheld', 'resolved_at' => now()]);
-            DB::table('fine_debt_entries')->insert($reduccion('1000000.00'));
+        $this->rechazaLaBase('solo un recurso que prosperó', function () use ($multa, $recurso, $reduccion): void {
+            $veredicto = $this->veredictoDirecto($multa, $recurso, 'rejected');
+            DB::table('fine_appeals')->where('id', $recurso)->update(['status' => 'rejected']);
+            DB::table('fine_debt_entries')->insert($reduccion($veredicto, '1120000.00'));
         });
 
-        $this->rechazaLaBase('deja la multa cancelada', fn () => DB::table('fine_appeals')->where('id', $recurso)->update(['status' => 'upheld', 'resolved_at' => now()]));
+        $this->rechazaLaBase('lleva la multa a lo cobrado', function () use ($multa, $recurso, $reduccion): void {
+            $veredicto = $this->veredictoDirecto($multa, $recurso, 'upheld');
+            DB::table('fine_appeals')->where('id', $recurso)->update(['status' => 'upheld']);
+            DB::table('fine_debt_entries')->insert($reduccion($veredicto, '1000000.00'));
+        });
+
+        $this->rechazaLaBase('deja la multa cancelada', function () use ($multa, $recurso): void {
+            $this->veredictoDirecto($multa, $recurso, 'upheld');
+            DB::table('fine_appeals')->where('id', $recurso)->update(['status' => 'upheld']);
+        });
 
         // Una segunda reducción ya no lleva la multa a lo cobrado: se rechaza antes del índice único.
         $this->resolver($multa, FineAppealStatus::Upheld);
-        $this->rechazaLaBase('lleva la multa a lo cobrado', fn () => DB::table('fine_debt_entries')->insert($reduccion('0.01')));
+        $vigente = (int) DB::table('fine_appeal_verdicts')->where('fine_appeal_id', $recurso)->value('id');
+        $this->rechazaLaBase('lleva la multa a lo cobrado', fn () => DB::table('fine_debt_entries')->insert($reduccion($vigente, '0.01')));
     }
 
-    /** Una corrección queda en el mismo recurso; un recurso resuelto no cambia ni vuelve a abrirse. */
+    /** Una corrección queda en el mismo recurso; un recurso resuelto no vuelve a abrirse sin revertir su veredicto. */
     public function test_the_database_keeps_corrections_and_verdicts_in_place(): void
     {
         $multa = $this->escenario();
@@ -411,8 +425,10 @@ class TramiteDelRecursoDeMultasTest extends TestCase
             [...$this->filaDeRecurso($otra), 'fine_appeal_id' => $ajeno, 'replaces_fine_payment_id' => $pago->id],
         ));
 
+        $this->verificar($pago, '280000.00');
         $this->resolver($multa, FineAppealStatus::Rejected);
-        $this->rechazaLaBase('ya se resolvió', fn () => DB::table('fine_appeals')->where('fine_id', $multa->id)->update(['status' => 'open', 'resolved_at' => null]));
+        $this->rechazaLaBase('no pasa a', fn () => DB::table('fine_appeals')->where('fine_id', $multa->id)->update(['status' => 'upheld']));
+        $this->rechazaLaBase('sin resolver no tiene un veredicto vigente', fn () => DB::table('fine_appeals')->where('fine_id', $multa->id)->update(['status' => 'open']));
         $this->rechazaLaBase('no se borra', fn () => DB::table('fine_appeals')->where('fine_id', $multa->id)->delete());
     }
 
@@ -554,17 +570,28 @@ class TramiteDelRecursoDeMultasTest extends TestCase
     }
 
     /**
-     * La migración, ya revertida: los triggers diferidos de lo cargado se
-     * disparan antes, porque PostgreSQL no altera una tabla con eventos
-     * pendientes.
+     * La migración, ya revertida junto con la que la sigue: los triggers
+     * diferidos de lo cargado se disparan antes, porque PostgreSQL no altera
+     * una tabla con eventos pendientes.
      */
     private function migracionDelTramite(): Migration
     {
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        $siguiente = require database_path('migrations/2026_11_04_000000_add_fine_payment_voids_and_appeal_verdicts.php');
+        $siguiente->down();
         $migracion = require database_path('migrations/2026_11_03_000000_add_fine_appeals.php');
         $migracion->down();
 
         return $migracion;
+    }
+
+    /** Un veredicto escrito directo: lo que la base acepta o no sin pasar por el Action. */
+    private function veredictoDirecto(Fine $multa, int $recurso, string $veredicto): int
+    {
+        return DB::table('fine_appeal_verdicts')->insertGetId([
+            'fine_appeal_id' => $recurso, 'fine_id' => $multa->id, 'verdict' => $veredicto,
+            'debt_entries_until_id' => 0, 'resolved_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
     }
 
     private function descartarDirecto(int $pago): void
