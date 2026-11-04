@@ -95,8 +95,12 @@ final class RegisterOpeningBalance
          * composición del fajo, que es para lo que se cuenta.
          */
         int $actorId,
+        /*
+         * Obligatoria también sin saldo en el banco: la apertura no se rehace,
+         * y es la que deja habilitada la primera cuenta de la caja.
+         */
+        int $bankAccountId,
         Currency $currency = Currency::Ars,
-        ?int $bankAccountId = null,
         ?string $notes = null,
         array $cheques = [],
         array $denominations = [],
@@ -480,7 +484,7 @@ final class RegisterOpeningBalance
     private function assertUsable(
         array $balances,
         Currency $currency,
-        ?int $bankAccountId,
+        int $bankAccountId,
         bool $declaredEmpty,
     ): array {
         $saldos = [];
@@ -553,35 +557,21 @@ final class RegisterOpeningBalance
         }
 
         /*
-         * «DEPOSITOS DIRECTOS» abre una pata bancaria, y una línea de
-         * `BANK_ACCOUNT` sin cuenta no dice dónde está el dinero. El libro
-         * no admite corregirla: es append-only.
+         * La cuenta es de la moneda del libro: dólares en una cuenta en pesos
+         * no existen. `journal_lines_bank_currency` y la FK compuesta de
+         * `cash_book_openings` lo impiden en la base; acá se dice al lado del
+         * campo. Se lee con `DB::table` por el mismo motivo que la pantalla:
+         * `bank_accounts` es el maestro del organismo, no dominio de Banking.
          */
-        if (isset($saldos[LedgerAccount::BankAccount->value]) && $bankAccountId === null) {
+        $monedaDeLaCuenta = DB::table('bank_accounts')->where('id', $bankAccountId)->value('currency');
+
+        if ($monedaDeLaCuenta !== $currency->value) {
             throw ValidationException::withMessages([
-                'bankAccountId' => 'El saldo de depósitos directos tiene que decir en qué cuenta bancaria está.',
+                'bankAccountId' => sprintf(
+                    'La cuenta elegida no es en %s: el libro opera con una cuenta de su moneda.',
+                    mb_strtolower($currency->label()),
+                ),
             ]);
-        }
-
-        /*
-         * Y esa cuenta es de la moneda del libro: dólares en una cuenta en
-         * pesos no existen. `journal_lines_bank_currency` y la FK compuesta
-         * de `cash_book_openings` lo impiden en la base; acá se dice al lado
-         * del campo. Se lee con `DB::table` por el mismo motivo que la
-         * pantalla: `bank_accounts` es el maestro del organismo, no dominio
-         * de Banking.
-         */
-        if ($bankAccountId !== null) {
-            $monedaDeLaCuenta = DB::table('bank_accounts')->where('id', $bankAccountId)->value('currency');
-
-            if ($monedaDeLaCuenta !== $currency->value) {
-                throw ValidationException::withMessages([
-                    'bankAccountId' => sprintf(
-                        'La cuenta elegida no es en %s: los depósitos directos de este libro tienen que estar en una cuenta de su moneda.',
-                        mb_strtolower($currency->label()),
-                    ),
-                ]);
-            }
         }
 
         return $saldos;

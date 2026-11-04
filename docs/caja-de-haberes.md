@@ -67,8 +67,9 @@ caja tiene el enlace a la pantalla de la apertura.
 
 **Inicio muestra la puesta en marcha** mientras falte algo para operar: primero
 las cuentas bancarias del organismo, después la apertura de Haberes en pesos y
-la de Multas, que no se puede hacer sin una cuenta en pesos. La de dólares figura
-como opcional y no la retiene. La lista sale del estado de los datos, no de quién
+la de Multas, que no se pueden hacer sin una cuenta en pesos. La de dólares figura
+como opcional y no la retiene, pero tampoco se hace sin una cuenta en dólares. La
+lista sale del estado de los datos, no de quién
 entra: la ve cualquier usuario, cada paso lleva a su pantalla solo si quien mira
 tiene el permiso, y desaparece cuando el último paso obligatorio está hecho.
 
@@ -91,10 +92,15 @@ revisado. Durante el día se cobra y se paga. A la noche se cuenta en un segundo
 turno solo lo que entró en el día —la plata de la apertura pasa como saldo del día
 anterior, sin recontar— y se cierra.
 
+**Todo libro abre con la cuenta bancaria con la que opera**, de su moneda, aunque
+no declare saldo en el banco (decisión del usuario, 04/11/2026; **no relevado con
+el área**). La pide el formulario, la exigen el Request y la base
+(`cash_book_openings_bank_account_required`), y queda como la predeterminada de la
+caja. Sin una cuenta activa en esa moneda la pantalla no ofrece abrir: lleva a
+Banco › Cuentas. Si hay depósitos directos, están en esa cuenta.
+
 **Los dólares se abren igual que los pesos**, con lo que haya: efectivo contado,
-cheques y depósitos directos. La cuenta de los depósitos directos tiene que ser
-de la moneda del libro; mientras no exista una cuenta en dólares el renglón
-aparece apagado, y la apertura en dólares es de efectivo y cheques. Si el día que
+cheques y depósitos directos. Si el día que
 se abre no hay nada en esa moneda —el primer dólar es el cobro que recién entra—,
 se abre igual **declarándolo**: «No hay dólares al abrir los libros». Un
 formulario en cero sin esa marca se rechaza, porque también podría ser un saldo
@@ -149,8 +155,8 @@ cuentas.
   en la moneda del haber, la predeterminada primero; la base exige una cuenta
   vigente ese día. **Un comprobante de depósito** tiene que ser de una cuenta de la
   caja vigente el día del depósito, y su formulario y su corrección ofrecen las de
-  esa fecha. Sin ninguna cuenta habilitada, la caja no se controla: es como
-  operaba antes.
+  esa fecha. Una apertura nueva siempre habilita su cuenta; solo un libro abierto
+  antes de esa regla puede quedar sin ninguna, y entonces la caja no se controla.
 - **Lo ya hecho sigue:** un traslado en tránsito se acredita contra su cuenta aunque
   esté dada de baja. La Orden de Pago sigue tomando la cuenta del organismo de donde
   está la plata, y su débito se valida contra ella.
@@ -564,7 +570,9 @@ legible; el trigger impide el desastre.
 - La apertura es **una por caja y moneda**, append-only, y lo que declara coincide
   con sus asientos; es el primer hecho de su libro (`cash_book_openings_consistent`).
 - La apertura dice con qué cuenta opera el libro (`bank_account_id`, de su misma
-  moneda por FK compuesta). La de Haberes se completó desde su pata bancaria.
+  moneda por FK compuesta), y ya no se admite una nueva sin cuenta
+  (`cash_book_openings_bank_account_required`). La de Haberes anterior a esa
+  columna se completó desde su pata bancaria.
 - Cada asiento **balancea por moneda**.
 - Un período cerrado **no admite movimientos** con fecha adentro…
 - …ni un movimiento anterior que **desactualice un cierre posterior**: la apertura

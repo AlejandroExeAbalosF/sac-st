@@ -307,6 +307,7 @@ class RecuentoDelFajoTest extends TestCase
     private function escenario(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '2000000.00'],
             denominations: $this->billetesPara('2000000.00'),

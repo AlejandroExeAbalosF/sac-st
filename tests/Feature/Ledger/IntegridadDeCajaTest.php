@@ -302,7 +302,7 @@ class IntegridadDeCajaTest extends TestCase
     public function test_la_base_rechaza_creditos_y_debitos_previos_al_corte(): void
     {
         $bank = $this->banco();
-        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-02'), $this->quienAbre(), declaredEmpty: true);
+        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-02'), $this->quienAbre(), bankAccountId: $bank->id, declaredEmpty: true);
         foreach ([TransactionDirection::Credit, TransactionDirection::Debit] as $direction) {
             $movement = $this->movimiento($bank, $direction, '2026-06-01');
             try {
@@ -324,8 +324,8 @@ class IntegridadDeCajaTest extends TestCase
     public function test_el_dia_de_apertura_admite_el_credito_y_el_corte_es_por_moneda(): void
     {
         $bank = $this->banco();
-        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-02'), $this->quienAbre(), declaredEmpty: true);
-        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-05'), $this->quienAbre(), currency: Currency::Usd, declaredEmpty: true);
+        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-02'), $this->quienAbre(), bankAccountId: $bank->id, declaredEmpty: true);
+        app(RegisterOpeningBalance::class)->handle($this->caja(), [], CarbonImmutable::parse('2026-06-05'), $this->quienAbre(), bankAccountId: $this->cuentaDeApertura(Currency::Usd), currency: Currency::Usd, declaredEmpty: true);
         $movement = $this->movimiento($bank, TransactionDirection::Credit, '2026-06-02');
         $receipt = app(RegisterBankFundReceipt::class)->handle($movement, '100.00', 'credito-apertura', $this->caja());
         $this->assertSame('100.00', $receipt->amount);

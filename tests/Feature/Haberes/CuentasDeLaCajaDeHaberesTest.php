@@ -28,8 +28,8 @@ use Tests\TestCase;
  * La caja de Haberes opera con sus cuentas habilitadas — ver
  * `docs/haberes-reglas.md#cuentas-de-la-caja`.
  *
- * Sin ninguna habilitada no se controla, como operaba antes: eso lo cubre
- * el resto de la suite de Haberes, que no crea vínculos.
+ * Abre con su propia cuenta y no con `abrirLibrosSinSaldo`, que habilita
+ * todas las del escenario: acá `ajena` tiene que quedar afuera.
  */
 class CuentasDeLaCajaDeHaberesTest extends TestCase
 {
@@ -45,16 +45,22 @@ class CuentasDeLaCajaDeHaberesTest extends TestCase
     {
         parent::setUp();
 
-        $this->abrirLibrosSinSaldo();
-        $this->seed(HaberesDemoSeeder::class);
-
         $this->a = $this->cuentaNueva('310000000000001', 'Cta. Cte. A — Haberes');
         $this->b = $this->cuentaNueva('310000000000002', 'Cta. Cte. B — Haberes');
         $this->ajena = $this->cuentaNueva('310000000000003', 'Cta. Cte. de otra caja');
 
-        $habilitar = app(LinkBankAccountToCashBox::class);
-        $habilitar->handle($this->caja(), $this->a->id, null, true, $this->quienAbre());
-        $habilitar->handle($this->caja(), $this->b->id, CarbonImmutable::parse('2026-10-01'), false, $this->quienAbre());
+        // Abrir deja a `a` habilitada, predeterminada y sin inicio.
+        app(RegisterOpeningBalance::class)->handle(
+            cashBoxId: $this->caja(),
+            balances: [],
+            date: CarbonImmutable::parse('2000-01-01'),
+            actorId: $this->quienAbre(),
+            bankAccountId: $this->a->id,
+            declaredEmpty: true,
+        );
+        $this->seed(HaberesDemoSeeder::class);
+
+        app(LinkBankAccountToCashBox::class)->handle($this->caja(), $this->b->id, CarbonImmutable::parse('2026-10-01'), false, $this->quienAbre());
     }
 
     /** Depositar ofrece solo las vigentes hoy, la predeterminada incluida. */
@@ -123,7 +129,7 @@ class CuentasDeLaCajaDeHaberesTest extends TestCase
 
     /**
      * Abrir un libro con su cuenta la habilita para la caja, predeterminada
-     * y sin inicio, igual que en Multas; abrir sin cuenta no habilita nada.
+     * y sin inicio, igual que en Multas.
      */
     public function test_opening_a_book_with_an_account_links_it(): void
     {
@@ -131,6 +137,8 @@ class CuentasDeLaCajaDeHaberesTest extends TestCase
             'account_number' => '310000000000999', 'label' => 'Cta. en dólares', 'bank_name' => 'Banco Macro',
             'currency' => 'USD', 'is_active' => true,
         ]);
+
+        $pesos = CashBoxBankAccount::query()->where('currency', 'ARS')->count();
 
         app(RegisterOpeningBalance::class)->handle(
             cashBoxId: $this->caja(),
@@ -147,8 +155,8 @@ class CuentasDeLaCajaDeHaberesTest extends TestCase
             ->and($vinculo->currency)->toBe('USD')
             ->and($vinculo->valid_from)->toBeNull()
             ->and($vinculo->is_default)->toBeTrue()
-            // La apertura en pesos, sin cuenta, no dejó vínculo: los dos de pesos son los del escenario.
-            ->and(CashBoxBankAccount::query()->where('currency', 'ARS')->count())->toBe(2);
+            // Los de pesos no cambian: la apertura en dólares vincula solo su cuenta.
+            ->and(CashBoxBankAccount::query()->where('currency', 'ARS')->count())->toBe($pesos);
     }
 
     /** Administrar las cuentas de Haberes es del administrador; mirarlas, de quien ve la caja. */

@@ -109,12 +109,13 @@ class RegisterOpeningBalanceRequest extends FormRequest
             'balances' => ['present', 'array'],
             'balances.*' => ['nullable', 'numeric', 'min:0'],
             /*
-             * Obligatoria solo si se declara saldo de depósitos directos.
-             * El Action lo vuelve a exigir: acá se gana el mensaje al lado
-             * del campo en vez de un error suelto arriba del formulario.
+             * Obligatoria siempre, también sin saldo en el banco y en dólares:
+             * la apertura no se rehace, y un libro sin cuenta no tendría dónde
+             * declarar lo depositado ni control de a qué cuenta se deposita.
+             * La base lo repite (`cash_book_openings_bank_account_required`).
              */
             'bankAccountId' => [
-                'nullable',
+                'required',
                 'integer',
                 Rule::exists('bank_accounts', 'id')->where('is_active', true),
             ],
@@ -183,6 +184,7 @@ class RegisterOpeningBalanceRequest extends FormRequest
     {
         return [
             'date.before_or_equal' => 'El saldo inicial es lo que ya está en el cajón: no puede tener fecha futura.',
+            'bankAccountId.required' => 'Elegí la cuenta bancaria con la que opera este libro.',
         ];
     }
 

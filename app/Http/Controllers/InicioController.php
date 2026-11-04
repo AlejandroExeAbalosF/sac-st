@@ -344,11 +344,10 @@ final class InicioController extends Controller
      * La puesta en marcha: las cuentas del organismo y la apertura de cada
      * caja, en ese orden.
      *
-     * Las cuentas van primero porque la apertura las usa: la de Multas
-     * elige con qué cuenta opera y no se puede hacer sin una en pesos, y la
-     * de Haberes declara en cuál está el saldo del banco. Los dólares de
-     * Haberes son opcionales: no toda caja los guarda, y su apertura se
-     * hace desde Caja el día que hagan falta.
+     * Las cuentas van primero porque toda apertura elige con cuál opera y no
+     * se puede hacer sin una en su moneda. Los dólares de Haberes son
+     * opcionales: no toda caja los guarda, y su apertura se hace desde Caja
+     * el día que hagan falta, con una cuenta en dólares.
      *
      * Cada paso lleva a su pantalla solo si quien mira puede hacerlo. Un
      * operador ve la lista igual: le dice por qué el sistema todavía no
@@ -360,7 +359,8 @@ final class InicioController extends Controller
     {
         $cuentas = BankAccount::query()->where('is_active', true);
         $hayCuentas = (clone $cuentas)->exists();
-        $hayCuentaEnPesos = $cuentas->where('currency', Currency::Ars->value)->exists();
+        $hayCuentaEnPesos = (clone $cuentas)->where('currency', Currency::Ars->value)->exists();
+        $hayCuentaEnDolares = (clone $cuentas)->where('currency', Currency::Usd->value)->exists();
 
         $haberes = (int) $this->cashBox()->id;
         $multas = (int) CashBox::query()->active()->where('code', CashBox::MULTAS)->valueOrFail('id');
@@ -376,9 +376,10 @@ final class InicioController extends Controller
             new SetupStepData(
                 key: 'apertura_haberes',
                 title: 'Abrir la Caja de Haberes',
-                description: 'El efectivo, los cheques y el saldo del banco con que arranca la caja, en pesos.',
+                description: 'El efectivo, los cheques y el saldo del banco con que arranca la caja, en pesos, y la cuenta con la que opera.',
                 done: $this->abrir->existingFor($haberes, Currency::Ars) !== null,
-                href: $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', absolute: false) : null,
+                href: $hayCuentaEnPesos && $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', absolute: false) : null,
+                blockedBy: $hayCuentaEnPesos ? null : 'Necesita una cuenta bancaria en pesos.',
             ),
             new SetupStepData(
                 key: 'apertura_multas',
@@ -394,7 +395,8 @@ final class InicioController extends Controller
                 description: 'Solo si la caja guarda dólares. Se puede hacer más adelante.',
                 done: $this->abrir->existingFor($haberes, Currency::Usd) !== null,
                 optional: true,
-                href: $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', ['moneda' => 'usd'], absolute: false) : null,
+                href: $hayCuentaEnDolares && $user->can('caja.abrir-saldo-inicial') ? route('caja.apertura.index', ['moneda' => 'usd'], absolute: false) : null,
+                blockedBy: $hayCuentaEnDolares ? null : 'Necesita una cuenta bancaria en dólares.',
             ),
         ];
 

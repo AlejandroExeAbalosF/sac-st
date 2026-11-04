@@ -111,6 +111,7 @@ class AperturaObligatoriaTest extends TestCase
     {
         // Como desde la pantalla: con quien abre, que deja revisado el conteo.
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '1000.00'],
             date: CarbonImmutable::parse('2026-06-10'),
@@ -185,6 +186,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_los_dolares_se_abren_con_efectivo_igual_que_los_pesos(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '500.00'],
@@ -210,6 +212,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_se_abre_declarando_solo_cheques_detallados(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::ChequesInCustody->value => '300.00'],
@@ -232,6 +235,7 @@ class AperturaObligatoriaTest extends TestCase
     public function test_se_abre_sin_saldo_cuando_se_declara(): void
     {
         $apertura = app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [],
@@ -258,6 +262,7 @@ class AperturaObligatoriaTest extends TestCase
         $this->expectExceptionMessage('que no había dólares al abrir');
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '0'],
@@ -272,6 +277,7 @@ class AperturaObligatoriaTest extends TestCase
         $this->expectExceptionMessage('hay saldos cargados');
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '100.00'],
@@ -382,6 +388,7 @@ class AperturaObligatoriaTest extends TestCase
         DB::table('cash_book_openings')->insert([
             'cash_box_id' => $this->caja(),
             'currency' => 'USD',
+            'bank_account_id' => $this->cuentaDeApertura(Currency::Usd),
             'opened_on' => '2026-06-01',
             'declared_total' => '100.00',
         ]);
@@ -397,6 +404,7 @@ class AperturaObligatoriaTest extends TestCase
         DB::table('cash_book_openings')->insert([
             'cash_box_id' => $this->caja(),
             'currency' => 'USD',
+            'bank_account_id' => $this->cuentaDeApertura(Currency::Usd),
             'opened_on' => '2026-06-10',
             'declared_total' => '0.00',
         ]);
@@ -527,8 +535,7 @@ class AperturaObligatoriaTest extends TestCase
                 'balances' => [],
                 'denominations' => [],
                 'declaredEmpty' => true,
-                // Sin cuentas en dólares el selector queda vacío y la pantalla no la manda.
-                'bankAccountId' => null,
+                'bankAccountId' => $this->cuentaDeApertura(Currency::Usd),
             ])
             ->assertSessionHasNoErrors()
             // De vuelta al libro que se acaba de abrir.
@@ -556,6 +563,7 @@ class AperturaObligatoriaTest extends TestCase
     private function abrirConEfectivo(string $efectivo, string $fecha): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => $efectivo],

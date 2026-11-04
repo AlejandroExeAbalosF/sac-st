@@ -130,7 +130,6 @@ final class EscenariosDemoSeeder extends Seeder
 
         try {
             $this->vaciar();
-            $this->abrirLibros();
 
             $this->cuenta = BankAccount::query()->firstOrCreate(
                 ['account_number' => self::CUENTA],
@@ -141,6 +140,8 @@ final class EscenariosDemoSeeder extends Seeder
                     'is_active' => true,
                 ],
             );
+
+            $this->abrirLibros();
 
             $this->personas();
 
@@ -179,6 +180,7 @@ final class EscenariosDemoSeeder extends Seeder
             balances: [],
             date: Carbon::parse('2026-01-01'),
             actorId: (int) $this->operador->id,
+            bankAccountId: (int) $this->cuenta->id,
             notes: 'Apertura sin saldo de los escenarios demo.',
             declaredEmpty: true,
         );

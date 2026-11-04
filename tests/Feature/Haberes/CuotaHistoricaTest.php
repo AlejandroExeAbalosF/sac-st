@@ -151,6 +151,7 @@ class CuotaHistoricaTest extends TestCase
         $this->expectExceptionMessage('Hay papeles del sistema anterior en pesos cargados con fecha hasta el 20/03/2025: la apertura tiene que ser posterior.');
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             cashBoxId: $this->caja(),
             balances: [],
             date: CarbonImmutable::parse('2025-03-20'),
@@ -180,6 +181,7 @@ class CuotaHistoricaTest extends TestCase
             ->assertSessionHasErrors(['installment' => 'La caja de Haberes todavía no tiene apertura en dólares: sin ella no se puede saber si un papel es anterior al sistema.']);
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(Currency::Usd),
             cashBoxId: $this->caja(),
             balances: [],
             date: CarbonImmutable::parse('2026-09-01'),
@@ -206,6 +208,7 @@ class CuotaHistoricaTest extends TestCase
     public function test_una_apertura_sin_saldo_tambien_marca_el_corte(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [],
@@ -688,6 +691,7 @@ class CuotaHistoricaTest extends TestCase
     private function abrirLibros(): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::CashOnHand->value => '1000000.00'],

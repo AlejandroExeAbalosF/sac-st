@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Banking;
 
-use App\Modules\Banking\Actions\LinkBankAccountToCashBox;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
-use App\Modules\Shared\Models\CashBox;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -340,9 +338,8 @@ class PantallasDeBancoTest extends TestCase
     public function test_no_se_cambia_la_moneda_de_una_cuenta_vinculada_a_una_caja(): void
     {
         $cuenta = $this->cuenta();
+        // Abrir con la cuenta ya la vincula a la caja.
         $this->abrirLibrosSinSaldo();
-        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
-        app(LinkBankAccountToCashBox::class)->handle($caja, $cuenta->id, null, true, $this->quienAbre());
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('banco.cuentas.update', $cuenta), [

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\IssueExpenseReceipt;
@@ -606,6 +607,10 @@ final class CajaDemoSeeder extends Seeder
             denominations: [100_000 => 32, 2_000 => 4, 200 => 1, 50 => 1],
             date: CarbonImmutable::parse('2026-05-31'),
             actorId: $this->cajero->id,
+            bankAccountId: (int) BankAccount::query()->firstOrCreate(
+                ['account_number' => '310000123456789'],
+                ['label' => 'Cta. Cte. 2693 — Haberes', 'bank_name' => 'Banco Macro', 'currency' => 'ARS', 'is_active' => true],
+            )->id,
             notes: 'Efectivo existente al arranque del sistema.',
         );
     }

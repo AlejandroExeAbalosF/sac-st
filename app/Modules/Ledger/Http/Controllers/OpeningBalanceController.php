@@ -70,14 +70,13 @@ final class OpeningBalanceController extends Controller
                 RegisterOpeningBalanceRequest::openableAccounts(),
             ),
             /*
-             * Para la pata de «DEPOSITOS DIRECTOS». Se leen con `DB::table`
+             * La cuenta con la que opera el libro. Se leen con `DB::table`
              * y no con el modelo de Banking: `bank_accounts` es el maestro
              * institucional de qué cuentas tiene el organismo, no dominio
              * de Banking, y es el mismo criterio con el que `journal_lines`
              * le pone una FK sin conocer su modelo.
              */
             'bankAccounts' => $this->bankAccounts($moneda),
-            'bankAccountCode' => LedgerAccount::BankAccount->value,
             'existing' => $apertura === null ? null : [
                 'date' => $apertura->opened_on->toDateString(),
                 'postedAt' => $apertura->created_at->toIso8601String(),
@@ -97,9 +96,7 @@ final class OpeningBalanceController extends Controller
             balances: $request->balances(),
             date: CarbonImmutable::parse((string) $request->validated('date')),
             currency: $moneda,
-            bankAccountId: $request->validated('bankAccountId') === null
-                ? null
-                : (int) $request->validated('bankAccountId'),
+            bankAccountId: (int) $request->validated('bankAccountId'),
             actorId: (int) $request->user()?->id,
             cheques: $request->cheques(),
             denominations: $request->denominations(),
@@ -116,11 +113,11 @@ final class OpeningBalanceController extends Controller
     }
 
     /**
-     * Las cuentas del organismo en la moneda del libro, para la pata bancaria.
+     * Las cuentas del organismo en la moneda del libro.
      *
      * Dólares en una cuenta en pesos no existen, y la base rechazaría la
-     * línea. Si no hay ninguna en esa moneda la lista llega vacía y la
-     * pantalla apaga el renglón.
+     * apertura. Si no hay ninguna en esa moneda la lista llega vacía y la
+     * pantalla no ofrece abrir: dice dónde darla de alta.
      *
      * @return list<array{id: int, label: string}>
      */

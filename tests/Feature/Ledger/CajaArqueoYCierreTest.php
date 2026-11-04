@@ -80,6 +80,7 @@ class CajaArqueoYCierreTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: [LedgerAccount::BeneficiaryFunds->value => '1000.00'],
@@ -1414,6 +1415,7 @@ class CajaArqueoYCierreTest extends TestCase
         }
 
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             actorId: $this->quienAbre(),
             cashBoxId: $this->caja(),
             balances: $saldos,

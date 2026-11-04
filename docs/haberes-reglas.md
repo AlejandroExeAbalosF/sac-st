@@ -181,7 +181,10 @@ Evidencia: [canal](../app/Modules/Haberes/Support/PaymentOrderSources.php),
 ## Cuentas de la caja
 
 - La caja opera con sus cuentas habilitadas (`cash_box_bank_accounts`), vigentes en
-  la fecha del acto. Sin ninguna habilitada, no se controla.
+  la fecha del acto. Toda apertura nueva habilita la suya: exige una cuenta de su
+  moneda, también en dólares y sin saldo en el banco
+  (`cash_book_openings_bank_account_required`). **Request y base.** Sin ninguna
+  habilitada —solo un libro abierto antes de esa regla—, no se controla.
 - Un traslado nuevo va a una cuenta vigente el día del depósito:
   `cash_transfer_follows_box_accounts`. **Base**; `DepositCashToBank` lo dice con
   palabras y la pantalla solo ofrece las vigentes en la fecha que se carga.

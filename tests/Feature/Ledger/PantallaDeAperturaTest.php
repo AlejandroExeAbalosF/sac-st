@@ -89,6 +89,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => '2026-05-31',
                 'balances' => [
                     LedgerAccount::CashOnHand->value => '9852300.00',
@@ -112,26 +113,94 @@ class PantallaDeAperturaTest extends TestCase
     }
 
     /**
-     * «DEPOSITOS DIRECTOS» es la tercera columna, y abre pata bancaria.
+     * Toda apertura dice con qué cuenta opera, aunque no declare saldo en el
+     * banco y sea en dólares: no se rehace, y es la que habilita la primera
+     * cuenta de la caja.
      *
-     * Es lo que las empresas depositaron derecho en la cuenta de la
-     * Secretaría. Sin decir en qué cuenta está, la línea no dice dónde
-     * quedó el dinero — y `journal_lines` es append-only: no se corrige
-     * después, se revierte.
+     * @param  array<string, string>  $saldos
+     * @param  array<int, int>  $billetes
      */
-    public function test_el_saldo_de_depositos_directos_exige_su_cuenta(): void
+    #[DataProvider('aperturasSinCuenta')]
+    public function test_toda_apertura_exige_su_cuenta(string $moneda, array $saldos, array $billetes, bool $vacia): void
     {
         $this->actingAs($this->operador('administrador'))
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
-                'currency' => 'ARS',
+                'currency' => $moneda,
                 'date' => '2026-05-31',
-                'balances' => [LedgerAccount::BankAccount->value => '1902907.01'],
+                'balances' => $saldos,
+                'denominations' => $billetes,
+                'declaredEmpty' => $vacia,
+            ])
+            ->assertSessionHasErrors(['bankAccountId' => 'Elegí la cuenta bancaria con la que opera este libro.']);
+
+        $this->assertSame(0, DB::table('cash_book_openings')->count());
+        $this->assertSame(0, DB::table('financial_events')->count());
+    }
+
+    /** @return array<string, array{0: string, 1: array<string, string>, 2: array<int, int>, 3: bool}> */
+    public static function aperturasSinCuenta(): array
+    {
+        return [
+            'depósitos directos en pesos' => ['ARS', [LedgerAccount::BankAccount->value => '1902907.01'], [], false],
+            'solo efectivo en pesos' => ['ARS', [LedgerAccount::CashOnHand->value => '100.00'], [100 => 1], false],
+            'solo efectivo en dólares' => ['USD', [LedgerAccount::CashOnHand->value => '100.00'], [100 => 1], false],
+            'dólares declarados vacíos' => ['USD', [], [], true],
+        ];
+    }
+
+    /** La base lo rechaza aunque algo saltee el formulario y el Action. */
+    public function test_la_base_rechaza_una_apertura_sin_cuenta(): void
+    {
+        $this->expectExceptionMessage('cash_book_openings_bank_account_required');
+
+        DB::table('cash_book_openings')->insert([
+            'cash_box_id' => $this->caja(),
+            'currency' => 'ARS',
+            'opened_on' => '2026-05-31',
+            'declared_total' => '0.00',
+        ]);
+    }
+
+    /** La cuenta queda habilitada en la caja aunque no haya saldo en el banco. */
+    public function test_la_cuenta_de_la_apertura_queda_habilitada_aunque_no_haya_saldo_en_el_banco(): void
+    {
+        $cuenta = $this->cuentaBancaria();
+
+        $this->actingAs($this->operador('administrador'))
+            ->post('/caja/apertura', [
+                'cashBoxId' => $this->caja(),
+                'currency' => 'ARS',
+                'bankAccountId' => $cuenta,
+                'date' => '2026-05-31',
+                'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
+                'denominations' => [100 => 1],
+            ])
+            ->assertRedirect('/caja/dia');
+
+        $vinculo = DB::table('cash_box_bank_accounts')->where('cash_box_id', $this->caja())->sole();
+
+        $this->assertSame($cuenta, (int) $vinculo->bank_account_id);
+        $this->assertTrue((bool) $vinculo->is_default);
+        $this->assertSame(0, DB::table('journal_lines')->whereNotNull('bank_account_id')->count());
+    }
+
+    /** Dólares en una cuenta en pesos no existen. */
+    public function test_la_cuenta_tiene_que_ser_de_la_moneda_del_libro(): void
+    {
+        $this->actingAs($this->operador('administrador'))
+            ->post('/caja/apertura', [
+                'cashBoxId' => $this->caja(),
+                'currency' => 'USD',
+                'bankAccountId' => $this->cuentaBancaria(),
+                'date' => '2026-05-31',
+                'balances' => [],
                 'denominations' => [],
+                'declaredEmpty' => true,
             ])
             ->assertSessionHasErrors('bankAccountId');
 
-        $this->assertSame(0, DB::table('financial_events')->count());
+        $this->assertSame(0, DB::table('cash_book_openings')->count());
     }
 
     /** Con la cuenta, la pata queda atribuida. */
@@ -178,6 +247,7 @@ class PantallaDeAperturaTest extends TestCase
         $datos = [
             'cashBoxId' => $this->caja(),
             'currency' => 'ARS',
+            'bankAccountId' => $this->cuentaDeApertura(),
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '100000.00'],
             'denominations' => [100_000 => 1],
@@ -202,6 +272,7 @@ class PantallaDeAperturaTest extends TestCase
         $this->actingAs($admin)->post('/caja/apertura', [
             'cashBoxId' => $this->caja(),
             'currency' => 'ARS',
+            'bankAccountId' => $this->cuentaDeApertura(),
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
             'denominations' => self::NUEVE_MILLONES,
@@ -223,6 +294,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => BusinessDate::today()->addDay()->toDateString(),
                 'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
                 'denominations' => [100 => 1],
@@ -250,6 +322,7 @@ class PantallaDeAperturaTest extends TestCase
         $this->actingAs($this->operador('administrador'))->post('/caja/apertura', [
             'cashBoxId' => $this->caja(),
             'currency' => 'ARS',
+            'bankAccountId' => $this->cuentaDeApertura(),
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '100.00'],
             'denominations' => [100 => 1],
@@ -281,6 +354,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => $escrito],
                 'denominations' => self::NUEVE_MILLONES,
@@ -325,6 +399,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => 'ocho millones'],
                 'denominations' => self::NUEVE_MILLONES,
@@ -357,6 +432,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
                 'denominations' => [],
@@ -373,6 +449,7 @@ class PantallaDeAperturaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'ARS',
+                'bankAccountId' => $this->cuentaDeApertura(),
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
                 'denominations' => [10_000 => 985],
@@ -404,6 +481,7 @@ class PantallaDeAperturaTest extends TestCase
         $this->actingAs($admin)->post('/caja/apertura', [
             'cashBoxId' => $this->caja(),
             'currency' => 'ARS',
+            'bankAccountId' => $this->cuentaDeApertura(),
             'date' => '2026-05-31',
             'balances' => [LedgerAccount::CashOnHand->value => '9852300.00'],
             'denominations' => self::NUEVE_MILLONES,

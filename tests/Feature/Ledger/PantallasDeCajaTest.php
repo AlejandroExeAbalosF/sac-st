@@ -265,6 +265,7 @@ class PantallasDeCajaTest extends TestCase
             ->post('/caja/apertura', [
                 'cashBoxId' => $this->caja(),
                 'currency' => 'USD',
+                'bankAccountId' => $this->cuentaDeApertura(Currency::Usd),
                 'date' => '2026-05-31',
                 'balances' => [LedgerAccount::CashOnHand->value => '320.00'],
                 'denominations' => [100 => 3, 20 => 1],
@@ -750,6 +751,7 @@ class PantallasDeCajaTest extends TestCase
     private function abrirLibros(string $efectivo = '9852300.00'): void
     {
         app(RegisterOpeningBalance::class)->handle(
+            bankAccountId: $this->cuentaDeApertura(),
             cashBoxId: $this->caja(),
             balances: [
                 LedgerAccount::CashOnHand->value => $efectivo,

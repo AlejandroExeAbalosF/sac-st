@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Models\User;
+use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Ledger\Actions\RecordCashCount;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Actions\ReviewCashCount;
@@ -208,10 +210,65 @@ abstract class TestCase extends BaseTestCase
                 balances: [],
                 date: CarbonImmutable::parse('2000-01-01'),
                 actorId: $this->quienAbre(),
+                bankAccountId: $this->cuentaDeApertura($moneda),
                 currency: $moneda,
                 declaredEmpty: true,
             );
         }
+    }
+
+    /**
+     * La cuenta con la que abre un libro en un test: toda apertura lleva una.
+     *
+     * La primera activa de la moneda, para que un escenario que ya armó su
+     * cuenta abra con ella; si no hay, una creada acá.
+     *
+     * Es para los tests que no tratan de las cuentas de la caja, así que
+     * además habilita en Haberes todas las cuentas del escenario, también las
+     * que cree después: sin eso, abrir en `setUp` y crear la cuenta recién al
+     * depositar chocaría con la vigencia. El control de esa vigencia lo prueba
+     * `CuentasDeLaCajaDeHaberesTest`, que abre con su cuenta y no pasa por acá.
+     */
+    protected function cuentaDeApertura(Currency $moneda = Currency::Ars): int
+    {
+        if (! $this->habilitaLasCuentasDelEscenario) {
+            $this->habilitaLasCuentasDelEscenario = true;
+
+            BankAccount::query()->orderBy('id')->each(fn (BankAccount $cuenta) => $this->habilitarEnHaberes($cuenta));
+            BankAccount::created(fn (BankAccount $cuenta) => $this->habilitarEnHaberes($cuenta));
+        }
+
+        return (int) (BankAccount::query()->where('currency', $moneda->value)->where('is_active', true)->orderBy('id')->first()
+            ?? BankAccount::query()->create([
+                'label' => 'Cuenta de la apertura '.$moneda->value,
+                'bank_name' => 'Banco de la apertura',
+                'account_number' => 'APERTURA-'.$moneda->value,
+                'currency' => $moneda->value,
+                'is_active' => true,
+            ]))->id;
+    }
+
+    private bool $habilitaLasCuentasDelEscenario = false;
+
+    private function habilitarEnHaberes(BankAccount $cuenta): void
+    {
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->value('id');
+
+        if (CashBoxBankAccount::query()->where('cash_box_id', $caja)->where('bank_account_id', $cuenta->id)->exists()) {
+            return;
+        }
+
+        CashBoxBankAccount::query()->create([
+            'cash_box_id' => $caja,
+            'bank_account_id' => $cuenta->id,
+            'is_default' => ! CashBoxBankAccount::query()
+                ->where('cash_box_id', $caja)
+                ->where('currency', $cuenta->currency)
+                ->where('is_default', true)
+                ->exists(),
+            'created_by' => $this->quienAbre(),
+            'updated_by' => $this->quienAbre(),
+        ]);
     }
 
     /**

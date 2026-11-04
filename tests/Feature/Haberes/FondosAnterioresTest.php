@@ -980,7 +980,7 @@ class FondosAnterioresTest extends TestCase
             cashBoxId: $this->caja(),
             balances: $saldos,
             date: CarbonImmutable::parse('2026-06-01'),
-            bankAccountId: $cuentaBancaria,
+            bankAccountId: $cuentaBancaria ?? $this->cuentaDeApertura(),
             cheques: $cartera,
             denominations: $this->billetesPara($efectivo),
         );

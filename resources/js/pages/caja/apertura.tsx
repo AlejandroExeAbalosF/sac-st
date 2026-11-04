@@ -35,6 +35,7 @@ import type {
 import { conMoneda } from '@/features/caja/moneda';
 import { businessToday } from '@/lib/format';
 import type { CurrencyCode } from '@/lib/format';
+import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { dia as caja } from '@/routes/caja';
 import { index as apertura, store } from '@/routes/caja/apertura';
 import { index as cuentasDeLaCaja } from '@/routes/caja/cuentas';
@@ -74,8 +75,6 @@ type Props = {
     accounts: Cuenta[];
     suggestedDenominations: number[];
     bankAccounts: { id: number; label: string }[];
-    /** Qué cuenta del plan es la bancaria, para saber cuándo pedir la cuenta. */
-    bankAccountCode: string;
     existing: AperturaExistente | null;
 };
 
@@ -95,7 +94,6 @@ export default function CajaApertura({
     accounts,
     suggestedDenominations,
     bankAccounts,
-    bankAccountCode,
     existing,
 }: Props) {
     const hoy = businessToday();
@@ -125,13 +123,6 @@ export default function CajaApertura({
     const nombre = nombreDeMoneda(selected.currency);
 
     /*
-     * Sin cuenta bancaria en esta moneda no hay dónde estar depositado: el
-     * renglón se apaga en vez de ofrecer cuentas de la otra moneda, que la
-     * base rechazaría. Hoy pasa con los dólares.
-     */
-    const sinCuentaEnLaMoneda = bankAccounts.length === 0;
-
-    /*
      * «No había nada al abrir» vacía lo cargado: un saldo escrito y después
      * declarado inexistente no puede viajar, y el Action lo rechazaría.
      */
@@ -143,16 +134,6 @@ export default function CajaApertura({
             denominations: vacio ? {} : form.data.denominations,
             cheques: vacio ? [] : form.data.cheques,
         });
-
-    /*
-     * «DEPOSITOS DIRECTOS» es lo que las empresas depositaron derecho en la
-     * cuenta de la Secretaría, así que su saldo abre una pata bancaria y
-     * hay que decir en qué cuenta está. El libro es append-only: una línea
-     * sin cuenta no se corrige después, se revierte.
-     */
-    const declaraBanco = /[1-9]/.test(
-        form.data.balances[bankAccountCode] ?? '',
-    );
 
     /*
      * Detallar los cheques es opcional, pero sin detalle el inventario del
@@ -233,13 +214,13 @@ export default function CajaApertura({
          */
         const conCampo = new Set([
             'date',
+            'bankAccountId',
             'notes',
             'declaredEmpty',
             ...(form.data.declaredEmpty
                 ? []
                 : [
                       'balances',
-                      ...(declaraBanco ? ['bankAccountId'] : []),
                       ...accounts.map((cuenta) => `balances.${cuenta.code}`),
                       ...form.data.cheques.flatMap((_, indice) =>
                           [
@@ -258,13 +239,7 @@ export default function CajaApertura({
         return Object.entries(errores)
             .filter(([clave]) => !conCampo.has(clave))
             .map(([, mensaje]) => mensaje);
-    }, [
-        errores,
-        accounts,
-        form.data.cheques,
-        form.data.declaredEmpty,
-        declaraBanco,
-    ]);
+    }, [errores, accounts, form.data.cheques, form.data.declaredEmpty]);
 
     const total = useMemo(
         () =>
@@ -303,6 +278,24 @@ export default function CajaApertura({
 
                 {existing ? (
                     <AperturaHecha existing={existing} />
+                ) : bankAccounts.length === 0 ? (
+                    /*
+                     * Sin cuenta en esta moneda no se ofrece el formulario: la
+                     * apertura no se rehace y todo libro abre con la cuenta con
+                     * la que opera.
+                     */
+                    <p className="rounded-lg border bg-card p-5 text-sm shadow-raised">
+                        No hay ninguna cuenta bancaria en {nombre} activa. Cada
+                        libro abre con la cuenta con la que opera: se da de alta
+                        en{' '}
+                        <Link
+                            href={cuentasBancarias()}
+                            className="text-primary hover:underline"
+                        >
+                            Banco › Cuentas
+                        </Link>
+                        .
+                    </p>
                 ) : (
                     <>
                         <AdvertenciaDeApertura />
@@ -318,18 +311,6 @@ export default function CajaApertura({
                         <form
                             onSubmit={(e) => {
                                 e.preventDefault();
-                                /*
-                                 * La cuenta viaja solo si hay depósitos
-                                 * directos: sin ellos no hay pata bancaria,
-                                 * y un selector vacío —no hay cuentas en esta
-                                 * moneda— no es una cuenta que validar.
-                                 */
-                                form.transform((datos) => ({
-                                    ...datos,
-                                    bankAccountId: declaraBanco
-                                        ? datos.bankAccountId
-                                        : null,
-                                }));
                                 form.post(store().url);
                             }}
                             className="flex flex-col gap-6"
@@ -353,6 +334,47 @@ export default function CajaApertura({
                                     como cuota histórica.
                                 </p>
                                 <InputError message={form.errors.date} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="bankAccountId">
+                                    Cuenta bancaria con la que opera
+                                </Label>
+                                <Select
+                                    value={
+                                        form.data.bankAccountId
+                                            ? String(form.data.bankAccountId)
+                                            : ''
+                                    }
+                                    onValueChange={(valor) =>
+                                        form.setData(
+                                            'bankAccountId',
+                                            Number(valor),
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger id="bankAccountId">
+                                        <SelectValue placeholder="Elegí la cuenta" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {bankAccounts.map((cuenta) => (
+                                            <SelectItem
+                                                key={cuenta.id}
+                                                value={String(cuenta.id)}
+                                            >
+                                                {cuenta.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Queda como la cuenta predeterminada de la
+                                    caja. Si declarás depósitos directos, es
+                                    donde están.
+                                </p>
+                                <InputError
+                                    message={form.errors.bankAccountId}
+                                />
                             </div>
 
                             {/*
@@ -422,21 +444,6 @@ export default function CajaApertura({
                                                                 }
                                                             </span>
                                                         )}
-                                                        {cuenta.code ===
-                                                            bankAccountCode &&
-                                                            sinCuentaEnLaMoneda && (
-                                                                <span className="mt-0.5 block text-xs font-normal text-warning-strong">
-                                                                    No hay
-                                                                    cuenta
-                                                                    bancaria en{' '}
-                                                                    {nombre}{' '}
-                                                                    registrada.
-                                                                    Se da de
-                                                                    alta en
-                                                                    Banco ›
-                                                                    Cuentas.
-                                                                </span>
-                                                            )}
                                                     </Label>
                                                     <div className="w-44">
                                                         <AmountInput
@@ -445,11 +452,6 @@ export default function CajaApertura({
                                                             readOnly={
                                                                 cuenta.code ===
                                                                 EFECTIVO
-                                                            }
-                                                            disabled={
-                                                                cuenta.code ===
-                                                                    bankAccountCode &&
-                                                                sinCuentaEnLaMoneda
                                                             }
                                                             value={
                                                                 cuenta.code ===
@@ -542,54 +544,6 @@ export default function CajaApertura({
                                                 form.setData('cheques', cheques)
                                             }
                                         />
-                                    )}
-
-                                    {declaraBanco && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="bankAccountId">
-                                                En qué cuenta están los
-                                                depósitos directos
-                                            </Label>
-                                            <Select
-                                                value={
-                                                    form.data.bankAccountId
-                                                        ? String(
-                                                              form.data
-                                                                  .bankAccountId,
-                                                          )
-                                                        : ''
-                                                }
-                                                onValueChange={(valor) =>
-                                                    form.setData(
-                                                        'bankAccountId',
-                                                        Number(valor),
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger id="bankAccountId">
-                                                    <SelectValue placeholder="Elegí la cuenta" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {bankAccounts.map(
-                                                        (cuenta) => (
-                                                            <SelectItem
-                                                                key={cuenta.id}
-                                                                value={String(
-                                                                    cuenta.id,
-                                                                )}
-                                                            >
-                                                                {cuenta.label}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                            <InputError
-                                                message={
-                                                    form.errors.bankAccountId
-                                                }
-                                            />
-                                        </div>
                                     )}
                                 </>
                             )}

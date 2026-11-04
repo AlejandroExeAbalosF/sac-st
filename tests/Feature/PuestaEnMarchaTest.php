@@ -36,6 +36,37 @@ class PuestaEnMarchaTest extends TestCase
                 ->where('setup.3.optional', true));
     }
 
+    public function test_haberes_no_se_abre_sin_una_cuenta_de_su_moneda(): void
+    {
+        $this->cuenta('310000999888777', 'USD');
+
+        $this->actingAs($this->operador('administrador'))
+            ->get(route('inicio'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('setup.1.href', null)
+                ->where('setup.1.blockedBy', 'Necesita una cuenta bancaria en pesos.')
+                ->where('setup.3.href', route('caja.apertura.index', ['moneda' => 'usd'], absolute: false))
+                ->where('setup.3.blockedBy', null));
+
+        $this->cuenta('310000111222333');
+
+        $this->get(route('inicio'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('setup.1.href', route('caja.apertura.index', absolute: false))
+                ->where('setup.1.blockedBy', null));
+    }
+
+    public function test_los_dolares_no_se_abren_sin_una_cuenta_en_dolares(): void
+    {
+        $this->cuenta('310000111222333');
+
+        $this->actingAs($this->operador('administrador'))
+            ->get(route('inicio'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('setup.3.href', null)
+                ->where('setup.3.blockedBy', 'Necesita una cuenta bancaria en dólares.'));
+    }
+
     public function test_multas_no_se_puede_abrir_sin_una_cuenta_en_pesos(): void
     {
         $this->cuenta('310000999888777', 'USD');
