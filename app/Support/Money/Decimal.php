@@ -151,6 +151,27 @@ final class Decimal
         return bcsub(self::numeric($a), self::numeric($b), $scale);
     }
 
+    /**
+     * Cantidad por precio, sin pasar por `float`.
+     *
+     * @return numeric-string
+     */
+    public static function times(string $amount, int $quantity): string
+    {
+        return bcmul(self::numeric($amount), (string) $quantity, self::SCALE);
+    }
+
+    /**
+     * Un porcentaje de un monto, redondeado una sola vez, al final, al centavo
+     * más cercano.
+     *
+     * @return numeric-string
+     */
+    public static function percentOf(string $base, string $rate): string
+    {
+        return self::scale(bcdiv(bcmul(self::numeric($base), self::numeric($rate), 8), '100', 8));
+    }
+
     public static function equals(string $a, string $b, int $scale = self::SCALE): bool
     {
         return bccomp(self::numeric($a), self::numeric($b), $scale) === 0;

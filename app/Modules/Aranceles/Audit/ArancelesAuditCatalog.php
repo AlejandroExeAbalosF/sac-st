@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Aranceles\Audit;
 
+use App\Modules\Aranceles\Audit\Subjects\FeeChargeSubject;
 use App\Modules\Aranceles\Audit\Subjects\FeeTypeSubject;
 use App\Modules\Shared\Audit\AuditActionDefinition;
 use App\Modules\Shared\Audit\AuditCatalog;
@@ -39,6 +40,37 @@ final class ArancelesAuditCatalog implements AuditCatalogContributor
             ),
         );
 
+        $catalog->registerActions(
+            new AuditActionDefinition(
+                'arancel.cobrado',
+                'Se cobró un arancel',
+                'Aranceles',
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo'],
+            ),
+            new AuditActionDefinition(
+                'arancel.cobro-anulado',
+                'Se anuló un cobro de arancel',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['recibo' => 'Recibo', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
+                'arancel.recibo-reemplazado',
+                'Se reemplazó un recibo de arancel',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['recibo' => 'Recibo', 'nuevo' => 'Recibo nuevo', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
+                'arancel.cobro-corregido',
+                'Se corrigió un cobro de arancel',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['anterior' => 'Importe anterior', 'amount' => 'Importe', 'recibo' => 'Recibo', 'reason' => 'Motivo'],
+            ),
+        );
+
         $catalog->registerSubject(new FeeTypeSubject);
+        $catalog->registerSubject(new FeeChargeSubject);
     }
 }

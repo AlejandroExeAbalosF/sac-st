@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Actions;
 
 use App\Modules\Aranceles\Enums\FeeCalculationMode;
+use App\Modules\Aranceles\Models\FeeChargeItem;
 use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Support\FeeTypeUniqueness;
 use App\Modules\Shared\Actions\RecordAuditEvent;
@@ -33,6 +34,10 @@ final class UpdateFeeType
             return DB::transaction(function () use ($tipo, $datos, $actorId): FeeType {
                 $tipo = FeeType::query()->whereKey($tipo->id)->lockForUpdate()->firstOrFail();
                 $antes = $tipo->only(self::AUDITABLE);
+
+                if ($datos['code'] !== $tipo->code && FeeChargeItem::query()->where('fee_type_id', $tipo->id)->exists()) {
+                    throw ValidationException::withMessages(['code' => 'Este arancel ya se usó en un cobro: su código no cambia.']);
+                }
 
                 $tipo->fill([
                     'code' => $datos['code'],

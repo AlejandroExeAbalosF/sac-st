@@ -46,8 +46,8 @@ exigir tocar el motor.
 
 De Multas ya está la cuenta corriente —expedientes, documentos, multas, su
 obligación y los pagos anteriores al sistema— y todavía no los cobros: ver
-[docs/multas.md](docs/multas.md). De Aranceles está el catálogo de tipos y precios, y
-todavía no se cobra: ver [docs/aranceles.md](docs/aranceles.md).
+[docs/multas.md](docs/multas.md). De Aranceles están el catálogo, el cobro en efectivo
+con su recibo y la caja; falta lo bancario: ver [docs/aranceles.md](docs/aranceles.md).
 Las dos comparten la regla que las gobierna: no admitirán egresos, porque recaudan
 para el Estado y lo que entra no vuelve a salir por esa caja, se rinde.
 

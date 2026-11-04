@@ -43,7 +43,7 @@ class NumeracionDeDocumentosTest extends TestCase
     public function test_el_catalogo_tiene_una_serie_por_tipo_y_caja(): void
     {
         $this->assertSame(
-            ['0010' => 'haberes', '0020' => 'haberes', '0030' => 'haberes', '0210' => 'multas'],
+            ['0010' => 'haberes', '0020' => 'haberes', '0030' => 'haberes', '0110' => 'aranceles', '0210' => 'multas'],
             DB::table('document_series')->join('cash_boxes', 'cash_boxes.id', '=', 'document_series.cash_box_id')
                 ->orderBy('document_series.code')
                 ->pluck('cash_boxes.code AS caja', 'document_series.code AS serie')->all(),
@@ -58,7 +58,7 @@ class NumeracionDeDocumentosTest extends TestCase
 
         $this->seed(DocumentSeriesSeeder::class);
 
-        $this->assertSame(4, DocumentSeries::query()->count());
+        $this->assertSame(5, DocumentSeries::query()->count());
         // Y sobre todo: el correlativo no volvió a empezar.
         $this->assertSame(2, $this->tomar('0010')['number']);
     }

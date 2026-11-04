@@ -1,4 +1,29 @@
 import { usePage } from '@inertiajs/react';
+import {
+    calendario as calendarioDeAranceles,
+    dia as diaDeAranceles,
+} from '@/routes/aranceles/caja';
+import { index as aperturaDeAranceles } from '@/routes/aranceles/caja/apertura';
+import {
+    adjust as imputarEnAranceles,
+    index as arqueosDeAranceles,
+    review as revisarEnAranceles,
+    store as arquearEnAranceles,
+} from '@/routes/aranceles/caja/arqueos';
+import {
+    index as cierresDeAranceles,
+    reopen as reabrirEnAranceles,
+    sheet as planillaDeAranceles,
+    store as cerrarEnAranceles,
+} from '@/routes/aranceles/caja/cierres';
+import { regenerate as rehacerEnAranceles } from '@/routes/aranceles/caja/cierres/sheet';
+import {
+    defaultMethod as predeterminarEnAranceles,
+    index as cuentasDeAranceles,
+    retire as darDeBajaEnAranceles,
+    start as moverInicioEnAranceles,
+    store as habilitarEnAranceles,
+} from '@/routes/aranceles/caja/cuentas';
 import { calendario, dia } from '@/routes/caja';
 import { index as aperturaDeHaberes } from '@/routes/caja/apertura';
 import {
@@ -50,7 +75,7 @@ import {
 import type { RouteQueryOptions } from '@/wayfinder';
 
 /** Las cajas que tienen pantallas de caja. */
-export type CodigoDeCaja = 'haberes' | 'multas';
+export type CodigoDeCaja = 'haberes' | 'multas' | 'aranceles';
 
 type Ruta = { url: string };
 type ConQuery = (options?: RouteQueryOptions) => Ruta;
@@ -105,6 +130,33 @@ const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
             retire: darDeBaja,
             default: predeterminar,
             start: moverInicio,
+        },
+    },
+    aranceles: {
+        rotulo: 'Caja de Aranceles',
+        dia: diaDeAranceles,
+        calendario: calendarioDeAranceles,
+        arqueos: {
+            index: arqueosDeAranceles,
+            store: arquearEnAranceles,
+            review: revisarEnAranceles,
+            adjust: imputarEnAranceles,
+        },
+        cierres: {
+            index: cierresDeAranceles,
+            store: cerrarEnAranceles,
+            reopen: reabrirEnAranceles,
+            sheet: planillaDeAranceles,
+            regenerate: rehacerEnAranceles,
+        },
+        apertura: aperturaDeAranceles,
+        saldoAnterior: null,
+        cuentas: {
+            index: cuentasDeAranceles,
+            store: habilitarEnAranceles,
+            retire: darDeBajaEnAranceles,
+            default: predeterminarEnAranceles,
+            start: moverInicioEnAranceles,
         },
     },
     multas: {

@@ -43,8 +43,9 @@ class CashBoxSeeder extends Seeder
             'name' => 'Aranceles',
             'allows_income' => true,
             'allows_expense' => false,
-            'requires_receipt_person' => true,
-            // Sin circuito todavía: la política la decide el área cuando se construya.
+            // El recibo se extiende al nombre de quien paga, en texto libre.
+            'requires_receipt_person' => false,
+            // El efectivo se acumula y se deposita junto (regla A82).
             'deposits_whole_receipts' => false,
         ],
         [

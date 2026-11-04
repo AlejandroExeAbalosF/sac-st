@@ -651,13 +651,13 @@ function ReciboLink({
     const destino =
         fila.receiptId === null ? undefined : enlaces[String(fila.receiptId)];
 
-    // En Multas el recibo lleva a la ficha de la multa que cobró.
+    // En Multas y Aranceles el recibo lleva a lo que cobró.
     if (destino !== undefined) {
         return (
             <Link
                 href={destino}
                 className="rounded-sm underline decoration-dotted underline-offset-4 transition-colors hover:text-primary hover:decoration-solid focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                aria-label={`Ver la multa del recibo ${fila.number}`}
+                aria-label={`Ver lo que documenta el recibo ${fila.number}`}
             >
                 {fila.number}
             </Link>

@@ -31,6 +31,9 @@ final class CashBox extends Model
     /** Opera con una cuenta bancaria compartida con Aranceles. */
     public const string MULTAS = 'multas';
 
+    /** Comparte la cuenta bancaria con Multas. */
+    public const string ARANCELES = 'aranceles';
+
     protected $fillable = [
         'code',
         'name',

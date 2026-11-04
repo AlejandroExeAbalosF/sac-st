@@ -71,6 +71,9 @@ return [
             'multas.cobros.preview',
             // La rendición mensual de Multas, en el visor.
             'multas.rendiciones.view',
+            // El recibo de Aranceles, antes y después de emitirlo.
+            'aranceles.recibos.view',
+            'aranceles.cobros.preview',
         ],
     ],
 

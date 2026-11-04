@@ -81,7 +81,8 @@ final class CashDayBook
              * el egreso del rechazo quedaría sin su ingreso.
              */
             ->where(function ($query): void {
-                $query->where('receipts.status', '!=', 'voided')
+                // Uno reemplazado tampoco: su lugar lo ocupa el reemplazante.
+                $query->whereNotIn('receipts.status', ['voided', 'replaced'])
                     ->orWhereExists(function ($rechazado): void {
                         $rechazado->selectRaw('1')
                             ->from('fund_receipts AS cheque')

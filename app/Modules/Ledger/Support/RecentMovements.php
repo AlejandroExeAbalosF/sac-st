@@ -77,7 +77,11 @@ final class RecentMovements
                     description: $fila->description,
                     cashBoxName: $fila->cash_box_name,
                     isReversed: $fila->status === FinancialEventStatus::Reversed->value,
-                    href: route($fila->cash_box_code === 'multas' ? 'multas.caja.dia' : 'caja.dia', ['fecha' => $fecha], absolute: false),
+                    href: route(match ($fila->cash_box_code) {
+                        'multas' => 'multas.caja.dia',
+                        'aranceles' => 'aranceles.caja.dia',
+                        default => 'caja.dia',
+                    }, ['fecha' => $fecha], absolute: false),
                 );
             })
             ->all());

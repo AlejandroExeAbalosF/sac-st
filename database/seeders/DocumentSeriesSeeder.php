@@ -58,6 +58,16 @@ class DocumentSeriesSeeder extends Seeder
             'label' => 'Orden de Pago — Haberes',
         ],
         /*
+         * Aranceles también numera aparte, con su propio formulario.
+         */
+        [
+            'code' => '0110',
+            'cash_box' => CashBox::ARANCELES,
+            'document_type' => 'receipt_income',
+            'origin' => 'system',
+            'label' => 'Recibo de ingreso — Aranceles',
+        ],
+        /*
          * Multas numera aparte: su talonario de papel es otro y su recibo
          * no puede confundirse con uno de Haberes. Solo emite ingresos.
          */

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Modules\Aranceles\Enums\FeeChargeStatus;
+use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
@@ -40,6 +42,7 @@ use App\Modules\Shared\Data\WorkQueueData;
 use App\Modules\Shared\Enums\QueueTone;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
+use App\Support\Database\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -248,6 +251,32 @@ final class InicioController extends Controller
                 'total' => $total,
                 'moreHref' => route('multas.index', ['q' => $term, 'vista' => 'multas'], absolute: false),
                 'results' => $results,
+            ];
+        }
+
+        if ($user->can('aranceles.ver')) {
+            $patron = '%'.Like::escape($term).'%';
+            $query = FeeCharge::query()->where('payer_name', 'ilike', $patron);
+            $total = (clone $query)->count();
+
+            $groups[] = [
+                'key' => 'aranceles',
+                'label' => 'Aranceles',
+                'total' => $total,
+                'moreHref' => route('aranceles.cobros.index', ['q' => $term], absolute: false),
+                'results' => $query
+                    ->latest('id')
+                    ->limit(6)
+                    ->get()
+                    ->map(fn (FeeCharge $cobro): array => [
+                        'id' => 'aranceles-'.$cobro->id,
+                        'title' => $cobro->payer_name,
+                        'description' => 'Cobro de arancel',
+                        'context' => $cobro->paid_on?->format('d/m/Y') ?? '',
+                        'status' => 'Arancel',
+                        'href' => route('aranceles.cobros.index', ['cobro' => $cobro->id], absolute: false),
+                    ])
+                    ->all(),
             ];
         }
 
@@ -681,7 +710,11 @@ final class InicioController extends Controller
                 ->whereNot('status', CashCountStatus::Draft)
                 ->count(),
             closingStatus: $cierre?->status->value,
-            href: route($code === CashBox::MULTAS ? 'multas.caja.dia' : 'caja.dia', absolute: false),
+            href: route(match ($code) {
+                CashBox::MULTAS => 'multas.caja.dia',
+                CashBox::ARANCELES => 'aranceles.caja.dia',
+                default => 'caja.dia',
+            }, absolute: false),
         );
     }
 
@@ -702,7 +735,7 @@ final class InicioController extends Controller
 
         return [
             new CashBoxSummaryData('haberes', 'Haberes', $haberes, $haberes > 0 ? 100 : 0, true),
-            new CashBoxSummaryData('aranceles', 'Aranceles', null, null, false),
+            new CashBoxSummaryData('aranceles', 'Aranceles', FeeCharge::query()->where('status', FeeChargeStatus::Paid)->count(), null, false),
             new CashBoxSummaryData('multas', 'Multas', null, null, false),
         ];
     }

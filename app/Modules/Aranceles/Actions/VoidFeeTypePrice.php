@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Aranceles\Actions;
 
+use App\Modules\Aranceles\Models\FeeChargeItem;
 use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Models\FeeTypePrice;
 use App\Modules\Shared\Actions\RecordAuditEvent;
@@ -14,8 +15,7 @@ use Illuminate\Validation\ValidationException;
  * Anula un precio mal cargado: queda a la vista con su motivo y deja de regir.
  *
  * Es la salida para un error de tipeo: los precios no se editan, y la fecha ya
- * ocupada no admite otro. Con los cobros, la Etapa 1b suma que un precio en uso
- * no se anule.
+ * ocupada no admite otro. Uno ya usado en un cobro no se anula.
  */
 final class VoidFeeTypePrice
 {
@@ -31,6 +31,12 @@ final class VoidFeeTypePrice
             // Un segundo envío del mismo formulario.
             if ($precio->voided_at !== null) {
                 return $precio;
+            }
+
+            if (FeeChargeItem::query()->where('fee_type_price_id', $precio->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Ese precio ya se usó en un cobro: no se anula. Cargá el correcto desde otra fecha.',
+                ]);
             }
 
             $otros = FeeTypePrice::query()

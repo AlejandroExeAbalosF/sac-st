@@ -9,6 +9,7 @@ use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Aranceles\Audit\ArancelesAuditCatalog;
 use App\Modules\Aranceles\Permissions\ArancelesPermissionCatalog;
+use App\Modules\Aranceles\Support\FeeCashBoxModule;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Listeners\LinkOpeningBankAccount;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
@@ -74,6 +75,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CashBoxModules::class, fn ($app): CashBoxModules => new CashBoxModules($app, [
             CashBox::HABERES => HaberesCashBoxModule::class,
             CashBox::MULTAS => FineCashBoxModule::class,
+            CashBox::ARANCELES => FeeCashBoxModule::class,
         ]));
 
         /*

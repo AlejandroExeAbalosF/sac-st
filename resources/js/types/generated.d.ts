@@ -2,6 +2,32 @@ declare namespace App {
     namespace Modules {
         namespace Aranceles {
             namespace Data {
+                export type FeeChargeLineData = {
+                    readonly feeTypeId: number;
+                    readonly code: number;
+                    readonly name: string;
+                    readonly quantity: number | null;
+                    readonly baseAmount: string | null;
+                    readonly calculatedAmount: string;
+                    readonly amount: string;
+                    readonly reasonCode: string | null;
+                    readonly reason: string | null;
+                };
+                export type FeeChargeListItemData = {
+                    readonly id: number;
+                    readonly payerName: string;
+                    readonly payerCuit: string | null;
+                    readonly medium: App.Modules.Aranceles.Enums.FeeChargeMedium;
+                    readonly status: App.Modules.Aranceles.Enums.FeeChargeStatus;
+                    readonly paidOn: string | null;
+                    readonly total: string;
+                    readonly lines: App.Modules.Aranceles.Data.FeeChargeLineData[];
+                    readonly receiptId: number | null;
+                    readonly receiptNumber: string | null;
+                    readonly talonarioNumber: string | null;
+                    readonly voidReason: string | null;
+                    readonly deposited: boolean;
+                };
                 export type FeeTypeData = {
                     id: number;
                     code: number;
@@ -27,6 +53,27 @@ declare namespace App {
             }
             namespace Enums {
                 export type FeeCalculationMode = 'unit' | 'percentage';
+                export type FeeChargeMedium = 'cash' | 'bank';
+                export type FeeChargeStatus = 'pending' | 'paid' | 'voided';
+                export type FeeReasonAct =
+                    | 'amount_change'
+                    | 'collection_void'
+                    | 'receipt_replacement'
+                    | 'charge_correction';
+                export type FeeReasonCode =
+                    | 'rounding'
+                    | 'less_accepted'
+                    | 'more_accepted'
+                    | 'exception'
+                    | 'data_entry_error'
+                    | 'duplicate'
+                    | 'wrong_payer'
+                    | 'wrong_cuit'
+                    | 'wrong_wording'
+                    | 'wrong_type'
+                    | 'wrong_quantity'
+                    | 'wrong_amount'
+                    | 'other';
             }
         }
         namespace Banking {

@@ -370,8 +370,9 @@ class InicioTest extends TestCase
             ->assertJsonPath('props.cashDay.balances.code', 'haberes')
             ->assertJsonCount(3, 'props.cashBoxes')
             ->assertJsonPath('props.cashBoxes.0.code', 'haberes')
-            // Las otras dos cajas no tienen módulo: `null`, no cero.
-            ->assertJsonPath('props.cashBoxes.1.count', null);
+            // Aranceles ya cuenta sus cobros; Multas sigue sin dato: `null`, no cero.
+            ->assertJsonPath('props.cashBoxes.1.count', 0)
+            ->assertJsonPath('props.cashBoxes.2.count', null);
     }
 
     public function test_un_usuario_sin_permisos_no_recibe_datos_operativos_diferidos(): void

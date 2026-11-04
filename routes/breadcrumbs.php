@@ -140,6 +140,46 @@ Breadcrumbs::for('aranceles.tipos.index', fn (): array => [
     Crumb::make('Tipos de arancel'),
 ]);
 
+Breadcrumbs::for('aranceles.cobros.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Cobros'),
+]);
+
+Breadcrumbs::for('aranceles.cobros.create', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Cobros', route('aranceles.cobros.index')),
+    Crumb::make('Nuevo cobro'),
+]);
+
+Breadcrumbs::for('aranceles.cobros.corregir.edit', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Cobros', route('aranceles.cobros.index')),
+    Crumb::make('Corregir cobro'),
+]);
+
+Breadcrumbs::for('aranceles.caja.apertura.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Apertura de la caja'),
+]);
+
+Breadcrumbs::for('aranceles.caja.cuentas.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Caja del día', route('aranceles.caja.dia')),
+    Crumb::make('Cuentas de la caja'),
+]);
+
+foreach ([
+    'aranceles.caja.dia' => 'Caja del día',
+    'aranceles.caja.arqueos.index' => 'Arqueos',
+    'aranceles.caja.cierres.index' => 'Cierres',
+    'aranceles.caja.calendario' => 'Calendario',
+] as $ruta => $titulo) {
+    Breadcrumbs::for($ruta, fn (): array => [
+        Crumb::make('Aranceles'),
+        Crumb::make($titulo),
+    ]);
+}
+
 // ── Haberes ──────────────────────────────────────────────────────────────
 
 Breadcrumbs::for('expedientes.index', fn (): array => [

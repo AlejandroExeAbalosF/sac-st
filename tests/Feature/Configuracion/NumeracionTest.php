@@ -38,11 +38,11 @@ class NumeracionTest extends TestCase
         $this->withoutVite();
         $user = $this->admin();
         $this->actingAs($user)->get('/configuracion/numeracion')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->component('configuracion/numeracion')->has('series', 4));
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('configuracion/numeracion')->has('series', 5));
         $this->put('/configuracion/numeracion/0010', $this->input())->assertSessionHasNoErrors()->assertRedirect();
         $number = DB::transaction(fn () => app(TakeNextDocumentNumber::class)->handle('0010'));
         $this->assertSame('00125-000123', $number['formatted']);
-        $this->assertSame(4, DocumentSeries::query()->count());
+        $this->assertSame(5, DocumentSeries::query()->count());
         $this->assertDatabaseHas('audit_events', ['action' => 'numeracion.configurada', 'user_id' => $user->id]);
     }
 

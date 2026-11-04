@@ -119,6 +119,7 @@ class HandleInertiaRequests extends Middleware
                     'multas.caja.ver' => $user->can('multas.caja.ver'),
                     // El catálogo de Aranceles.
                     'aranceles.ver' => $user->can('aranceles.ver'),
+                    'aranceles.caja.ver' => $user->can('aranceles.caja.ver'),
                     // El acordeón Banco: movimientos y extractos, y las cuentas. Lo ven todos, pero se puede quitar.
                     'banco.extractos.ver' => $user->can('banco.extractos.ver'),
                     'banco.cuentas.ver' => $user->can('banco.cuentas.ver'),

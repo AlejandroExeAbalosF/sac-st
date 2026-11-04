@@ -70,8 +70,15 @@ describe('la sección Operación', () => {
 describe('el grupo Aranceles de la barra', () => {
     it('ofrece el catálogo a quien puede ver aranceles', () => {
         expect(hijosPara('Aranceles', { 'aranceles.ver': true })).toEqual([
+            'Cobros',
             'Tipos de arancel',
         ]);
+        expect(
+            hijosPara('Aranceles', {
+                'aranceles.ver': true,
+                'aranceles.caja.ver': true,
+            }),
+        ).toEqual(['Cobros', 'Caja del día', 'Calendario', 'Tipos de arancel']);
     });
 
     it('no aparece sin el permiso', () => {

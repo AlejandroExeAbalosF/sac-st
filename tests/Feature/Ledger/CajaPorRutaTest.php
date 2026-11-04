@@ -61,7 +61,7 @@ class CajaPorRutaTest extends TestCase
     /** Una caja sin módulo, o una pantalla sin caja, no caen en Haberes. */
     public function test_without_a_box_with_a_module_the_screen_does_not_exist(): void
     {
-        Route::middleware(['web', 'auth', 'caja:aranceles'])->get('/_prueba/caja-aranceles', [CashController::class, 'index']);
+        Route::middleware(['web', 'auth', 'caja:inexistente'])->get('/_prueba/caja-aranceles', [CashController::class, 'index']);
         Route::middleware(['web', 'auth'])->get('/_prueba/caja-sin-caja', [CashController::class, 'index']);
 
         $admin = $this->operador('administrador');

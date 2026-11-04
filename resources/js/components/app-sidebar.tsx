@@ -12,6 +12,7 @@ import {
     Landmark,
     LayoutGrid,
     Lock,
+    ReceiptText,
     Scale,
     Stamp,
     Tags,
@@ -31,6 +32,11 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { inicio } from '@/routes';
+import {
+    calendario as calendarioDeAranceles,
+    dia as diaDeAranceles,
+} from '@/routes/aranceles/caja';
+import { index as cobrosDeAranceles } from '@/routes/aranceles/cobros';
 import { index as tiposDeArancel } from '@/routes/aranceles/tipos';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { index as extractos } from '@/routes/banco/extractos';
@@ -167,11 +173,30 @@ export const navGroups: NavGroup[] = [
                     },
                 ],
             },
-            // Por ahora, su catálogo: el cobro y la caja entran en la etapa siguiente.
+            // Otra caja, el mismo recorrido: se cobra y se cierra el día.
             {
                 title: 'Aranceles',
                 icon: Stamp,
                 children: [
+                    {
+                        title: 'Cobros',
+                        href: cobrosDeAranceles(),
+                        icon: ReceiptText,
+                        permission: 'aranceles.ver',
+                        activeOn: ['aranceles/nuevo'],
+                    },
+                    {
+                        title: 'Caja del día',
+                        href: diaDeAranceles(),
+                        icon: Scale,
+                        permission: 'aranceles.caja.ver',
+                    },
+                    {
+                        title: 'Calendario',
+                        href: calendarioDeAranceles(),
+                        icon: CalendarDays,
+                        permission: 'aranceles.caja.ver',
+                    },
                     {
                         title: 'Tipos de arancel',
                         href: tiposDeArancel(),
