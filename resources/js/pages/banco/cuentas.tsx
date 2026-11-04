@@ -75,7 +75,11 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
             return;
         }
 
-        form.setDefaults(
+        /*
+         * `setData` y no `setDefaults` + `reset`: `reset` usa los valores por
+         * defecto del render anterior, y el formulario abría vacío al editar.
+         */
+        form.setData(
             editando
                 ? {
                       label: editando.label,
@@ -89,7 +93,6 @@ export default function BancoCuentas({ accounts, canManage }: Props) {
                   }
                 : VACIO,
         );
-        form.reset();
         form.clearErrors();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [abierto, editando]);
