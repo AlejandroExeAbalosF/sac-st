@@ -23,7 +23,7 @@
 # ─────────────────────────────────────────────────────────────────────────
 # base · PHP con las extensiones que el sistema usa en runtime
 # ─────────────────────────────────────────────────────────────────────────
-FROM php:8.5-fpm-bookworm@sha256:53eab56a8f43f51a92119f6c29b3448af98eec288ff17f92829354a4b4c9ca05 AS base
+FROM php:8.5-fpm-bookworm@sha256:75dc898a8861a777f14c57b2afbb811a848735701593cbc354e4194807a88f3e AS base
 
 # - pdo_pgsql/pgsql  PostgreSQL, sin plan B.
 # - intl             importes y fechas en es-AR.
