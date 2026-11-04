@@ -1,5 +1,34 @@
 declare namespace App {
     namespace Modules {
+        namespace Aranceles {
+            namespace Data {
+                export type FeeTypeData = {
+                    id: number;
+                    code: number;
+                    decreeLetter: string | null;
+                    name: string;
+                    calculationMode: App.Modules.Aranceles.Enums.FeeCalculationMode;
+                    unitLabel: string | null;
+                    isActive: boolean;
+                    currentPrice: App.Modules.Aranceles.Data.FeeTypePriceData | null;
+                    prices: App.Modules.Aranceles.Data.FeeTypePriceData[];
+                };
+                export type FeeTypePriceData = {
+                    id: number;
+                    validFrom: string;
+                    unitPrice: string | null;
+                    rate: string | null;
+                    legalReference: string | null;
+                    createdBy: string | null;
+                    createdAt: string;
+                    status: string;
+                    voidReason: string | null;
+                };
+            }
+            namespace Enums {
+                export type FeeCalculationMode = 'unit' | 'percentage';
+            }
+        }
         namespace Banking {
             namespace Data {
                 export type BankAccountData = {

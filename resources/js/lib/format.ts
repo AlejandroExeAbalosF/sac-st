@@ -58,6 +58,21 @@ function currencySymbol(currency: CurrencyCode): string {
 }
 
 /**
+ * Una tasa del servidor (`0.0700`) como se escribe en el decreto: `0,07 %`.
+ * Sin los ceros de relleno, y sin pasar por `number`.
+ */
+export function percent(value: DecimalString | null | undefined): string {
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    const [entero, decimales = ''] = value.split('.');
+    const fraccion = decimales.replace(/0+$/, '');
+
+    return `${entero}${fraccion === '' ? '' : `,${fraccion}`} %`;
+}
+
+/**
  * Fecha de negocio en Salta, sin el desfasaje UTC que adelanta el día desde
  * las 21:00 locales. Se arma desde partes para no depender del formato que
  * un navegador elija para `toLocaleDateString`.

@@ -54,3 +54,4 @@ require __DIR__.'/modules/ledger.php';
 require __DIR__.'/modules/banking.php';
 require __DIR__.'/modules/haberes.php';
 require __DIR__.'/modules/multas.php';
+require __DIR__.'/modules/aranceles.php';

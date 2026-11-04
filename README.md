@@ -33,7 +33,7 @@ construcción y la de Aranceles existe en el modelo de datos sin circuito.
 | Caja                        | Estado             | Movimientos      |
 | --------------------------- | ------------------ | ---------------- |
 | **Haberes en consignación** | ✅ Implementada    | ingreso y egreso |
-| **Aranceles**               | ⏳ Pendiente       | -                |
+| **Aranceles**               | 🚧 En construcción | solo ingreso     |
 | **Multas**                  | 🚧 En construcción | solo ingreso     |
 
 La caja es una clasificación
@@ -46,10 +46,10 @@ exigir tocar el motor.
 
 De Multas ya está la cuenta corriente —expedientes, documentos, multas, su
 obligación y los pagos anteriores al sistema— y todavía no los cobros: ver
-[docs/multas.md](docs/multas.md). De Aranceles **no hay nada operativo todavía**.
+[docs/multas.md](docs/multas.md). De Aranceles está el catálogo de tipos y precios, y
+todavía no se cobra: ver [docs/aranceles.md](docs/aranceles.md).
 Las dos comparten la regla que las gobierna: no admitirán egresos, porque recaudan
-para el Estado y lo que entra no vuelve a salir por esa caja, se rinde. El circuito
-de Aranceles está por hacerse y su relevamiento, pendiente.
+para el Estado y lo que entra no vuelve a salir por esa caja, se rinde.
 
 ## Arquitectura
 

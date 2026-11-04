@@ -133,6 +133,13 @@ Breadcrumbs::for('banco.cuentas.index', fn (): array => [
     Crumb::make('Cuentas bancarias'),
 ]);
 
+// ── Aranceles ─────────────────────────────────────────────
+
+Breadcrumbs::for('aranceles.tipos.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Tipos de arancel'),
+]);
+
 // ── Haberes ──────────────────────────────────────────────────────────────
 
 Breadcrumbs::for('expedientes.index', fn (): array => [

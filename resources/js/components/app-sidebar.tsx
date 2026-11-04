@@ -13,6 +13,8 @@ import {
     LayoutGrid,
     Lock,
     Scale,
+    Stamp,
+    Tags,
     ScrollText,
     Settings,
     ShieldCheck,
@@ -29,6 +31,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { inicio } from '@/routes';
+import { index as tiposDeArancel } from '@/routes/aranceles/tipos';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { index as extractos } from '@/routes/banco/extractos';
 import { index as movimientos } from '@/routes/banco/movimientos';
@@ -161,6 +164,19 @@ export const navGroups: NavGroup[] = [
                         icon: CalendarDays,
                         permission: 'multas.caja.ver',
                         activeOn: ['multas/rendiciones', 'multas/movimientos'],
+                    },
+                ],
+            },
+            // Por ahora, su catálogo: el cobro y la caja entran en la etapa siguiente.
+            {
+                title: 'Aranceles',
+                icon: Stamp,
+                children: [
+                    {
+                        title: 'Tipos de arancel',
+                        href: tiposDeArancel(),
+                        icon: Tags,
+                        permission: 'aranceles.ver',
                     },
                 ],
             },

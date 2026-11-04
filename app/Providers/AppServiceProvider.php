@@ -7,6 +7,8 @@ namespace App\Providers;
 use App\Listeners\ConfirmPasswordOnLogin;
 use App\Listeners\RecordAuthEvent;
 use App\Models\User;
+use App\Modules\Aranceles\Audit\ArancelesAuditCatalog;
+use App\Modules\Aranceles\Permissions\ArancelesPermissionCatalog;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Listeners\LinkOpeningBankAccount;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
@@ -104,6 +106,7 @@ class AppServiceProvider extends ServiceProvider
                 BankingAuditCatalog::class,
                 HaberesAuditCatalog::class,
                 MultasAuditCatalog::class,
+                ArancelesAuditCatalog::class,
             ] as $contributor) {
                 /** @var AuditCatalogContributor $aporte */
                 $aporte = $this->app->make($contributor);
@@ -133,6 +136,7 @@ class AppServiceProvider extends ServiceProvider
                 BankingPermissionCatalog::class,
                 HaberesPermissionCatalog::class,
                 MultasPermissionCatalog::class,
+                ArancelesPermissionCatalog::class,
             ] as $contributor) {
                 /** @var PermissionCatalogContributor $aporte */
                 $aporte = $this->app->make($contributor);

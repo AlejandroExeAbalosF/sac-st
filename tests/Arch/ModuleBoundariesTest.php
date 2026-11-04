@@ -54,6 +54,18 @@ arch('Shared, Ledger y Banking no conocen el dominio de Multas')
     ->expect(['App\Modules\Shared', 'App\Modules\Ledger', 'App\Modules\Banking'])
     ->not->toUse('App\Modules\Multas');
 
+arch('Aranceles no conoce a Haberes ni a Multas')
+    ->expect('App\Modules\Aranceles')
+    ->not->toUse(['App\Modules\Haberes', 'App\Modules\Multas']);
+
+arch('Haberes y Multas no conocen el dominio de Aranceles')
+    ->expect(['App\Modules\Haberes', 'App\Modules\Multas'])
+    ->not->toUse('App\Modules\Aranceles');
+
+arch('Shared, Ledger y Banking no conocen el dominio de Aranceles')
+    ->expect(['App\Modules\Shared', 'App\Modules\Ledger', 'App\Modules\Banking'])
+    ->not->toUse('App\Modules\Aranceles');
+
 arch('Support es infraestructura sin dominio')
     ->expect('App\Support')
     ->not->toUse('App\Modules');
@@ -90,6 +102,18 @@ arch('los modelos de Multas son modelos de Eloquent')
 
 arch('los Actions de Multas exponen una sola operación')
     ->expect('App\Modules\Multas\Actions')
+    ->toHaveMethod('handle');
+
+arch('los Enums de Aranceles están respaldados por string')
+    ->expect('App\Modules\Aranceles\Enums')
+    ->toBeStringBackedEnums();
+
+arch('los modelos de Aranceles son modelos de Eloquent')
+    ->expect('App\Modules\Aranceles\Models')
+    ->toExtend('Illuminate\Database\Eloquent\Model');
+
+arch('los Actions de Aranceles exponen una sola operación')
+    ->expect('App\Modules\Aranceles\Actions')
     ->toHaveMethod('handle');
 
 arch('los Enums de Banking están respaldados por string')

@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Aranceles\Audit;
+
+use App\Modules\Aranceles\Audit\Subjects\FeeTypeSubject;
+use App\Modules\Shared\Audit\AuditActionDefinition;
+use App\Modules\Shared\Audit\AuditCatalog;
+use App\Modules\Shared\Audit\AuditCatalogContributor;
+use App\Modules\Shared\Enums\AuditSeverity;
+
+/**
+ * Lo que Aranceles registra. Es crítico lo que cambia cuánto se propone cobrar,
+ * o lo que ya estaba cargado.
+ */
+final class ArancelesAuditCatalog implements AuditCatalogContributor
+{
+    public function register(AuditCatalog $catalog): void
+    {
+        $catalog->registerCategory('Aranceles', 36);
+
+        $catalog->registerActions(
+            new AuditActionDefinition('arancel.tipo-registrado', 'Se registró un tipo de arancel', 'Aranceles'),
+            new AuditActionDefinition('arancel.tipo-corregido', 'Se corrigió un tipo de arancel', 'Aranceles', AuditSeverity::Critical),
+            new AuditActionDefinition(
+                'arancel.precio-agregado',
+                'Se agregó un precio de arancel',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['desde' => 'Vigente desde', 'valor' => 'Valor', 'referencia' => 'Referencia legal'],
+            ),
+            new AuditActionDefinition(
+                'arancel.precio-anulado',
+                'Se anuló un precio de arancel',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['desde' => 'Vigente desde', 'valor' => 'Valor', 'reason' => 'Motivo'],
+            ),
+        );
+
+        $catalog->registerSubject(new FeeTypeSubject);
+    }
+}

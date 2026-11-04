@@ -45,5 +45,7 @@ final class CatalogosSeeder extends Seeder
         // Las etiquetas son las opciones que ofrece el formulario de la
         // cuota: sin ellas el selector sale vacío.
         $this->call(HaberManagementLabelSeeder::class);
+        // Las tasas del decreto: sin ellas no hay qué cobrar en Aranceles.
+        $this->call(FeeTypeSeeder::class);
     }
 }

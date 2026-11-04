@@ -67,6 +67,18 @@ describe('la sección Operación', () => {
     });
 });
 
+describe('el grupo Aranceles de la barra', () => {
+    it('ofrece el catálogo a quien puede ver aranceles', () => {
+        expect(hijosPara('Aranceles', { 'aranceles.ver': true })).toEqual([
+            'Tipos de arancel',
+        ]);
+    });
+
+    it('no aparece sin el permiso', () => {
+        expect(hijosPara('Aranceles', {})).toBeUndefined();
+    });
+});
+
 describe('el grupo Multas de la barra', () => {
     it('aparece con la caja del día a quien solo opera la caja', () => {
         expect(multasPara({ 'multas.caja.ver': true })).toEqual([
