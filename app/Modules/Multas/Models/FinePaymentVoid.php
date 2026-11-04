@@ -11,8 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * La anulación de un cobro de la caja: el dinero nunca entró. Queda con su
- * motivo y las dos reversiones del libro; la base no deja editarla.
+ * La anulación de un pago: un cobro de la caja cuyo dinero nunca entró, un
+ * cheque rechazado o un pago bancario. Queda con su motivo y los dos asientos:
+ * la reversión de la aplicación y el que saca el dinero de los libros, que en
+ * un cheque rechazado no es una reversión. La base no deja editarla.
  *
  * @property int $id
  * @property int $fine_payment_id
@@ -20,7 +22,7 @@ use Illuminate\Support\Carbon;
  * @property FineReasonCode $reason_code
  * @property string|null $reason
  * @property int $application_reversal_event_id
- * @property int $receipt_reversal_event_id
+ * @property int $funds_exit_event_id
  * @property int|null $voided_by
  * @property Carbon|null $voided_at
  * @property-read User|null $voider
@@ -37,7 +39,7 @@ final class FinePaymentVoid extends Model
         'reason_code',
         'reason',
         'application_reversal_event_id',
-        'receipt_reversal_event_id',
+        'funds_exit_event_id',
         'voided_by',
         'voided_at',
     ];

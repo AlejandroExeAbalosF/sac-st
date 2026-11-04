@@ -641,10 +641,63 @@ trámite), `upheld` (prosperó), `rejected` (no prosperó), `dropped` (cayó).
 - El motivo sale de la lista del acto. **Base:** `fine_payment_voids_reason_check`.
 - Un recurso con veredicto no deja anular su cobro: primero se revierte. **Base:**
   `fine_appeal_consistent`; **Action:** `VoidFineCollection`.
-- **P13 queda parcialmente resuelto.** Pendientes: el cambio de medio después de un
-  rechazo y la corrección de un pago bancario verificado.
+- **P13 sigue parcial.** Pendiente: corregir un cobro ya depositado.
 - **No relevado con el área:** la lista de motivos, quién anula, que un recurso resuelto
   exija revertir el veredicto antes de anular su cobro y las condiciones para revertir.
+
+<a id="anular-cheque-rechazado"></a>
+
+## Anular un cheque rechazado
+
+- Se anula si el último cheque de la cadena está rechazado y sin reemplazo, y ningún
+  rechazo de la cadena figura `debit_pending` ni `debit_recorded`. **Base:**
+  `fine_payment_voids_coherent`; **Action:** `VoidFineCollection` con
+  `FineDeposits::rejectionVoidBlock`.
+- Los dos toman el último cheque y después sus rechazos, en el orden de un reemplazo: el
+  segundo espera y ve lo que hizo el primero. **Base:** `fine_payment_voids_coherent` y
+  `fund_receipts_replacement_matches`.
+- La recepción no se revierte y sale lo que había que regularizar, por el importe entero.
+  **Base:** `fine_payment_voids_coherent` (asiento `rejected_cheque_voided`) y
+  `fine_payment_voids_settled` (recepción sin revertir).
+- Un cobro anulado no se reemplaza. **Base:** `fund_receipts_replacement_matches`;
+  **Action:** `ReplaceFineCheque`.
+- El motivo «Se paga por otro medio» es solo para un cheque rechazado. **Solo Action:**
+  `VoidFineCollection`; la base acepta el código en toda anulación.
+- La planilla conserva el renglón del cheque, aunque su recibo esté anulado. **Solo
+  lectura:** `CashDayBook`.
+- **No relevado con el área:** anular sin saber si el banco lo acreditó (`unverified`),
+  quién anula y la lista de motivos.
+
+<a id="pago-verificado-corregir"></a>
+
+## Corregir un pago bancario verificado
+
+- Un pago anulado deja revertidas la aplicación y la recepción, y su crédito sin
+  imputar. **Base:** `fine_payment_voids_coherent` y `fine_payment_voids_settled`;
+  **Action:** `VoidVerifiedFinePayment`, con `ReleaseFundReceiptAllocations`.
+- El crédito liberado se puede volver a usar: lo que tiene reversa ya no respalda nada.
+  **Base:** `fine_payment_application_bank_credit`.
+- El importe del pago nuevo es el del crédito entero. **Base:**
+  `fine_payment_application_bank_credit`; **Action:** `VerifyFineBankPayment`.
+- `fine_payment_corrections` une un pago bancario anulado con otro aplicado del mismo
+  medio, conserva la presentación y cambia la multa o el crédito; es append-only. **Base:**
+  `fine_payment_corrections_coherent` y `fine_payment_corrections_append_only`;
+  **Action:** `CorrectVerifiedFinePayment`.
+- El pago de un recurso en trámite se corrige dentro de su recurso y de su multa, sin
+  dejar de tener un solo pago vivo al confirmar. **Base:**
+  `fine_payment_corrections_coherent`, `fine_payments_follow_appeal` y
+  `fine_appeal_consistent`; **Action:** `CorrectVerifiedFinePayment`.
+- La multa de destino de un pago sin recurso no está congelada. **Base:**
+  `fine_payments_follow_appeal`; **Action:** `FineAppeals::assertNotFrozen`. Que tenga
+  deuda y la misma moneda es **solo del Action**.
+- Con veredicto, primero se revierte. **Base:** `fine_appeal_consistent`; **Action:**
+  `VoidVerifiedFinePayment`.
+- En la misma multa se conservan el término y su fecha de corte. **Solo Action:**
+  `CorrectVerifiedFinePayment`, porque la aplicación no sabe de dónde viene.
+- El permiso no se delega. **Base:** `role_has_permissions_guard_non_delegable`;
+  **Aplicación:** `PermissionCatalog`.
+- **No relevado con el área:** salvo que lo haga solo el administrador, ninguna de estas
+  reglas, la lista de motivos ni la regla provisoria de la [rendición](multas.md#rendicion).
 
 <a id="correccion"></a>
 

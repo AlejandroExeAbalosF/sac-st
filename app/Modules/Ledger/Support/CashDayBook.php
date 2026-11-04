@@ -75,8 +75,20 @@ final class CashDayBook
              * Un recibo anulado no aparece: el talonario del área se rompe
              * y el papel tampoco lo tiene. Lo que sí queda es el asiento de
              * reversión, ya reflejado en los totales.
+             *
+             * Salvo el cheque rechazado que se anuló: su recepción no se revierte,
+             * porque el cheque sí entró y salió con el rechazo. Sin este renglón,
+             * el egreso del rechazo quedaría sin su ingreso.
              */
-            ->where('receipts.status', '!=', 'voided')
+            ->where(function ($query): void {
+                $query->where('receipts.status', '!=', 'voided')
+                    ->orWhereExists(function ($rechazado): void {
+                        $rechazado->selectRaw('1')
+                            ->from('fund_receipts AS cheque')
+                            ->join('cheque_rejections AS rechazo', 'rechazo.fund_receipt_id', '=', 'cheque.id')
+                            ->whereColumn('cheque.financial_event_id', 'pivote.financial_event_id');
+                    });
+            })
             ->select([
                 'receipts.id',
                 'receipts.receipt_type',

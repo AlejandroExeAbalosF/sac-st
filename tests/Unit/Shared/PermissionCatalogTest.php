@@ -117,6 +117,7 @@ class PermissionCatalogTest extends TestCase
         sort($noDelegables);
 
         $this->assertSame([
+            'multas.corregir-pagos',
             'roles.gestionar',
             'usuarios.crear',
             'usuarios.desactivar',

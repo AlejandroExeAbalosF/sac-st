@@ -20,6 +20,7 @@ use App\Modules\Multas\Enums\FineDocumentKind;
 use App\Modules\Multas\Enums\FineDocumentRole;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\Fine;
@@ -54,6 +55,11 @@ use RuntimeException;
  *
  * Se llama dentro de la transacción de quien recibió el dinero, con la multa
  * bloqueada y el pago ya marcado como aplicado.
+ *
+ * Una corrección en la misma multa trae el término ya juzgado: la fecha de
+ * registro pudo cambiar después, y lo que se corrige es otra cosa.
+ *
+ * @phpstan-type Termino array{timeliness: FineTimeliness, termEndsOn: CarbonImmutable|null}
  */
 final class ApplyFinePayment
 {
@@ -64,6 +70,9 @@ final class ApplyFinePayment
         private readonly CashBoxBankAccounts $cuentas,
     ) {}
 
+    /**
+     * @param  Termino|null  $juzgado
+     */
     public function handle(
         FinePayment $pago,
         FundReceipt $recepcion,
@@ -71,6 +80,7 @@ final class ApplyFinePayment
         ?string $talonarioNumber,
         ?int $signedById,
         ?int $actorId,
+        ?array $juzgado = null,
     ): FinePaymentReceipt {
         if (DB::transactionLevel() === 0 || $pago->status !== FinePaymentStatus::Applied) {
             throw new RuntimeException('Se aplica un pago ya marcado como aplicado, en la transacción que recibió su dinero.');
@@ -103,7 +113,7 @@ final class ApplyFinePayment
             actorId: $actorId,
         );
 
-        $termino = $this->termino->judge($multa, $pago->presented_at, $pago->presented_precision);
+        $termino = $juzgado ?? $this->termino->judge($multa, $pago->presented_at, $pago->presented_precision);
 
         FinePaymentApplication::query()->create([
             'fine_payment_id' => $pago->id,

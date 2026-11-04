@@ -146,6 +146,26 @@ final class FinePayment extends Model
     }
 
     /**
+     * La corrección que reemplazó a este pago.
+     *
+     * @return HasOne<FinePaymentCorrection, $this>
+     */
+    public function correctedBy(): HasOne
+    {
+        return $this->hasOne(FinePaymentCorrection::class, 'corrected_payment_id');
+    }
+
+    /**
+     * La corrección de la que nació este pago.
+     *
+     * @return HasOne<FinePaymentCorrection, $this>
+     */
+    public function correctionOf(): HasOne
+    {
+        return $this->hasOne(FinePaymentCorrection::class, 'new_payment_id');
+    }
+
+    /**
      * @return HasOne<FinePaymentApplication, $this>
      */
     public function application(): HasOne

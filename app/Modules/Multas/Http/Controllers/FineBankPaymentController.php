@@ -6,11 +6,14 @@ namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\AttachFineFile;
+use App\Modules\Multas\Actions\CorrectVerifiedFinePayment;
 use App\Modules\Multas\Actions\DiscardFinePayment;
 use App\Modules\Multas\Actions\RecordVerifiedFineBankPayment;
 use App\Modules\Multas\Actions\ReportFineBankPayment;
 use App\Modules\Multas\Actions\VerifyFineBankPayment;
+use App\Modules\Multas\Actions\VoidVerifiedFinePayment;
 use App\Modules\Multas\Enums\FinePaymentMedium;
+use App\Modules\Multas\Http\Requests\CorrectFineBankPaymentRequest;
 use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\RecordVerifiedFineBankPaymentRequest;
 use App\Modules\Multas\Http\Requests\ReportFineBankPaymentRequest;
@@ -102,6 +105,38 @@ final class FineBankPaymentController extends Controller
         $descartar->handle($payment, $request->reason(), $request->user()?->id);
 
         Toast::success('Pago descartado.');
+
+        return back();
+    }
+
+    /** Pasa un pago verificado a otra multa o a otro crédito: el anterior queda anulado, a la vista. */
+    public function correct(CorrectFineBankPaymentRequest $request, FinePayment $payment, CorrectVerifiedFinePayment $corregir): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        $correccion = $corregir->handle(
+            pago: $payment,
+            destino: Fine::query()->findOrFail((int) $datos['fineId']),
+            bankTransactionId: (int) $datos['bankTransactionId'],
+            motivo: $request->reason(),
+            talonarioNumber: $datos['talonarioNumber'] ?? null,
+            signedById: isset($datos['signedById']) ? (int) $datos['signedById'] : null,
+            actorId: $request->user()?->id,
+        );
+
+        $recibo = $correccion->newPayment()->firstOrFail()->paymentReceipt()->with('receipt')->first()?->receipt;
+
+        Toast::success('Pago corregido.', $recibo === null ? null : 'El recibo anterior quedó anulado y se emitió el '.$recibo->formatted_number.'.');
+
+        return back();
+    }
+
+    /** El pago no corresponde: se anula y su crédito queda libre, sin pago nuevo. */
+    public function voidVerified(ReasonRequest $request, FinePayment $payment, VoidVerifiedFinePayment $anular): RedirectResponse
+    {
+        $anular->handle($payment, $request->reason(), $request->user()?->id);
+
+        Toast::success('Pago anulado.', 'El recibo quedó anulado y el crédito volvió a estar sin identificar.');
 
         return back();
     }

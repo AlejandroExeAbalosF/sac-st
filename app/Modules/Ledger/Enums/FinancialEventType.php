@@ -86,6 +86,12 @@ enum FinancialEventType: string
     /** Llegó el cheque que reemplaza al rechazado: vuelve a custodia. */
     case ChequeReplaced = 'cheque_replaced';
 
+    /**
+     * Se anuló el cobro de un cheque rechazado: sale lo que la empresa tenía
+     * que regularizar. El papel ya había salido con el rechazo.
+     */
+    case RejectedChequeVoided = 'rejected_cheque_voided';
+
     public function label(): string
     {
         return match ($this) {
@@ -106,6 +112,7 @@ enum FinancialEventType: string
             self::RejectedChequeCredited => 'Crédito de un cheque rechazado',
             self::ChequeDebitRecorded => 'Débito de un cheque rechazado',
             self::ChequeReplaced => 'Reemplazo de un cheque rechazado',
+            self::RejectedChequeVoided => 'Anulación de un cheque rechazado',
         };
     }
 

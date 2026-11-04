@@ -222,6 +222,20 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'reason' => 'Motivo'],
             ),
             new AuditActionDefinition(
+                'multa.pago-bancario-anulado',
+                'Se anuló un pago bancario verificado y su recibo, y el crédito quedó libre',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'credito' => 'Crédito', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
+                'multa.pago-corregido',
+                'Se corrigió un pago bancario verificado',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['multa_anterior' => 'Multa anterior', 'multa_nueva' => 'Multa nueva', 'recibo_anterior' => 'Recibo anterior', 'recibo_nuevo' => 'Recibo nuevo', 'amount' => 'Importe', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'multa.recurso-caido',
                 'Cayó el recurso de la multa al descartarse o anularse su pago',
                 'Multas',

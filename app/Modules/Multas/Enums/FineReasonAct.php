@@ -28,6 +28,7 @@ enum FineReasonAct: string implements ReasonAct
     case HistoricalRejection = 'historical_rejection';
     case OriginReplacement = 'origin_replacement';
     case CollectionVoid = 'collection_void';
+    case PaymentCorrection = 'payment_correction';
     case VerdictReversal = 'verdict_reversal';
 
     /**
@@ -44,7 +45,8 @@ enum FineReasonAct: string implements ReasonAct
             self::Correction => [FineReasonCode::DataEntryError, FineReasonCode::MisreadPaper, FineReasonCode::Other],
             self::HistoricalRejection => [FineReasonCode::NoEvidence, FineReasonCode::Duplicate, FineReasonCode::WrongFine, FineReasonCode::DataEntryError, FineReasonCode::Other],
             self::OriginReplacement => [FineReasonCode::WrongDocument, FineReasonCode::DataEntryError, FineReasonCode::Other],
-            self::CollectionVoid => [FineReasonCode::DataEntryError, FineReasonCode::WrongFine, FineReasonCode::Duplicate, FineReasonCode::Other],
+            self::CollectionVoid => [FineReasonCode::DataEntryError, FineReasonCode::WrongFine, FineReasonCode::Duplicate, FineReasonCode::MediumChange, FineReasonCode::Other],
+            self::PaymentCorrection => [FineReasonCode::DataEntryError, FineReasonCode::WrongFine, FineReasonCode::WrongBankCredit, FineReasonCode::CreditOfAnotherBox, FineReasonCode::Duplicate, FineReasonCode::Other],
             self::VerdictReversal => [FineReasonCode::DataEntryError, FineReasonCode::Other],
         };
     }

@@ -13,8 +13,12 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\CorrectVerifiedFinePayment;
 use App\Modules\Multas\Actions\DepositFineCollection;
+use App\Modules\Multas\Actions\RecordFineChequeMovements;
 use App\Modules\Multas\Actions\RegisterFineAppeal;
+use App\Modules\Multas\Actions\ReplaceFineCheque;
+use App\Modules\Multas\Actions\VerifyFineBankPayment;
 use App\Modules\Multas\Actions\VoidFineCollection;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
@@ -99,6 +103,33 @@ try {
             Fine::query()->findOrFail($input['fine']), FinePaymentMedium::Cash, $input['amount'], 'worker-collect-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done', 'payment' => $pago->id];
+    } elseif ($input['mode'] === 'correct') {
+        // Corregir un pago verificado mientras otro lo corrige o usa ese crédito.
+        $correccion = app(CorrectVerifiedFinePayment::class)->handle(
+            FinePayment::query()->findOrFail($input['payment']), Fine::query()->findOrFail($input['fine']), $input['credit'],
+            new Reason(FineReasonCode::DataEntryError, 'Worker'), null, null, $input['actor'],
+        );
+        $result = ['status' => 'done', 'correction' => $correccion->id];
+    } elseif ($input['mode'] === 'verify') {
+        // Verificar un pago con un crédito mientras una corrección lo toma.
+        app(VerifyFineBankPayment::class)->handle(FinePayment::query()->findOrFail($input['payment']), $input['credit'], $input['actor']);
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'fine-replace') {
+        // Recibir el reemplazo mientras otro anula el cobro.
+        $reemplazo = app(ReplaceFineCheque::class)->handle(
+            ChequeRejection::query()->findOrFail($input['rejection']),
+            ['number' => 'W-'.$input['tag'], 'bank' => null, 'issueDate' => null],
+            'worker-fine-replace-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'replacement' => $reemplazo->id];
+    } elseif ($input['mode'] === 'cheque-credit') {
+        // Registrar la acreditación tardía mientras otro anula el cobro.
+        config(['multas.cheque_bank_followup_enabled' => true]);
+        $rechazo = app(RecordFineChequeMovements::class)->handle(
+            ChequeRejection::query()->findOrFail($input['rejection']), BankTransaction::query()->findOrFail($input['credit']), null,
+            'worker-cheque-credit-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'bank' => $rechazo->bank_status->value];
     } elseif ($input['mode'] === 'void') {
         // Anular un cobro mientras otro lo deposita.
         app(VoidFineCollection::class)->handle(
@@ -128,7 +159,7 @@ try {
             DB::table('fine_payment_voids')->insert([
                 'fine_payment_id' => $pago->id, 'fine_id' => $pago->fine_id, 'reason_code' => 'data_entry_error',
                 'application_reversal_event_id' => $revertir($aplicacion->application_event_id),
-                'receipt_reversal_event_id' => $revertir($recepcion->financial_event_id),
+                'funds_exit_event_id' => $revertir($recepcion->financial_event_id),
             ]);
         });
         $result = ['status' => 'done'];

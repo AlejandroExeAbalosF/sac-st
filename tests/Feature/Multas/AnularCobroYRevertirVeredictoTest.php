@@ -175,23 +175,6 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         expect($pago->refresh()->status)->toBe(FinePaymentStatus::Voided);
     }
 
-    /** Un cheque rechazado se regulariza: no se puede afirmar que nunca entró. */
-    public function test_a_collection_with_a_rejected_cheque_is_not_voided(): void
-    {
-        $multa = $this->escenario();
-        $pago = app(CollectFinePayment::class)->handle(
-            $multa, FinePaymentMedium::Cheque, '400000.00', (string) Str::uuid(), $this->quienAbre(),
-            cheque: ['number' => 'A-0002', 'bank' => null, 'issueDate' => null],
-        );
-        $this->depositar($pago);
-        $this->actingAs($this->operador('contador'))->post(route('multas.pagos.rechazo.store', $pago), [
-            'rejectedOn' => BusinessDate::today()->toDateString(), 'reason' => 'Sin fondos',
-            'evidence' => UploadedFile::fake()->image('aviso.jpg'), 'idempotencyKey' => (string) Str::uuid(),
-        ])->assertSessionHasNoErrors();
-
-        $this->rechazaElAction('reason', fn () => $this->anular($pago));
-    }
-
     /** Lo informado se descarta; lo verificado contra el banco queda fuera de esta anulación. */
     public function test_only_counter_collections_are_voided(): void
     {
@@ -351,10 +334,10 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         $pago = $this->cobrar($multa, '400000.00');
         $ajeno = $this->cobrar($multa, '100000.00')->application()->firstOrFail()->application_event_id;
 
-        $this->rechazaLaBase('revirtiendo la aplicación y la recepción', fn () => DB::table('fine_payment_voids')->insert([
+        $this->rechazaLaBase('se asienta revirtiendo', fn () => DB::table('fine_payment_voids')->insert([
             'fine_payment_id' => $pago->id, 'fine_id' => $pago->fine_id, 'reason_code' => 'data_entry_error',
             'application_reversal_event_id' => $this->reversion($ajeno),
-            'receipt_reversal_event_id' => $this->reversion($pago->application()->firstOrFail()->fundReceipt()->firstOrFail()->financial_event_id),
+            'funds_exit_event_id' => $this->reversion($pago->application()->firstOrFail()->fundReceipt()->firstOrFail()->financial_event_id),
         ]));
     }
 
@@ -559,7 +542,7 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         expect(FineAppeal::query()->sole()->status)->toBe(FineAppealStatus::Open);
     }
 
-    /** Un pago verificado o depositado no tiene corrección todavía: el mensaje lo dice. */
+    /** Un pago verificado se anula con «Corregir pago»: el mensaje lo dice. */
     public function test_a_later_bank_payment_blocks_the_revert_and_says_why(): void
     {
         $multa = $this->escenario();
@@ -567,9 +550,17 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         $this->resolver($multa, FineAppealStatus::Rejected);
         $this->verificar($this->informar($multa, '100000.00'), '100000.00');
 
-        $this->rechazaConMensaje('todavía no está disponible', fn () => $this->revertir($multa));
+        $this->rechazaConMensaje('Corregir pago', fn () => $this->revertir($multa));
+    }
 
+    /** Un cobro ya depositado no tiene corrección todavía: el mensaje lo dice. */
+    public function test_a_later_deposited_collection_blocks_the_revert_and_says_why(): void
+    {
+        $multa = $this->escenario();
+        $this->recurrir($multa, FinePaymentMedium::Cash, '280000.00');
+        $this->resolver($multa, FineAppealStatus::Rejected);
         $this->depositar($this->cobrar($multa, '50000.00'));
+
         $this->rechazaConMensaje('todavía no está disponible', fn () => $this->revertir($multa));
     }
 
@@ -1001,7 +992,7 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         DB::table('fine_payment_voids')->insert([
             'fine_payment_id' => $pago->id, 'fine_id' => $pago->fine_id, 'reason_code' => 'data_entry_error',
             'application_reversal_event_id' => $this->reversion($aplicacion->application_event_id),
-            'receipt_reversal_event_id' => $this->reversion($recepcion->financial_event_id),
+            'funds_exit_event_id' => $this->reversion($recepcion->financial_event_id),
         ]);
     }
 

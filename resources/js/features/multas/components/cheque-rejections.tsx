@@ -26,12 +26,15 @@ export default function ChequeRejections({
     canManage,
     canReplace,
     canViewAttachments,
+    cobroAnulado = false,
 }: {
     rechazos: Rechazo[];
     amount: string;
     canManage: boolean;
     canReplace: boolean;
     canViewAttachments: boolean;
+    /** El cobro se anuló: el cheque ya no espera reemplazo. */
+    cobroAnulado?: boolean;
 }) {
     return (
         <ul className="grid gap-2">
@@ -43,6 +46,7 @@ export default function ChequeRejections({
                     canManage={canManage}
                     canReplace={canReplace}
                     canViewAttachments={canViewAttachments}
+                    cobroAnulado={cobroAnulado}
                 />
             ))}
         </ul>
@@ -55,12 +59,14 @@ function Rechazo({
     canManage,
     canReplace,
     canViewAttachments,
+    cobroAnulado,
 }: {
     rechazo: Rechazo;
     amount: string;
     canManage: boolean;
     canReplace: boolean;
     canViewAttachments: boolean;
+    cobroAnulado: boolean;
 }) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
     const banco = CHEQUE_BANK_STATUS[r.bankStatus];
@@ -77,8 +83,20 @@ function Rechazo({
                     {date(r.rejectedOn)}
                 </span>
                 <StatusBadge
-                    label={r.regularized ? 'Regularizado' : 'A regularizar'}
-                    tone={r.regularized ? 'done' : 'blocked'}
+                    label={
+                        r.regularized
+                            ? 'Regularizado'
+                            : cobroAnulado
+                              ? 'Cobro anulado'
+                              : 'A regularizar'
+                    }
+                    tone={
+                        r.regularized
+                            ? 'done'
+                            : cobroAnulado
+                              ? 'neutral'
+                              : 'blocked'
+                    }
                 />
                 <StatusBadge
                     label={banco.label}
@@ -102,7 +120,9 @@ function Rechazo({
             <p className="text-muted-foreground">
                 {r.replacementChequeNumber
                     ? `Reemplazado por el cheque n.º ${r.replacementChequeNumber}.`
-                    : 'Sin reemplazo todavía.'}{' '}
+                    : cobroAnulado
+                      ? 'El cobro se anuló: no espera reemplazo.'
+                      : 'Sin reemplazo todavía.'}{' '}
                 {r.companyNotifiedOn
                     ? `Se avisó a la empresa el ${date(r.companyNotifiedOn)}.`
                     : 'Falta registrar el aviso a la empresa.'}{' '}

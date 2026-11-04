@@ -917,7 +917,8 @@ declare namespace App {
                     | 'cheque_rejected'
                     | 'rejected_cheque_credited'
                     | 'cheque_debit_recorded'
-                    | 'cheque_replaced';
+                    | 'cheque_replaced'
+                    | 'rejected_cheque_voided';
                 export type FundReceiptOrigin =
                     'received' | 'opening' | 'legacy' | 'replacement';
                 export type LedgerAccount =
@@ -1051,6 +1052,12 @@ declare namespace App {
                     replacementChequeNumber: string | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
                 };
+                export type FineCorrectionTargetData = {
+                    id: number;
+                    caption: string;
+                    caseLabel: string;
+                    debt: string;
+                };
                 export type FineDebtEntryData = {
                     id: number;
                     kind: App.Modules.Multas.Enums.FineDebtEntryKind;
@@ -1078,6 +1085,7 @@ declare namespace App {
                     chequeBank: string | null;
                     openRejectionId: number | null;
                     rejections: App.Modules.Multas.Data.FineChequeRejectionData[];
+                    voided: boolean;
                 };
                 export type FineDetailData = {
                     id: number;
@@ -1179,6 +1187,11 @@ declare namespace App {
                     voidReason: string | null;
                     voidedAt: string | null;
                     voidable: boolean;
+                    correctable: boolean;
+                    correctedByPaymentId: number | null;
+                    correctedInFine: string | null;
+                    correctsPaymentId: number | null;
+                    correctsInFine: string | null;
                     replacesPaymentId: number | null;
                     attachments: App.Modules.Multas.Data.FineAttachmentData[];
                     deposit: App.Modules.Multas.Data.FineDepositData | null;
@@ -1237,6 +1250,7 @@ declare namespace App {
                     | 'historical_rejection'
                     | 'origin_replacement'
                     | 'collection_void'
+                    | 'payment_correction'
                     | 'verdict_reversal';
                 export type FineReasonCode =
                     | 'data_entry_error'
@@ -1249,6 +1263,9 @@ declare namespace App {
                     | 'resolution_correction'
                     | 'not_credited'
                     | 'no_evidence'
+                    | 'medium_change'
+                    | 'wrong_bank_credit'
+                    | 'credit_of_another_box'
                     | 'replaced_by_correction'
                     | 'appeal_verdict_reverted'
                     | 'other';

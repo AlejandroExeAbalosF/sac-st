@@ -16,6 +16,7 @@ export default function ReasonDialog({
     url,
     submitLabel,
     extra,
+    excludeCodes,
     onClose,
 }: {
     act: Acto;
@@ -25,6 +26,8 @@ export default function ReasonDialog({
     submitLabel: string;
     /** Lo que se estaba mirando: el Action rechaza si cambió. */
     extra?: Record<string, number>;
+    /** Los motivos de la lista que no aplican a este caso. */
+    excludeCodes?: Codigo[];
     onClose: () => void;
 }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -47,6 +50,7 @@ export default function ReasonDialog({
         >
             <ReasonFields
                 act={act}
+                excludeCodes={excludeCodes}
                 code={data.reasonCode}
                 detail={data.reason}
                 onCodeChange={(codigo) => setData('reasonCode', codigo)}

@@ -11,6 +11,8 @@ use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Data\FineBankCreditData;
+use App\Modules\Multas\Enums\FinePaymentStatus;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\Database\Like;
 use App\Support\Money\Decimal;
@@ -92,6 +94,34 @@ final class FineBankCredits
         }
 
         return $this->buscar($this->pending($apertura), $termino, $limite);
+    }
+
+    /**
+     * El crédito que respalda cada pago verificado de la multa, por id del pago:
+     * corregirlo puede conservar ese mismo crédito.
+     *
+     * @return array<int, FineBankCreditData>
+     */
+    public function backing(Fine $multa): array
+    {
+        $creditos = BankTransaction::query()
+            ->join('bank_transaction_allocations AS imputacion', 'imputacion.bank_transaction_id', '=', 'bank_transactions.id')
+            ->join('fund_receipts AS recepcion', 'recepcion.financial_event_id', '=', 'imputacion.financial_event_id')
+            ->join('fine_payment_applications AS aplicacion', 'aplicacion.fund_receipt_id', '=', 'recepcion.id')
+            ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
+            ->where('pago.fine_id', $multa->id)
+            ->where('pago.status', FinePaymentStatus::Applied->value)
+            ->whereNotIn('pago.medium', ['cash', 'cheque'])
+            ->whereNull('imputacion.reversal_of_id')
+            ->get(['bank_transactions.*', 'pago.id AS pago_id']);
+
+        $porPago = [];
+
+        foreach ($creditos as $credito) {
+            $porPago[(int) $credito->getAttribute('pago_id')] = FineBankCreditData::fromModel($credito);
+        }
+
+        return $porPago;
     }
 
     /**

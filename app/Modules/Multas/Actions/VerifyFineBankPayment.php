@@ -32,6 +32,8 @@ use Illuminate\Validation\ValidationException;
  * Un crédito por pago y por su importe entero, hasta que el área responda P14.
  * Una transferencia es de una sola multa (M06). La base repite las dos
  * reglas (`fine_payment_application_bank_credit`).
+ *
+ * @phpstan-import-type Termino from ApplyFinePayment
  */
 final class VerifyFineBankPayment
 {
@@ -44,6 +46,8 @@ final class VerifyFineBankPayment
     ) {}
 
     /**
+     * @param  Termino|null  $juzgado  El término de la corrección que no cambia de multa.
+     *
      * @throws ValidationException
      */
     public function handle(
@@ -52,11 +56,12 @@ final class VerifyFineBankPayment
         ?int $actorId,
         ?string $talonarioNumber = null,
         ?int $signedById = null,
+        ?array $juzgado = null,
     ): FinePayment {
         $talonario = trim((string) $talonarioNumber) ?: null;
 
         try {
-            return $this->verify($pago, $bankTransactionId, $actorId, $talonario, $signedById);
+            return $this->verify($pago, $bankTransactionId, $actorId, $talonario, $signedById, $juzgado);
         } catch (UniqueConstraintViolationException $e) {
             throw $this->talonarios->translate(
                 $e, ReceiptType::Income, (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id'), $talonario,
@@ -65,12 +70,14 @@ final class VerifyFineBankPayment
     }
 
     /**
+     * @param  Termino|null  $juzgado
+     *
      * @throws ValidationException
      * @throws UniqueConstraintViolationException dos verificaciones simultáneas con la misma hoja del talonario
      */
-    private function verify(FinePayment $pago, int $creditoId, ?int $actorId, ?string $talonario, ?int $signedById): FinePayment
+    private function verify(FinePayment $pago, int $creditoId, ?int $actorId, ?string $talonario, ?int $signedById, ?array $juzgado): FinePayment
     {
-        return DB::transaction(function () use ($pago, $creditoId, $actorId, $talonario, $signedById): FinePayment {
+        return DB::transaction(function () use ($pago, $creditoId, $actorId, $talonario, $signedById, $juzgado): FinePayment {
             $multa = Fine::query()->whereKey($pago->fine_id)->lockForUpdate()->firstOrFail();
             $pago = FinePayment::query()->whereKey($pago->id)->lockForUpdate()->firstOrFail();
 
@@ -124,7 +131,7 @@ final class VerifyFineBankPayment
                 notes: 'Multa '.$multa->caption,
             );
 
-            $comprobante = $this->aplicar->handle($pago, $recepcion, BusinessDate::today(), $talonario, $signedById, $actorId);
+            $comprobante = $this->aplicar->handle($pago, $recepcion, BusinessDate::today(), $talonario, $signedById, $actorId, $juzgado);
 
             $this->auditar->handle(
                 'multa.pago-verificado',

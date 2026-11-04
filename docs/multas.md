@@ -476,6 +476,14 @@ el total es la última fila y nunca queda solo en una hoja, y cada hoja lleva
   octubre; reconocido el 02/11, fuera de término en noviembre, aunque octubre
   siguiera sin cerrar. **Cada pago va a un solo informe**, y como un mes cerrado no
   admite asientos con su fecha, lo emitido no cambia.
+- **Un pago por el banco corregido** (regla provisoria, no relevada, hasta definir
+  cómo se informa a la SAF): lo emitido no cambia. Anulado dentro del mes en que se
+  reconoció, no figura. Anulado después, sigue en su mes, también si ese mes se
+  reabre y se vuelve a emitir, y en el mes de la anulación va una fila en negativo,
+  fuera de término. El pago nuevo va en el mes de su reconocimiento, el día de la
+  corrección, con la fecha de su crédito: en término solo si el crédito es de ese
+  mes. Las filas concilian las correcciones con lo reconocido en el libro de Multas;
+  no se comparan con el saldo de la cuenta, que tiene otros movimientos.
 - Se emite con el mes cerrado (`multas.rendicion.emitir`) y queda **congelado**:
   pedirla de nuevo devuelve la misma. Reabrir y volver a cerrar el mes produce otra
   versión; la anterior se conserva. La base exige el cierre mensual vigente y
@@ -610,7 +618,8 @@ acto, sin mover dinero.
 
 **Anular un cobro** (`multas.anular-cobros`): para un cobro de la caja cuyo dinero
 nunca entró, por ejemplo un importe mal tipeado. Solo mientras siga en la caja: sin
-depósito vigente y sin cheque rechazado. Pide motivo. Revierte la aplicación y la
+depósito vigente. Un cheque rechazado se anula de otra forma: ver
+[Cheque rechazado y reemplazo](#rechazo). Pide motivo. Revierte la aplicación y la
 recepción con fecha de hoy, la deuda vuelve, y el recibo queda anulado **con su
 número**, que no se reutiliza; la hoja del talonario sigue usada. El cobro queda a la
 vista como «Anulado», con el motivo. Si el día de hoy está cerrado, no se puede.
@@ -619,8 +628,8 @@ En **Movimientos**, el cobro sigue en su mes, marcado «anulado el …» y suman
 día el recibo existió y el libro lo registró, y los cierres anteriores no cambian. La
 anulación es una fila propia, en negativo y con su fecha.
 
-Lo depositado o verificado no se anula así. Sigue pendiente (P13) el cambio de medio
-después de un rechazo y la corrección de un pago bancario verificado.
+Lo depositado no se anula así, y sigue sin corrección (P13). Un pago bancario
+verificado se corrige aparte: ver [Pagos por el banco](#pago-verificado-corregir).
 
 <a id="deposito"></a>
 
@@ -666,9 +675,21 @@ regularización» (M03).
   el usuario: la ausencia de crédito en el extracto no demuestra un rechazo.
   El rechazo es del cheque vigente: el original o su último reemplazo.
 - **Recibir el reemplazo** (`multas.cobrar`): solo otro cheque del **mismo
-  importe**; el cambio de medio no es un reemplazo (P13). Vuelve a custodia y se
-  deposita como cualquier cobro, sin recibo nuevo ni nueva recaudación. Si también
-  se rechaza, se repite el circuito y la ficha conserva toda la cadena.
+  importe**. Vuelve a custodia y se deposita como cualquier cobro, sin recibo nuevo
+  ni nueva recaudación. Si también se rechaza, se repite el circuito y la ficha
+  conserva toda la cadena.
+- **Anular el cobro** (`multas.anular-cobros`): para cobrar por otro medio, o con un
+  cheque de otro importe. Se puede si el último cheque de la cadena está rechazado y
+  sin reemplazo, y ningún rechazo de la cadena figura acreditado. La deuda vuelve, el
+  recibo queda anulado con su número y el pago nuevo lleva su propio recibo. La
+  recepción **no se revierte**: el cheque entró y salió con el rechazo, y en la
+  planilla sigue ese renglón. Sale lo que había que regularizar, con el asiento
+  `rejected_cheque_voided` (D `UNASSIGNED_FUNDS` / C `REJECTED_CHEQUES`).
+  El rechazo queda a la vista, con el aviso y el papel por completar. **Anular no
+  afirma que el banco nunca lo acreditó:** si el extracto trae después el crédito o
+  el débito, se registra sobre el rechazo sin reactivar el pago ni pedir reemplazo.
+  Esa vía sigue apagada hasta habilitar la revisión bancaria, así que mientras tanto
+  ese crédito queda sin identificar. Regla no relevada con el área.
 - **Completar** (`multas.gestionar-rechazos`): cuándo se avisó a la empresa y qué
   se hizo con el papel —anulado y devuelto, o acta—, con su constancia. Una vez
   cada uno; se puede completar con la regularización ya cerrada.
@@ -742,10 +763,33 @@ un cheque electrónico** (M02):
   corrige. Se puede corregir aunque otro pago ya haya cancelado la multa; lo que
   sobre queda como excedente al verificarlo. Un depósito de recurso se corrige
   como depósito: si se pagó en efectivo, se descarta y se cobra en la caja. Lo ya
-  aplicado tiene recibo y no se corrige así: un cobro de la caja [se anula](#anular-cobro);
-  corregir un pago bancario verificado está pendiente (P13).
+  aplicado tiene recibo y no se corrige así: un cobro de la caja [se anula](#anular-cobro)
+  y uno verificado se corrige como sigue.
 - **Descartar** (`multas.verificar-pagos`): un informado que no corresponde, con su
   motivo. Nunca tocó el saldo.
+
+<a id="pago-verificado-corregir"></a>
+
+**Corregir un pago verificado** (`multas.corregir-pagos`, solo el administrador, no
+se delega): «Corregir pago» pasa el pago a otra multa, a otro crédito o a los dos.
+Nada se edita: el pago y su recibo quedan anulados, a la vista y con su número, y
+nace otro pago con recibo nuevo, en una sola transacción. Si algo falla, también al
+emitir el recibo, el pago original sigue vigente. **El importe no se escribe:** es el
+del crédito entero. Si lo mal cargado es lo que debe la multa, se usa «Ajustar».
+
+- **La presentación se conserva.** En la misma multa se conservan también el término
+  y su fecha de corte, aunque la fecha de registro haya cambiado después; en otra
+  multa, el término se juzga contra esa.
+- **La multa de destino** tiene que tener deuda y no estar congelada.
+- **Con recurso en trámite** se corrige dentro de su multa, con otro crédito: es la
+  única excepción al congelamiento. Con veredicto, primero se revierte.
+- **«Solo anularlo»**, si el crédito no era de Multas: la deuda vuelve, el crédito
+  queda sin identificar y no nace otro pago. Si era el pago del recurso en trámite, el
+  recurso cae. También sirve para destrabar la reversión de un veredicto.
+- **El mes ya rendido no cambia:** ver la regla provisoria en la
+  [rendición](#rendicion). Un recibo cancelatorio ya emitido tampoco se regenera.
+
+Nada de esto está relevado con el área, salvo que lo haga solo el administrador.
 
 Una transferencia es de una sola multa (M06). El cheque físico sigue entrando solo
 por la caja (P15).
@@ -858,7 +902,8 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.reemplazar-origen` | Reemplazar la resolución de origen cargada por error | administrador |
 | `multas.corregir-importe` | Corregir un importe mal cargado sin resolución, y revertir esa corrección | administrador |
 | `multas.cobrar` | Cobrar en la caja en efectivo o con cheque y emitir el recibo; informar un pago por banco; registrar un recurso y resolverlo | administrador, administrativo |
-| `multas.anular-cobros` | Anular un cobro de la caja que sigue sin depositar. Sensible: administrador y contador |
+| `multas.anular-cobros` | Anular un cobro de la caja que sigue sin depositar, o un cheque rechazado sin acreditación registrada. Sensible: administrador y contador |
+| `multas.corregir-pagos` | Corregir o anular un pago bancario verificado. Sensible y no delegable: administrador |
 | `multas.depositar` | Depositar en el banco un cobro de la caja, con el ticket del cajero | administrador, administrativo |
 | `multas.gestionar-rechazos` | Registrar el rechazo de un cheque y completar el aviso y la disposición | administrador, contador |
 | `multas.verificar-pagos` | Informar, verificar contra el extracto y descartar pagos por banco; ver los pagos informados en los pendientes; identificar un crédito desde Banco › Movimientos; acreditar o cancelar un depósito de la caja | administrador, contador |

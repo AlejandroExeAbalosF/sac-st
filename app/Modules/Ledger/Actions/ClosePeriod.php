@@ -93,6 +93,12 @@ final class ClosePeriod
          */
         FinancialEventType::ChequeRejected->value => 'disbursed',
         FinancialEventType::ChequeReplaced->value => 'received',
+        /*
+         * Anular un cheque rechazado no mueve ninguna cuenta de ubicación: el
+         * papel ya salió con el rechazo. Aparece para que su ausencia no frene
+         * el cierre, como `FundsAllocated`.
+         */
+        FinancialEventType::RejectedChequeVoided->value => 'received',
     ];
 
     public function __construct(

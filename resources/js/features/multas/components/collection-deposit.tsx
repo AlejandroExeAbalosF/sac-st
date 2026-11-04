@@ -153,7 +153,8 @@ export default function CollectionDeposit({
                     rechazos={deposito.rejections}
                     amount={amount}
                     canManage={canManageRejections}
-                    canReplace={canReplaceCheque}
+                    canReplace={canReplaceCheque && !deposito.voided}
+                    cobroAnulado={deposito.voided}
                     canViewAttachments={canViewAttachments}
                 />
             )}

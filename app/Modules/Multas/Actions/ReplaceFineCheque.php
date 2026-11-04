@@ -8,6 +8,7 @@ use App\Modules\Banking\Actions\ReplaceRejectedCheque;
 use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
+use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Support\Facades\DB;
@@ -36,8 +37,16 @@ final class ReplaceFineCheque
     {
         return DB::transaction(function () use ($rechazo, $cheque, $idempotencyKey, $actorId): FundReceipt {
             $yaRecibido = FinancialEvent::query()->where('idempotency_key', $idempotencyKey)->exists();
-            $reemplazo = $this->reemplazar->handle($rechazo, $cheque, $idempotencyKey, $actorId);
+
+            // El mismo candado que anular: el segundo espera y ve lo que hizo el primero.
+            FundReceipt::query()->whereKey($rechazo->fund_receipt_id)->lockForUpdate()->first();
             $pago = $this->depositos->paymentOfRejection($rechazo);
+
+            if ($pago?->status === FinePaymentStatus::Voided) {
+                throw ValidationException::withMessages(['chequeNumber' => 'El cobro de ese cheque se anuló: ya no se reemplaza. Se cobra de nuevo por el medio que corresponda.']);
+            }
+
+            $reemplazo = $this->reemplazar->handle($rechazo, $cheque, $idempotencyKey, $actorId);
 
             if (! $yaRecibido && $pago !== null) {
                 $this->auditar->handle('multa.cheque-reemplazado', $pago->fine, metadata: [

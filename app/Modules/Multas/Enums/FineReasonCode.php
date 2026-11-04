@@ -28,6 +28,9 @@ enum FineReasonCode: string implements ReasonCode
     case ResolutionCorrection = 'resolution_correction';
     case NotCredited = 'not_credited';
     case NoEvidence = 'no_evidence';
+    case MediumChange = 'medium_change';
+    case WrongBankCredit = 'wrong_bank_credit';
+    case CreditOfAnotherBox = 'credit_of_another_box';
     /** Lo pone el sistema: el pago informado se reemplazó por su corrección. */
     case ReplacedByCorrection = 'replaced_by_correction';
     /** Lo pone el sistema: la reversión de la reducción de un veredicto. */
@@ -47,6 +50,9 @@ enum FineReasonCode: string implements ReasonCode
             self::ResolutionCorrection => 'Corrige una resolución anterior',
             self::NotCredited => 'No se acreditó en el banco',
             self::NoEvidence => 'Sin respaldo que lo pruebe',
+            self::MediumChange => 'Se paga por otro medio',
+            self::WrongBankCredit => 'Se eligió otro crédito',
+            self::CreditOfAnotherBox => 'El crédito no era de Multas',
             self::ReplacedByCorrection => 'Reemplazado por su corrección',
             self::AppealVerdictReverted => 'Se revirtió el veredicto',
             self::Other => 'Otro',

@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Actions;
 
-use App\Modules\Banking\Enums\BankAllocationRole;
-use App\Modules\Banking\Enums\ReconciliationStatus;
-use App\Modules\Banking\Models\BankTransaction;
-use App\Modules\Banking\Models\BankTransactionAllocation;
-use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Actions\ReleaseFundReceiptAllocations;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -54,7 +50,7 @@ final class ReverseFundReceipt
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly InstallmentFunding $financiacion,
-        private readonly AllocatableAmount $disponible,
+        private readonly ReleaseFundReceiptAllocations $liberar,
         private readonly RecordAuditEvent $auditar,
         private readonly InverseEntry $inverso,
     ) {}
@@ -96,7 +92,7 @@ final class ReverseFundReceipt
                 reversalReason: $reason,
             );
 
-            $this->devolverElSaldoDelMovimiento($bloqueada, $evento->id, $reason, $actorId);
+            $this->liberar->handle($bloqueada, $evento->id, $reason, $actorId);
 
             $bloqueada->forceFill([
                 'reversal_event_id' => $evento->id,
@@ -146,56 +142,6 @@ final class ReverseFundReceipt
                     Decimal::format($asignado),
                 ),
             ]);
-        }
-    }
-
-    /**
-     * El crédito del extracto vuelve a tener saldo libre.
-     *
-     * La imputación no se borra —nada del libro se borra—: se le agrega su
-     * reversa, que es lo que `AllocatableAmount` netea. Y el estado de
-     * conciliación se recalcula, porque un movimiento que vuelve a estar
-     * sin imputar tiene que volver a ofrecerse.
-     */
-    private function devolverElSaldoDelMovimiento(
-        FundReceipt $receipt,
-        int $eventoId,
-        string $reason,
-        ?int $actorId,
-    ): void {
-        $imputaciones = BankTransactionAllocation::query()
-            ->where('financial_event_id', $receipt->financial_event_id)
-            ->whereNull('reversal_of_id')
-            ->get();
-
-        foreach ($imputaciones as $imputacion) {
-            BankTransactionAllocation::query()->create([
-                'bank_transaction_id' => $imputacion->bank_transaction_id,
-                'financial_event_id' => $eventoId,
-                'allocation_role' => BankAllocationRole::FundsReceived,
-                'reversal_of_id' => $imputacion->id,
-                'amount' => $imputacion->amount,
-                'allocated_by' => $actorId,
-                'allocated_at' => now(),
-                'notes' => $reason,
-            ]);
-        }
-
-        $movimientos = BankTransaction::query()
-            ->whereIn('id', $imputaciones->pluck('bank_transaction_id')->unique())
-            ->get();
-
-        foreach ($movimientos as $movimiento) {
-            $imputado = $this->disponible->allocated($movimiento);
-            $total = Decimal::abs($movimiento->amount);
-
-            $movimiento->forceFill([
-                'reconciliation_status' => match (true) {
-                    Decimal::equals($imputado, '0') => ReconciliationStatus::Pending,
-                    Decimal::equals($imputado, $total) => ReconciliationStatus::Reconciled,
-                    default => ReconciliationStatus::Partial,
-                },
-            ])->save();
         }
     }
 }

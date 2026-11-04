@@ -13,6 +13,7 @@ use App\Modules\Multas\Actions\RegisterFine;
 use App\Modules\Multas\Actions\ReviseFineIdentifiers;
 use App\Modules\Multas\Data\FineCaseData;
 use App\Modules\Multas\Data\FineCaseListItemData;
+use App\Modules\Multas\Data\FineCorrectionTargetData;
 use App\Modules\Multas\Data\FineDetailData;
 use App\Modules\Multas\Data\FineDocumentData;
 use App\Modules\Multas\Data\FineListItemData;
@@ -39,6 +40,7 @@ use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
+use App\Support\Database\Like;
 use App\Support\Excel\SpreadsheetWriter;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -239,6 +241,8 @@ final class FineController extends Controller
             'payments.creator:id,name',
             'payments.voiding',
             'payments.appeal',
+            'payments.correctedBy.newPayment.fine',
+            'payments.correctionOf.correctedPayment.fine',
         ]);
 
         $usuario = $request->user();
@@ -277,6 +281,12 @@ final class FineController extends Controller
              * identificó, para verificar un pago por el banco. También al buscar.
              */
             'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),
+            /*
+             * Las multas a las que puede pasar un pago verificado, y el crédito
+             * que ya lo respalda, para corregirlo. También al buscar.
+             */
+            'multasDestino' => Inertia::optional(fn (): array => $this->multasDestino($request->string('multaDestino')->toString(), $fine)),
+            'creditosActuales' => Inertia::optional(fn (): array => $creditos->backing($fine)),
             /*
              * El 20 % para recurrir, calculado sobre el importe vigente de hoy
              * (M07), y el trámite. Es el anticipo de la pantalla: lo que vale
@@ -329,6 +339,8 @@ final class FineController extends Controller
                 'resolveAppeal' => $cobra,
                 'revertVerdict' => $cobra,
                 'voidCollection' => $usuario?->can('multas.anular-cobros') ?? false,
+                // Corregir exige la caja abierta con su cuenta, como verificar.
+                'correctPayment' => ($usuario?->can('multas.corregir-pagos') ?? false) && $cajaAbierta && $creditos->book() !== null,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
                 // Corregir el importe sin resolución, y revertir esa corrección.
                 'correctAmount' => $usuario?->can('multas.corregir-importe') ?? false,
@@ -399,6 +411,39 @@ final class FineController extends Controller
                 ];
             }
         }
+    }
+
+    /**
+     * Las multas con deuda a las que puede pasar un pago, por expediente o carátula.
+     *
+     * @return list<FineCorrectionTargetData>
+     */
+    private function multasDestino(string $termino, Fine $actual): array
+    {
+        $termino = trim($termino);
+
+        if (mb_strlen($termino) < 2) {
+            return [];
+        }
+
+        return array_values(Fine::query()
+            ->with(['fineCase', 'balance'])
+            ->whereKeyNot($actual->id)
+            ->where('currency', $actual->currency)
+            ->whereHas('balance', fn ($saldo) => $saldo->where('debt', '>', 0))
+            ->where(fn ($consulta) => $consulta
+                ->where('caption', 'ilike', Like::contains($termino))
+                ->orWhereHas('fineCase', fn ($expediente) => $expediente->where('original_text', 'ilike', Like::contains($termino))))
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->map(fn (Fine $multa): FineCorrectionTargetData => new FineCorrectionTargetData(
+                id: $multa->id,
+                caption: $multa->caption,
+                caseLabel: $multa->fineCase->label(),
+                debt: $multa->balance->debt ?? '0.00',
+            ))
+            ->all());
     }
 
     /** Sin la apertura en la moneda de la multa no hay libro donde asentar el cobro. */

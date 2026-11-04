@@ -29,6 +29,7 @@ import { ReviseDocumentDialog } from '@/features/multas/components/case-dialogs'
 import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
 import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
 import CollectionDeposit from '@/features/multas/components/collection-deposit';
+import CorrectPaymentDialog from '@/features/multas/components/correct-payment-dialog';
 import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
@@ -91,6 +92,10 @@ type Props = {
     creditosDelBanco?: Credito[];
     /** Los créditos libres posteriores a la apertura; llegan al buscar. */
     creditosDisponibles?: Credito[];
+    /** Para corregir un pago verificado: las multas de destino, al buscar. */
+    multasDestino?: App.Modules.Multas.Data.FineCorrectionTargetData[];
+    /** El crédito que respalda cada pago verificado, por id del pago; llega al abrir. */
+    creditosActuales?: Record<number, Credito | undefined>;
     /**
      * El 20 % calculado como referencia (M07), si la multa admite recurso y
      * el trámite del que tiene, con lo que se cobró por él.
@@ -128,6 +133,7 @@ type Props = {
         resolveAppeal: boolean;
         revertVerdict: boolean;
         voidCollection: boolean;
+        correctPayment: boolean;
     };
 };
 
@@ -139,6 +145,7 @@ type Dialogo =
     | { tipo: 'resolver-recurso' }
     | { tipo: 'revertir-veredicto'; veredicto: number }
     | { tipo: 'anular-cobro'; pago: Pago }
+    | { tipo: 'corregir-verificado'; pago: Pago }
     | { tipo: 'verificar'; pago: Pago }
     | { tipo: 'descartar-pago'; pago: Pago }
     | { tipo: 'corregir-pago'; pago: Pago }
@@ -176,6 +183,8 @@ export default function MultaShow({
     adjuntosDeDocumentos,
     creditosDelBanco,
     creditosDisponibles,
+    multasDestino,
+    creditosActuales,
     recurso,
     firmantes,
     cobroKey,
@@ -951,6 +960,21 @@ export default function MultaShow({
                                                         Anular cobro
                                                     </Button>
                                                 )}
+                                            {pago.correctable &&
+                                                can.correctPayment && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            setDialogo({
+                                                                tipo: 'corregir-verificado',
+                                                                pago,
+                                                            })
+                                                        }
+                                                    >
+                                                        Corregir pago
+                                                    </Button>
+                                                )}
                                             {/* El depósito de un recurso resuelto ya no se corrige: solo se descarta. */}
                                             {pago.status === 'reported' &&
                                                 can.reportBank &&
@@ -1058,9 +1082,33 @@ export default function MultaShow({
                                                 Anulado
                                                 {pago.voidedAt &&
                                                     ` el ${dateTime(pago.voidedAt)}`}
-                                                : {pago.voidReason}. El dinero
-                                                nunca entró y el recibo quedó
-                                                anulado, con su número.
+                                                : {pago.voidReason}.{' '}
+                                                {pago.deposit?.voided
+                                                    ? 'El cheque se rechazó: ya no se regulariza, y se cobra de nuevo por el medio que corresponda.'
+                                                    : pago.medium === 'cash' ||
+                                                        pago.medium === 'cheque'
+                                                      ? 'El dinero nunca entró.'
+                                                      : pago.correctedByPaymentId ===
+                                                          null
+                                                        ? 'El crédito volvió a quedar libre.'
+                                                        : ''}{' '}
+                                                El recibo quedó anulado, con su
+                                                número.
+                                            </p>
+                                        )}
+                                        {pago.correctedByPaymentId !== null && (
+                                            <p className="w-full text-xs text-muted-foreground">
+                                                Se corrigió con otro pago
+                                                {pago.correctedInFine &&
+                                                    `, en la multa ${pago.correctedInFine}`}
+                                            </p>
+                                        )}
+                                        {pago.correctsPaymentId !== null && (
+                                            <p className="w-full text-xs text-muted-foreground">
+                                                Corrige un pago verificado que
+                                                quedó anulado
+                                                {pago.correctsInFine &&
+                                                    `, en la multa ${pago.correctsInFine}`}
                                             </p>
                                         )}
                                         {pago.deposit && (
@@ -1355,10 +1403,34 @@ export default function MultaShow({
             {dialogo?.tipo === 'anular-cobro' && (
                 <ReasonDialog
                     act="collection_void"
-                    title="Anular el cobro"
-                    description="Es para un cobro cuyo dinero nunca entró: revierte los asientos, la deuda vuelve y el recibo queda anulado. Su número no se reutiliza. Si el cobro es el del recurso en trámite, el recurso cae."
+                    title={
+                        dialogo.pago.deposit?.place === 'rejected'
+                            ? 'Anular el cobro del cheque rechazado'
+                            : 'Anular el cobro'
+                    }
+                    description={
+                        dialogo.pago.deposit?.place === 'rejected'
+                            ? 'La deuda vuelve y el recibo queda anulado; su número no se reutiliza. Después se cobra por el medio que corresponda, también con otro cheque. El rechazo queda a la vista: falta el aviso, el papel y lo que diga el banco, y anular no afirma que el banco no lo haya acreditado.'
+                            : 'Es para un cobro cuyo dinero nunca entró: revierte los asientos, la deuda vuelve y el recibo queda anulado. Su número no se reutiliza. Si el cobro es el del recurso en trámite, el recurso cae.'
+                    }
                     url={voidMethod(dialogo.pago.id).url}
                     submitLabel="Anular cobro"
+                    excludeCodes={
+                        dialogo.pago.deposit?.place === 'rejected'
+                            ? ['wrong_fine', 'duplicate']
+                            : ['medium_change']
+                    }
+                    onClose={cerrar}
+                />
+            )}
+            {dialogo?.tipo === 'corregir-verificado' && (
+                <CorrectPaymentDialog
+                    pago={dialogo.pago}
+                    fineId={multa.id}
+                    multasDestino={multasDestino}
+                    creditoActual={creditosActuales?.[dialogo.pago.id]}
+                    creditos={creditosDisponibles}
+                    firmantes={firmantes}
                     onClose={cerrar}
                 />
             )}

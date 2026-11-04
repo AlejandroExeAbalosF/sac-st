@@ -39,5 +39,7 @@ final class FineDepositData extends Data
          * @var list<FineChequeRejectionData>
          */
         public array $rejections = [],
+        /** El cobro se anuló: el rechazo sigue a la vista, sin nada que reemplazar. */
+        public bool $voided = false,
     ) {}
 }

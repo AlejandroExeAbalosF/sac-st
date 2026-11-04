@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Support;
 
 use App\Models\User;
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Banking\Enums\ChequeRejectionBankStatus;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\CashToBankTransferItem;
 use App\Modules\Banking\Models\ChequeRejection;
@@ -127,18 +128,23 @@ final class FineDeposits
      * disposición del papel. Una incidencia con reemplazo y débito pendiente
      * sigue acá (DER físico §6.6).
      *
+     * Un cobro anulado ya no espera reemplazo, pero el aviso, el papel y la
+     * revisión bancaria siguen pendientes: el rechazo ocurrió igual.
+     *
      * @return Builder<FinePayment>
      */
     public function paymentsWithPendingRejections(): Builder
     {
         return FinePayment::query()
-            ->where('status', FinePaymentStatus::Applied)
+            ->whereIn('status', [FinePaymentStatus::Applied, FinePaymentStatus::Voided])
             ->where('medium', 'cheque')
             ->whereHas('application', fn (Builder $aplicacion) => $aplicacion->whereExists(fn ($e) => $e->selectRaw('1')
                 ->from('cheque_rejections as c')
                 ->whereRaw('fund_receipt_root(c.fund_receipt_id) = fine_payment_applications.fund_receipt_id')
                 ->where(fn ($pendiente) => $pendiente
-                    ->whereNull('c.replacement_fund_receipt_id')
+                    ->where(fn ($reemplazo) => $reemplazo
+                        ->whereNull('c.replacement_fund_receipt_id')
+                        ->where('fine_payments.status', FinePaymentStatus::Applied->value))
                     ->orWhereIn('c.bank_status', ['unverified', 'debit_pending'])
                     ->orWhereNull('c.company_notified_on')
                     ->orWhereNull('c.disposition'))));
@@ -148,17 +154,33 @@ final class FineDeposits
      * Dónde está la plata de cada cobro de caja: su instrumento vigente, su
      * depósito, los cancelados y los rechazos de la cadena.
      *
+     * El cheque rechazado de un cobro anulado sigue a la vista, sin nada que
+     * reemplazar: falta el aviso y el papel, y lo que diga el banco.
+     *
      * @param  iterable<FinePayment>  $pagos  con `application` cargada
-     * @return array<int, FineDepositData> por id del pago; solo los cobros de caja aplicados
+     * @return array<int, FineDepositData> por id del pago; los cobros de caja aplicados y los anulados con rechazo
      */
     public function forPayments(iterable $pagos): array
     {
         $raizDe = [];
+        $anulados = [];
 
         foreach ($pagos as $pago) {
-            if ($pago->status === FinePaymentStatus::Applied && $pago->medium->isCounter() && $pago->application !== null) {
-                $raizDe[$pago->id] = $pago->application->fund_receipt_id;
+            if (! $pago->medium->isCounter() || $pago->application === null) {
+                continue;
             }
+
+            if ($pago->status === FinePaymentStatus::Applied) {
+                $raizDe[$pago->id] = $pago->application->fund_receipt_id;
+            } elseif ($pago->status === FinePaymentStatus::Voided) {
+                $anulados[$pago->id] = $pago->application->fund_receipt_id;
+            }
+        }
+
+        if ($anulados !== []) {
+            $conRechazo = array_keys($this->rejectionsOf(array_values(array_unique($anulados))));
+            $anulados = array_filter($anulados, fn (int $raiz): bool => in_array($raiz, $conRechazo, true));
+            $raizDe += $anulados;
         }
 
         if ($raizDe === []) {
@@ -226,10 +248,11 @@ final class FineDeposits
                     ->all()),
                 chequeNumber: $actual?->cheque_number,
                 chequeBank: $actual?->cheque_bank,
-                openRejectionId: $rechazado
+                openRejectionId: $rechazado && ! isset($anulados[$pagoId])
                     ? collect($cadena)->first(fn (FineChequeRejectionData $r): bool => ! $r->regularized)?->id
                     : null,
                 rejections: $cadena,
+                voided: isset($anulados[$pagoId]),
             );
         }
 
@@ -251,6 +274,51 @@ final class FineDeposits
         return ! $depositada && ! ChequeRejection::query()
             ->whereRaw('fund_receipt_root(fund_receipt_id) = ?', [$recepcion->id])
             ->exists();
+    }
+
+    /** Si el cheque de esta recepción, o alguno de sus reemplazos, tuvo un rechazo. */
+    public function hasRejections(FundReceipt $recepcion): bool
+    {
+        return ChequeRejection::query()
+            ->whereRaw('fund_receipt_root(fund_receipt_id) = ?', [$recepcion->id])
+            ->exists();
+    }
+
+    /**
+     * Qué impide anular un cobro cuyo cheque tuvo un rechazo, o null si se puede.
+     *
+     * Bloquea el último cheque y los rechazos en el orden en que los toma un
+     * reemplazo: el segundo espera y ve lo que hizo el primero. La base repite
+     * las condiciones (`fine_payment_voids_coherent`).
+     */
+    public function rejectionVoidBlock(FundReceipt $recepcion): ?string
+    {
+        $ultimo = $this->tip($recepcion->id);
+        FundReceipt::query()->whereKey($ultimo)->lockForUpdate()->first();
+
+        if ($this->tip($recepcion->id) !== $ultimo) {
+            return 'Ese cheque acaba de recibir un reemplazo: revisá la multa actualizada.';
+        }
+
+        $rechazos = ChequeRejection::query()
+            ->whereRaw('fund_receipt_root(fund_receipt_id) = ?', [$recepcion->id])
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($rechazos->firstWhere('fund_receipt_id', $ultimo)?->replacement_fund_receipt_id !== null || $rechazos->firstWhere('fund_receipt_id', $ultimo) === null) {
+            return 'El cheque de reemplazo sigue en curso: se anula un cheque rechazado y sin reemplazo.';
+        }
+
+        $acreditado = $rechazos->contains(fn (ChequeRejection $rechazo): bool => in_array(
+            $rechazo->bank_status,
+            [ChequeRejectionBankStatus::DebitPending, ChequeRejectionBankStatus::DebitRecorded],
+            true,
+        ));
+
+        return $acreditado
+            ? 'El banco acreditó ese cheque antes del rechazo: su revisión bancaria está pendiente y el cobro no se anula.'
+            : null;
     }
 
     /**

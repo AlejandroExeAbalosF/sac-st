@@ -79,10 +79,21 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'multas.anular-cobros',
                 'Anular cobros de multas',
-                'Anular un cobro de la caja que sigue sin depositar: el dinero nunca entró. Revierte sus asientos y anula el recibo, que conserva su número.',
+                'Anular un cobro de la caja que sigue sin depositar, o un cheque rechazado sin acreditación registrada. Anula el recibo, que conserva su número, y la multa vuelve a deber.',
                 'multas',
                 ['administrador', 'contador'],
                 sensitive: true,
+            ),
+            // Deshace una conciliación ya hecha y mueve dinero entre multas:
+            // queda solo en el administrador, y la base lo repite.
+            new PermissionDefinition(
+                'multas.corregir-pagos',
+                'Corregir pagos bancarios verificados',
+                'Pasar un pago verificado a otra multa o a otro crédito, o anularlo y dejar libre su crédito. Anula el recibo, que conserva su número, y emite uno nuevo si corresponde.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+                delegable: false,
             ),
             // Llevar al banco lo cobrado: cambia de lugar, no de dueño. Lo hace
             // quien atiende la caja, como en Haberes (`caja.trasladar`).

@@ -144,12 +144,18 @@ final class RevertFineAppealVerdict
             return 'Desde el veredicto se informó otro pago: descartalo y volvé a intentar.';
         }
 
-        $recepcion = $pago->medium->isCounter() && $pago->application !== null
-            ? FundReceipt::query()->find($pago->application->fund_receipt_id)
-            : null;
+        if (! $pago->medium->isCounter()) {
+            return 'Desde el veredicto se verificó otro pago por el banco: anulalo con «Corregir pago» y volvé a intentar.';
+        }
 
-        return $recepcion !== null && $this->depositos->isAtTheCounter($recepcion)
-            ? 'Desde el veredicto se cobró otro pago en la caja: anulalo y volvé a intentar.'
-            : 'Desde el veredicto entró otro pago ya depositado o verificado, y su corrección todavía no está disponible: el veredicto no se puede revertir por ahora.';
+        $recepcion = $pago->application === null ? null : FundReceipt::query()->find($pago->application->fund_receipt_id);
+
+        if ($recepcion !== null && $this->depositos->isAtTheCounter($recepcion)) {
+            return 'Desde el veredicto se cobró otro pago en la caja: anulalo y volvé a intentar.';
+        }
+
+        return $recepcion !== null && $this->depositos->rejectionVoidBlock($recepcion) === null
+            ? 'Desde el veredicto se rechazó el cheque de otro pago: anulalo y volvé a intentar.'
+            : 'Desde el veredicto entró otro pago ya depositado, y su corrección todavía no está disponible: el veredicto no se puede revertir por ahora.';
     }
 }

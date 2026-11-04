@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Data;
 
 use App\Models\User;
+use App\Modules\Banking\Enums\ChequeRejectionBankStatus;
 use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FineAppealStatus;
 use App\Modules\Multas\Enums\FineCollectionPlace;
@@ -12,6 +13,7 @@ use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Enums\PresentationPrecision;
+use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
@@ -68,8 +70,19 @@ final class FinePaymentData extends Data
         /** El motivo de la anulación y su fecha. */
         public ?string $voidReason,
         public ?string $voidedAt,
-        /** Un cobro que sigue en la caja, sin depósito ni rechazo, y sin veredicto en su recurso. */
+        /**
+         * Un cobro que sigue en la caja, o un cheque rechazado sin reemplazo ni
+         * acreditación registrada, y sin veredicto en su recurso.
+         */
         public bool $voidable,
+        /** Un pago por el banco ya verificado, sin veredicto en su recurso. */
+        public bool $correctable,
+        /** El pago que reemplazó a este, y su multa si es otra. */
+        public ?int $correctedByPaymentId,
+        public ?string $correctedInFine,
+        /** El pago que este corrigió, y su multa si es otra. */
+        public ?int $correctsPaymentId,
+        public ?string $correctsInFine,
         /** El informado que este corrige. */
         public ?int $replacesPaymentId,
         /** @var list<FineAttachmentData> */
@@ -79,7 +92,8 @@ final class FinePaymentData extends Data
     ) {}
 
     /**
-     * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt`, `creator`, `voiding` y `appeal`.
+     * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt`, `creator`, `voiding`, `appeal`,
+     * `correctedBy.newPayment.fine` y `correctionOf.correctedPayment.fine`.
      *
      * @param  list<FineAttachmentData>  $adjuntos
      */
@@ -89,6 +103,8 @@ final class FinePaymentData extends Data
         $recepcion = $aplicacion?->fundReceipt;
         $recibo = $pago->paymentReceipt?->receipt;
         $autor = $pago->creator;
+        $sinVeredicto = $pago->appeal === null || $pago->appeal->status === FineAppealStatus::Open;
+        $otraMulta = fn (?Fine $multa): ?string => $multa === null || $multa->id === $pago->fine_id ? null : $multa->caption;
 
         return new self(
             id: $pago->id,
@@ -121,12 +137,37 @@ final class FinePaymentData extends Data
             voidReason: $pago->voiding === null ? null : Reason::text($pago->voiding->reason_code, $pago->voiding->reason),
             voidedAt: $pago->voiding?->voided_at?->toIso8601String(),
             voidable: $pago->status === FinePaymentStatus::Applied
-                && $deposito?->place === FineCollectionPlace::InCustody
-                && $deposito->rejections === []
-                && ($pago->appeal === null || $pago->appeal->status === FineAppealStatus::Open),
+                && $deposito !== null
+                && self::sigueSinEntrar($deposito)
+                && $sinVeredicto,
+            correctable: $pago->status === FinePaymentStatus::Applied && ! $pago->medium->isCounter() && $sinVeredicto,
+            correctedByPaymentId: $pago->correctedBy?->new_payment_id,
+            correctedInFine: $otraMulta($pago->correctedBy?->newPayment?->fine),
+            correctsPaymentId: $pago->correctionOf?->corrected_payment_id,
+            correctsInFine: $otraMulta($pago->correctionOf?->correctedPayment?->fine),
             replacesPaymentId: $pago->replaces_fine_payment_id,
             attachments: $adjuntos,
             deposit: $deposito,
         );
+    }
+
+    /** El dinero sigue en la caja, o el cheque volvió rechazado y nadie afirma que el banco lo acreditó. */
+    private static function sigueSinEntrar(FineDepositData $deposito): bool
+    {
+        if ($deposito->place === FineCollectionPlace::InCustody) {
+            return $deposito->rejections === [];
+        }
+
+        if ($deposito->place !== FineCollectionPlace::Rejected) {
+            return false;
+        }
+
+        foreach ($deposito->rejections as $rechazo) {
+            if (in_array($rechazo->bankStatus, [ChequeRejectionBankStatus::DebitPending, ChequeRejectionBankStatus::DebitRecorded], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

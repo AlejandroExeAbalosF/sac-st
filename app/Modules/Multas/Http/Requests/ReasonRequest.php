@@ -56,6 +56,7 @@ final class ReasonRequest extends FormRequest
             $this->routeIs('multas.ajustes.reverse') => FineReasonAct::Reversal,
             $this->routeIs('multas.pagos.discard') => FineReasonAct::PaymentDiscard,
             $this->routeIs('multas.pagos.void') => FineReasonAct::CollectionVoid,
+            $this->routeIs('multas.pagos.void-verified') => FineReasonAct::PaymentCorrection,
             $this->routeIs('multas.documentos.anulacion.store') => FineReasonAct::LinkRevocation,
             default => throw new LogicException('Esta ruta no declara qué motivo pide.'),
         };

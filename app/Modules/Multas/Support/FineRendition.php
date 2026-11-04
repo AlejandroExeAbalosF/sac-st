@@ -35,6 +35,14 @@ use Illuminate\Support\Facades\DB;
  * Cada fila lleva la cuenta en la que se acreditó y cómo se cita: con más de
  * una cuenta en el mes, la nota las muestra fila por fila.
  *
+ * **Un pago por el banco corregido** (provisorio, hasta definir cómo se informa
+ * a la SAF): lo emitido no cambia. Anulado dentro del mes en que se reconoció, no
+ * figura. Anulado después, sigue en su mes —también si ese mes se reabre y se
+ * vuelve a emitir— y en el mes de la anulación va una fila en negativo, fuera de
+ * término. El pago nuevo va en el mes de su reconocimiento, con la fecha de su
+ * crédito. Las filas concilian las correcciones con lo reconocido en el libro de
+ * Multas; no se comparan con el saldo de la cuenta, que tiene otros movimientos.
+ *
  * @phpstan-type Fila array{date: string, origin: string, voucher: string, caption: string, caseLabel: string, amount: numeric-string, receipt: string, rejected: bool, accountId: int, account: string}
  */
 final class FineRendition
@@ -103,10 +111,38 @@ final class FineRendition
             ->whereNotIn('pago.medium', ['cash', 'cheque'])
             ->where('movimiento.transaction_date', '<=', $hasta)
             ->whereBetween('aplicada.event_date', [$desde, $hasta])
+            // Anulado dentro del mes, nunca llegó a rendirse.
+            ->whereNotExists(fn ($anulado) => $anulado->selectRaw('1')
+                ->from('fine_payment_voids AS anulacion')
+                ->join('financial_events AS revertida', 'revertida.id', '=', 'anulacion.application_reversal_event_id')
+                ->whereColumn('anulacion.fine_payment_id', 'pago.id')
+                ->where('revertida.event_date', '<=', $hasta))
             ->select([
                 'pago.medium', 'aplicacion.amount', 'movimiento.transaction_date AS credited_on',
                 'movimiento.operation_id AS voucher',
             ])
+            ->selectRaw('FALSE AS rejected');
+
+        // Lo que se rindió en un mes anterior y este mes se anuló: resta, sin tocar aquel.
+        $anulados = DB::table('fine_payment_voids AS anulacion')
+            ->join('fine_payment_applications AS aplicacion', 'aplicacion.fine_payment_id', '=', 'anulacion.fine_payment_id')
+            ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
+            ->join('financial_events AS aplicada', 'aplicada.id', '=', 'aplicacion.application_event_id')
+            ->join('financial_events AS revertida', 'revertida.id', '=', 'anulacion.application_reversal_event_id')
+            ->join('fund_receipts AS recepcion', 'recepcion.id', '=', 'aplicacion.fund_receipt_id')
+            ->join('bank_transaction_allocations AS imputacion', function ($join): void {
+                $join->on('imputacion.financial_event_id', '=', 'recepcion.financial_event_id')
+                    ->whereNull('imputacion.reversal_of_id');
+            })
+            ->join('bank_transactions AS movimiento', 'movimiento.id', '=', 'imputacion.bank_transaction_id')
+            ->leftJoin('fine_payment_receipts AS papel', 'papel.fine_payment_id', '=', 'pago.id')
+            ->leftJoin('receipts AS recibo', 'recibo.id', '=', 'papel.receipt_id')
+            ->whereNotIn('pago.medium', ['cash', 'cheque'])
+            ->whereBetween('revertida.event_date', [$desde, $hasta])
+            ->where('aplicada.event_date', '<', $desde)
+            ->select(['pago.medium'])
+            ->selectRaw('-aplicacion.amount AS amount')
+            ->addSelect(['movimiento.transaction_date AS credited_on', 'movimiento.operation_id AS voucher'])
             ->selectRaw('FALSE AS rejected');
 
         // Cobros de la caja: la acreditación del depósito de su instrumento vigente.
@@ -133,7 +169,7 @@ final class FineRendition
             // El cheque acreditado que el banco después rechazó: se acreditó, y se marca.
             ->selectRaw('EXISTS (SELECT 1 FROM cheque_rejections r WHERE r.fund_receipt_id = item.fund_receipt_id) AS rejected');
 
-        foreach ([$banco, $caja] as $consulta) {
+        foreach ([$banco, $anulados, $caja] as $consulta) {
             $consulta->join('bank_accounts AS cuenta', 'cuenta.id', '=', 'movimiento.bank_account_id')->addSelect([
                 'cuenta.id AS account_id',
                 DB::raw('COALESCE(cuenta.document_citation, cuenta.label) AS account'),
@@ -143,7 +179,7 @@ final class FineRendition
             ]);
         }
 
-        return array_values($banco->unionAll($caja)->get()->map(fn (object $fila): array => (array) $fila)->all());
+        return array_values($banco->unionAll($anulados)->unionAll($caja)->get()->map(fn (object $fila): array => (array) $fila)->all());
     }
 
     /** Cómo entró, como lo escribe la planilla del área: CC, Trans., Cheque. */

@@ -160,6 +160,12 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
         Route::post('pagos/{payment}/anular', [FinePaymentController::class, 'void'])->whereNumber('payment')->name('pagos.void');
     });
 
+    // Deshace una conciliación ya hecha: solo el administrador.
+    Route::middleware('can:multas.corregir-pagos')->group(function (): void {
+        Route::post('pagos/{payment}/corregir', [FineBankPaymentController::class, 'correct'])->whereNumber('payment')->name('pagos.correct');
+        Route::post('pagos/{payment}/anular-verificado', [FineBankPaymentController::class, 'voidVerified'])->whereNumber('payment')->name('pagos.void-verified');
+    });
+
     /*
      * Lo que llega por el banco se informa —desde el mostrador o desde la
      * conciliación— y el recurso del 20 % se registra según su medio: cada

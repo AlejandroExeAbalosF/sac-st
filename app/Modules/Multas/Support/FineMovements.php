@@ -114,7 +114,7 @@ final class FineMovements
 
         return match ($section) {
             // Lo que entró en la caja: la recepción original, no su reemplazo.
-            'cobros' => $this->conAnulacion($this->conMulta(DB::table('fund_receipts AS cheque')), 'receipt_reversal_event_id')
+            'cobros' => $this->conAnulacion($this->conMulta(DB::table('fund_receipts AS cheque')), 'funds_exit_event_id')
                 ->where('cheque.cash_box_id', $caja)
                 ->where('cheque.origin', 'received')
                 ->whereIn('cheque.medium', ['cash', 'cheque'])
@@ -124,8 +124,10 @@ final class FineMovements
                     'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
                 ])
                 ->unionAll(
-                    $this->anulaciones('receipt_reversal_event_id', $desde, $hasta)
+                    $this->anulaciones('funds_exit_event_id', $desde, $hasta)
                         ->join('fund_receipts AS cheque', 'cheque.id', '=', 'aplicacion.fund_receipt_id')
+                        // Un pago por el banco no fue un cobro en caja.
+                        ->whereIn('cheque.medium', ['cash', 'cheque'])
                         ->addSelect([
                             'revertido.event_date AS fecha', 'cheque.id AS orden', DB::raw('-cheque.amount AS importe'),
                             'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
@@ -207,7 +209,7 @@ final class FineMovements
                 ]),
 
             // Lo que llegó por el banco y se reconoció: el día en que se verificó.
-            'creditos' => $this->conPapel(DB::table('fine_payment_applications AS aplicacion'))
+            'creditos' => $this->conAnulacion($this->conPapel(DB::table('fine_payment_applications AS aplicacion')), 'application_reversal_event_id')
                 ->join('financial_events AS aplicada', 'aplicada.id', '=', 'aplicacion.application_event_id')
                 ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
                 ->whereNotIn('pago.medium', ['cash', 'cheque'])
@@ -215,7 +217,16 @@ final class FineMovements
                 ->addSelect([
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.amount AS importe',
                     'pago.medium AS medio', $cuenta,
-                ]),
+                ])
+                ->unionAll(
+                    $this->anulaciones('application_reversal_event_id', $desde, $hasta)
+                        ->join('fine_payments AS pago', 'pago.id', '=', 'aplicacion.fine_payment_id')
+                        ->whereNotIn('pago.medium', ['cash', 'cheque'])
+                        ->addSelect([
+                            'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.amount AS importe'),
+                            'pago.medium AS medio', $cuenta,
+                        ]),
+                ),
 
             default => throw new InvalidArgumentException("La sección «{$section}» no existe."),
         };
@@ -312,7 +323,7 @@ final class FineMovements
 
         if ($texto('es_anulacion') === '1' || ($datos['es_anulacion'] ?? false) === true) {
             $detalle = implode(' · ', array_filter([
-                'Anulación del cobro',
+                $section === 'creditos' ? 'Anulación del pago verificado' : 'Anulación del cobro',
                 Reason::text(FineReasonCode::tryFrom($texto('motivo_codigo')), $texto('motivo_detalle') ?: null),
             ]));
         } elseif ($texto('anulado_el') !== '') {

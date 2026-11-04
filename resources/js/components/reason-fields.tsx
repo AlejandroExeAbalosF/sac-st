@@ -33,6 +33,7 @@ export default function ReasonFields<A extends string, C extends string>({
     detailPlaceholder,
     detailRequired = false,
     maxLength = 500,
+    excludeCodes = [],
 }: {
     act: A;
     code: C | '';
@@ -49,6 +50,8 @@ export default function ReasonFields<A extends string, C extends string>({
     detailRequired?: boolean;
     /** El largo de la columna del detalle. */
     maxLength?: number;
+    /** Los motivos del acto que no aplican a este caso. */
+    excludeCodes?: C[];
 }) {
     const { motivos } = usePage<{ motivos?: Record<string, Opcion[]> }>().props;
     const opciones = motivos?.[act];
@@ -84,11 +87,21 @@ export default function ReasonFields<A extends string, C extends string>({
                         <SelectValue placeholder="Elegí el motivo" />
                     </SelectTrigger>
                     <SelectContent>
-                        {opciones.map((opcion) => (
-                            <SelectItem key={opcion.value} value={opcion.value}>
-                                {opcion.label}
-                            </SelectItem>
-                        ))}
+                        {opciones
+                            .filter(
+                                (opcion) =>
+                                    !(excludeCodes as string[]).includes(
+                                        opcion.value,
+                                    ),
+                            )
+                            .map((opcion) => (
+                                <SelectItem
+                                    key={opcion.value}
+                                    value={opcion.value}
+                                >
+                                    {opcion.label}
+                                </SelectItem>
+                            ))}
                     </SelectContent>
                 </Select>
                 <InputError className="mt-1" message={codeError} />
