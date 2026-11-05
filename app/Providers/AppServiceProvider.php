@@ -9,6 +9,7 @@ use App\Listeners\RecordAuthEvent;
 use App\Models\User;
 use App\Modules\Aranceles\Audit\ArancelesAuditCatalog;
 use App\Modules\Aranceles\Permissions\ArancelesPermissionCatalog;
+use App\Modules\Aranceles\Support\FeeBankCreditHandler;
 use App\Modules\Aranceles\Support\FeeCashBoxModule;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Listeners\LinkOpeningBankAccount;
@@ -84,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->singleton(BankCreditHandlers::class, fn ($app): BankCreditHandlers => new BankCreditHandlers($app, [
             FineBankCreditHandler::class,
+            FeeBankCreditHandler::class,
         ]));
     }
 

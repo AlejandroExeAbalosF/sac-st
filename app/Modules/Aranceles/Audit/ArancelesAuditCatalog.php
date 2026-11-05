@@ -48,6 +48,25 @@ final class ArancelesAuditCatalog implements AuditCatalogContributor
                 metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo'],
             ),
             new AuditActionDefinition(
+                'arancel.pendiente-creado',
+                'Se registró un arancel pendiente de pago',
+                'Aranceles',
+                metadata: ['amount' => 'Importe'],
+            ),
+            new AuditActionDefinition(
+                'arancel.credito-identificado',
+                'Se identificó un crédito como pago de un arancel',
+                'Aranceles',
+                metadata: ['amount' => 'Importe', 'falta' => 'Falta'],
+            ),
+            new AuditActionDefinition(
+                'arancel.ajustado',
+                'Se ajustó el importe de un arancel pendiente',
+                'Aranceles',
+                AuditSeverity::Critical,
+                metadata: ['anterior' => 'Importe anterior', 'amount' => 'Importe', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
                 'arancel.cobro-anulado',
                 'Se anuló un cobro de arancel',
                 'Aranceles',

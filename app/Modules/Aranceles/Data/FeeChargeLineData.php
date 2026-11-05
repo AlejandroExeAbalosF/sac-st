@@ -11,6 +11,7 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 final readonly class FeeChargeLineData
 {
     public function __construct(
+        public int $itemId,
         public int $feeTypeId,
         public int $code,
         public string $name,

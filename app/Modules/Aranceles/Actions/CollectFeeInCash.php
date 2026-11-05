@@ -147,17 +147,18 @@ final class CollectFeeInCash
     }
 
     /**
-     * Crea el cobro pagado con sus renglones. Lo usa también la corrección.
+     * Crea el cobro con sus renglones: pagado, o pendiente si no tiene fecha de
+     * pago. Lo usan también la corrección y el pago por el banco.
      *
      * @param  list<Renglon>  $items
      */
-    public function crear(string $payerName, ?string $payerCuit, array $items, CarbonImmutable $fechaDeTarifa, CarbonImmutable $pagadoEl, string $idempotencyKey, ?int $actorId, FeeChargeMedium $medio = FeeChargeMedium::Cash): FeeCharge
+    public function crear(string $payerName, ?string $payerCuit, array $items, CarbonImmutable $fechaDeTarifa, ?CarbonImmutable $pagadoEl, string $idempotencyKey, ?int $actorId, FeeChargeMedium $medio = FeeChargeMedium::Cash): FeeCharge
     {
         $cobro = FeeCharge::query()->create([
             'payer_name' => $payerName,
             'payer_cuit' => $payerCuit,
             'medium' => $medio,
-            'status' => FeeChargeStatus::Paid,
+            'status' => $pagadoEl === null ? FeeChargeStatus::Pending : FeeChargeStatus::Paid,
             'requested_on' => BusinessDate::today(),
             'pricing_date' => $fechaDeTarifa,
             'paid_on' => $pagadoEl,

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Modules\Aranceles\Actions\IdentifyFeeCredits;
 use App\Modules\Aranceles\Actions\VoidFeeCollection;
 use App\Modules\Aranceles\Enums\FeeReasonCode;
 use App\Modules\Aranceles\Models\FeeCharge;
@@ -155,6 +156,12 @@ try {
             $input['box'], Currency::Ars, $input['amount'], BusinessDate::today(), null, null, $input['key'] ?? 'worker-fee-transfer-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done', 'transfer' => $traslado->id];
+    } elseif ($input['mode'] === 'fee-identify') {
+        // Identificar un crédito mientras otro lo identifica o anula el cobro.
+        $cobro = app(IdentifyFeeCredits::class)->handle(
+            FeeCharge::query()->findOrFail($input['charge']), $input['credits'], 'worker-fee-identify-'.$input['tag'], null, $input['actor'],
+        );
+        $result = ['status' => 'done', 'charge' => $cobro->status->value];
     } elseif ($input['mode'] === 'fee-void') {
         // Anular un cobro de Aranceles mientras otro traspasa ese efectivo.
         app(VoidFeeCollection::class)->handle(

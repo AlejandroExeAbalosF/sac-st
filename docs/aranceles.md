@@ -4,7 +4,7 @@ Qué hace hoy la Caja de Aranceles. Describe lo implementado.
 
 **Estado: en construcción.** Están el catálogo, el cobro en efectivo con su recibo, la
 anulación, el reemplazo del recibo, la corrección, la caja del día con su arqueo, cierre y
-planilla, y el depósito del efectivo. Todavía no están el pago por depósito ni el informe mensual.
+planilla, el depósito del efectivo y el pago por depósito. Todavía no está el informe mensual.
 
 Las reglas con su origen están fuera del repo, en `Relevamiento/Aranceles/Reglas-y-DER-Aranceles-v1.md`.
 Varias son provisorias: no salen del relevamiento y están para confirmar con el área.
@@ -118,6 +118,8 @@ Son hechos distintos:
 | Otro importe, sin traspasar | **Corregir** | `aranceles.corregir` | Se revierte la recepción y se registra la correcta |
 | Otro importe, traspaso sin acreditar | Cancelar todo el traspaso y **corregir** | | |
 | Otro importe, depósito acreditado | **Sin operación**: pendiente con el área | | |
+| Pago por banco: el crédito no era de este cobro | **Anular** | `aranceles.anular` | Se revierte; el crédito vuelve a quedar libre y el recibo queda anulado |
+| Pago por banco: otro importe | **Corregir** | `aranceles.corregir` | Los mismos créditos pagan el cobro nuevo; lo que sobra queda libre, y si no alcanzan queda pendiente (**provisorio**) |
 
 Corregir pasa en una transacción: el cobro anterior queda anulado y a la vista, nace otro
 vinculado a él (`fee_charge_corrections`) y usa la fecha de tarifa del original. Anular y
@@ -128,6 +130,50 @@ Una devolución de dinero no existe todavía: no se resuelve anulando.
 **En el libro del día,** anular o corregir el importe otro día deja el recibo en la fecha en que
 entró el dinero y agrega una fila «Anulación del recibo N» que resta en la fecha de la reversión.
 Con el mismo importe el dinero no se mueve: el renglón de ese día pasa a ser el del recibo nuevo.
+
+<a id="pago-por-deposito"></a>
+
+## Pago por depósito · `/aranceles/pendientes`
+
+Para quien paga por depósito o transferencia. Es una decisión del usuario, **sin relevar con el
+área**. No se imprime constancia: el usuario la sacó del alcance.
+
+1. **Alta** (`aranceles.cobrar`): en `/aranceles/nuevo`, «Depósito o transferencia». El cobro queda
+   pendiente, con el precio de hoy. No mueve dinero ni emite recibo. No vence y conserva su precio,
+   aunque el precio cambie después (**provisorio**).
+2. **Identificar** (`aranceles.verificar-pagos`): desde Pendientes se eligen uno o más créditos, o
+   desde **Banco › Movimientos**, «Identificar como arancel». Solo créditos desde la apertura de la
+   caja y dentro de la vigencia de la cuenta. Se usan del más antiguo al más nuevo y de cada uno se
+   toma lo necesario.
+3. **Recibo:** sale al completar el total, uno solo con todos los hechos, con fecha del día.
+
+- **De más:** lo que sobra del crédito queda libre, sin identificar, para otro cobro o para otra
+  caja. Un crédito usado en parte se sigue ofreciendo por lo libre, solo en Aranceles.
+- **De menos:** queda como ingreso parcial, vinculado y protegido, con lo que falta a la vista. Ese
+  dinero espera sin identificar y no es recaudación hasta el recibo.
+- **Ajustar** (`aranceles.modificar-importe`): cambia el importe de cada renglón de un pendiente,
+  de más o de menos, con motivo. El original se conserva. Si lo recibido alcanza el total nuevo, sale
+  el recibo. El total no puede quedar por debajo de lo recibido. Se envían solo los renglones
+  editados: si otra persona cambió uno mientras tanto, se rechaza con un aviso.
+- **Anular** (`aranceles.anular`): con un ingreso parcial, revierte la recepción y el crédito vuelve a
+  quedar libre, y no se puede con el día de hoy cerrado. Sin dinero no hay asiento, así que se puede
+  aunque el día esté cerrado, igual que dar de alta un pendiente (**provisorio**).
+- **Sin ventanilla** (`aranceles.verificar-pagos`): desde el crédito se carga quién pagó y qué, y el
+  cobro nace ahí. Usa el precio de la fecha del más antiguo de los créditos elegidos (**provisorio**);
+  uno que se sume después no lo recalcula.
+
+**En el libro del día,** cada día muestra lo que entró al banco ese día: «Ingreso por banco, sin
+recibo todavía» y, al emitirlo, el mismo importe con el número del recibo. Un ingreso parcial anulado
+otro día agrega su reversión en esa fecha.
+
+**Cuenta compartida:** cada crédito ofrece lo de cada caja, y quien identifica decide. Identificar no
+hace falta para cerrar el día. Lo que no sea de Aranceles queda sin identificar.
+
+**Base:** `fee_charge_settled` exige que un pendiente no tenga recibo, fecha de pago ni dinero
+aplicado, y que un pagado tenga todo aplicado; `fee_charge_funding_coherent` impide usar dos veces una
+recepción; `fee_charge_funding_born_unapplied` hace nacer un vínculo sin aplicar;
+`fund_receipts_fee_bank_has_a_charge` exige que una recepción por banco de la caja esté vinculada por
+todo su importe o revertida. Los bloqueos van en orden: cobro, créditos y recepciones.
 
 <a id="deposito"></a>
 

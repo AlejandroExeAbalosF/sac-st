@@ -67,6 +67,12 @@ final class FeeCashBoxModule implements CashBoxModule
         return 'Lo reconocido en el libro de Aranceles. La cuenta es compartida con Multas: no es su saldo.';
     }
 
+    /** Un ingreso parcial queda vinculado y el recibo sale al completar (regla A55). */
+    public function bankIncomePrecedesReceipt(): bool
+    {
+        return true;
+    }
+
     public function bankLedgerLabel(): string
     {
         return 'Reconocido en el libro de Aranceles';

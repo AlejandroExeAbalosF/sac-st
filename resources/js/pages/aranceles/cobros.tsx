@@ -28,6 +28,7 @@ import type { Firmante } from '@/features/aranceles/components/signer-select';
 import { date, money } from '@/lib/format';
 import { anular, create, index, reemplazar } from '@/routes/aranceles/cobros';
 import { edit as corregir } from '@/routes/aranceles/cobros/corregir';
+import { index as pendientes } from '@/routes/aranceles/pendientes';
 
 type Cobro = App.Modules.Aranceles.Data.FeeChargeListItemData;
 type Acto = App.Modules.Aranceles.Enums.FeeReasonAct;
@@ -213,6 +214,15 @@ function FilaDeCobro({
                         {money(cobro.total)}
                     </span>
                     {anulado && <StatusBadge label="Anulado" voided />}
+                    {cobro.status === 'pending' && (
+                        <StatusBadge
+                            label={`Pendiente: faltan ${money(cobro.missing)}`}
+                            tone="action"
+                        />
+                    )}
+                    {cobro.medium === 'bank' && !anulado && (
+                        <StatusBadge label="Por banco" tone="progress" />
+                    )}
                     {cobro.deposited && (
                         <StatusBadge label="Depositado" tone="progress" />
                     )}
@@ -230,7 +240,7 @@ function FilaDeCobro({
                     ))}
                 </ul>
                 <p className="text-xs text-muted-foreground">
-                    {cobro.paidOn && date(cobro.paidOn)}
+                    {date(cobro.paidOn ?? cobro.requestedOn)}
                     {cobro.receiptNumber && ` · Recibo ${cobro.receiptNumber}`}
                     {cobro.talonarioNumber &&
                         ` · Talonario ${cobro.talonarioNumber}`}
@@ -238,6 +248,11 @@ function FilaDeCobro({
                 </p>
             </div>
             <div className="flex flex-wrap gap-1 sm:justify-end">
+                {cobro.status === 'pending' && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <Link href={pendientes()}>Ver en pendientes</Link>
+                    </Button>
+                )}
                 {cobro.receiptId !== null && (
                     <Button
                         variant="ghost"
@@ -299,10 +314,9 @@ function AnularDialog({
                     <DialogHeader>
                         <DialogTitle>Anular el cobro</DialogTitle>
                         <DialogDescription>
-                            Es para un cobro cuyo dinero nunca entró. El
-                            efectivo sale de la caja y el recibo queda anulado
-                            con su número. Si el dinero entró y hay un error,
-                            corregí el cobro o reemplazá su recibo.
+                            {cobro.medium === 'bank'
+                                ? 'Es para un crédito que no era de este cobro. El crédito vuelve a quedar libre en el extracto y el recibo queda anulado con su número. Si el crédito era correcto y hay un error, corregí el cobro o reemplazá su recibo.'
+                                : 'Es para un cobro cuyo dinero nunca entró. El efectivo sale de la caja y el recibo queda anulado con su número. Si el dinero entró y hay un error, corregí el cobro o reemplazá su recibo.'}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">

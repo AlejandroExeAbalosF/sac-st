@@ -36,6 +36,9 @@ use Illuminate\Validation\ValidationException;
  *   correcta. Es para lo cargado mal: se recibieron $ 220 y se cargaron $ 250.
  * - **Otro importe, con depósito:** se cancela el depósito sin acreditar, y con
  *   uno acreditado no hay operación: está pendiente con el área.
+ * - **Otro importe, por el banco:** se revierten las recepciones y los mismos
+ *   créditos pagan el cobro nuevo. Lo que sobre queda libre; si no alcanza, queda
+ *   pendiente con lo que falta (A77). Para liberarlos del todo, se anula.
  *
  * @phpstan-import-type Linea from FeeLineCalculator
  */
@@ -47,6 +50,7 @@ final class CorrectFeeCharge
         private readonly RegisterCashFundReceipt $recibir,
         private readonly CollectFeeInCash $cobrar,
         private readonly IssueFeeReceipt $emitir,
+        private readonly IdentifyFeeCredits $identificar,
         private readonly RecordAuditEvent $auditar,
     ) {}
 
@@ -78,13 +82,11 @@ final class CorrectFeeCharge
                 throw ValidationException::withMessages(['reason' => 'Se corrige un cobro pagado.']);
             }
 
-            if ($cobro->medium !== FeeChargeMedium::Cash) {
-                throw ValidationException::withMessages(['reason' => 'Un pago por el banco se corrige desde su crédito.']);
-            }
-
             ['items' => $items, 'total' => $total] = $this->calcular->build($lineas, $cobro->pricing_date, $puedeCambiarImporte);
             $totalAnterior = (string) FeeChargeBalance::query()->whereKey($cobro->id)->value('total');
             $mismoImporte = Decimal::equals($total, $totalAnterior);
+            $porBanco = $cobro->medium === FeeChargeMedium::Bank;
+            $creditos = $porBanco ? $this->fondos->lockCreditsOf($cobro) : [];
 
             $recepciones = FundReceipt::query()
                 ->whereIn('id', FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->whereNull('released_at')->select('fund_receipt_id'))
@@ -103,7 +105,27 @@ final class CorrectFeeCharge
             VoidFeeCollection::anularRecibos($cobro, $motivo, $actorId);
             VoidFeeCollection::marcarAnulado($cobro, $motivo, $actorId);
 
-            $nuevo = $this->cobrar->crear($payerName, $payerCuit, $items, $cobro->pricing_date, $hoy, $clave, $actorId);
+            // Por el banco y con otro importe: los mismos créditos pagan un cobro nuevo.
+            if ($porBanco && ! $mismoImporte) {
+                foreach ($recepciones as $recepcion) {
+                    $this->fondos->reverseReceipt($recepcion, $clave.':recepcion-'.$recepcion->id, $motivo, $actorId);
+                }
+
+                $nuevo = $this->cobrar->crear($payerName, $payerCuit, $items, $cobro->pricing_date, null, $clave, $actorId, FeeChargeMedium::Bank);
+                $this->identificar->within($nuevo, $creditos, $clave, $signedById, $actorId, usaSoloLoNecesario: true);
+                $this->registrarCorreccion($cobro, $nuevo, $motivo, $actorId);
+
+                $this->auditar->handle('arancel.cobro-corregido', $nuevo, metadata: [
+                    'anterior' => $totalAnterior,
+                    'amount' => $total,
+                    'recibo' => $nuevo->chargeReceipts()->first()?->receipt()->value('formatted_number'),
+                    ...$motivo->auditMetadata(),
+                ], actorId: $actorId);
+
+                return $nuevo->refresh();
+            }
+
+            $nuevo = $this->cobrar->crear($payerName, $payerCuit, $items, $cobro->pricing_date, $hoy, $clave, $actorId, $cobro->medium);
 
             if ($mismoImporte) {
                 $eventos = [];
@@ -136,7 +158,10 @@ final class CorrectFeeCharge
 
             $comprobante = $this->emitir->handle(
                 $nuevo,
-                CollectFeeInCash::papel($payerName, $payerCuit, $items),
+                [
+                    ...CollectFeeInCash::papel($payerName, $payerCuit, $items),
+                    'bankAccountNumber' => $porBanco ? $this->fondos->accountNumbersOf($recepciones->pluck('id')) : null,
+                ],
                 $total,
                 $hoy,
                 array_values(array_unique($eventos)),
@@ -145,14 +170,7 @@ final class CorrectFeeCharge
                 $actorId,
             );
 
-            FeeChargeCorrection::query()->create([
-                'corrected_charge_id' => $cobro->id,
-                'new_charge_id' => $nuevo->id,
-                'reason_code' => $motivo->code->value,
-                'reason' => $motivo->detail === null ? null : mb_substr($motivo->detail, 0, 300),
-                'corrected_by' => $actorId,
-                'corrected_at' => now(),
-            ]);
+            $this->registrarCorreccion($cobro, $nuevo, $motivo, $actorId);
 
             $this->auditar->handle('arancel.cobro-corregido', $nuevo, metadata: [
                 'anterior' => $totalAnterior,
@@ -163,6 +181,18 @@ final class CorrectFeeCharge
 
             return $nuevo;
         });
+    }
+
+    private function registrarCorreccion(FeeCharge $cobro, FeeCharge $nuevo, Reason $motivo, ?int $actorId): void
+    {
+        FeeChargeCorrection::query()->create([
+            'corrected_charge_id' => $cobro->id,
+            'new_charge_id' => $nuevo->id,
+            'reason_code' => $motivo->code->value,
+            'reason' => $motivo->detail === null ? null : mb_substr($motivo->detail, 0, 300),
+            'corrected_by' => $actorId,
+            'corrected_at' => now(),
+        ]);
     }
 
     /**

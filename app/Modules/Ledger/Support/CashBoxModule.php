@@ -73,6 +73,13 @@ interface CashBoxModule
     public function bankColumnNote(): ?string;
 
     /**
+     * Si el dinero de un recibo por el banco puede entrar en varios días, antes de
+     * emitirlo. Entonces el libro muestra cada día lo que entró ese día, con recibo
+     * o sin él, y no el recibo entero en cada uno.
+     */
+    public function bankIncomePrecedesReceipt(): bool;
+
+    /**
      * A dónde lleva cada renglón del libro del día, por recibo: la ficha de
      * lo que ese recibo documenta. Se pide **en lote**, una consulta por
      * pantalla, y un recibo que no está en el resultado queda como texto.

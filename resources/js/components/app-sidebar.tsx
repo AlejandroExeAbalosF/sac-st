@@ -4,6 +4,7 @@ import {
     Banknote,
     CalendarDays,
     ClipboardCheck,
+    Clock,
     Contact,
     FileSpreadsheet,
     FileText,
@@ -38,6 +39,7 @@ import {
 } from '@/routes/aranceles/caja';
 import { index as cobrosDeAranceles } from '@/routes/aranceles/cobros';
 import { index as depositosDeAranceles } from '@/routes/aranceles/depositos';
+import { index as pendientesDeAranceles } from '@/routes/aranceles/pendientes';
 import { index as tiposDeArancel } from '@/routes/aranceles/tipos';
 import { index as cuentasBancarias } from '@/routes/banco/cuentas';
 import { index as extractos } from '@/routes/banco/extractos';
@@ -185,6 +187,12 @@ export const navGroups: NavGroup[] = [
                         icon: ReceiptText,
                         permission: 'aranceles.ver',
                         activeOn: ['aranceles/nuevo'],
+                    },
+                    {
+                        title: 'Pendientes',
+                        href: pendientesDeAranceles(),
+                        icon: Clock,
+                        permission: 'aranceles.ver',
                     },
                     {
                         title: 'Depósitos',

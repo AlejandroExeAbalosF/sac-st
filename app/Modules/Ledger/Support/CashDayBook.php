@@ -51,6 +51,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class CashDayBook
 {
+    public function __construct(private readonly CashBoxModules $modules) {}
+
     /**
      * @return array{income: list<Fila>, expense: list<Fila>}
      */
@@ -142,9 +144,23 @@ final class CashDayBook
             ->get();
 
         $libro = ['income' => [], 'expense' => []];
+        $ingresoPrevio = $this->modules->forCashBox($cashBoxId)->bankIncomePrecedesReceipt();
+        $delPeriodo = $ingresoPrevio
+            ? $this->bankIncomeOfReceipts(array_values($filas->map(fn (object $fila): int => (int) $fila->id)->all()), $cashBoxId, $from, $to, $currency)
+            : [];
 
         foreach ($filas as $fila) {
             $bloque = $fila->receipt_type === 'income' ? 'income' : 'expense';
+            $banco = $fila->medium_snapshot === 'bank' ? Decimal::scale((string) $fila->amount) : '0.00';
+
+            if ($ingresoPrevio && $fila->medium_snapshot === 'bank') {
+                $banco = $delPeriodo[(int) $fila->id] ?? '0.00';
+
+                // Emitido hoy sobre dinero que entró antes: su renglón está en esos días.
+                if (Decimal::equals($banco, '0')) {
+                    continue;
+                }
+            }
 
             $libro[$bloque][] = [
                 /*
@@ -166,7 +182,7 @@ final class CashDayBook
                     : (int) $fila->beneficiary_installment_id,
                 'cash' => $fila->medium_snapshot === 'cash' ? Decimal::scale((string) $fila->amount) : '0.00',
                 'cheques' => $fila->medium_snapshot === 'cheque' ? Decimal::scale((string) $fila->amount) : '0.00',
-                'bank' => $fila->medium_snapshot === 'bank' ? Decimal::scale((string) $fila->amount) : '0.00',
+                'bank' => $banco,
             ];
         }
 
@@ -174,11 +190,111 @@ final class CashDayBook
             array_push($libro[$bloque], ...$filasDelHecho);
         }
 
+        if ($ingresoPrevio) {
+            array_push($libro['income'], ...$this->bankIncomeWithoutReceipt($cashBoxId, $from, $to, $currency));
+        }
+
         foreach ($this->laterVoids($cashBoxId, $from, $to, $currency) as $bloque => $filasDelHecho) {
             array_push($libro[$bloque], ...$filasDelHecho);
         }
 
         return $libro;
+    }
+
+    /**
+     * Lo que entró al banco en el período por cada recibo, según los hechos que
+     * documenta.
+     *
+     * @param  list<int>  $recibos
+     * @return array<int, numeric-string>
+     */
+    private function bankIncomeOfReceipts(array $recibos, int $cashBoxId, CarbonInterface $from, CarbonInterface $to, Currency $currency): array
+    {
+        $filas = $this->bankLines($cashBoxId, $from, $to, $currency)
+            ->join('receipt_financial_events AS pivote', 'pivote.financial_event_id', '=', 'financial_events.id')
+            ->whereIn('pivote.receipt_id', $recibos)
+            // Revertido el mismo día, ese dinero no figuró: un rango de días no lo suma.
+            ->whereNotExists(function ($revertido): void {
+                $revertido->selectRaw('1')
+                    ->from('financial_events AS reversion')
+                    ->whereColumn('reversion.reversal_of_id', 'financial_events.id')
+                    ->whereColumn('reversion.event_date', 'financial_events.event_date')
+                    ->whereIn('reversion.status', [
+                        FinancialEventStatus::Posted->value,
+                        FinancialEventStatus::Reversed->value,
+                    ]);
+            })
+            ->groupBy('pivote.receipt_id')
+            ->select('pivote.receipt_id')
+            ->selectRaw('SUM(journal_lines.debit - journal_lines.credit) AS bank')
+            ->get();
+
+        $porRecibo = [];
+
+        foreach ($filas as $fila) {
+            $porRecibo[(int) $fila->receipt_id] = Decimal::scale((string) $fila->bank);
+        }
+
+        return $porRecibo;
+    }
+
+    /**
+     * Lo que entró al banco sin recibo todavía —un ingreso parcial— y su reversión
+     * si el cobro se anuló. Sin estas filas, los totales del día no cuadran con su
+     * detalle. Al emitir el recibo, el mismo importe pasa a figurar con su número.
+     *
+     * @return list<Fila>
+     */
+    private function bankIncomeWithoutReceipt(int $cashBoxId, CarbonInterface $from, CarbonInterface $to, Currency $currency): array
+    {
+        $filas = $this->bankLines($cashBoxId, $from, $to, $currency)
+            ->leftJoin('financial_events AS revertido', 'revertido.id', '=', 'financial_events.reversal_of_id')
+            ->where(function ($hecho): void {
+                $hecho->where('financial_events.event_type', FinancialEventType::FundsReceived->value)
+                    ->orWhere('revertido.event_type', FinancialEventType::FundsReceived->value);
+            })
+            ->whereNotExists(function ($documentado): void {
+                $documentado->selectRaw('1')
+                    ->from('receipt_financial_events AS pivote')
+                    ->whereRaw('pivote.financial_event_id = COALESCE(financial_events.reversal_of_id, financial_events.id)');
+            })
+            ->groupBy('financial_events.id', 'financial_events.reversal_of_id')
+            ->select('financial_events.id', 'financial_events.reversal_of_id')
+            ->selectRaw('SUM(journal_lines.debit - journal_lines.credit) AS bank')
+            ->orderBy('financial_events.id')
+            ->get();
+
+        $libro = [];
+
+        foreach ($filas as $fila) {
+            $libro[] = [
+                'number' => $fila->reversal_of_id === null ? 'Ingreso por banco, sin recibo todavía' : 'Reversión de un ingreso por banco sin recibo',
+                'receiptId' => null,
+                'eventId' => (int) $fila->id,
+                'installmentId' => null,
+                'cash' => '0.00',
+                'cheques' => '0.00',
+                'bank' => Decimal::scale((string) $fila->bank),
+            ];
+        }
+
+        return $libro;
+    }
+
+    /** Las líneas de la cuenta bancaria de la caja en el período, asentadas. */
+    private function bankLines(int $cashBoxId, CarbonInterface $from, CarbonInterface $to, Currency $currency): Builder
+    {
+        return DB::table('financial_events')
+            ->join('journal_lines', 'journal_lines.financial_event_id', '=', 'financial_events.id')
+            ->where('journal_lines.cash_box_id', $cashBoxId)
+            ->where('journal_lines.currency', $currency->value)
+            ->where('journal_lines.account_code', LedgerAccount::BankAccount->value)
+            ->whereIn('financial_events.status', [
+                FinancialEventStatus::Posted->value,
+                FinancialEventStatus::Reversed->value,
+            ])
+            ->whereDate('financial_events.event_date', '>=', $from)
+            ->whereDate('financial_events.event_date', '<=', $to);
     }
 
     /** @return list<string> Las cuentas de las tres columnas de la planilla. */

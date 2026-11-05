@@ -5,28 +5,23 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Modules\Aranceles\Actions\CollectFeeInCash;
 use App\Modules\Aranceles\Actions\CorrectFeeCharge;
 use App\Modules\Aranceles\Actions\ReplaceFeeReceipt;
 use App\Modules\Aranceles\Actions\VoidFeeCollection;
-use App\Modules\Aranceles\Data\FeeChargeLineData;
 use App\Modules\Aranceles\Data\FeeChargeListItemData;
 use App\Modules\Aranceles\Data\FeeTypeData;
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
 use App\Modules\Aranceles\Enums\FeeReasonAct;
-use App\Modules\Aranceles\Enums\FeeReasonCode;
 use App\Modules\Aranceles\Http\Requests\CollectFeeRequest;
 use App\Modules\Aranceles\Http\Requests\CorrectFeeChargeRequest;
 use App\Modules\Aranceles\Http\Requests\ReplaceFeeReceiptRequest;
 use App\Modules\Aranceles\Http\Requests\VoidFeeCollectionRequest;
 use App\Modules\Aranceles\Models\FeeCharge;
-use App\Modules\Aranceles\Models\FeeChargeFunding;
-use App\Modules\Aranceles\Models\FeeChargeItem;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Pdf\FeeReceiptPdf;
-use App\Modules\Aranceles\Support\FeeChargeFunds;
+use App\Modules\Aranceles\Support\FeeChargeRows;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Shared\Enums\ReceiptStatus;
@@ -34,13 +29,11 @@ use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\BusinessDate;
 use App\Support\Database\Like;
-use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,7 +45,9 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  */
 final class FeeChargeController extends Controller
 {
-    public function index(Request $request, FeeChargeFunds $fondos): Response
+    public function __construct(private readonly FeeChargeRows $filas) {}
+
+    public function index(Request $request): Response
     {
         $usuario = $request->user();
         $buscado = trim((string) $request->query('q', ''));
@@ -74,13 +69,13 @@ final class FeeChargeController extends Controller
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString()
-            ->through(fn (FeeCharge $cobro): FeeChargeListItemData => $this->fila($cobro, $fondos));
+            ->through(fn (FeeCharge $cobro): FeeChargeListItemData => $this->filas->row($cobro));
 
         return Inertia::render('aranceles/cobros', [
             'charges' => $cobros,
             'filters' => ['q' => $buscado, 'cobro' => $cobroId],
             'openReceipt' => $request->integer('recibo') ?: null,
-            'firmantes' => $this->firmantes(),
+            'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),
             'can' => [
                 'collect' => $usuario?->can('aranceles.cobrar') ?? false,
@@ -96,11 +91,11 @@ final class FeeChargeController extends Controller
         return $this->formulario($request, null);
     }
 
-    public function editCorrection(Request $request, FeeCharge $feeCharge, FeeChargeFunds $fondos): Response
+    public function editCorrection(Request $request, FeeCharge $feeCharge): Response
     {
         abort_unless($feeCharge->status === FeeChargeStatus::Paid, 404);
 
-        return $this->formulario($request, $this->fila($feeCharge->load(['items', 'balance', 'chargeReceipts.receipt']), $fondos));
+        return $this->formulario($request, $this->filas->row($feeCharge->load(['items', 'balance', 'chargeReceipts.receipt'])));
     }
 
     public function store(CollectFeeRequest $request, CollectFeeInCash $cobrar): RedirectResponse
@@ -146,9 +141,13 @@ final class FeeChargeController extends Controller
 
     public function void(VoidFeeCollectionRequest $request, FeeCharge $feeCharge, VoidFeeCollection $anular): RedirectResponse
     {
+        $pendiente = $feeCharge->status === FeeChargeStatus::Pending;
+
         $anular->handle($feeCharge, $request->reason(), $request->user()?->id);
 
-        Toast::success('Cobro anulado.', 'El recibo quedó anulado y su número no se reutiliza.');
+        Toast::success('Cobro anulado.', $pendiente
+            ? 'Si tenía un ingreso parcial, el crédito volvió a quedar libre.'
+            : 'El recibo quedó anulado y su número no se reutiliza.');
 
         return back();
     }
@@ -228,7 +227,7 @@ final class FeeChargeController extends Controller
             'corrects' => $corrige,
             'isOpen' => $apertura !== null,
             'canChangeAmount' => $request->user()?->can('aranceles.modificar-importe') ?? false,
-            'firmantes' => $this->firmantes(),
+            'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),
             'idempotencyKey' => 'arancel-cobro:'.Str::ulid(),
         ]);
@@ -242,76 +241,16 @@ final class FeeChargeController extends Controller
             ->with('receipt')
             ->first();
 
-        Toast::success($mensaje, $recibo === null ? null : 'Se emitió el recibo '.$recibo->receipt->formatted_number.'.');
+        // Corregido por el banco con un importe mayor: sigue pendiente de lo que falta.
+        if ($recibo === null) {
+            Toast::success($mensaje, 'Los créditos no alcanzan: el cobro quedó pendiente de lo que falta.');
 
-        return to_route('aranceles.cobros.index', ['recibo' => $recibo?->receipt_id]);
-    }
-
-    private function fila(FeeCharge $cobro, FeeChargeFunds $fondos): FeeChargeListItemData
-    {
-        $vigente = $cobro->chargeReceipts->first(fn (FeeChargeReceipt $c): bool => $c->receipt->status === ReceiptStatus::Issued);
-        $ultimo = $vigente ?? $cobro->chargeReceipts->first();
-        $papel = $ultimo?->snapshot;
-        $importes = DB::table('fee_charge_item_amounts')->where('fee_charge_id', $cobro->id)->pluck('amount', 'fee_charge_item_id');
-
-        $recepciones = FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->whereNull('released_at')->pluck('fund_receipt_id');
-
-        return new FeeChargeListItemData(
-            id: $cobro->id,
-            payerName: $papel['payerName'] ?? $cobro->payer_name,
-            // Un CUIT quitado en el reemplazo es nulo en el papel: no vuelve el original.
-            payerCuit: $papel === null ? $cobro->payer_cuit : ($papel['payerCuit'] ?? null),
-            medium: $cobro->medium,
-            status: $cobro->status,
-            paidOn: $cobro->paid_on?->toDateString(),
-            pricingDate: $cobro->pricing_date->toDateString(),
-            total: Decimal::scale((string) $cobro->balance?->total),
-            lines: array_values($cobro->items->map(fn (FeeChargeItem $i): FeeChargeLineData => new FeeChargeLineData(
-                feeTypeId: $i->fee_type_id,
-                code: $i->code_snapshot,
-                name: $i->name_snapshot,
-                quantity: $i->quantity,
-                baseAmount: $i->base_amount,
-                calculatedAmount: $i->calculated_amount,
-                amount: Decimal::scale((string) ($importes[$i->id] ?? $i->original_amount)),
-                reasonCode: $i->change_reason_code,
-                reason: $i->change_reason,
-            ))->all()),
-            receiptId: $ultimo?->receipt_id,
-            receiptNumber: $ultimo?->receipt->formatted_number,
-            talonarioNumber: $ultimo?->receipt->talonario_number,
-            voidReason: $this->motivoDeAnulacion($cobro),
-            deposited: $recepciones->contains(fn (int $id): bool => $fondos->isDeposited($id)),
-        );
-    }
-
-    /** Se lee junto: «Error de carga: el importe tenía un cero de más». */
-    private function motivoDeAnulacion(FeeCharge $cobro): ?string
-    {
-        if ($cobro->void_reason_code === null) {
-            return null;
+            return to_route('aranceles.pendientes.index');
         }
 
-        $codigo = FeeReasonCode::tryFrom($cobro->void_reason_code)?->label() ?? $cobro->void_reason_code;
+        Toast::success($mensaje, 'Se emitió el recibo '.$recibo->receipt->formatted_number.'.');
 
-        return $cobro->void_reason === null ? $codigo : $codigo.': '.$cobro->void_reason;
-    }
-
-    /**
-     * Quienes pueden firmar el recibo, con su cargo. Opcional: sin firmante el
-     * pie queda para firmar y sellar a mano (regla A92).
-     *
-     * @return list<array{id: int, name: string, position: string|null}>
-     */
-    private function firmantes(): array
-    {
-        return array_values(User::query()
-            ->where('is_active', true)
-            ->whereNotNull('position')
-            ->orderBy('name')
-            ->get(['id', 'name', 'position'])
-            ->map(fn (User $u): array => ['id' => $u->id, 'name' => $u->name, 'position' => $u->position])
-            ->all());
+        return to_route('aranceles.cobros.index', ['recibo' => $recibo->receipt_id]);
     }
 
     /** @param array<string, mixed> $datos */

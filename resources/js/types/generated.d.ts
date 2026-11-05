@@ -2,6 +2,16 @@ declare namespace App {
     namespace Modules {
         namespace Aranceles {
             namespace Data {
+                export type FeeBankCreditData = {
+                    readonly id: number;
+                    readonly date: string;
+                    readonly amount: string;
+                    readonly free: string;
+                    readonly description: string | null;
+                    readonly counterparty: string | null;
+                    readonly operationId: string | null;
+                    readonly accountLabel: string;
+                };
                 export type FeeCashShareData = {
                     amount: string;
                     receivedOn: string;
@@ -9,7 +19,12 @@ declare namespace App {
                     receiptNumber: string | null;
                     payerName: string | null;
                 };
+                export type FeeChargeFundingData = {
+                    readonly amount: string;
+                    readonly receivedOn: string;
+                };
                 export type FeeChargeLineData = {
+                    readonly itemId: number;
                     readonly feeTypeId: number;
                     readonly code: number;
                     readonly name: string;
@@ -26,10 +41,14 @@ declare namespace App {
                     readonly payerCuit: string | null;
                     readonly medium: App.Modules.Aranceles.Enums.FeeChargeMedium;
                     readonly status: App.Modules.Aranceles.Enums.FeeChargeStatus;
+                    readonly requestedOn: string;
                     readonly paidOn: string | null;
                     readonly pricingDate: string;
                     readonly total: string;
+                    readonly funded: string;
+                    readonly missing: string;
                     readonly lines: App.Modules.Aranceles.Data.FeeChargeLineData[];
+                    readonly fundings: App.Modules.Aranceles.Data.FeeChargeFundingData[];
                     readonly receiptId: number | null;
                     readonly receiptNumber: string | null;
                     readonly talonarioNumber: string | null;

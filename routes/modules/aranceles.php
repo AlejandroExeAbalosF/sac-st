@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Aranceles\Http\Controllers\FeeCashController;
 use App\Modules\Aranceles\Http\Controllers\FeeChargeController;
 use App\Modules\Aranceles\Http\Controllers\FeeDepositController;
+use App\Modules\Aranceles\Http\Controllers\FeePendingController;
 use App\Modules\Aranceles\Http\Controllers\FeeTypeController;
 use App\Modules\Banking\Http\Controllers\CashBoxAccountController;
 use App\Modules\Ledger\Http\Controllers\CashCalendarController;
@@ -22,6 +23,7 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
     Route::middleware('can:aranceles.ver')->group(function (): void {
         Route::get('tipos', [FeeTypeController::class, 'index'])->name('tipos.index');
         Route::get('cobros', [FeeChargeController::class, 'index'])->name('cobros.index');
+        Route::get('pendientes', [FeePendingController::class, 'index'])->name('pendientes.index');
         Route::get('depositos', [FeeDepositController::class, 'index'])->name('depositos.index');
         Route::get('caja/apertura', [FeeCashController::class, 'apertura'])->name('caja.apertura.index');
         // El recibo: el mismo papel en el visor y en la impresora.
@@ -41,6 +43,18 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
         // La vista previa va antes del cobro y con el mismo permiso.
         Route::get('cobros/previsualizar', [FeeChargeController::class, 'preview'])->name('cobros.preview');
         Route::post('cobros', [FeeChargeController::class, 'store'])->name('cobros.store');
+        Route::post('pendientes', [FeePendingController::class, 'store'])->name('pendientes.store');
+    });
+
+    Route::middleware('can:aranceles.verificar-pagos')->group(function (): void {
+        Route::get('creditos', [FeePendingController::class, 'credits'])->name('creditos.index');
+        Route::get('creditos/{transaction}/identificar', [FeePendingController::class, 'showCredit'])->whereNumber('transaction')->name('creditos.identificar');
+        Route::post('creditos/registrar', [FeePendingController::class, 'storeVerified'])->name('creditos.registrar');
+        Route::post('pendientes/{feeCharge}/identificar', [FeePendingController::class, 'identify'])->whereNumber('feeCharge')->name('pendientes.identificar');
+    });
+
+    Route::middleware('can:aranceles.modificar-importe')->group(function (): void {
+        Route::post('pendientes/{feeCharge}/ajustar', [FeePendingController::class, 'adjust'])->whereNumber('feeCharge')->name('pendientes.ajustar');
     });
 
     Route::middleware('can:aranceles.anular')->group(function (): void {

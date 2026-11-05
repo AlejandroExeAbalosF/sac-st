@@ -90,6 +90,11 @@ final class FineCashBoxModule implements CashBoxModule
         return 'Lo reconocido en el libro de Multas. La cuenta es compartida con Aranceles: no es su saldo.';
     }
 
+    public function bankIncomePrecedesReceipt(): bool
+    {
+        return false;
+    }
+
     /** La cuenta es compartida: lo que se muestra es lo que reconoció el libro. */
     public function bankLedgerLabel(): string
     {

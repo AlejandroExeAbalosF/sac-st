@@ -75,8 +75,8 @@ class CuentasDeLaCajaDeMultasTest extends TestCase
         $this->actingAs($this->operador('contador'))
             ->get(route('banco.movimientos.index'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("creditActions.{$deA->id}.label", 'Identificar')
-                ->where("creditActions.{$deB->id}.label", 'Identificar'));
+                ->where("creditActions.{$deA->id}.0.label", 'Identificar como multa')
+                ->where("creditActions.{$deB->id}.0.label", 'Identificar como multa'));
 
         $this->identificar($deB)->assertSessionHasNoErrors();
         // El recibo cita la cuenta del crédito.
@@ -129,7 +129,7 @@ class CuentasDeLaCajaDeMultasTest extends TestCase
         $this->identificar($despues)->assertSessionHasErrors('bankTransactionId');
         $this->actingAs($this->operador('contador'))
             ->get(route('banco.movimientos.index'))
-            ->assertInertia(fn (Assert $page) => $page->where("creditActions.{$despues->id}.href", null));
+            ->assertInertia(fn (Assert $page) => $page->where("creditActions.{$despues->id}.0.href", null));
     }
 
     /**

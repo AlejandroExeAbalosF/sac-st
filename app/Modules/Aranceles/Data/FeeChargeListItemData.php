@@ -14,6 +14,7 @@ final readonly class FeeChargeListItemData
 {
     /**
      * @param  list<FeeChargeLineData>  $lines
+     * @param  list<FeeChargeFundingData>  $fundings
      */
     public function __construct(
         public int $id,
@@ -21,11 +22,16 @@ final readonly class FeeChargeListItemData
         public ?string $payerCuit,
         public FeeChargeMedium $medium,
         public FeeChargeStatus $status,
+        public string $requestedOn,
         public ?string $paidOn,
         /** Con qué tarifa se calcula: la corrección conserva la del cobro original. */
         public string $pricingDate,
         public string $total,
+        /** Lo vinculado: en un pendiente, un ingreso parcial. */
+        public string $funded,
+        public string $missing,
         public array $lines,
+        public array $fundings,
         public ?int $receiptId,
         public ?string $receiptNumber,
         public ?string $talonarioNumber,

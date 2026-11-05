@@ -157,6 +157,17 @@ Breadcrumbs::for('aranceles.cobros.corregir.edit', fn (): array => [
     Crumb::make('Corregir cobro'),
 ]);
 
+Breadcrumbs::for('aranceles.pendientes.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Pendientes'),
+]);
+
+Breadcrumbs::for('aranceles.creditos.identificar', fn (): array => [
+    Crumb::make('Banco'),
+    Crumb::make('Movimientos', route('banco.movimientos.index')),
+    Crumb::make('Identificar como arancel'),
+]);
+
 Breadcrumbs::for('aranceles.depositos.index', fn (): array => [
     Crumb::make('Aranceles'),
     Crumb::make('Depósitos'),

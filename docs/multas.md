@@ -421,7 +421,9 @@ caja por descarte. Banking no sabe qué es una multa: cada crédito pendiente le
 pregunta al módulo de la caja de su cuenta qué ofrecer (`BankCreditHandler`).
 
 - **Desde la apertura de la caja, libre** y con `multas.verificar-pagos`:
-  «Identificar».
+  «Identificar como multa». Si la cuenta también es de Aranceles, la fila ofrece además
+  «Identificar como arancel», y quien identifica decide. Un crédito que Aranceles ya usó
+  en parte no se ofrece acá: un pago de multa toma el crédito entero.
 - **Anterior a la apertura**: la fila lo dice y no ofrece identificar. Ya estaba en el
   saldo que el área traía: se usa como pago anterior desde la ficha de la multa.
 

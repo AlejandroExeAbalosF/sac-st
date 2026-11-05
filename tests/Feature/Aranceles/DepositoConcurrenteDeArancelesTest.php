@@ -6,6 +6,8 @@ namespace Tests\Feature\Aranceles;
 
 use App\Models\User;
 use App\Modules\Aranceles\Actions\CollectFeeInCash;
+use App\Modules\Aranceles\Actions\CreateFeeCharge;
+use App\Modules\Aranceles\Actions\IdentifyFeeCredits;
 use App\Modules\Aranceles\Actions\OpenFeeCashBook;
 use App\Modules\Aranceles\Actions\VoidFeeCollection;
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
@@ -15,7 +17,9 @@ use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\StartCashTransfer;
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Reason;
@@ -50,6 +54,8 @@ class DepositoConcurrenteDeArancelesTest extends TestCase
 
     private int $caja;
 
+    private BankAccount $banco;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -61,10 +67,11 @@ class DepositoConcurrenteDeArancelesTest extends TestCase
 
         $this->admin = $this->operador('administrador');
         $this->caja = $this->cajaDe(CashBox::ARANCELES);
+        $this->banco = $this->cuenta();
 
         app(OpenFeeCashBook::class)->handle(
             date: BusinessDate::today()->subDays(10),
-            bankAccountId: $this->cuenta()->id,
+            bankAccountId: $this->banco->id,
             balances: [],
             denominations: [],
             notes: null,
@@ -155,6 +162,70 @@ class DepositoConcurrenteDeArancelesTest extends TestCase
     public static function importesDelMismoEnvio(): array
     {
         return ['una parte' => ['50'], 'todo el efectivo' => ['120']];
+    }
+
+    private function pendiente(): FeeCharge
+    {
+        return app(CreateFeeCharge::class)->handle(
+            'AG Max SRL', null, [['feeTypeId' => FeeType::query()->where('code', 14)->value('id'), 'quantity' => 1]],
+            (string) Str::uuid(), $this->admin->id, true,
+        );
+    }
+
+    /** Dos cobros y un solo crédito: el segundo espera y solo toma lo que quedó libre. */
+    public function test_two_charges_share_a_credit_without_using_it_twice(): void
+    {
+        $credito = $this->movimiento($this->banco, BusinessDate::today()->toDateString(), '200');
+        $primero = $this->pendiente();
+        $segundo = $this->pendiente();
+
+        DB::beginTransaction();
+        app(IdentifyFeeCredits::class)->handle($primero, [$credito->id], (string) Str::uuid(), null, $this->admin->id);
+
+        $worker = $this->esperando(['mode' => 'fee-identify', 'charge' => $segundo->id, 'credits' => [$credito->id], 'actor' => $this->admin->id]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('done')
+            ->and($resultado['charge'])->toBe('pending')
+            ->and($primero->refresh()->status)->toBe(FeeChargeStatus::Paid)
+            ->and(app(AllocatableAmount::class)->for($credito->refresh()))->toBe('0.00');
+    }
+
+    /** Mientras se anula un pendiente, identificarlo espera y lo encuentra anulado. */
+    public function test_identifying_while_it_is_being_voided_is_refused(): void
+    {
+        $credito = $this->movimiento($this->banco, BusinessDate::today()->toDateString(), '120');
+        $cobro = $this->pendiente();
+
+        DB::beginTransaction();
+        app(VoidFeeCollection::class)->handle($cobro, new Reason(FeeReasonCode::DataEntryError, null), $this->admin->id);
+
+        $worker = $this->esperando(['mode' => 'fee-identify', 'charge' => $cobro->id, 'credits' => [$credito->id], 'actor' => $this->admin->id]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('validation')
+            ->and($resultado['errors'])->toHaveKey('credits')
+            ->and(app(AllocatableAmount::class)->for($credito->refresh()))->toBe('120.00');
+    }
+
+    /** Mientras se identifica, anular espera y revierte lo que entró. */
+    public function test_voiding_while_it_is_being_identified_frees_the_credit(): void
+    {
+        $credito = $this->movimiento($this->banco, BusinessDate::today()->toDateString(), '100');
+        $cobro = $this->pendiente();
+
+        DB::beginTransaction();
+        app(IdentifyFeeCredits::class)->handle($cobro, [$credito->id], (string) Str::uuid(), null, $this->admin->id);
+
+        $worker = $this->esperando(['mode' => 'fee-void', 'charge' => $cobro->id, 'actor' => $this->admin->id]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('done')
+            ->and($cobro->refresh()->status)->toBe(FeeChargeStatus::Voided)
+            ->and(app(AllocatableAmount::class)->for($credito->refresh()))->toBe('100.00');
     }
 
     /** Mientras se traspasa, anular espera y lo encuentra afuera de la caja. */

@@ -249,10 +249,10 @@ class CajaDeMultasTest extends TestCase
         $this->actingAs($this->operador('contador'))
             ->get(route('banco.movimientos.index', ['cuenta' => $cuenta->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("creditActions.{$nuevo->id}.label", 'Identificar')
-                ->where("creditActions.{$nuevo->id}.href", route('multas.creditos.identificar', $nuevo, absolute: false))
-                ->where("creditActions.{$anterior->id}.label", 'Anterior a la apertura de Multas')
-                ->where("creditActions.{$anterior->id}.href", null));
+                ->where("creditActions.{$nuevo->id}.0.label", 'Identificar como multa')
+                ->where("creditActions.{$nuevo->id}.0.href", route('multas.creditos.identificar', $nuevo, absolute: false))
+                ->where("creditActions.{$anterior->id}.0.label", 'Anterior a la apertura de Multas')
+                ->where("creditActions.{$anterior->id}.0.href", null));
 
         // Quien no concilia no identifica: el posterior queda sin acción.
         $this->actingAs($this->operador('consulta'))

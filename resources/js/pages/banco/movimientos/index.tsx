@@ -57,11 +57,12 @@ type Props = {
     }[];
     /**
      * Qué se puede hacer con cada crédito pendiente de la página, según el
-     * módulo que lleva la caja de su cuenta: identificarlo, o por qué no.
+     * módulo que lleva la caja de su cuenta: identificarlo, o por qué no. Una
+     * cuenta compartida ofrece lo de cada caja.
      */
     creditActions: Record<
         number,
-        { label: string; href: string | null; note: string | null }
+        { label: string; href: string | null; note: string | null }[]
     >;
 };
 
@@ -412,9 +413,14 @@ export default function MovimientosIndex({
                                         </td>
                                         <td className="p-2 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                <AccionDelCredito
-                                                    accion={creditActions[m.id]}
-                                                />
+                                                {creditActions[m.id]?.map(
+                                                    (accion) => (
+                                                        <AccionDelCredito
+                                                            key={accion.label}
+                                                            accion={accion}
+                                                        />
+                                                    ),
+                                                )}
                                                 {canIgnore &&
                                                     m.reconciliationStatus ===
                                                         'pending' && (
@@ -539,12 +545,8 @@ function DialogoIgnorar({
 function AccionDelCredito({
     accion,
 }: {
-    accion: Props['creditActions'][number] | undefined;
+    accion: Props['creditActions'][number][number];
 }) {
-    if (accion === undefined) {
-        return null;
-    }
-
     if (accion.href === null) {
         return (
             <span

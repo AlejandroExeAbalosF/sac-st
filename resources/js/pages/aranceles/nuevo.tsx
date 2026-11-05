@@ -25,6 +25,7 @@ import SignerSelect, {
     SIN_FIRMANTE,
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
+import { itemsDeLineas, lineaVacia } from '@/features/aranceles/lib/fee-form';
 import { consultaDeCobro } from '@/features/aranceles/lib/fee-query';
 import DocumentFrame, {
     HOJA_ALTO_A5,
@@ -38,6 +39,7 @@ import {
     preview,
     store,
 } from '@/routes/aranceles/cobros';
+import { store as guardarPendiente } from '@/routes/aranceles/pendientes';
 
 type Tipo = App.Modules.Aranceles.Data.FeeTypeData;
 type Cobro = App.Modules.Aranceles.Data.FeeChargeListItemData;
@@ -54,21 +56,9 @@ type Props = {
     idempotencyKey: string;
 };
 
-let proximaClave = 1;
-
-const lineaVacia = (): LineaDeCobro => ({
-    key: proximaClave++,
-    feeTypeId: null,
-    quantity: '1',
-    baseAmount: '',
-    amount: '',
-    reasonCode: '',
-    reason: '',
-});
-
 const lineasDe = (cobro: Cobro): LineaDeCobro[] =>
     cobro.lines.map((l) => ({
-        key: proximaClave++,
+        ...lineaVacia(),
         feeTypeId: l.feeTypeId,
         quantity: l.quantity === null ? '1' : String(l.quantity),
         baseAmount: l.baseAmount ?? '',
@@ -78,11 +68,13 @@ const lineasDe = (cobro: Cobro): LineaDeCobro[] =>
     }));
 
 /**
- * Cobrar un arancel en efectivo, o corregir uno ya cobrado.
+ * Cobrar un arancel, registrar uno que se va a pagar por depósito, o corregir uno
+ * ya cobrado.
  *
- * Va en dos pasos: el servidor comprueba los datos y muestra el recibo como va a
- * salir, y recién después se cobra. El total y los importes de esta pantalla son
- * un anticipo: los calcula el servidor al cobrar.
+ * En efectivo va en dos pasos: el servidor comprueba los datos y muestra el recibo
+ * como va a salir, y recién después se cobra. Por depósito queda pendiente, y el
+ * recibo sale al identificar el crédito. El total y los importes de esta pantalla
+ * son un anticipo: los calcula el servidor.
  */
 export default function NuevoCobro({
     feeTypes,
@@ -108,6 +100,8 @@ export default function NuevoCobro({
         numero: string;
     } | null>(null);
     const [revisando, setRevisando] = useState(false);
+    const [medio, setMedio] = useState<'cash' | 'bank'>('cash');
+    const porDeposito = !corrects && medio === 'bank';
 
     const errores = form.errors as unknown as Record<
         string,
@@ -115,7 +109,11 @@ export default function NuevoCobro({
     >;
     const atrasado = form.data.receivedOn < hoy;
     // La corrección conserva la tarifa del cobro original, como en el servidor.
-    const fecha = corrects ? corrects.pricingDate : form.data.receivedOn;
+    const fecha = corrects
+        ? corrects.pricingDate
+        : porDeposito
+          ? hoy
+          : form.data.receivedOn;
     const importes = form.data.lineas.map((l) =>
         importeDeLinea(l, feeTypes, fecha),
     );
@@ -129,15 +127,19 @@ export default function NuevoCobro({
             ),
         );
 
-    const items = () =>
-        form.data.lineas.map((l) => ({
-            feeTypeId: l.feeTypeId,
-            quantity: l.quantity.trim() === '' ? null : l.quantity.trim(),
-            baseAmount: l.baseAmount || null,
-            amount: l.amount || null,
-            reasonCode: l.reasonCode || null,
-            reason: l.reason.trim() || null,
-        }));
+    const items = () => itemsDeLineas(form.data.lineas);
+
+    const registrarPendiente = () =>
+        router.post(
+            guardarPendiente().url,
+            {
+                payerName: form.data.payerName,
+                payerCuit: form.data.payerCuit || null,
+                items: items(),
+                idempotencyKey,
+            },
+            { onError: (e) => form.setError(e as never) },
+        );
 
     const datos = () => ({
         payerName: form.data.payerName,
@@ -218,12 +220,16 @@ export default function NuevoCobro({
                     title={
                         corrects
                             ? `Corregir el cobro de ${corrects.payerName}`
-                            : 'Nuevo cobro en efectivo'
+                            : 'Nuevo cobro'
                     }
                     description={
                         corrects
-                            ? 'El cobro anterior queda anulado y a la vista, y nace otro. Si el importe es el mismo, el dinero no se mueve.'
-                            : 'Se cobra y se emite el recibo en el mismo acto.'
+                            ? corrects.medium === 'bank'
+                                ? 'El cobro anterior queda anulado y a la vista, y nace otro con los mismos créditos. Lo que sobre queda libre; si no alcanzan, queda pendiente de lo que falta.'
+                                : 'El cobro anterior queda anulado y a la vista, y nace otro. Si el importe es el mismo, el dinero no se mueve.'
+                            : porDeposito
+                              ? 'Queda pendiente, con el precio de hoy. El recibo sale cuando se identifique el depósito en el extracto.'
+                              : 'Se cobra y se emite el recibo en el mismo acto.'
                     }
                 />
 
@@ -246,11 +252,41 @@ export default function NuevoCobro({
 
                         if (corrects) {
                             enviarCorreccion();
+                        } else if (porDeposito) {
+                            registrarPendiente();
                         } else {
                             revisar();
                         }
                     }}
                 >
+                    {!corrects && (
+                        <fieldset className="grid gap-1.5">
+                            <legend className="text-sm font-medium">
+                                Cómo paga
+                            </legend>
+                            <div className="flex flex-wrap gap-4 text-sm">
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="radio"
+                                        name="medio"
+                                        checked={medio === 'cash'}
+                                        onChange={() => setMedio('cash')}
+                                    />
+                                    Efectivo
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="radio"
+                                        name="medio"
+                                        checked={medio === 'bank'}
+                                        onChange={() => setMedio('bank')}
+                                    />
+                                    Depósito o transferencia
+                                </label>
+                            </div>
+                        </fieldset>
+                    )}
+
                     <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
                         <div className="grid gap-1.5">
                             <Label htmlFor="payerName">Recibí de</Label>
@@ -323,7 +359,7 @@ export default function NuevoCobro({
                         </div>
                     </div>
 
-                    {!corrects && (
+                    {!corrects && !porDeposito && (
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="receivedOn">
@@ -371,12 +407,16 @@ export default function NuevoCobro({
                         </div>
                     )}
 
-                    <SignerSelect
-                        id="signedById"
-                        firmantes={firmantes}
-                        value={form.data.signedById}
-                        onChange={(valor) => form.setData('signedById', valor)}
-                    />
+                    {!porDeposito && (
+                        <SignerSelect
+                            id="signedById"
+                            firmantes={firmantes}
+                            value={form.data.signedById}
+                            onChange={(valor) =>
+                                form.setData('signedById', valor)
+                            }
+                        />
+                    )}
 
                     {corrects && (
                         <ReasonFields<Acto, Codigo>
@@ -402,9 +442,11 @@ export default function NuevoCobro({
                         >
                             {corrects
                                 ? 'Corregir y emitir recibo'
-                                : revisando
-                                  ? 'Comprobando…'
-                                  : 'Revisar recibo'}
+                                : porDeposito
+                                  ? 'Registrar pendiente'
+                                  : revisando
+                                    ? 'Comprobando…'
+                                    : 'Revisar recibo'}
                         </Button>
                     </div>
                 </form>

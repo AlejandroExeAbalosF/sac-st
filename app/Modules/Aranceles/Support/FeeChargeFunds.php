@@ -6,18 +6,24 @@ namespace App\Modules\Aranceles\Support;
 
 use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeFunding;
+use App\Modules\Banking\Actions\ReleaseFundReceiptAllocations;
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Reason;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
 
 /** Lo que un cobro hace con su dinero: vincularlo, aplicarlo y liberarlo. */
@@ -26,6 +32,7 @@ final class FeeChargeFunds
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly FeeEventReversal $reversion,
+        private readonly ReleaseFundReceiptAllocations $liberar,
     ) {}
 
     public function cashBoxId(): int
@@ -36,31 +43,87 @@ final class FeeChargeFunds
     /** Vincula la recepción y aplica el importe: pasa de sin identificar a recaudado. */
     public function apply(FeeCharge $cobro, FundReceipt $recepcion, string $importe, CarbonInterface $fecha, ?int $actorId): FinancialEvent
     {
-        $caja = $this->cashBoxId();
+        return $this->applyLinked($this->link($cobro, $recepcion, $importe, $actorId), $fecha, $actorId);
+    }
 
-        $vinculo = FeeChargeFunding::query()->create([
+    /** Reserva ese dinero para el cobro: sigue sin identificar hasta aplicarlo. */
+    public function link(FeeCharge $cobro, FundReceipt $recepcion, string $importe, ?int $actorId): FeeChargeFunding
+    {
+        return FeeChargeFunding::query()->create([
             'fee_charge_id' => $cobro->id,
             'fund_receipt_id' => $recepcion->id,
             'amount' => $importe,
             'created_by' => $actorId,
         ]);
+    }
+
+    public function applyLinked(FeeChargeFunding $vinculo, CarbonInterface $fecha, ?int $actorId): FinancialEvent
+    {
+        $caja = $this->cashBoxId();
+        $importe = (string) $vinculo->amount;
 
         $evento = $this->asentar->handle(
             type: FinancialEventType::FundsApplied,
-            idempotencyKey: 'arancel-cobro-'.$cobro->id.'-aplicacion-'.$vinculo->id,
+            idempotencyKey: 'arancel-cobro-'.$vinculo->fee_charge_id.'-aplicacion-'.$vinculo->id,
             lines: [
                 EntryLine::debit(LedgerAccount::UnassignedFunds, $importe)->in(Currency::Ars)->onCashBox($caja),
                 EntryLine::credit(LedgerAccount::CollectedFunds, $importe)->in(Currency::Ars)->onCashBox($caja),
             ],
             date: $fecha,
             cashBoxId: $caja,
-            description: 'Cobro de arancel de '.$cobro->payer_name,
+            description: 'Cobro de arancel de '.FeeCharge::query()->whereKey($vinculo->fee_charge_id)->value('payer_name'),
             actorId: $actorId,
         );
 
         $vinculo->forceFill(['application_event_id' => $evento->id])->save();
 
         return $evento;
+    }
+
+    /**
+     * Toma los créditos del extracto que respaldan el cobro. Va antes que las
+     * recepciones: identificar los bloquea en ese orden, y al revés se trabarían.
+     *
+     * @return list<int> los créditos bloqueados
+     */
+    public function lockCreditsOf(FeeCharge $cobro): array
+    {
+        return array_values(BankTransaction::query()
+            ->whereIn('id', $this->creditsOf($cobro))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id')
+            ->all());
+    }
+
+    /**
+     * Los números de cuenta que van en el papel de un cobro por el banco.
+     *
+     * @param  iterable<int>  $recepciones
+     */
+    public function accountNumbersOf(iterable $recepciones): ?string
+    {
+        $eventos = FundReceipt::query()->whereIn('id', collect($recepciones)->all())->select('financial_event_id');
+        $numeros = BankAccount::query()
+            ->whereIn('id', BankTransaction::query()
+                ->whereIn('id', BankTransactionAllocation::query()->whereIn('financial_event_id', $eventos)->select('bank_transaction_id'))
+                ->select('bank_account_id'))
+            ->orderBy('account_number')
+            ->pluck('account_number')
+            ->all();
+
+        return $numeros === [] ? null : implode(' y ', $numeros);
+    }
+
+    /** @return Builder<BankTransactionAllocation> */
+    private function creditsOf(FeeCharge $cobro): Builder
+    {
+        return BankTransactionAllocation::query()
+            ->whereNull('reversal_of_id')
+            ->whereIn('financial_event_id', FundReceipt::query()
+                ->whereIn('id', FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->whereNull('released_at')->select('fund_receipt_id'))
+                ->select('financial_event_id'))
+            ->select('bank_transaction_id');
     }
 
     /**
@@ -93,7 +156,8 @@ final class FeeChargeFunds
 
     /**
      * Revierte una recepción ya liberada. Con el vínculo vigente, la base lo
-     * rechaza (`fund_receipts_keep_fee_fundings`).
+     * rechaza (`fund_receipts_keep_fee_fundings`). Si vino del banco, el crédito
+     * vuelve a quedar libre en el extracto.
      */
     public function reverseReceipt(FundReceipt $recepcion, string $clave, Reason $motivo, ?int $actorId): void
     {
@@ -109,6 +173,10 @@ final class FeeChargeFunds
             'reversed_by' => $actorId,
             'reversal_reason' => $motivo->describe(),
         ])->save();
+
+        if ($recepcion->medium === PaymentMedium::Bank) {
+            $this->liberar->handle($recepcion, $salida->id, $motivo->describe(), $actorId);
+        }
     }
 
     /** Si algo de este efectivo viajó en un depósito que no se canceló. */

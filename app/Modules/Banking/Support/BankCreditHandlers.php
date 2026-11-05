@@ -12,8 +12,9 @@ use Illuminate\Contracts\Container\Container;
  * Los módulos que identifican créditos desde la lista de movimientos.
  *
  * Lo arma `AppServiceProvider`, que es el único lugar que puede nombrarlos.
- * Una cuenta compartida puede interesarle a más de uno: el primero que
- * responde por un crédito se queda con él.
+ * Una cuenta compartida le interesa a más de uno, y cada uno ofrece lo suyo: quien
+ * identifica decide de qué caja es. Si alguno lo puede identificar, las notas de
+ * los otros —por qué no desde su caja— no aportan y no se muestran.
  *
  * @phpstan-import-type CreditAction from BankCreditHandler
  */
@@ -27,7 +28,7 @@ final class BankCreditHandlers
 
     /**
      * @param  list<BankTransaction>  $credits
-     * @return array<int, CreditAction>
+     * @return array<int, list<CreditAction>>
      */
     public function actionsFor(array $credits, ?Authorizable $viewer): array
     {
@@ -36,9 +37,16 @@ final class BankCreditHandlers
         foreach ($this->handlers as $clase) {
             /** @var BankCreditHandler $handler */
             $handler = $this->container->make($clase);
-            $acciones += $handler->actionsFor($credits, $viewer);
+
+            foreach ($handler->actionsFor($credits, $viewer) as $credito => $accion) {
+                $acciones[$credito][] = $accion;
+            }
         }
 
-        return $acciones;
+        return array_map(function (array $delCredito): array {
+            $identificables = array_values(array_filter($delCredito, fn (array $a): bool => $a['href'] !== null));
+
+            return $identificables === [] ? $delCredito : $identificables;
+        }, $acciones);
     }
 }

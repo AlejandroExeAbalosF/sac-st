@@ -65,7 +65,8 @@ final class FineBankCreditHandler implements BankCreditHandler
                 ];
             } elseif ($concilia) {
                 $acciones[$credito->id] = [
-                    'label' => 'Identificar',
+                    // Una cuenta compartida ofrece también lo de otras cajas.
+                    'label' => 'Identificar como multa',
                     'href' => route('multas.creditos.identificar', $credito, absolute: false),
                     'note' => null,
                 ];

@@ -65,6 +65,11 @@ final class HaberesCashBoxModule implements CashBoxModule
         return null;
     }
 
+    public function bankIncomePrecedesReceipt(): bool
+    {
+        return false;
+    }
+
     /** Ninguno: la cuenta es solo de Haberes y su saldo lo dice el banco. */
     public function bankLedgerLabel(): ?string
     {

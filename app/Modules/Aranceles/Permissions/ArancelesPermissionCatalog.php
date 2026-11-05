@@ -38,7 +38,7 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'aranceles.cobrar',
                 'Cobrar aranceles',
-                'Cobrar aranceles en efectivo y emitir su recibo.',
+                'Cobrar aranceles en efectivo y emitir su recibo, y registrar los que se van a pagar por depósito.',
                 'aranceles',
                 ['administrador', 'administrativo'],
             ),
@@ -46,7 +46,7 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'aranceles.modificar-importe',
                 'Modificar el importe de un arancel',
-                'Cobrar de más o de menos que lo calculado, con su motivo.',
+                'Cobrar de más o de menos que lo calculado, o ajustar un cobro pendiente, con su motivo.',
                 'aranceles',
                 ['administrador', 'administrativo'],
                 sensitive: true,
@@ -54,7 +54,7 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'aranceles.anular',
                 'Anular cobros de aranceles',
-                'Anular un cobro en efectivo cuyo dinero nunca entró. El recibo queda anulado con su número.',
+                'Anular un cobro cuyo dinero nunca entró, o un pendiente que no sigue. El recibo queda anulado con su número, y un crédito identificado vuelve a quedar libre.',
                 'aranceles',
                 ['administrador', 'contador'],
                 sensitive: true,
@@ -103,7 +103,7 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'aranceles.verificar-pagos',
                 'Verificar depósitos de Aranceles',
-                'Acreditar un depósito contra el extracto.',
+                'Identificar créditos del extracto como pagos de aranceles y acreditar un depósito de la caja.',
                 'aranceles',
                 ['administrador', 'contador'],
                 sensitive: true,

@@ -18,14 +18,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Anula un cobro en efectivo cuyo dinero nunca entró (regla A70), solo mientras
- * siga en la caja: lo depositado sí entró.
+ * Anula un cobro cuyo dinero nunca entró (regla A70), solo mientras el efectivo
+ * siga en la caja: lo depositado sí entró. También un cobro por el banco, con su
+ * recibo o pendiente (A71): el crédito vuelve a quedar libre en el extracto.
  *
  * Revierte la aplicación y la recepción con fecha de hoy. El recibo queda anulado
  * con su número, que no se reutiliza, y el cobro queda a la vista con su motivo.
  *
- * Toma los bloqueos en orden —cobro y recepciones—, como un depósito: si los dos
- * llegan juntos, el segundo espera y encuentra lo que hizo el primero.
+ * Toma los bloqueos en orden —cobro, créditos y recepciones—, como un depósito o
+ * una identificación: si dos llegan juntos, el segundo espera y encuentra lo que
+ * hizo el primero.
  */
 final class VoidFeeCollection
 {
@@ -45,8 +47,8 @@ final class VoidFeeCollection
                 return $cobro;
             }
 
-            if ($cobro->status !== FeeChargeStatus::Paid || $cobro->medium !== FeeChargeMedium::Cash) {
-                throw ValidationException::withMessages(['reason' => 'Se anula un cobro en efectivo con su recibo.']);
+            if ($cobro->medium === FeeChargeMedium::Bank) {
+                $this->fondos->lockCreditsOf($cobro);
             }
 
             $recepciones = FundReceipt::query()

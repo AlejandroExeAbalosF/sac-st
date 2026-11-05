@@ -88,7 +88,7 @@ class CreditosYMovimientosDeMultasTest extends TestCase
         $this->actingAs($this->operador('contador'))
             ->get(route('banco.movimientos.index', ['cuenta' => $this->laCuenta->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where("creditActions.{$libre->id}.label", 'Identificar')
+                ->where("creditActions.{$libre->id}.0.label", 'Identificar como multa')
                 ->missing("creditActions.{$acreditacion->id}"));
 
         // Quien no concilia ve la lista sin la acción, y la pantalla le da 403.

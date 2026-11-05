@@ -88,8 +88,8 @@ export default function FeeLineEditor({
     const error = (campo: string) => errors[`items.${index}.${campo}`];
 
     return (
-        <div className="grid gap-3 rounded-lg border bg-card p-3">
-            <div className="grid gap-1.5">
+        <div className="grid grid-cols-1 gap-3 rounded-lg border bg-card p-3">
+            <div className="grid grid-cols-1 gap-1.5">
                 <div className="flex items-center justify-between gap-2">
                     <Label htmlFor={`linea-${linea.key}-tipo`}>
                         Arancel {index + 1}
