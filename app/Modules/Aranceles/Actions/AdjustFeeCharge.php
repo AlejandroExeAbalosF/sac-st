@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Actions;
 
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
-use App\Modules\Aranceles\Enums\FeeReasonCode;
 use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeBalance;
 use App\Modules\Aranceles\Models\FeeChargeItem;
@@ -70,10 +69,6 @@ final class AdjustFeeCharge
 
                 if (Decimal::isNegative($nuevo) || Decimal::equals($nuevo, '0')) {
                     throw ValidationException::withMessages(['lines' => 'El importe tiene que ser mayor que cero.']);
-                }
-
-                if ($motivo->code === FeeReasonCode::Rounding && bccomp(Decimal::abs(Decimal::sub($nuevo, $vigente)), '1', 2) >= 0) {
-                    throw ValidationException::withMessages(['reasonCode' => 'El redondeo es solo para diferencias menores de $ 1.']);
                 }
 
                 FeeChargeItemAdjustment::query()->create([

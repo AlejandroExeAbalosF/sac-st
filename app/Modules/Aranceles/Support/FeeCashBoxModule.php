@@ -43,14 +43,14 @@ final class FeeCashBoxModule implements CashBoxModule
     }
 
     /**
-     * Las tasas son chicas —$ 85, $ 120, $ 3 el folio—: sin billetes y monedas
-     * menores a $ 50 el cajón no se podría contar. Cuáles circulan en la caja
-     * **no está relevado** y queda a confirmar con el área. Un importe con
-     * centavos, como el del 0,07 %, queda como diferencia explicada.
+     * Los billetes de las demás cajas: no circula nada menor de $ 50 (decisión del
+     * usuario, 05/11/2026; **sin relevar con el área**). Lo que no se pueda pagar justo
+     * se redondea al cobrar, con su motivo. Un importe sin redondear, como el del
+     * 0,07 %, queda como diferencia explicada.
      */
     public function countDenominations(Currency $currency): array
     {
-        return [...CashCountLine::suggestedDenominations($currency), 20, 10, 5, 2, 1];
+        return CashCountLine::suggestedDenominations($currency);
     }
 
     public function chequesInCustody(PeriodClosing $closing): array

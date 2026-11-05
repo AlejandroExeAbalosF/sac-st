@@ -23,7 +23,7 @@ enum FeeReasonAct: string implements ReasonAct
     public function codes(): array
     {
         return match ($this) {
-            self::AmountChange => [FeeReasonCode::Rounding, FeeReasonCode::LessAccepted, FeeReasonCode::MoreAccepted, FeeReasonCode::Exception, FeeReasonCode::Other],
+            self::AmountChange => [FeeReasonCode::Rounding, FeeReasonCode::Exception, FeeReasonCode::Other],
             self::CollectionVoid => [FeeReasonCode::DataEntryError, FeeReasonCode::Duplicate, FeeReasonCode::Other],
             self::ReceiptReplacement => [FeeReasonCode::WrongPayer, FeeReasonCode::WrongCuit, FeeReasonCode::WrongWording, FeeReasonCode::Other],
             self::ChargeCorrection => [FeeReasonCode::WrongType, FeeReasonCode::WrongQuantity, FeeReasonCode::WrongAmount, FeeReasonCode::Other],

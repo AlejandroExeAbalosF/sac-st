@@ -16,8 +16,6 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 enum FeeReasonCode: string implements ReasonCode
 {
     case Rounding = 'rounding';
-    case LessAccepted = 'less_accepted';
-    case MoreAccepted = 'more_accepted';
     case Exception = 'exception';
     case DataEntryError = 'data_entry_error';
     case Duplicate = 'duplicate';
@@ -32,9 +30,7 @@ enum FeeReasonCode: string implements ReasonCode
     public function label(): string
     {
         return match ($this) {
-            self::Rounding => 'Redondeo (menos de $ 1)',
-            self::LessAccepted => 'Se acepta un pago menor',
-            self::MoreAccepted => 'Se acepta un pago mayor',
+            self::Rounding => 'Redondeo',
             self::Exception => 'Excepción autorizada',
             self::DataEntryError => 'Error de carga',
             self::Duplicate => 'Cargado dos veces',

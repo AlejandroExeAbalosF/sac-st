@@ -355,13 +355,13 @@ class MovimientosDeArancelesTest extends TestCase
     {
         $this->cobrar();
         app(CollectFeeInCash::class)->handle(
-            'Con diferencia', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '100', 'reasonCode' => 'less_accepted']],
+            'Con diferencia', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '100', 'reasonCode' => 'rounding']],
             'difiere', $this->admin->id, null, null, null, true,
         );
         $cobro = $this->pendiente();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
         $this->identificar($cobro, '110');
-        app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '110', 'previous' => '120.00']], new Reason(FeeReasonCode::LessAccepted, null), null, $this->admin->id);
+        app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '110', 'previous' => '120.00']], new Reason(FeeReasonCode::Rounding, null), null, $this->admin->id);
         app(CollectFeeInCash::class)->handle(
             'De más', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '150', 'reasonCode' => 'exception', 'reason' => 'Autorizó la dirección']],
             'de-mas', $this->admin->id, null, null, null, true,
@@ -375,8 +375,8 @@ class MovimientosDeArancelesTest extends TestCase
 
         $porMotivo = collect($this->movimientos()->byReason($this->mes))->keyBy('reason');
 
-        $this->assertSame('-30.00', $porMotivo['Se acepta un pago menor']['total']);
-        $this->assertSame(2, $porMotivo['Se acepta un pago menor']['count']);
+        $this->assertSame('-30.00', $porMotivo['Redondeo']['total']);
+        $this->assertSame(2, $porMotivo['Redondeo']['count']);
         $this->assertSame('30.00', $porMotivo['Excepción autorizada']['total']);
     }
 
@@ -385,34 +385,34 @@ class MovimientosDeArancelesTest extends TestCase
     {
         $cobro = $this->pendiente();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
-        $ajustar = fn (string $de, string $a, FeeReasonCode $motivo) => app(AdjustFeeCharge::class)->handle(
-            $cobro, [$renglon->id => ['amount' => $a, 'previous' => $de]], new Reason($motivo, null), null, $this->admin->id,
+        $ajustar = fn (string $de, string $a, Reason $motivo) => app(AdjustFeeCharge::class)->handle(
+            $cobro, [$renglon->id => ['amount' => $a, 'previous' => $de]], $motivo, null, $this->admin->id,
         );
-        $ajustar('120.00', '100', FeeReasonCode::LessAccepted);
-        $ajustar('100.00', '99.50', FeeReasonCode::Rounding);
-        $this->identificar($cobro, '99.50');
+        $ajustar('120.00', '100', new Reason(FeeReasonCode::Rounding, null));
+        $ajustar('100.00', '90', new Reason(FeeReasonCode::Exception, 'Autorizó la dirección'));
+        $this->identificar($cobro, '90');
 
         $porMotivo = collect($this->movimientos()->byReason($this->mes))->keyBy('reason');
         $seccion = $this->seccion('diferencias');
 
-        $this->assertSame('-20.00', $porMotivo['Se acepta un pago menor']['total']);
-        $this->assertSame('-0.50', $porMotivo['Redondeo (menos de $ 1)']['total']);
-        $this->assertSame('-20.50', $seccion['total']);
+        $this->assertSame('-20.00', $porMotivo['Redondeo']['total']);
+        $this->assertSame('-10.00', $porMotivo['Excepción autorizada']['total']);
+        $this->assertSame('-30.00', $seccion['total']);
         $this->assertSame(1, $seccion['count']);
-        $this->assertStringContainsString('Se acepta un pago menor: −$ 20,00', $seccion['rows'][0]['detail']);
-        $this->assertStringContainsString('Redondeo', $seccion['rows'][0]['detail']);
+        $this->assertStringContainsString('Redondeo: −$ 20,00', $seccion['rows'][0]['detail']);
+        $this->assertStringContainsString('Autorizó la dirección', $seccion['rows'][0]['detail']);
     }
 
     /** También el cambio al cobrar y el ajuste posterior; y lo que suman da la sección. */
     public function test_the_totals_by_reason_add_up_to_the_section(): void
     {
         $cobro = app(CreateFeeCharge::class)->handle(
-            'Con cambio', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '110', 'reasonCode' => 'less_accepted']],
+            'Con cambio', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '110', 'reasonCode' => 'rounding']],
             'con-cambio', $this->admin->id, true,
         );
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
         app(AdjustFeeCharge::class)->handle(
-            $cobro, [$renglon->id => ['amount' => '115', 'previous' => '110.00']], new Reason(FeeReasonCode::MoreAccepted, null), null, $this->admin->id,
+            $cobro, [$renglon->id => ['amount' => '115', 'previous' => '110.00']], new Reason(FeeReasonCode::Other, 'Se recalculó'), null, $this->admin->id,
         );
         $this->identificar($cobro, '115');
 
@@ -429,18 +429,20 @@ class MovimientosDeArancelesTest extends TestCase
     {
         $cobro = $this->pendiente();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
-        $ajustar = fn (string $de, string $a, FeeReasonCode $motivo) => app(AdjustFeeCharge::class)->handle(
-            $cobro, [$renglon->id => ['amount' => $a, 'previous' => $de]], new Reason($motivo, null), null, $this->admin->id,
+        $ajustar = fn (string $de, string $a) => app(AdjustFeeCharge::class)->handle(
+            $cobro, [$renglon->id => ['amount' => $a, 'previous' => $de]], new Reason(FeeReasonCode::Rounding, null), null, $this->admin->id,
         );
-        $ajustar('120.00', '100', FeeReasonCode::LessAccepted);
-        $ajustar('100.00', '120', FeeReasonCode::MoreAccepted);
+        $ajustar('120.00', '100');
+        $ajustar('100.00', '120');
         $this->identificar($cobro, '120');
 
         $seccion = $this->seccion('diferencias');
+        $porMotivo = $this->movimientos()->byReason($this->mes);
 
         $this->assertSame(1, $seccion['count']);
         $this->assertSame('0.00', $seccion['total']);
-        $this->assertCount(2, $this->movimientos()->byReason($this->mes));
+        $this->assertSame(2, $porMotivo[0]['count']);
+        $this->assertSame('0.00', $porMotivo[0]['total']);
     }
 
     // ── Pantalla y Excel ──────────────────────────────────────────────────

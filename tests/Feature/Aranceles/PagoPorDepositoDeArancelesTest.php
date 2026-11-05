@@ -161,7 +161,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->fail('La base tenía que rechazar la escritura: '.$mensaje);
     }
 
-    private function motivo(FeeReasonCode $codigo = FeeReasonCode::LessAccepted): Reason
+    private function motivo(FeeReasonCode $codigo = FeeReasonCode::Rounding): Reason
     {
         return new Reason($codigo, null);
     }
@@ -373,7 +373,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $cobro = $this->pendiente();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
 
-        $ajustado = app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '150', 'previous' => '120.00']], $this->motivo(FeeReasonCode::MoreAccepted), null, $this->admin->id);
+        $ajustado = app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '150', 'previous' => '120.00']], $this->motivo(FeeReasonCode::Rounding), null, $this->admin->id);
 
         $this->assertSame(FeeChargeStatus::Pending, $ajustado->status);
         $this->identificar($cobro, $this->credito('150'));
@@ -389,12 +389,30 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->assertRechazaEn('lines', fn () => app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '90', 'previous' => '120.00']], $this->motivo(), null, $this->admin->id), 'Ya hay');
     }
 
-    public function test_rounding_is_only_for_small_differences(): void
+    /** A26: el redondeo no tiene tope; si fue de más o de menos sale de lo calculado. */
+    public function test_rounding_has_no_limit(): void
     {
         $cobro = $this->pendiente();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
 
-        $this->assertRechazaEn('reasonCode', fn () => app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '100', 'previous' => '120.00']], $this->motivo(FeeReasonCode::Rounding), null, $this->admin->id), 'redondeo');
+        app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '50', 'previous' => '120.00']], $this->motivo(FeeReasonCode::Rounding), null, $this->admin->id);
+
+        $this->assertDatabaseHas('fee_charge_item_adjustments', ['fee_charge_item_id' => $renglon->id, 'new_amount' => '50.00', 'change_reason_code' => 'rounding']);
+    }
+
+    /** Los motivos que se quitaron no entran ni por la pantalla ni por la base. */
+    public function test_a_removed_reason_is_refused(): void
+    {
+        $cobro = $this->pendiente();
+        $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
+
+        $this->actingAs($this->admin)->post(route('aranceles.pendientes.ajustar', $cobro), [
+            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+        ])->assertSessionHasErrors('reasonCode');
+
+        $this->assertLaBaseRechaza(fn () => DB::table('fee_charge_item_adjustments')->insert([
+            'fee_charge_item_id' => $renglon->id, 'previous_amount' => '120', 'new_amount' => '100', 'change_reason_code' => 'more_accepted',
+        ]), 'fee_charge_item_adjustments_change_reason_code_check');
     }
 
     /** A63: en el Action y en la base. */
@@ -407,7 +425,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->assertRechazaEn('lines', fn () => app(AdjustFeeCharge::class)->handle($cobro, [$renglon->id => ['amount' => '100', 'previous' => '120.00']], $this->motivo(), null, $this->admin->id), 'se corrige');
 
         $this->assertLaBaseRechaza(fn () => DB::table('fee_charge_item_adjustments')->insert([
-            'fee_charge_item_id' => $renglon->id, 'previous_amount' => '120', 'new_amount' => '100', 'change_reason_code' => 'less_accepted',
+            'fee_charge_item_id' => $renglon->id, 'previous_amount' => '120', 'new_amount' => '100', 'change_reason_code' => 'rounding',
         ]), 'Solo se ajusta un cobro pendiente');
     }
 
@@ -418,7 +436,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
 
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.ajustar', $cobro), [
-            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertRedirect(route('aranceles.pendientes.index'));
 
         $this->actingAs($this->admin)->get(route('aranceles.pendientes.index'))
@@ -440,19 +458,19 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $url = route('aranceles.pendientes.ajustar', $cobro);
 
         $this->actingAs($this->admin)->post($url, [
-            'lines' => [['itemId' => $primero, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $primero, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertSessionHasNoErrors();
 
         // Quien abrió antes ve $ 120 en el primero, edita el segundo: no lo toca.
         $this->actingAs($this->admin)->post($url, [
-            'lines' => [['itemId' => $segundo, 'amount' => '110', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $segundo, 'amount' => '110', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(['100.00', '110.00'], DB::table('fee_charge_item_amounts')->where('fee_charge_id', $cobro->id)->orderBy('fee_charge_item_id')->pluck('amount')->all());
 
         // Y si quiere cambiar el que otro ya cambió, se le avisa.
         $this->actingAs($this->admin)->post($url, [
-            'lines' => [['itemId' => $primero, 'amount' => '90', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $primero, 'amount' => '90', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertSessionHasErrors('lines');
 
         $this->assertSame('100.00', DB::table('fee_charge_item_amounts')->where('fee_charge_item_id', $primero)->value('amount'));
@@ -725,7 +743,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
 
         $this->assertLaBaseRechaza(function () use ($cobro, $renglon): void {
             DB::table('fee_charge_item_adjustments')->insert([
-                'fee_charge_item_id' => $renglon->id, 'previous_amount' => '120', 'new_amount' => '100', 'change_reason_code' => 'less_accepted',
+                'fee_charge_item_id' => $renglon->id, 'previous_amount' => '120', 'new_amount' => '100', 'change_reason_code' => 'rounding',
             ]);
             $cobro->forceFill(['status' => FeeChargeStatus::Paid, 'paid_on' => BusinessDate::today()])->save();
         }, 'Un cobro pagado');
@@ -827,7 +845,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
 
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.ajustar', $cobro), [
-            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertRedirect();
 
         $this->assertSame(FeeChargeStatus::Paid, $cobro->refresh()->status);
@@ -850,14 +868,14 @@ class PagoPorDepositoDeArancelesTest extends TestCase
             'payerName' => 'AG', 'items' => [['feeTypeId' => $this->homologacion(), 'quantity' => 1]], 'idempotencyKey' => 'y',
         ])->assertForbidden();
         $this->actingAs($contador)->post(route('aranceles.pendientes.ajustar', $cobro), [
-            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'less_accepted',
+            'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
         ])->assertForbidden();
     }
 
     public function test_a_price_change_without_permission_is_rejected_when_pending(): void
     {
         $this->assertRechazaEn('items.0.amount', fn () => app(CreateFeeCharge::class)->handle(
-            'AG', null, [['feeTypeId' => $this->homologacion(), 'quantity' => 1, 'amount' => '100', 'reasonCode' => 'less_accepted']],
+            'AG', null, [['feeTypeId' => $this->homologacion(), 'quantity' => 1, 'amount' => '100', 'reasonCode' => 'rounding']],
             'sin-permiso', $this->admin->id, false,
         ), 'No tenés permiso');
     }

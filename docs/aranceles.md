@@ -58,9 +58,10 @@ Son las pantallas de caja de siempre, con la caja de Aranceles y permisos propio
   sobre el mismo evento de apertura, sin asiento nuevo: no es recaudación ni respalda un
   cobro, y es lo que permite depositarlo.
 - **Serie:** los recibos numeran con `0110`, configurable en Numeración.
-- **Arqueo:** además de los billetes de las otras cajas ofrece 20, 10, 5, 2 y 1, porque las tasas
-  son chicas. Qué denominaciones circulan **no está relevado**. Un importe con centavos no se
-  puede contar y queda como diferencia explicada, hasta que el área diga cómo se rinde.
+- **Arqueo:** ofrece los mismos billetes que las otras cajas, hasta $ 50, porque no circula nada
+  menor (decisión del usuario, **sin relevar con el área**). Lo que no se pueda pagar justo se
+  redondea al cobrar. Un importe sin redondear no se puede contar y queda como diferencia
+  explicada, hasta que el área diga cómo se rinde.
 - **Cierre y planilla:** sin columnas de cheques ni inventario. **Base:**
   `closing_evidence_matches_version` admite la lista vacía solo si la evidencia no trae cheques.
 
@@ -76,10 +77,13 @@ una sola transacción.
   según la fecha: la pantalla solo muestra un anticipo. Cantidad por precio, o el porcentaje
   sobre un monto, redondeado una vez, al final, al centavo más cercano (**sin confirmar**).
 - **Importe distinto del calculado:** con `aranceles.modificar-importe`, en cualquier renglón.
-  Pide un motivo de la lista: Redondeo (solo menos de $ 1), Se acepta un pago menor, Se acepta
-  un pago mayor, Excepción autorizada u Otro. Los dos últimos piden detalle. Si el cálculo da
-  $ 0,00, hay que escribir el importe. **Base:** `fee_charge_items_change_has_reason`,
-  `fee_charge_items_rounding_is_small`, `fee_charge_items_reason_detail`.
+  Pide un motivo de la lista: Redondeo, Excepción autorizada u Otro. Los dos últimos piden detalle.
+  Si fue de más o de menos no se elige: sale de comparar con lo calculado, y el informe del mes lo
+  muestra. El redondeo no tiene tope ni pide detalle, porque no circulan billetes menores de $ 50
+  (decisión del usuario, **sin relevar con el área**): la base no distingue un redondeo real de una
+  rebaja, y el control es el informe de importes distintos de lo calculado. Si el cálculo da $ 0,00,
+  hay que escribir el importe. **Base:** `fee_charge_items_change_has_reason`,
+  `fee_charge_items_change_reason_code_check`, `fee_charge_items_reason_detail`.
 - **Fecha:** hoy. Un cobro de un día anterior se carga con el número de talonario de la hoja
   que se entregó ese día, y usa el precio de ese día. **Base:** `fee_charge_item_coherent`
   exige el precio vigente en la fecha de tarifa.

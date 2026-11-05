@@ -585,15 +585,14 @@ class CobroDeArancelesTest extends TestCase
 
         $this->assertRechazaEn('items.0.amount', fn () => $this->cobrar([$this->linea(14, ['amount' => '100'])], puede: false), 'permiso');
         $this->assertRechazaEn('items.0.reasonCode', fn () => $this->cobrar([$this->linea(14, ['amount' => '100'])]));
-        $this->assertRechazaEn('items.0.reasonCode', fn () => $this->cobrar([$this->linea(14, ['amount' => '100', 'reasonCode' => 'rounding'])]), 'menores de $ 1');
         $this->assertRechazaEn('items.0.reason', fn () => $this->cobrar([$this->linea(14, ['amount' => '100', 'reasonCode' => 'exception'])]));
 
-        $cobro = $this->cobrar([$this->linea(14, ['amount' => '100', 'reasonCode' => 'less_accepted'])]);
+        $cobro = $this->cobrar([$this->linea(14, ['amount' => '100', 'reasonCode' => 'rounding'])]);
         $item = $cobro->items()->firstOrFail();
 
         $this->assertSame('120.00', $item->calculated_amount);
         $this->assertSame('100.00', $item->original_amount);
-        $this->assertSame('less_accepted', $item->change_reason_code);
+        $this->assertSame('rounding', $item->change_reason_code);
         $this->assertSame('100.00', $this->efectivo());
     }
 
@@ -819,7 +818,7 @@ class CobroDeArancelesTest extends TestCase
     {
         $this->abrir();
         // Se recibieron $ 220 y se cargaron $ 250.
-        $cobro = $this->cobrar([$this->linea(14, ['amount' => '250', 'reasonCode' => 'more_accepted'])]);
+        $cobro = $this->cobrar([$this->linea(14, ['amount' => '250', 'reasonCode' => 'rounding'])]);
         $this->assertSame('250.00', $this->efectivo());
 
         $nuevo = app(CorrectFeeCharge::class)->handle(
@@ -978,7 +977,7 @@ class CobroDeArancelesTest extends TestCase
         $base = collect($item->getAttributes())->except('id')->all();
 
         $this->assertLaBaseRechaza(fn () => DB::table('fee_charge_items')->insert([...$base, 'line_number' => 2, 'original_amount' => '100']), 'fee_charge_items_change_has_reason');
-        $this->assertLaBaseRechaza(fn () => DB::table('fee_charge_items')->insert([...$base, 'line_number' => 3, 'original_amount' => '100', 'change_reason_code' => 'rounding']), 'fee_charge_items_rounding_is_small');
+        $this->assertLaBaseRechaza(fn () => DB::table('fee_charge_items')->insert([...$base, 'line_number' => 3, 'original_amount' => '100', 'change_reason_code' => 'less_accepted']), 'fee_charge_items_change_reason_code_check');
     }
 
     public function test_a_line_must_use_the_price_in_force(): void
@@ -1083,13 +1082,13 @@ class CobroDeArancelesTest extends TestCase
         $this->assertSame([1.0, 20.0, 20.0], array_map(floatval(...), array_slice($fila, 0, 3)));
     }
 
-    /** Las tasas chicas se pueden contar, sin sumarle filas a las otras cajas. */
-    public function test_the_count_offers_what_small_fees_need_only_in_this_box(): void
+    /** No circula nada menor de $ 50: el arqueo ofrece lo mismo que las otras cajas. */
+    public function test_the_count_offers_no_bill_under_fifty(): void
     {
         $this->abrir();
 
         $this->actingAs($this->admin)->get(route('aranceles.caja.dia'))->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->contains(1) && collect($d)->contains(20)));
+            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->min() === 50));
 
         $this->actingAs($this->admin)->get(route('caja.dia'))->assertOk()
             ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->min() === 50));
@@ -1137,7 +1136,7 @@ class CobroDeArancelesTest extends TestCase
     {
         $this->abrir();
         $ayer = BusinessDate::today()->subDay();
-        $cobro = $this->cobrar([$this->linea(14, ['amount' => '250', 'reasonCode' => 'more_accepted'])], $ayer, 'T-1');
+        $cobro = $this->cobrar([$this->linea(14, ['amount' => '250', 'reasonCode' => 'rounding'])], $ayer, 'T-1');
 
         app(CorrectFeeCharge::class)->handle($cobro, 'AG Max SRL', null, [$this->linea(14), $this->linea(25, ['quantity' => 2])], $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true);
 
@@ -1162,7 +1161,7 @@ class CobroDeArancelesTest extends TestCase
         $this->abrir();
         $ayer = BusinessDate::today()->subDay();
         $cobro = $this->cobrar(null, $ayer, 'T-1');
-        $mismoImporte = [$this->linea(14), $this->linea(25, ['amount' => '100', 'reasonCode' => 'more_accepted'])];
+        $mismoImporte = [$this->linea(14), $this->linea(25, ['amount' => '100', 'reasonCode' => 'rounding'])];
 
         $segundo = app(CorrectFeeCharge::class)->handle($cobro, 'AG Max SRL', null, $mismoImporte, $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true);
         $numeroSegundo = $this->numeroVigente($segundo->id);

@@ -104,7 +104,7 @@ final class FeeLineCalculator
                 throw ValidationException::withMessages(["{$campo}.amount" => 'No tenés permiso para cobrar un importe distinto del calculado.']);
             }
 
-            [$codigo, $detalle] = $this->motivo($linea, $campo, $importe, $calculado);
+            [$codigo, $detalle] = $this->motivo($linea, $campo);
         }
 
         return [
@@ -132,19 +132,15 @@ final class FeeLineCalculator
      *
      * @throws ValidationException
      */
-    private function motivo(array $linea, string $campo, string $importe, string $calculado): array
+    private function motivo(array $linea, string $campo): array
     {
         $codigo = FeeReasonCode::tryFrom((string) ($linea['reasonCode'] ?? ''));
 
-        if ($codigo === null || ! in_array($codigo, [FeeReasonCode::Rounding, FeeReasonCode::LessAccepted, FeeReasonCode::MoreAccepted, FeeReasonCode::Exception, FeeReasonCode::Other], true)) {
+        if ($codigo === null || ! in_array($codigo, [FeeReasonCode::Rounding, FeeReasonCode::Exception, FeeReasonCode::Other], true)) {
             throw ValidationException::withMessages(["{$campo}.reasonCode" => 'El importe es distinto del calculado: elegí el motivo.']);
         }
 
         $detalle = trim((string) ($linea['reason'] ?? ''));
-
-        if ($codigo === FeeReasonCode::Rounding && bccomp(Decimal::abs(Decimal::sub($importe, $calculado)), '1', 2) >= 0) {
-            throw ValidationException::withMessages(["{$campo}.reasonCode" => 'El redondeo es solo para diferencias menores de $ 1.']);
-        }
 
         if (in_array($codigo, [FeeReasonCode::Exception, FeeReasonCode::Other], true) && $detalle === '') {
             throw ValidationException::withMessages(["{$campo}.reason" => 'Con este motivo, contá el detalle.']);

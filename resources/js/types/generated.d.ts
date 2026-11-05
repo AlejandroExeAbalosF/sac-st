@@ -107,8 +107,6 @@ declare namespace App {
                     | 'charge_correction';
                 export type FeeReasonCode =
                     | 'rounding'
-                    | 'less_accepted'
-                    | 'more_accepted'
                     | 'exception'
                     | 'data_entry_error'
                     | 'duplicate'
