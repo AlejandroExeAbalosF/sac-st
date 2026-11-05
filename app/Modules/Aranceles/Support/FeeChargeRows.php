@@ -17,6 +17,9 @@ use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\Attachment;
 use App\Support\Money\Decimal;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
 
 /** Un cobro como lo muestran las pantallas: el listado, los pendientes y su corrección. */
@@ -26,17 +29,74 @@ final class FeeChargeRows
 
     public function row(FeeCharge $cobro): FeeChargeListItemData
     {
-        $vigente = $cobro->chargeReceipts->first(fn (FeeChargeReceipt $c): bool => $c->receipt->status === ReceiptStatus::Issued);
-        $ultimo = $vigente ?? $cobro->chargeReceipts->first();
-        $papel = $ultimo?->snapshot;
-        $importes = DB::table('fee_charge_item_amounts')->where('fee_charge_id', $cobro->id)->pluck('amount', 'fee_charge_item_id');
+        return $this->rows(new Collection([$cobro]))[$cobro->id];
+    }
 
+    /**
+     * Una página del listado: las filas se arman juntas, no de a una.
+     *
+     * @param  LengthAwarePaginator<int, FeeCharge>  $pagina
+     * @return LengthAwarePaginator<int, FeeChargeListItemData>
+     */
+    public function page(LengthAwarePaginator $pagina): LengthAwarePaginator
+    {
+        $filas = $this->rows(new Collection($pagina->items()));
+
+        return $pagina->through(fn (FeeCharge $cobro): FeeChargeListItemData => $filas[$cobro->id]);
+    }
+
+    /**
+     * Las filas de varios cobros, por el id de cada uno, con una consulta por
+     * dato y no una por cobro. Los cobros llegan con `items`, `balance` y
+     * `chargeReceipts.receipt` cargados.
+     *
+     * @param  Collection<int, FeeCharge>  $cobros
+     * @return array<int, FeeChargeListItemData>
+     */
+    public function rows(Collection $cobros): array
+    {
+        $ids = $cobros->modelKeys();
+        $importes = DB::table('fee_charge_item_amounts')->whereIn('fee_charge_id', $ids)->pluck('amount', 'fee_charge_item_id');
         $vinculos = FeeChargeFunding::query()
-            ->where('fee_charge_id', $cobro->id)
+            ->whereIn('fee_charge_id', $ids)
             ->whereNull('released_at')
             ->with('fundReceipt')
             ->orderBy('id')
             ->get();
+        $depositadas = $this->fondos->depositedAmong(array_values($vinculos->pluck('fund_receipt_id')->unique()->all()));
+        // Por todos los recibos del cobro: el reemplazo emite otro, sin talonario.
+        $fotos = Attachment::query()
+            ->where('subject_type', AttachmentSubject::Receipt)
+            ->whereIn('subject_id', $cobros->flatMap(fn (FeeCharge $c) => $c->chargeReceipts->pluck('receipt_id')))
+            ->where('document_type', 'talonario_photo')
+            ->orderBy('id')
+            ->pluck('id', 'subject_id');
+
+        $filas = [];
+
+        foreach ($cobros as $cobro) {
+            $filas[$cobro->id] = $this->build(
+                $cobro,
+                $importes,
+                $vinculos->where('fee_charge_id', $cobro->id)->values(),
+                $depositadas,
+                $cobro->chargeReceipts->map(fn (FeeChargeReceipt $c): ?int => $fotos[$c->receipt_id] ?? null)->filter()->first(),
+            );
+        }
+
+        return $filas;
+    }
+
+    /**
+     * @param  BaseCollection<array-key, mixed>  $importes
+     * @param  Collection<int, FeeChargeFunding>  $vinculos
+     * @param  list<int>  $depositadas
+     */
+    private function build(FeeCharge $cobro, BaseCollection $importes, Collection $vinculos, array $depositadas, ?int $foto): FeeChargeListItemData
+    {
+        $vigente = $cobro->chargeReceipts->first(fn (FeeChargeReceipt $c): bool => $c->receipt->status === ReceiptStatus::Issued);
+        $ultimo = $vigente ?? $cobro->chargeReceipts->first();
+        $papel = $ultimo?->snapshot;
         $total = Decimal::scale((string) $cobro->balance?->total);
         $vinculado = Decimal::scale((string) $cobro->balance?->funded);
 
@@ -72,13 +132,9 @@ final class FeeChargeRows
             receiptId: $ultimo?->receipt_id,
             receiptNumber: $ultimo?->receipt->formatted_number,
             talonarioNumber: $ultimo?->receipt->talonario_number,
-            talonarioPhotoId: Attachment::query()
-                ->where('subject_type', AttachmentSubject::Receipt)
-                ->whereIn('subject_id', $cobro->chargeReceipts->pluck('receipt_id'))
-                ->where('document_type', 'talonario_photo')
-                ->value('id'),
+            talonarioPhotoId: $foto,
             voidReason: $this->motivoDeAnulacion($cobro),
-            deposited: $vinculos->contains(fn (FeeChargeFunding $v): bool => $this->fondos->isDeposited($v->fund_receipt_id)),
+            deposited: $vinculos->contains(fn (FeeChargeFunding $v): bool => in_array($v->fund_receipt_id, $depositadas, true)),
         );
     }
 

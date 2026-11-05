@@ -53,7 +53,7 @@ final class FeeChargeController extends Controller
         $buscado = trim((string) $request->query('q', ''));
         $cobroId = $request->integer('cobro') ?: null;
 
-        $cobros = FeeCharge::query()
+        $cobros = $this->filas->page(FeeCharge::query()
             ->with(['items', 'balance', 'chargeReceipts.receipt'])
             ->when($cobroId !== null, fn (Builder $q) => $q->whereKey($cobroId))
             ->when($buscado !== '', function (Builder $q) use ($buscado): void {
@@ -68,8 +68,7 @@ final class FeeChargeController extends Controller
             })
             ->orderByDesc('id')
             ->paginate(25)
-            ->withQueryString()
-            ->through(fn (FeeCharge $cobro): FeeChargeListItemData => $this->filas->row($cobro));
+            ->withQueryString());
 
         return Inertia::render('aranceles/cobros', [
             'charges' => $cobros,
@@ -82,6 +81,7 @@ final class FeeChargeController extends Controller
                 'void' => $usuario?->can('aranceles.anular') ?? false,
                 'replace' => $usuario?->can('aranceles.reemplazar-recibos') ?? false,
                 'correct' => $usuario?->can('aranceles.corregir') ?? false,
+                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }

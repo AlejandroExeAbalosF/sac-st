@@ -313,6 +313,31 @@ class CobroEnCajaDeMultasTest extends TestCase
         Storage::disk('local')->assertDirectoryEmpty('/');
     }
 
+    public function test_a_damaged_talonario_photo_is_marked_on_its_field(): void
+    {
+        Storage::fake('local');
+        $multa = $this->escenario();
+
+        $imagen = imagecreatetruecolor(200, 200);
+        ob_start();
+        imagepng($imagen);
+        $png = (string) ob_get_clean();
+        $datos = (int) strpos($png, 'IDAT') + 8;
+        $ruta = (string) tempnam(sys_get_temp_dir(), 'png');
+        file_put_contents($ruta, substr($png, 0, $datos).str_repeat("\xAA", strlen($png) - $datos));
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.cobros.store', $multa), [
+                ...$this->cobro('1000.00'),
+                'talonarioNumber' => '18470',
+                'talonarioPhoto' => new UploadedFile($ruta, 'hoja.png', 'image/png', null, true),
+            ])
+            ->assertSessionHasErrors('talonarioPhoto');
+
+        expect(FinePayment::query()->count())->toBe(0)
+            ->and(Attachment::query()->count())->toBe(0);
+    }
+
     public function test_a_talonario_photo_requires_its_number(): void
     {
         Storage::fake('local');

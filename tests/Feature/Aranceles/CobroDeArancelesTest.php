@@ -402,6 +402,116 @@ class CobroDeArancelesTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
+    public function test_a_damaged_photo_is_marked_on_its_field_and_nothing_is_written(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $this->cobrarPorPantalla([
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => $this->pngDanado(),
+        ])->assertSessionHasErrors([
+            'talonarioPhoto' => 'El archivo no se puede abrir: está dañado o incompleto. Quitalo o elegí otro.',
+        ]);
+
+        $this->assertSame(0, FeeCharge::query()->count());
+        $this->assertSame(0, Attachment::query()->count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
+
+        // Otro archivo, con el mismo intento: el error no deja nada trabado.
+        $this->cobrarPorPantalla([
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => UploadedFile::fake()->image('otra.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(1, FeeCharge::query()->count());
+    }
+
+    /** Cabecera válida y datos rotos: `getimagesize()` lo acepta, decodificarlo no. */
+    private function pngDanado(): UploadedFile
+    {
+        $imagen = imagecreatetruecolor(200, 200);
+        ob_start();
+        imagepng($imagen);
+        $png = (string) ob_get_clean();
+        $datos = (int) strpos($png, 'IDAT') + 8;
+
+        $ruta = (string) tempnam(sys_get_temp_dir(), 'png');
+        file_put_contents($ruta, substr($png, 0, $datos).str_repeat("\xAA", strlen($png) - $datos));
+        $this->assertNotFalse(getimagesize($ruta));
+
+        return new UploadedFile($ruta, 'hoja.png', 'image/png', null, true);
+    }
+
+    public function test_the_attachment_links_are_offered_only_to_who_can_open_them(): void
+    {
+        $sinPermiso = $this->operador('consulta');
+        $sinPermiso->syncRoles([]);
+        $sinPermiso->givePermissionTo('aranceles.ver');
+
+        foreach (['aranceles.cobros.index', 'aranceles.depositos.index'] as $pantalla) {
+            $this->actingAs($sinPermiso)->get(route($pantalla))
+                ->assertInertia(fn (Assert $p) => $p->where('can.viewAttachments', false));
+            $this->actingAs($this->admin)->get(route($pantalla))
+                ->assertInertia(fn (Assert $p) => $p->where('can.viewAttachments', true));
+        }
+    }
+
+    public function test_the_list_does_not_query_per_charge(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $consultas = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))->assertOk();
+            $cuantas = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $cuantas;
+        };
+
+        // La primera petición además carga los permisos, que quedan en caché.
+        $consultas();
+
+        $this->cobrar([$this->linea(14)]);
+        $conUno = $consultas();
+
+        foreach (range(1, 5) as $_) {
+            $this->cobrar([$this->linea(14)]);
+        }
+
+        $this->assertSame($conUno, $consultas());
+    }
+
+    public function test_the_rows_keep_the_data_of_each_charge(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $this->cobrarPorPantalla([
+            'payerName' => 'Con foto',
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => UploadedFile::fake()->image('hoja.jpg'),
+            'items' => [$this->linea(14)],
+        ])->assertSessionHasNoErrors();
+        $this->cobrarPorPantalla(['payerName' => 'Sin foto', 'items' => [$this->linea(25, ['quantity' => 2])]])->assertSessionHasNoErrors();
+
+        $foto = Attachment::query()->sole()->id;
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))
+            ->assertInertia(fn (Assert $p) => $p
+                ->where('charges.data.0.payerName', 'Sin foto')
+                ->where('charges.data.0.total', '100.00')
+                ->where('charges.data.0.lines.0.amount', '100.00')
+                ->where('charges.data.0.talonarioPhotoId', null)
+                ->where('charges.data.1.payerName', 'Con foto')
+                ->where('charges.data.1.total', '120.00')
+                ->where('charges.data.1.lines.0.amount', '120.00')
+                ->where('charges.data.1.talonarioPhotoId', $foto));
+    }
+
     public function test_a_previous_day_needs_a_talonario_and_uses_that_days_price(): void
     {
         $this->abrir();

@@ -68,6 +68,7 @@ final class FeeDepositController extends Controller
                 'chooseDate' => $usuario?->can('aranceles.fechar-traspaso') ?? false,
                 'confirm' => $usuario?->can('aranceles.verificar-pagos') ?? false,
                 'cancel' => $usuario?->can('aranceles.cancelar-traspaso') ?? false,
+                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }

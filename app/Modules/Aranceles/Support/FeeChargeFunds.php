@@ -182,11 +182,25 @@ final class FeeChargeFunds
     /** Si algo de este efectivo viajó en un depósito que no se canceló. */
     public function isDeposited(int $recepcionId): bool
     {
-        return CashToBankTransfer::query()
+        return $this->depositedAmong([$recepcionId]) !== [];
+    }
+
+    /**
+     * De estas recepciones, las que viajaron en un depósito que no se canceló.
+     *
+     * @param  list<int>  $recepciones
+     * @return list<int>
+     */
+    public function depositedAmong(array $recepciones): array
+    {
+        return array_values(CashToBankTransfer::query()
             ->join('cash_to_bank_transfer_items AS item', 'item.cash_to_bank_transfer_id', '=', 'cash_to_bank_transfers.id')
-            ->where('item.fund_receipt_id', $recepcionId)
+            ->whereIn('item.fund_receipt_id', $recepciones)
             ->where('cash_to_bank_transfers.status', '<>', CashTransferStatus::Cancelled)
-            ->exists();
+            ->distinct()
+            ->pluck('item.fund_receipt_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
     }
 
     /** Si algo de este efectivo se acreditó en el banco. */

@@ -45,6 +45,7 @@ type Props = {
         void: boolean;
         replace: boolean;
         correct: boolean;
+        viewAttachments: boolean;
     };
 };
 
@@ -263,7 +264,7 @@ function FilaDeCobro({
                         Ver recibo
                     </Button>
                 )}
-                {cobro.talonarioPhotoId !== null && (
+                {can.viewAttachments && cobro.talonarioPhotoId !== null && (
                     <Button variant="ghost" size="sm" asChild>
                         <a
                             href={verAdjunto(cobro.talonarioPhotoId).url}

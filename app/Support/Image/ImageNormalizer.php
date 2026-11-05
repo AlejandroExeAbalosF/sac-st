@@ -43,6 +43,25 @@ final class ImageNormalizer
     private const NORMALIZABLE = ['image/jpeg', 'image/png', 'image/webp'];
 
     /**
+     * Si `normalize()` va a poder abrir este archivo.
+     *
+     * Un encabezado sano no alcanza: un PNG con los datos rotos lo pasa y
+     * recién falla al decodificarlo. Lo que no es una imagen no se abre acá.
+     * Quien llama controla antes el tope de píxeles.
+     */
+    public static function canDecode(UploadedFile $file): bool
+    {
+        if (! in_array($file->getMimeType(), self::NORMALIZABLE, true)) {
+            return true;
+        }
+
+        $path = $file->getRealPath();
+        $contents = $path === false || @getimagesize($path) === false ? false : file_get_contents($path);
+
+        return $contents !== false && @imagecreatefromstring($contents) !== false;
+    }
+
+    /**
      * La imagen normalizada, o el mismo archivo si no es una imagen.
      *
      * Cuando devuelve otro archivo, es un temporal: quien lo usa lo borra

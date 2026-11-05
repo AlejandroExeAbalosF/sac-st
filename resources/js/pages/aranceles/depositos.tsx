@@ -54,6 +54,7 @@ type Permisos = {
     chooseDate: boolean;
     confirm: boolean;
     cancel: boolean;
+    viewAttachments: boolean;
 };
 
 type Props = {
@@ -251,7 +252,8 @@ function FilaDeDeposito({
             {(deposito.ticketDate ||
                 deposito.creditedOn ||
                 deposito.notes ||
-                deposito.ticketAttachmentId !== null) && (
+                (can.viewAttachments &&
+                    deposito.ticketAttachmentId !== null)) && (
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {deposito.ticketDate && (
                         <span>
@@ -265,23 +267,31 @@ function FilaDeDeposito({
                     {deposito.creditedOn && (
                         <span>Acreditado el {date(deposito.creditedOn)}</span>
                     )}
-                    {deposito.ticketAttachmentId !== null && (
-                        <a
-                            href={
-                                deposito.ticketViewable
-                                    ? preview(deposito.ticketAttachmentId).url
-                                    : download(deposito.ticketAttachmentId).url
-                            }
-                            target={
-                                deposito.ticketViewable ? '_blank' : undefined
-                            }
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                        >
-                            <Paperclip className="size-3" aria-hidden="true" />
-                            Ver comprobante
-                        </a>
-                    )}
+                    {can.viewAttachments &&
+                        deposito.ticketAttachmentId !== null && (
+                            <a
+                                href={
+                                    deposito.ticketViewable
+                                        ? preview(deposito.ticketAttachmentId)
+                                              .url
+                                        : download(deposito.ticketAttachmentId)
+                                              .url
+                                }
+                                target={
+                                    deposito.ticketViewable
+                                        ? '_blank'
+                                        : undefined
+                                }
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                            >
+                                <Paperclip
+                                    className="size-3"
+                                    aria-hidden="true"
+                                />
+                                Ver comprobante
+                            </a>
+                        )}
                     {deposito.notes && <span>{deposito.notes}</span>}
                 </p>
             )}

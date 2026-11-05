@@ -35,7 +35,7 @@ final class ScannedDocument
             File::types(self::TYPES)
                 ->extensions(self::TYPES)
                 ->max(self::MAX_KILOBYTES),
-            self::pixelLimit(),
+            self::readableImage(),
         ];
     }
 
@@ -55,12 +55,14 @@ final class ScannedDocument
     }
 
     /**
-     * Rechaza la imagen que declara más píxeles de los que se pueden abrir.
+     * Rechaza la imagen que no se va a poder abrir al guardarla.
      *
-     * Lo lee del encabezado, sin decodificarla: justamente lo que se
-     * quiere evitar es abrirla.
+     * Primero los píxeles, leídos del encabezado sin decodificarla: una
+     * imagen demasiado grande justamente no hay que abrirla. Después, que se
+     * pueda decodificar: un archivo dañado se marca en su campo, y no como un
+     * error del servidor en medio de la operación.
      */
-    private static function pixelLimit(): Closure
+    private static function readableImage(): Closure
     {
         return static function (string $attribute, mixed $value, Closure $fail): void {
             if (! $value instanceof UploadedFile) {
@@ -72,6 +74,12 @@ final class ScannedDocument
 
             if ($size !== false && $size[0] * $size[1] > ImageNormalizer::MAX_PIXELS) {
                 $fail('La imagen tiene demasiada resolución. Sacá la foto de nuevo con la cámara en calidad normal.');
+
+                return;
+            }
+
+            if (! ImageNormalizer::canDecode($value)) {
+                $fail('El archivo no se puede abrir: está dañado o incompleto. Quitalo o elegí otro.');
             }
         };
     }

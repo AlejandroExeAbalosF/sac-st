@@ -86,8 +86,9 @@ una sola transacción.
 - **Foto del talonario:** al escribir el número aparece un campo para adjuntar, de manera
   opcional, una foto o PDF de la hoja. Se guarda como adjunto privado del recibo (`receipt` /
   `talonario_photo`) dentro del mismo acto; si el cobro vuelve atrás, el archivo se elimina. Se
-  abre desde la fila del cobro, también si después se reemplaza el recibo. **Action y validación
-  HTTP.**
+  abre desde la fila del cobro, también si después se reemplaza el recibo, para quien tiene
+  `adjuntos.ver`. Un archivo dañado se marca en el campo, sin escribir nada. **Action y
+  validación HTTP.**
 - **Revisar:** el servidor comprueba los datos y muestra el recibo tal como va a salir, sin
   escribir nada. El número es un anticipo.
 

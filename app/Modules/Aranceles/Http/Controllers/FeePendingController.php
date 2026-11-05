@@ -9,7 +9,6 @@ use App\Modules\Aranceles\Actions\AdjustFeeCharge;
 use App\Modules\Aranceles\Actions\CreateFeeCharge;
 use App\Modules\Aranceles\Actions\IdentifyFeeCredits;
 use App\Modules\Aranceles\Actions\RecordVerifiedFeeBankPayment;
-use App\Modules\Aranceles\Data\FeeChargeListItemData;
 use App\Modules\Aranceles\Data\FeeTypeData;
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
 use App\Modules\Aranceles\Enums\FeeReasonAct;
@@ -50,12 +49,11 @@ final class FeePendingController extends Controller
         $usuario = $request->user();
 
         return Inertia::render('aranceles/pendientes', [
-            'charges' => FeeCharge::query()
+            'charges' => $this->filas->page(FeeCharge::query()
                 ->where('status', FeeChargeStatus::Pending)
                 ->with(['items', 'balance', 'chargeReceipts.receipt'])
                 ->orderBy('id')
-                ->paginate(25)
-                ->through(fn (FeeCharge $cobro): FeeChargeListItemData => $this->filas->row($cobro)),
+                ->paginate(25)),
             'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),
             'can' => [
@@ -150,13 +148,11 @@ final class FeePendingController extends Controller
 
         return Inertia::render('aranceles/identificar-credito', [
             'credit' => $this->creditos->data($transaction),
-            'charges' => array_values(FeeCharge::query()
+            'charges' => array_values($this->filas->rows(FeeCharge::query()
                 ->where('status', FeeChargeStatus::Pending)
                 ->with(['items', 'balance', 'chargeReceipts.receipt'])
                 ->orderBy('id')
-                ->get()
-                ->map(fn (FeeCharge $cobro): FeeChargeListItemData => $this->filas->row($cobro))
-                ->all()),
+                ->get())),
             // El precio de un cobro sin ventanilla es el de la fecha del crédito.
             'feeTypes' => FeeType::query()
                 ->where('is_active', true)
