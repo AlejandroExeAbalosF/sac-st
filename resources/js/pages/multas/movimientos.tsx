@@ -15,8 +15,6 @@ type Fila = {
     caption: string;
     detail: string;
     amount: string;
-    /** Si suma al total de la sección: un depósito cancelado queda como antecedente. */
-    counted: boolean;
 };
 
 type Seccion = {
@@ -25,9 +23,6 @@ type Seccion = {
     dateLabel: string;
     count: number;
     total: string;
-    /** Lo que quedó fuera del total: hoy, los depósitos cancelados. */
-    excludedCount: number;
-    excludedTotal: string;
     rows: Fila[];
 };
 
@@ -113,24 +108,12 @@ export default function MovimientosDeMultas({
                                     Por {seccion.dateLabel.toLowerCase()}
                                 </p>
                             </div>
-                            <div className="flex flex-col items-end gap-0.5 text-sm">
-                                <div className="flex items-center gap-3">
-                                    <StatusBadge
-                                        label={String(seccion.count)}
-                                        tone="neutral"
-                                    />
-                                    <Money value={seccion.total} />
-                                </div>
-                                {seccion.excludedCount > 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {seccion.excludedCount === 1
-                                            ? '1 cancelado'
-                                            : `${seccion.excludedCount} cancelados`}{' '}
-                                        por{' '}
-                                        <Money value={seccion.excludedTotal} />{' '}
-                                        fuera del total
-                                    </p>
-                                )}
+                            <div className="flex items-center gap-3 text-sm">
+                                <StatusBadge
+                                    label={String(seccion.count)}
+                                    tone="neutral"
+                                />
+                                <Money value={seccion.total} />
                             </div>
                         </header>
 
@@ -162,14 +145,7 @@ export default function MovimientosDeMultas({
                                     </thead>
                                     <tbody className="divide-y">
                                         {seccion.rows.map((fila, i) => (
-                                            <tr
-                                                key={i}
-                                                className={
-                                                    fila.counted
-                                                        ? undefined
-                                                        : 'text-muted-foreground'
-                                                }
-                                            >
+                                            <tr key={i}>
                                                 <td className="px-4 py-1.5 whitespace-nowrap">
                                                     {date(fila.date)}
                                                 </td>

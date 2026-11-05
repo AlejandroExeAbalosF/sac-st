@@ -522,12 +522,13 @@ total general** (M10):
 
 Un cobro, su aplicación, su depósito y el reemplazo de su cheque son hechos
 distintos del mismo dinero: sumarlos lo contaría varias veces. El depósito es un
-traslado y el reemplazo no es recaudación. Un depósito **cancelado** queda en la
-lista como antecedente pero no suma —el dinero no salió de la caja, y volver a
-depositarlo lo contaría dos veces—; la sección dice aparte cuánto quedó fuera de su
-total, y el Excel lo marca fila por fila. Uno devuelto por un rechazo sí ocurrió y
-suma. La pantalla muestra las primeras cien
-filas de cada sección; el Excel, que se arma por cursor, las trae todas.
+traslado y el reemplazo no es recaudación. Un depósito **cancelado** sigue en su mes,
+marcado, y la cancelación es una fila negativa en la fecha de su asiento inverso: un
+mes pasado no cambia, cancelado en el mismo mes da cero, y volver a depositarlo no lo
+cuenta dos veces. Uno devuelto por un rechazo sí ocurrió y suma. La pantalla muestra
+las primeras cien filas de cada sección; el Excel, que se arma por cursor, las trae
+todas. Las dos leen todas las secciones de una misma foto de la base: si alguien cobra
+mientras tanto, ese cobro no aparece en unas secciones y en otras no.
 
 ---
 

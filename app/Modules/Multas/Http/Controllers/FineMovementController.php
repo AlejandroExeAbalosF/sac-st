@@ -7,6 +7,7 @@ namespace App\Modules\Multas\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Multas\Support\FineMovements;
 use App\Support\BusinessDate;
+use App\Support\Database\ReadSnapshot;
 use App\Support\Excel\SpreadsheetWriter;
 use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
@@ -30,7 +31,10 @@ final class FineMovementController extends Controller
 
     public const ROTULO = 'Consulta operativa: no es la rendición oficial.';
 
-    public function __construct(private readonly FineMovements $movimientos) {}
+    public function __construct(
+        private readonly FineMovements $movimientos,
+        private readonly ReadSnapshot $foto,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -39,7 +43,7 @@ final class FineMovementController extends Controller
         return Inertia::render('multas/movimientos', [
             'month' => $mes->format('Y-m'),
             'currentMonth' => BusinessDate::today()->format('Y-m'),
-            'sections' => array_map(
+            'sections' => $this->foto->run(fn (): array => array_map(
                 fn (string $clave): array => [
                     'key' => $clave,
                     'title' => FineMovements::SECTIONS[$clave]['title'],
@@ -47,7 +51,7 @@ final class FineMovementController extends Controller
                     ...$this->movimientos->summary($clave, $mes, self::EN_PANTALLA),
                 ],
                 array_keys(FineMovements::SECTIONS),
-            ),
+            )),
             'shown' => self::EN_PANTALLA,
         ]);
     }
@@ -58,8 +62,8 @@ final class FineMovementController extends Controller
 
         return SpreadsheetWriter::download(
             sprintf('movimientos-multas-%s.xlsx', $mes->format('Y-m')),
-            ['Sección', 'Fecha que filtra', 'Fecha', 'Recibo', 'Expediente', 'Carátula', 'Detalle', 'Importe', 'Suma al total'],
-            $this->filas($mes),
+            ['Sección', 'Fecha que filtra', 'Fecha', 'Recibo', 'Expediente', 'Carátula', 'Detalle', 'Importe'],
+            $this->foto->rows(fn (): Generator => $this->filas($mes)),
         );
     }
 
@@ -71,44 +75,34 @@ final class FineMovementController extends Controller
      */
     private function filas(CarbonImmutable $mes): Generator
     {
-        yield [self::ROTULO, null, null, null, null, null, null, null, null];
+        yield [self::ROTULO, null, null, null, null, null, null, null];
 
         foreach (FineMovements::SECTIONS as $clave => $seccion) {
             $total = '0.00';
-            $apartado = '0.00';
-            $apartadas = 0;
 
             foreach ($this->movimientos->rows($clave, $mes) as $fila) {
-                if ($fila['counted']) {
-                    $total = Decimal::add($total, $fila['amount']);
-                } else {
-                    $apartado = Decimal::add($apartado, $fila['amount']);
-                    $apartadas++;
-                }
+                $total = Decimal::add($total, $fila['amount']);
 
                 yield [
                     $seccion['title'], $seccion['dateLabel'], date('d/m/Y', (int) strtotime($fila['date'])),
                     $fila['receipt'], $fila['caseLabel'], $fila['caption'], $fila['detail'], Decimal::format($fila['amount']),
-                    $fila['counted'] ? 'Sí' : 'No',
                 ];
             }
 
-            yield [$seccion['title'], 'Total de la sección', null, null, null, null, null, Decimal::format($total), null];
-
-            // Lo que quedó como antecedente y no suma: hoy, los depósitos cancelados.
-            if ($apartadas > 0) {
-                yield [$seccion['title'], 'Fuera del total (cancelados)', null, null, null, null, null, Decimal::format($apartado), null];
-            }
+            yield [$seccion['title'], 'Total de la sección', null, null, null, null, null, Decimal::format($total)];
         }
     }
 
-    /** El mes pedido (`?mes=AAAA-MM`), el actual por defecto y nunca uno futuro. */
+    /**
+     * El mes pedido (`?mes=AAAA-MM`), el actual por defecto y nunca uno futuro.
+     * El año cero no existe en PostgreSQL: se trata como cualquier mes inválido.
+     */
     private function month(Request $request): CarbonImmutable
     {
         $hoy = BusinessDate::today()->startOfMonth();
         $pedido = $request->query('mes');
 
-        if (! is_string($pedido) || preg_match('/^\d{4}-\d{2}$/', $pedido) !== 1) {
+        if (! is_string($pedido) || preg_match('/^[1-9]\d{3}-(0[1-9]|1[0-2])$/', $pedido) !== 1) {
             return $hoy;
         }
 

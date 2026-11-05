@@ -30,17 +30,16 @@ use InvalidArgumentException;
  * Cada multa se nombra con lo que congeló su recibo —expediente y carátula
  * del día del cobro—, por la aplicación de la raíz de la cadena del cheque.
  *
- * Una fila puede **no sumar**: un depósito cancelado queda como antecedente,
- * pero ese dinero no salió de la caja, y contarlo lo sumaría dos veces el
- * día que se vuelva a depositar. La sección informa aparte cuánto quedó
- * fuera de su total.
+ * **Un cobro anulado o un depósito cancelado no desaparecen de su mes**: ese día
+ * el libro lo registró, y un mes ya cerrado no cambia. Siguen sumando, marcados, y
+ * la anulación o la cancelación es una fila propia, en negativo y con la fecha de
+ * su reversión: cada total dice lo asentado en ese mes, y revertido en el mismo mes
+ * da cero. Volver a depositar ese cobro no lo cuenta dos veces.
  *
- * **Un cobro anulado no desaparece de su mes**: ese día el recibo existió y el
- * libro lo registró, y un mes ya cerrado no cambia. Sigue sumando, marcado, y
- * la anulación es una fila propia, en negativo y con su fecha: cada total dice
- * lo asentado en ese mes, y anulado en el mismo mes da cero.
+ * Quien la consulta lee todas las secciones de una misma foto (`ReadSnapshot`): si
+ * otro cobra mientras se arma, ese cobro no aparece en unas secciones y en otras no.
  *
- * @phpstan-type Fila array{date: string, receipt: string, caseLabel: string, caption: string, detail: string, amount: numeric-string, counted: bool}
+ * @phpstan-type Fila array{date: string, receipt: string, caseLabel: string, caption: string, detail: string, amount: numeric-string}
  */
 final class FineMovements
 {
@@ -70,19 +69,16 @@ final class FineMovements
     }
 
     /**
-     * Cuántas filas, cuánto suman las que cuentan, cuánto quedó fuera del
-     * total y las primeras filas, para la pantalla.
+     * Cuántas filas, cuánto suman y las primeras filas, para la pantalla.
      *
-     * @return array{count: int, total: numeric-string, excludedCount: int, excludedTotal: numeric-string, rows: list<Fila>}
+     * @return array{count: int, total: numeric-string, rows: list<Fila>}
      */
     public function summary(string $section, CarbonImmutable $month, int $limit): array
     {
         $base = $this->query($section, $month);
         $totales = DB::query()->fromSub($base, 'seccion')
             ->selectRaw('COUNT(*) AS cantidad')
-            ->selectRaw('COALESCE(SUM(importe) FILTER (WHERE cuenta), 0) AS total')
-            ->selectRaw('COUNT(*) FILTER (WHERE NOT cuenta) AS apartadas')
-            ->selectRaw('COALESCE(SUM(importe) FILTER (WHERE NOT cuenta), 0) AS apartado')
+            ->selectRaw('COALESCE(SUM(importe), 0) AS total')
             ->first();
 
         $filas = [];
@@ -93,8 +89,6 @@ final class FineMovements
         return [
             'count' => (int) ($totales->cantidad ?? 0),
             'total' => Decimal::scale((string) ($totales->total ?? '0')),
-            'excludedCount' => (int) ($totales->apartadas ?? 0),
-            'excludedTotal' => Decimal::scale((string) ($totales->apartado ?? '0')),
             'rows' => $filas,
         ];
     }
@@ -105,13 +99,6 @@ final class FineMovements
         $hasta = $month->endOfMonth()->toDateString();
         $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id');
 
-        /*
-         * Qué filas suman. Solo el depósito cancelado queda fuera: no
-         * ocurrió. Uno devuelto por un rechazo sí ocurrió —el cheque fue al
-         * banco y volvió— y suma; su reemplazo es otro instrumento.
-         */
-        $cuenta = DB::raw($section === 'depositos' ? "traslado.status <> 'cancelled' AS cuenta" : 'TRUE AS cuenta');
-
         return match ($section) {
             // Lo que entró en la caja: la recepción original, no su reemplazo.
             'cobros' => $this->conAnulacion($this->conMulta(DB::table('fund_receipts AS cheque')), 'funds_exit_event_id')
@@ -121,7 +108,7 @@ final class FineMovements
                 ->whereBetween('cheque.received_date', [$desde, $hasta])
                 ->addSelect([
                     'cheque.received_date AS fecha', 'cheque.id AS orden', 'cheque.amount AS importe',
-                    'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
+                    'cheque.medium AS medio', 'cheque.cheque_number AS numero',
                 ])
                 ->unionAll(
                     $this->anulaciones('funds_exit_event_id', $desde, $hasta)
@@ -130,7 +117,7 @@ final class FineMovements
                         ->whereIn('cheque.medium', ['cash', 'cheque'])
                         ->addSelect([
                             'revertido.event_date AS fecha', 'cheque.id AS orden', DB::raw('-cheque.amount AS importe'),
-                            'cheque.medium AS medio', 'cheque.cheque_number AS numero', $cuenta,
+                            'cheque.medium AS medio', 'cheque.cheque_number AS numero',
                         ]),
                 ),
 
@@ -142,7 +129,7 @@ final class FineMovements
                     // Lo que redujo la deuda; el excedente va en su sección.
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.applied_amount AS importe',
                     'pago.medium AS medio', 'aplicacion.timeliness AS termino',
-                    'aplicacion.excess_amount AS excedente', $cuenta,
+                    'aplicacion.excess_amount AS excedente',
                 ])
                 ->unionAll(
                     $this->anulaciones('application_reversal_event_id', $desde, $hasta)
@@ -150,7 +137,7 @@ final class FineMovements
                         ->addSelect([
                             'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.applied_amount AS importe'),
                             'pago.medium AS medio', 'aplicacion.timeliness AS termino',
-                            'aplicacion.excess_amount AS excedente', $cuenta,
+                            'aplicacion.excess_amount AS excedente',
                         ]),
                 ),
 
@@ -161,7 +148,7 @@ final class FineMovements
                 ->whereBetween('aplicada.event_date', [$desde, $hasta])
                 ->addSelect([
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.excess_amount AS importe',
-                    'pago.medium AS medio', 'aplicacion.amount AS pagado', $cuenta,
+                    'pago.medium AS medio', 'aplicacion.amount AS pagado',
                 ])
                 ->unionAll(
                     $this->anulaciones('application_reversal_event_id', $desde, $hasta)
@@ -169,7 +156,7 @@ final class FineMovements
                         ->where('aplicacion.excess_amount', '>', 0)
                         ->addSelect([
                             'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.excess_amount AS importe'),
-                            'pago.medium AS medio', 'aplicacion.amount AS pagado', $cuenta,
+                            'pago.medium AS medio', 'aplicacion.amount AS pagado',
                         ]),
                 ),
 
@@ -182,8 +169,26 @@ final class FineMovements
                 ->whereBetween('traslado.deposit_date', [$desde, $hasta])
                 ->addSelect([
                     'traslado.deposit_date AS fecha', 'traslado.id AS orden', 'item.amount AS importe',
-                    'cheque.medium AS medio', 'cheque.cheque_number AS numero', 'traslado.status AS estado', $cuenta,
-                ]),
+                    'cheque.medium AS medio', 'cheque.cheque_number AS numero', 'traslado.status AS estado',
+                    DB::raw('NULL::text AS motivo_cancelacion'), DB::raw('FALSE AS es_cancelacion'),
+                ])
+                ->unionAll(
+                    // Solo la cancelación: un depósito devuelto por un rechazo sí ocurrió.
+                    $this->conMulta(
+                        DB::table('cash_to_bank_transfers AS traslado')
+                            ->join('cash_to_bank_transfer_items AS item', 'item.cash_to_bank_transfer_id', '=', 'traslado.id')
+                            ->join('fund_receipts AS cheque', 'cheque.id', '=', 'item.fund_receipt_id')
+                            ->join('financial_events AS revertido', 'revertido.reversal_of_id', '=', 'traslado.deposit_event_id'),
+                    )
+                        ->where('traslado.cash_box_id', $caja)
+                        ->where('traslado.status', CashTransferStatus::Cancelled->value)
+                        ->whereBetween('revertido.event_date', [$desde, $hasta])
+                        ->addSelect([
+                            'revertido.event_date AS fecha', 'traslado.id AS orden', DB::raw('-item.amount AS importe'),
+                            'cheque.medium AS medio', 'cheque.cheque_number AS numero', 'traslado.status AS estado',
+                            'revertido.reversal_reason AS motivo_cancelacion', DB::raw('TRUE AS es_cancelacion'),
+                        ]),
+                ),
 
             'rechazos' => $this->conMulta(
                 DB::table('cheque_rejections AS rechazo')
@@ -193,7 +198,7 @@ final class FineMovements
                 ->whereBetween('rechazo.rejected_on', [$desde, $hasta])
                 ->addSelect([
                     'rechazo.rejected_on AS fecha', 'rechazo.id AS orden', 'cheque.amount AS importe',
-                    'cheque.cheque_number AS numero', 'rechazo.reason AS motivo', $cuenta,
+                    'cheque.cheque_number AS numero', 'rechazo.reason AS motivo',
                 ]),
 
             'reemplazos' => $this->conMulta(
@@ -205,7 +210,7 @@ final class FineMovements
                 ->whereBetween('cheque.received_date', [$desde, $hasta])
                 ->addSelect([
                     'cheque.received_date AS fecha', 'cheque.id AS orden', 'cheque.amount AS importe',
-                    'cheque.cheque_number AS numero', 'rechazado.cheque_number AS reemplazado', $cuenta,
+                    'cheque.cheque_number AS numero', 'rechazado.cheque_number AS reemplazado',
                 ]),
 
             // Lo que llegó por el banco y se reconoció: el día en que se verificó.
@@ -216,7 +221,7 @@ final class FineMovements
                 ->whereBetween('aplicada.event_date', [$desde, $hasta])
                 ->addSelect([
                     'aplicada.event_date AS fecha', 'aplicacion.id AS orden', 'aplicacion.amount AS importe',
-                    'pago.medium AS medio', $cuenta,
+                    'pago.medium AS medio',
                 ])
                 ->unionAll(
                     $this->anulaciones('application_reversal_event_id', $desde, $hasta)
@@ -224,7 +229,7 @@ final class FineMovements
                         ->whereNotIn('pago.medium', ['cash', 'cheque'])
                         ->addSelect([
                             'revertido.event_date AS fecha', 'aplicacion.id AS orden', DB::raw('-aplicacion.amount AS importe'),
-                            'pago.medium AS medio', $cuenta,
+                            'pago.medium AS medio',
                         ]),
                 ),
 
@@ -306,10 +311,9 @@ final class FineMovements
                 FineTimeliness::tryFrom($texto('termino'))?->label(),
                 Decimal::equals($texto('excedente') ?: '0', '0') ? null : 'excedente '.Decimal::format($texto('excedente')),
             ])),
-            'depositos' => implode(' · ', array_filter([
-                $cheque ?? $medio,
-                CashTransferStatus::tryFrom($texto('estado'))?->label(),
-            ])),
+            'depositos' => implode(' · ', array_filter(($datos['es_cancelacion'] ?? false) === true
+                ? ['Cancelación del depósito', $cheque ?? $medio, $texto('motivo_cancelacion')]
+                : [$cheque ?? $medio, CashTransferStatus::tryFrom($texto('estado'))?->label()])),
             'rechazos' => implode(' · ', array_filter([$cheque, $texto('motivo')])),
             'reemplazos' => sprintf('%s, reemplaza el cheque n.º %s — no es recaudación', $cheque ?? 'cheque', $texto('reemplazado')),
             'creditos' => $medio,
@@ -340,7 +344,6 @@ final class FineMovements
             'caption' => $texto('caratula'),
             'detail' => (string) $detalle,
             'amount' => Decimal::scale($texto('importe') ?: '0'),
-            'counted' => (bool) ($datos['cuenta'] ?? true),
         ];
     }
 }

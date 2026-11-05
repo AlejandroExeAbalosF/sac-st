@@ -342,10 +342,10 @@ class CreditosYMovimientosDeMultasTest extends TestCase
     }
 
     /**
-     * Un depósito cancelado queda como antecedente, pero no suma: volver a
-     * depositar ese cobro no puede contar dos veces el mismo dinero.
+     * Un depósito cancelado queda como antecedente y la cancelación lo compensa:
+     * volver a depositar ese cobro no puede contar dos veces el mismo dinero.
      */
-    public function test_a_cancelled_deposit_stays_listed_but_out_of_the_total(): void
+    public function test_a_deposit_cancelled_in_the_same_month_nets_zero(): void
     {
         $multa = $this->escenario();
         $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
@@ -368,18 +368,63 @@ class CreditosYMovimientosDeMultasTest extends TestCase
             ->assertInertia(function (Assert $page): void {
                 $depositos = collect($page->toArray()['props']['sections'])->keyBy('key')['depositos'];
 
-                expect($depositos['count'])->toBe(2)
+                expect($depositos['count'])->toBe(3)
                     ->and($depositos['total'])->toBe('5000.00')
-                    ->and($depositos['excludedCount'])->toBe(1)
-                    ->and($depositos['excludedTotal'])->toBe('5000.00')
-                    ->and(array_column($depositos['rows'], 'counted'))->toBe([false, true]);
+                    ->and(array_column($depositos['rows'], 'amount'))->toBe(['5000.00', '-5000.00', '5000.00'])
+                    ->and($depositos['rows'][1]['detail'])->toContain('Cancelación');
             });
 
         $filas = collect($this->exporte('2026-09'))->filter(fn (array $f): bool => $f[0] === 'Depósitos al banco');
 
         expect($filas->firstWhere(1, 'Total de la sección')[7])->toBe('5.000,00')
-            ->and($filas->firstWhere(1, 'Fuera del total (cancelados)')[7])->toBe('5.000,00')
-            ->and($filas->pluck(8)->filter()->values()->all())->toBe(['No', 'Sí']);
+            ->and($filas->firstWhere(1, 'Fuera del total (cancelados)'))->toBeNull();
+    }
+
+    /**
+     * Cancelar otro mes no cambia un mes pasado: la salida sigue en el suyo y la
+     * reversión resta en la fecha en que el libro la asentó.
+     */
+    public function test_a_deposit_cancelled_in_a_later_month_does_not_change_its_month(): void
+    {
+        $multa = $this->escenario();
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
+        $pago = $this->cobrarEfectivo($multa, '5000.00');
+        $this->actingAs($this->operador())->post(route('multas.pagos.deposito.store', $pago), [
+            'depositDate' => '2026-09-15', 'ticket' => UploadedFile::fake()->image('ticket.jpg'), 'idempotencyKey' => (string) Str::uuid(),
+        ])->assertSessionHasNoErrors();
+
+        $depositos = fn (string $mes): array => app(FineMovements::class)->summary('depositos', CarbonImmutable::parse($mes.'-01'), 100);
+
+        expect($depositos('2026-09')['total'])->toBe('5000.00');
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00'));
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.traslados.cancel', CashToBankTransfer::query()->sole()), [
+                'reason' => 'Se cargó el ticket de otro depósito', 'idempotencyKey' => (string) Str::uuid(),
+            ])->assertSessionHasNoErrors();
+
+        $octubre = $depositos('2026-10');
+
+        expect($depositos('2026-09')['total'])->toBe('5000.00')
+            ->and($octubre['count'])->toBe(1)
+            ->and($octubre['total'])->toBe('-5000.00')
+            ->and($octubre['rows'][0]['detail'])->toContain('Cancelación')
+            ->and($octubre['rows'][0]['detail'])->toContain('Se cargó el ticket de otro depósito');
+    }
+
+    public function test_a_month_with_year_zero_falls_back_to_the_current_one(): void
+    {
+        $this->escenario();
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 10:00'));
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.movimientos.index', ['mes' => '0000-01']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('month', '2026-09'));
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.movimientos.exportar', ['mes' => '0000-01']))
+            ->assertOk();
     }
 
     /** @return list<list<mixed>> */
