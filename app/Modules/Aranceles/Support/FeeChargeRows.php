@@ -13,7 +13,9 @@ use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeFunding;
 use App\Modules\Aranceles\Models\FeeChargeItem;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\Attachment;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 
@@ -70,6 +72,11 @@ final class FeeChargeRows
             receiptId: $ultimo?->receipt_id,
             receiptNumber: $ultimo?->receipt->formatted_number,
             talonarioNumber: $ultimo?->receipt->talonario_number,
+            talonarioPhotoId: Attachment::query()
+                ->where('subject_type', AttachmentSubject::Receipt)
+                ->whereIn('subject_id', $cobro->chargeReceipts->pluck('receipt_id'))
+                ->where('document_type', 'talonario_photo')
+                ->value('id'),
             voidReason: $this->motivoDeAnulacion($cobro),
             deposited: $vinculos->contains(fn (FeeChargeFunding $v): bool => $this->fondos->isDeposited($v->fund_receipt_id)),
         );

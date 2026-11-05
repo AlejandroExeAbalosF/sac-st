@@ -5,6 +5,7 @@ import DateInput from '@/components/date-input';
 import DocumentInput from '@/components/document-input';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
@@ -94,6 +95,7 @@ export default function NuevoCobro({
         payerCuit: corrects?.payerCuit ?? '',
         receivedOn: hoy,
         talonarioNumber: '',
+        talonarioPhoto: null as File | null,
         signedById: SIN_FIRMANTE,
         reasonCode: '' as Codigo | '',
         reason: '',
@@ -205,7 +207,11 @@ export default function NuevoCobro({
     const cobrar = () =>
         router.post(
             store().url,
-            { ...datos(), idempotencyKey },
+            {
+                ...datos(),
+                idempotencyKey,
+                talonarioPhoto: form.data.talonarioPhoto,
+            },
             {
                 onError: (e) => {
                     form.setError(e as never);
@@ -391,12 +397,19 @@ export default function NuevoCobro({
                                     id="talonarioNumber"
                                     maxLength={20}
                                     value={form.data.talonarioNumber}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                         form.setData(
                                             'talonarioNumber',
                                             e.target.value,
-                                        )
-                                    }
+                                        );
+
+                                        if (e.target.value.trim() === '') {
+                                            form.setData(
+                                                'talonarioPhoto',
+                                                null,
+                                            );
+                                        }
+                                    }}
                                 />
                                 {atrasado && (
                                     <p className="text-xs text-muted-foreground">
@@ -410,6 +423,20 @@ export default function NuevoCobro({
                             </div>
                         </div>
                     )}
+
+                    {!corrects &&
+                        !porDeposito &&
+                        form.data.talonarioNumber.trim() !== '' && (
+                            <PaperPhotoDropzone
+                                id="foto-talonario"
+                                foto={form.data.talonarioPhoto}
+                                onElegir={(archivo) =>
+                                    form.setData('talonarioPhoto', archivo)
+                                }
+                                error={form.errors.talonarioPhoto}
+                                label="Foto del talonario"
+                            />
+                        )}
 
                     {!porDeposito && (
                         <SignerSelect

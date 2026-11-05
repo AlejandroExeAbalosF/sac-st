@@ -52,6 +52,7 @@ declare namespace App {
                     readonly receiptId: number | null;
                     readonly receiptNumber: string | null;
                     readonly talonarioNumber: string | null;
+                    readonly talonarioPhotoId: number | null;
                     readonly voidReason: string | null;
                     readonly deposited: boolean;
                 };

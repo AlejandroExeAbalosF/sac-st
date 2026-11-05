@@ -112,6 +112,7 @@ final class FeeChargeController extends Controller
             $datos['talonarioNumber'] ?? null,
             isset($datos['signedById']) ? (int) $datos['signedById'] : null,
             $request->user()?->can('aranceles.modificar-importe') ?? false,
+            $request->file('talonarioPhoto'),
         );
 
         return $this->conRecibo($cobro, 'Cobrado.');

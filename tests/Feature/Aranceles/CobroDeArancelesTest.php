@@ -44,7 +44,9 @@ use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Ledger\Support\EntryLine;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Reason;
@@ -56,9 +58,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
@@ -303,6 +308,98 @@ class CobroDeArancelesTest extends TestCase
     public function test_it_does_not_collect_with_the_box_closed_to_begin_with(): void
     {
         $this->assertRechazaEn('items', fn () => $this->cobrar(), 'todavía no se abrió');
+    }
+
+    /** @param array<string, mixed> $extra @return TestResponse<Response> */
+    private function cobrarPorPantalla(array $extra): TestResponse
+    {
+        return $this->actingAs($this->admin)->post(route('aranceles.cobros.store'), [
+            'payerName' => 'AG Max SRL',
+            'idempotencyKey' => 'con-foto-'.(++$this->clave),
+            'items' => [$this->linea(14)],
+            ...$extra,
+        ]);
+    }
+
+    public function test_the_talonario_photo_is_stored_with_the_receipt_and_survives_its_replacement(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $this->cobrarPorPantalla([
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => UploadedFile::fake()->image('hoja.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $cobro = FeeCharge::query()->sole();
+        $recibo = (int) FeeChargeReceipt::query()->where('fee_charge_id', $cobro->id)->value('receipt_id');
+        $foto = Attachment::query()->forSubject(AttachmentSubject::Receipt, $recibo)->sole();
+
+        $this->assertSame('talonario_photo', $foto->document_type);
+        $this->assertSame('Foto del talonario N.º 00686701', $foto->title);
+        Storage::disk($foto->storage_disk)->assertExists($foto->object_key);
+
+        app(ReplaceFeeReceipt::class)->handle($cobro, 'AG MAX S.R.L.', null, [], $this->motivo(FeeReasonCode::WrongPayer), null, $this->admin->id);
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.talonarioPhotoId', $foto->id));
+    }
+
+    public function test_a_talonario_photo_requires_its_number_on_both_sides(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $this->cobrarPorPantalla(['talonarioPhoto' => UploadedFile::fake()->image('sin-numero.jpg')])
+            ->assertSessionHasErrors('talonarioNumber');
+
+        $this->assertRechazaEn('talonarioNumber', fn () => app(CollectFeeInCash::class)->handle(
+            'AG Max SRL', null, [$this->linea(14)], 'sin-numero', $this->admin->id, null, null, null, true,
+            UploadedFile::fake()->image('sin-numero.jpg'),
+        ));
+
+        $this->assertSame(0, FeeCharge::query()->count());
+        $this->assertSame(0, Attachment::query()->count());
+        Storage::disk('local')->assertDirectoryEmpty('/');
+    }
+
+    public function test_a_talonario_photo_must_be_a_scanned_document(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        $this->cobrarPorPantalla([
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => UploadedFile::fake()->create('planilla.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+        ])->assertSessionHasErrors('talonarioPhoto');
+
+        $this->assertSame(0, FeeCharge::query()->count());
+    }
+
+    public function test_the_talonario_photo_is_deleted_if_the_charge_rolls_back(): void
+    {
+        Storage::fake('local');
+        $this->abrir();
+
+        AuditEvent::creating(function (AuditEvent $evento): void {
+            if ($evento->action === 'arancel.cobrado') {
+                throw new RuntimeException('Falla después de guardar la foto.');
+            }
+        });
+
+        try {
+            app(CollectFeeInCash::class)->handle(
+                'AG Max SRL', null, [$this->linea(14)], 'vuelve-atras', $this->admin->id, null, '00686701', null, true,
+                UploadedFile::fake()->image('hoja.jpg'),
+            );
+            $this->fail('El cobro tenía que fallar.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Falla después de guardar la foto.', $e->getMessage());
+        }
+
+        $this->assertSame(0, FeeCharge::query()->count());
+        $this->assertSame(0, Attachment::query()->count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     public function test_a_previous_day_needs_a_talonario_and_uses_that_days_price(): void

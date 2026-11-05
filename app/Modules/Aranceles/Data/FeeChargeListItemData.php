@@ -35,6 +35,8 @@ final readonly class FeeChargeListItemData
         public ?int $receiptId,
         public ?string $receiptNumber,
         public ?string $talonarioNumber,
+        /** La foto de la hoja del talonario: sigue a la vista si después se reemplaza el recibo. */
+        public ?int $talonarioPhotoId,
         public ?string $voidReason,
         /** Si algo de su efectivo viajó en un depósito vigente. */
         public bool $deposited,

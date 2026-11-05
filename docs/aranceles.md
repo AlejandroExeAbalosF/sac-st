@@ -83,6 +83,11 @@ una sola transacción.
 - **Fecha:** hoy. Un cobro de un día anterior se carga con el número de talonario de la hoja
   que se entregó ese día, y usa el precio de ese día. **Base:** `fee_charge_item_coherent`
   exige el precio vigente en la fecha de tarifa.
+- **Foto del talonario:** al escribir el número aparece un campo para adjuntar, de manera
+  opcional, una foto o PDF de la hoja. Se guarda como adjunto privado del recibo (`receipt` /
+  `talonario_photo`) dentro del mismo acto; si el cobro vuelve atrás, el archivo se elimina. Se
+  abre desde la fila del cobro, también si después se reemplaza el recibo. **Action y validación
+  HTTP.**
 - **Revisar:** el servidor comprueba los datos y muestra el recibo tal como va a salir, sin
   escribir nada. El número es un anticipo.
 

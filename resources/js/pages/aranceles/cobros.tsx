@@ -26,6 +26,7 @@ import SignerSelect, {
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
 import { date, money } from '@/lib/format';
+import { preview as verAdjunto } from '@/routes/adjuntos';
 import { anular, create, index, reemplazar } from '@/routes/aranceles/cobros';
 import { edit as corregir } from '@/routes/aranceles/cobros/corregir';
 import { index as pendientes } from '@/routes/aranceles/pendientes';
@@ -260,6 +261,17 @@ function FilaDeCobro({
                         onClick={() => onVerRecibo(cobro.receiptId as number)}
                     >
                         Ver recibo
+                    </Button>
+                )}
+                {cobro.talonarioPhotoId !== null && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <a
+                            href={verAdjunto(cobro.talonarioPhotoId).url}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            Ver foto del talonario
+                        </a>
                     </Button>
                 )}
                 {pagado && can.replace && (

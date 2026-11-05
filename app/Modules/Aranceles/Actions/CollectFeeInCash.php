@@ -16,13 +16,18 @@ use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Enums\AttachmentSource;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * El cobro de aranceles en efectivo: crear, recibir, aplicar y emitir el recibo
@@ -43,6 +48,7 @@ final class CollectFeeInCash
         private readonly IssueFeeReceipt $emitir,
         private readonly TalonarioSequence $talonarios,
         private readonly RecordAuditEvent $auditar,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -85,12 +91,21 @@ final class CollectFeeInCash
         ?string $talonarioNumber,
         ?int $signedById,
         bool $puedeCambiarImporte,
+        ?UploadedFile $talonarioPhoto = null,
     ): FeeCharge {
         $fecha = $receivedOn ?? BusinessDate::today();
         $talonario = trim((string) $talonarioNumber) ?: null;
 
+        if ($talonarioPhoto !== null && $talonario === null) {
+            throw ValidationException::withMessages([
+                'talonarioNumber' => 'Indicá el número del talonario al que pertenece la foto.',
+            ]);
+        }
+
+        $adjunto = null;
+
         try {
-            return DB::transaction(function () use ($payerName, $payerCuit, $lineas, $idempotencyKey, $actorId, $fecha, $talonario, $signedById, $puedeCambiarImporte): FeeCharge {
+            return DB::transaction(function () use ($payerName, $payerCuit, $lineas, $idempotencyKey, $actorId, $fecha, $talonario, $signedById, $puedeCambiarImporte, $talonarioPhoto, &$adjunto): FeeCharge {
                 $yaCobrado = FeeCharge::query()->where('idempotency_key', $idempotencyKey)->first();
 
                 if ($yaCobrado !== null) {
@@ -126,6 +141,18 @@ final class CollectFeeInCash
                     $actorId,
                 );
 
+                if ($talonarioPhoto !== null) {
+                    $adjunto = $this->adjuntos->handle(
+                        file: $talonarioPhoto,
+                        subject: AttachmentSubject::Receipt,
+                        subjectId: $comprobante->receipt_id,
+                        documentType: 'talonario_photo',
+                        userId: $actorId,
+                        title: 'Foto del talonario N.º '.$talonario,
+                        source: AttachmentSource::Scanned,
+                    );
+                }
+
                 $this->auditar->handle('arancel.cobrado', $cobro, metadata: [
                     'medio' => $cobro->medium->label(),
                     'amount' => $total,
@@ -134,7 +161,16 @@ final class CollectFeeInCash
 
                 return $cobro;
             });
-        } catch (UniqueConstraintViolationException $e) {
+        } catch (Throwable $e) {
+            // La transacción volvió atrás y se llevó la fila: el archivo quedaría huérfano.
+            if ($adjunto !== null) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            if (! $e instanceof UniqueConstraintViolationException) {
+                throw $e;
+            }
+
             // El mismo clic dos veces a la vez: el que llegó tarde devuelve el que ganó.
             $yaCobrado = FeeCharge::query()->where('idempotency_key', $idempotencyKey)->first();
 

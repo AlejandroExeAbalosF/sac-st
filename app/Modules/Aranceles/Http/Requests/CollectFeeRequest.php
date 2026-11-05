@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Http\Requests;
 
 use App\Support\BusinessDate;
+use App\Support\Validation\ScannedDocument;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -30,7 +31,8 @@ class CollectFeeRequest extends FormRequest
             'payerName' => ['required', 'string', 'max:200'],
             'payerCuit' => ['nullable', 'digits:11'],
             'receivedOn' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.BusinessDate::today()->toDateString()],
-            'talonarioNumber' => ['nullable', 'string', 'max:20'],
+            'talonarioNumber' => ['nullable', 'string', 'max:20', 'required_with:talonarioPhoto'],
+            'talonarioPhoto' => ScannedDocument::rules(required: false),
             'signedById' => ['nullable', 'integer', 'exists:users,id'],
             'idempotencyKey' => [$this->isMethod('GET') ? 'nullable' : 'required', 'string', 'max:90'],
             'items' => ['required', 'array', 'min:1'],
@@ -53,6 +55,7 @@ class CollectFeeRequest extends FormRequest
             'payerCuit' => 'CUIT',
             'receivedOn' => 'fecha del cobro',
             'talonarioNumber' => 'número de talonario',
+            'talonarioPhoto' => 'foto del talonario',
             'signedById' => 'firma',
             'idempotencyKey' => 'clave del cobro',
             'items' => 'aranceles',
@@ -62,6 +65,17 @@ class CollectFeeRequest extends FormRequest
             'items.*.amount' => 'importe',
             'items.*.reasonCode' => 'motivo',
             'items.*.reason' => 'detalle',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'talonarioNumber.required_with' => 'Indicá el número del talonario al que pertenece la foto.',
+            ...ScannedDocument::messages('talonarioPhoto', 'La foto del talonario'),
         ];
     }
 }
