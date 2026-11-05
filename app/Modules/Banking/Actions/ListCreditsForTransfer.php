@@ -76,7 +76,7 @@ final class ListCreditsForTransfer
                 )'
             )
             ->orderByRaw('ABS(ABS(amount) - ?::numeric)', [$transfer->amount])
-            ->orderByRaw('ABS(transaction_date - ?::date)', [$transfer->deposit_date->toDateString()])
+            ->orderByRaw('ABS(transaction_date - ?::date)', [$transfer->bankDate()->toDateString()])
             ->orderByDesc('id')
             ->limit(self::LIMITE)
             ->get()
@@ -102,8 +102,8 @@ final class ListCreditsForTransfer
             ->where('status', ImportStatus::Completed->value)
             ->whereNotNull('period_from')
             ->whereNotNull('period_to')
-            ->whereDate('period_from', '<=', $transfer->deposit_date)
-            ->whereDate('period_to', '>=', $transfer->deposit_date)
+            ->whereDate('period_from', '<=', $transfer->bankDate())
+            ->whereDate('period_to', '>=', $transfer->bankDate())
             ->exists();
     }
 }

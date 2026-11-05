@@ -1,16 +1,22 @@
 <?php
 
 declare(strict_types=1);
+use App\Modules\Aranceles\Actions\VoidFeeCollection;
+use App\Modules\Aranceles\Enums\FeeReasonCode;
+use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
 use App\Modules\Banking\Actions\LinkBankAccountToCashBox;
+use App\Modules\Banking\Actions\RecordTransferTicket;
 use App\Modules\Banking\Actions\RejectCheque;
 use App\Modules\Banking\Actions\ReplaceRejectedCheque;
 use App\Modules\Banking\Actions\RetireCashBoxBankAccount;
+use App\Modules\Banking\Actions\StartCashTransfer;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
 use App\Modules\Multas\Actions\CorrectVerifiedFinePayment;
@@ -141,6 +147,26 @@ try {
         app(DepositFineCollection::class)->handle(
             FinePayment::query()->findOrFail($input['payment']), ['depositDate' => BusinessDate::today()],
             UploadedFile::fake()->image('ticket.jpg'), 'worker-deposit-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'fee-transfer') {
+        // Traspasar el efectivo de Aranceles mientras otro lo traspasa o lo anula.
+        $traslado = app(StartCashTransfer::class)->handle(
+            $input['box'], Currency::Ars, $input['amount'], BusinessDate::today(), null, null, $input['key'] ?? 'worker-fee-transfer-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'transfer' => $traslado->id];
+    } elseif ($input['mode'] === 'fee-void') {
+        // Anular un cobro de Aranceles mientras otro traspasa ese efectivo.
+        app(VoidFeeCollection::class)->handle(
+            FeeCharge::query()->findOrFail($input['charge']), new Reason(FeeReasonCode::DataEntryError, null), $input['actor'],
+        );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'fee-ticket') {
+        // Cargar el comprobante mientras otro cancela el traspaso.
+        $traslado = CashToBankTransfer::query()->findOrFail($input['transfer']);
+        app(RecordTransferTicket::class)->handle(
+            $traslado, $traslado->amount, ['depositDate' => BusinessDate::today()],
+            UploadedFile::fake()->image('comprobante.jpg'), 'worker-fee-ticket-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done'];
     } elseif ($input['mode'] === 'raw-void') {

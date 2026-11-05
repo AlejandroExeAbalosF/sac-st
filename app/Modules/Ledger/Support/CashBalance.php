@@ -231,6 +231,33 @@ final class CashBalance
     }
 
     /**
+     * El saldo más bajo desde una fecha en adelante, y el día en que se da.
+     *
+     * Un asiento con fecha pasada baja también todos los días siguientes: mirar
+     * solo esa fecha y hoy deja afuera a los del medio.
+     *
+     * @return array{date: string, balance: numeric-string}
+     */
+    public function lowestSince(
+        LedgerAccount $account,
+        int $cashBoxId,
+        Currency $currency,
+        CarbonInterface $from,
+    ): array {
+        $acumulados = $this->runningTotals($account, $cashBoxId, $currency);
+        $desde = $from->toDateString();
+        $minimo = ['date' => $desde, 'balance' => self::balanceOn($acumulados, $desde)];
+
+        foreach ($acumulados as $dia => $saldo) {
+            if ($dia > $desde && Decimal::isNegative(Decimal::sub($saldo, $minimo['balance']))) {
+                $minimo = ['date' => $dia, 'balance' => $saldo];
+            }
+        }
+
+        return $minimo;
+    }
+
+    /**
      * Las líneas que cuentan: asentadas, de esta caja y de esta moneda.
      *
      * Un borrador no pesa en ningún saldo: es un asiento a medio escribir.

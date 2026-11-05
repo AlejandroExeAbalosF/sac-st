@@ -76,7 +76,7 @@ final class CashDepositCreditOptions
 
         $dias = $movimiento->transaction_date === null
             ? null
-            : (int) $transfer->deposit_date->diffInDays($movimiento->transaction_date, false);
+            : (int) $transfer->bankDate()->diffInDays($movimiento->transaction_date, false);
 
         $signals = [
             'importe' => Decimal::equals($diferencia, '0')

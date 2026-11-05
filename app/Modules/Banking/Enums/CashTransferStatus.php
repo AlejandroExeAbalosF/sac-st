@@ -14,6 +14,12 @@ namespace App\Modules\Banking\Enums;
  */
 enum CashTransferStatus: string
 {
+    /**
+     * El efectivo salió de la caja y falta el comprobante del banco. Solo en
+     * las cajas que depositan en dos pasos: todavía no se puede acreditar.
+     */
+    case AwaitingTicket = 'awaiting_ticket';
+
     /** El efectivo salió de la caja. En tránsito hasta que el banco acredite. */
     case Deposited = 'deposited';
 
@@ -38,6 +44,7 @@ enum CashTransferStatus: string
     public function label(): string
     {
         return match ($this) {
+            self::AwaitingTicket => 'Sin comprobante',
             self::Deposited => 'En tránsito',
             self::BankConfirmed => 'Acreditado',
             self::Cancelled => 'Cancelado',

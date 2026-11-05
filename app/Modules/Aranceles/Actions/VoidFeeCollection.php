@@ -58,7 +58,7 @@ final class VoidFeeCollection
             foreach ($recepciones as $recepcion) {
                 if ($this->fondos->isDeposited($recepcion->id)) {
                     throw ValidationException::withMessages([
-                        'reason' => 'Ese efectivo ya se depositó: no se puede afirmar que nunca entró. Si el error es otro, corregí el cobro o reemplazá su recibo.',
+                        'reason' => 'Ese efectivo ya salió de la caja para depositarlo: no se puede afirmar que nunca entró. Si el error es otro, corregí el cobro o reemplazá su recibo.',
                     ]);
                 }
             }

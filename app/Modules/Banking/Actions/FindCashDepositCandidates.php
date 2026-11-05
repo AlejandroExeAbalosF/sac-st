@@ -44,8 +44,8 @@ final class FindCashDepositCandidates
     /** @return list<CashDepositCandidate> */
     public function handle(CashToBankTransfer $transfer): array
     {
-        $desde = $transfer->deposit_date->copy()->subDays(self::DAYS_BACKWARD);
-        $hasta = $transfer->deposit_date->copy()->addDays(self::DAYS_FORWARD);
+        $desde = $transfer->bankDate()->copy()->subDays(self::DAYS_BACKWARD);
+        $hasta = $transfer->bankDate()->copy()->addDays(self::DAYS_FORWARD);
 
         /*
          * Importe exacto, sin tolerancia: en el extracto real las
@@ -85,7 +85,7 @@ final class FindCashDepositCandidates
     private function describe(CashToBankTransfer $transfer, BankTransaction $movimiento): CashDepositCandidate
     {
         $fecha = $movimiento->transaction_date;
-        $dias = $fecha === null ? 0 : (int) $transfer->deposit_date->diffInDays($fecha, false);
+        $dias = $fecha === null ? 0 : (int) $transfer->bankDate()->diffInDays($fecha, false);
 
         /*
          * El número de operación del ticket se compara, pero no manda: no

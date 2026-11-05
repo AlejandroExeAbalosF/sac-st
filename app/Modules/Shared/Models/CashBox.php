@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $allows_expense
  * @property bool $requires_receipt_person
  * @property bool $deposits_whole_receipts Cada cobro va al banco entero y en su propio traslado.
+ * @property bool $deposits_in_two_steps El efectivo sale con el traspaso y el comprobante llega después.
  * @property bool $is_active
  */
 final class CashBox extends Model
@@ -41,6 +42,7 @@ final class CashBox extends Model
         'allows_expense',
         'requires_receipt_person',
         'deposits_whole_receipts',
+        'deposits_in_two_steps',
         'is_active',
     ];
 
@@ -61,6 +63,7 @@ final class CashBox extends Model
             'allows_expense' => 'boolean',
             'requires_receipt_person' => 'boolean',
             'deposits_whole_receipts' => 'boolean',
+            'deposits_in_two_steps' => 'boolean',
             'is_active' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

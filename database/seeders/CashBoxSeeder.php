@@ -24,7 +24,7 @@ use Illuminate\Database\Seeder;
 class CashBoxSeeder extends Seeder
 {
     /**
-     * @var list<array{code: string, name: string, allows_income: bool, allows_expense: bool, requires_receipt_person: bool, deposits_whole_receipts: bool}>
+     * @var list<array{code: string, name: string, allows_income: bool, allows_expense: bool, requires_receipt_person: bool, deposits_whole_receipts: bool, deposits_in_two_steps: bool}>
      */
     private const CAJAS = [
         [
@@ -35,6 +35,7 @@ class CashBoxSeeder extends Seeder
             'requires_receipt_person' => true,
             // Deposita por cuota: un cheque puede viajar repartido entre varias.
             'deposits_whole_receipts' => false,
+            'deposits_in_two_steps' => false,
         ],
         [
             // Recauda para el Estado: lo que entra no vuelve a salir por
@@ -47,6 +48,8 @@ class CashBoxSeeder extends Seeder
             'requires_receipt_person' => false,
             // El efectivo se acumula y se deposita junto (regla A82).
             'deposits_whole_receipts' => false,
+            // Sale de la caja con el traspaso; el comprobante llega después (regla A83).
+            'deposits_in_two_steps' => true,
         ],
         [
             'code' => 'multas',
@@ -58,6 +61,7 @@ class CashBoxSeeder extends Seeder
             'requires_receipt_person' => false,
             // Cada cobro va al banco entero y solo (M06).
             'deposits_whole_receipts' => true,
+            'deposits_in_two_steps' => false,
         ],
     ];
 
@@ -73,6 +77,7 @@ class CashBoxSeeder extends Seeder
                     'allows_expense' => $caja['allows_expense'],
                     'requires_receipt_person' => $caja['requires_receipt_person'],
                     'deposits_whole_receipts' => $caja['deposits_whole_receipts'],
+                    'deposits_in_two_steps' => $caja['deposits_in_two_steps'],
                 ])->save();
 
                 continue;

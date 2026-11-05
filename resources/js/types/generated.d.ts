@@ -2,6 +2,13 @@ declare namespace App {
     namespace Modules {
         namespace Aranceles {
             namespace Data {
+                export type FeeCashShareData = {
+                    amount: string;
+                    receivedOn: string;
+                    opening: boolean;
+                    receiptNumber: string | null;
+                    payerName: string | null;
+                };
                 export type FeeChargeLineData = {
                     readonly feeTypeId: number;
                     readonly code: number;
@@ -28,6 +35,23 @@ declare namespace App {
                     readonly talonarioNumber: string | null;
                     readonly voidReason: string | null;
                     readonly deposited: boolean;
+                };
+                export type FeeDepositData = {
+                    id: number;
+                    status: App.Modules.Banking.Enums.CashTransferStatus;
+                    amount: string;
+                    depositDate: string;
+                    registeredAt: string;
+                    accountLabel: string;
+                    depositedByName: string | null;
+                    ticketDate: string | null;
+                    operationNumber: string | null;
+                    terminal: string | null;
+                    notes: string | null;
+                    creditedOn: string | null;
+                    ticketAttachmentId: number | null;
+                    ticketViewable: boolean;
+                    shares: App.Modules.Aranceles.Data.FeeCashShareData[];
                 };
                 export type FeeTypeData = {
                     id: number;
@@ -181,7 +205,11 @@ declare namespace App {
                     | 'cheque_rejection_credit'
                     | 'cheque_rejection_debit';
                 export type CashTransferStatus =
-                    'deposited' | 'bank_confirmed' | 'cancelled' | 'bounced';
+                    | 'awaiting_ticket'
+                    | 'deposited'
+                    | 'bank_confirmed'
+                    | 'cancelled'
+                    | 'bounced';
                 export type ChequeDisposition = 'voided_returned' | 'act';
                 export type ChequeRejectionBankStatus =
                     | 'not_applicable'

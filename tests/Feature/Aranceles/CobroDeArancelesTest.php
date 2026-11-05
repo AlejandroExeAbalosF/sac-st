@@ -23,9 +23,10 @@ use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Pdf\FeeReceiptPdf;
 use App\Modules\Aranceles\Support\FeeChargeFunds;
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
+use App\Modules\Banking\Actions\RecordTransferTicket;
+use App\Modules\Banking\Actions\StartCashTransfer;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\CashToBankTransferItem;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
@@ -52,6 +53,7 @@ use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -182,37 +184,22 @@ class CobroDeArancelesTest extends TestCase
 
     private function depositoDe(FundReceipt $recepcion, string $importe, CashTransferStatus $estado = CashTransferStatus::Deposited): void
     {
-        $cuenta = (int) DB::table('cash_book_openings')->where('cash_box_id', $this->caja)->value('bank_account_id');
-        $evento = app(PostJournalEntry::class)->handle(
-            type: FinancialEventType::CashDepositedToBank,
-            idempotencyKey: 'deposito-'.$recepcion->id.'-'.(++$this->clave),
-            lines: [
-                EntryLine::debit(LedgerAccount::CashInTransit, $importe)->in(Currency::Ars)->onBankAccount($cuenta)->onCashBox($this->caja),
-                EntryLine::credit(LedgerAccount::CashOnHand, $importe)->in(Currency::Ars)->onCashBox($this->caja),
-            ],
-            date: BusinessDate::today(),
-            cashBoxId: $this->caja,
-            actorId: $this->admin->id,
+        Storage::fake('local');
+
+        $traslado = app(StartCashTransfer::class)->handle(
+            $this->caja, Currency::Ars, $importe, BusinessDate::today(), null, null,
+            'deposito-'.$recepcion->id.'-'.(++$this->clave), $this->admin->id,
         );
 
-        $traslado = CashToBankTransfer::query()->create([
-            'deposit_event_id' => $evento->id,
-            'cash_box_id' => $this->caja,
-            'bank_account_id' => $cuenta,
-            'amount' => $importe,
-            'deposit_date' => BusinessDate::today(),
-            'deposited_by' => $this->admin->id,
-            'status' => CashTransferStatus::Deposited,
-        ]);
+        $this->assertSame($recepcion->id, CashToBankTransferItem::query()->where('cash_to_bank_transfer_id', $traslado->id)->value('fund_receipt_id'));
 
-        CashToBankTransferItem::query()->create([
-            'cash_to_bank_transfer_id' => $traslado->id,
-            'fund_receipt_id' => $recepcion->id,
-            'amount' => $importe,
-        ]);
+        $traslado = app(RecordTransferTicket::class)->handle(
+            $traslado, $importe, ['depositDate' => BusinessDate::today()], UploadedFile::fake()->image('ticket.jpg'),
+            'comprobante-'.$traslado->id, $this->admin->id,
+        );
 
         if ($estado === CashTransferStatus::BankConfirmed) {
-            $credito = $this->movimiento(BankAccount::query()->findOrFail($cuenta), BusinessDate::today()->toDateString(), $importe);
+            $credito = $this->movimiento(BankAccount::query()->findOrFail($traslado->bank_account_id), BusinessDate::today()->toDateString(), $importe);
 
             app(ConfirmCashDepositCredit::class)->handle($traslado, $credito, 'acreditacion-'.$traslado->id, $this->admin->id);
         }
@@ -522,7 +509,7 @@ class CobroDeArancelesTest extends TestCase
         $cobro = $this->cobrar();
         $this->depositoDe($this->recepcionDe($cobro), '220');
 
-        $this->assertRechazaEn('reason', fn () => app(VoidFeeCollection::class)->handle($cobro, $this->motivo(), $this->admin->id), 'depositó');
+        $this->assertRechazaEn('reason', fn () => app(VoidFeeCollection::class)->handle($cobro, $this->motivo(), $this->admin->id), 'salió de la caja');
         $this->assertSame(FeeChargeStatus::Paid, $cobro->refresh()->status);
     }
 
@@ -651,7 +638,7 @@ class CobroDeArancelesTest extends TestCase
         $this->abrir();
         $enTransito = $this->cobrar([$this->linea(14)]);
         $this->depositoDe($this->recepcionDe($enTransito), '120');
-        $this->assertRechazaEn('items', fn () => app(CorrectFeeCharge::class)->handle($enTransito, 'AG', null, [$this->linea(25)], $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true), 'cancelá el depósito');
+        $this->assertRechazaEn('items', fn () => app(CorrectFeeCharge::class)->handle($enTransito, 'AG', null, [$this->linea(25)], $this->motivo(FeeReasonCode::WrongAmount), null, $this->admin->id, true), 'cancelá el traspaso');
 
         $acreditado = $this->cobrar([$this->linea(14)]);
         $this->depositoDe($this->recepcionDe($acreditado), '120', CashTransferStatus::BankConfirmed);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Aranceles\Http\Controllers\FeeCashController;
 use App\Modules\Aranceles\Http\Controllers\FeeChargeController;
+use App\Modules\Aranceles\Http\Controllers\FeeDepositController;
 use App\Modules\Aranceles\Http\Controllers\FeeTypeController;
 use App\Modules\Banking\Http\Controllers\CashBoxAccountController;
 use App\Modules\Ledger\Http\Controllers\CashCalendarController;
@@ -21,6 +22,7 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
     Route::middleware('can:aranceles.ver')->group(function (): void {
         Route::get('tipos', [FeeTypeController::class, 'index'])->name('tipos.index');
         Route::get('cobros', [FeeChargeController::class, 'index'])->name('cobros.index');
+        Route::get('depositos', [FeeDepositController::class, 'index'])->name('depositos.index');
         Route::get('caja/apertura', [FeeCashController::class, 'apertura'])->name('caja.apertura.index');
         // El recibo: el mismo papel en el visor y en la impresora.
         Route::get('recibos/{receipt}/ver', [FeeChargeController::class, 'viewReceipt'])->whereNumber('receipt')->name('recibos.view');
@@ -53,6 +55,23 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
         Route::get('cobros/{feeCharge}/corregir', [FeeChargeController::class, 'editCorrection'])->whereNumber('feeCharge')->name('cobros.corregir.edit');
         Route::post('cobros/{feeCharge}/corregir', [FeeChargeController::class, 'correct'])->whereNumber('feeCharge')->name('cobros.corregir');
     });
+
+    Route::middleware('can:aranceles.depositar')->group(function (): void {
+        Route::get('depositos/reparto', [FeeDepositController::class, 'preview'])->name('depositos.reparto');
+        Route::post('depositos', [FeeDepositController::class, 'store'])->name('depositos.store');
+        Route::get('depositos/{transfer}/comprobante', [FeeDepositController::class, 'createTicket'])->whereNumber('transfer')->name('depositos.comprobante.create');
+        Route::post('depositos/{transfer}/comprobante', [FeeDepositController::class, 'storeTicket'])->whereNumber('transfer')->name('depositos.comprobante.store');
+    });
+
+    Route::middleware('can:aranceles.verificar-pagos')->group(function (): void {
+        Route::get('depositos/{transfer}/candidatos', [FeeDepositController::class, 'candidates'])->whereNumber('transfer')->name('depositos.candidates');
+        Route::post('depositos/{transfer}/acreditar', [FeeDepositController::class, 'confirm'])->whereNumber('transfer')->name('depositos.confirm');
+    });
+
+    Route::post('depositos/{transfer}/cancelar', [FeeDepositController::class, 'cancel'])
+        ->middleware('can:aranceles.cancelar-traspaso')
+        ->whereNumber('transfer')
+        ->name('depositos.cancel');
 
     Route::middleware('can:aranceles.caja.abrir')->group(function (): void {
         Route::post('caja/apertura', [FeeCashController::class, 'store'])->name('caja.apertura.store');

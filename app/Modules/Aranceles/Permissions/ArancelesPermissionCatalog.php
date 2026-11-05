@@ -76,6 +76,39 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
                 sensitive: true,
             ),
             new PermissionDefinition(
+                'aranceles.depositar',
+                'Depositar el efectivo de Aranceles',
+                'Registrar el traspaso del efectivo al banco y cargar su comprobante.',
+                'aranceles',
+                ['administrador', 'administrativo'],
+            ),
+            // Decisión del usuario: la fecha la toma el sistema; registrar otra es una excepción.
+            new PermissionDefinition(
+                'aranceles.fechar-traspaso',
+                'Registrar traspasos con otra fecha',
+                'Registrar un traspaso con una fecha pasada, en vez de la del día.',
+                'aranceles',
+                ['administrador'],
+                sensitive: true,
+            ),
+            // Decisión del usuario: lo hace quien traspasa, con motivo y auditado.
+            new PermissionDefinition(
+                'aranceles.cancelar-traspaso',
+                'Cancelar traspasos de Aranceles',
+                'Cancelar un traspaso sin acreditar, con su motivo. El efectivo vuelve a la caja.',
+                'aranceles',
+                ['administrador', 'contador', 'administrativo'],
+                sensitive: true,
+            ),
+            new PermissionDefinition(
+                'aranceles.verificar-pagos',
+                'Verificar depósitos de Aranceles',
+                'Acreditar un depósito contra el extracto.',
+                'aranceles',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
+            new PermissionDefinition(
                 'aranceles.caja.abrir',
                 'Abrir la caja de Aranceles',
                 'Declarar el efectivo con el que empieza la caja, una sola vez.',

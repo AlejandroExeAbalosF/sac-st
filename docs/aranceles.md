@@ -3,8 +3,8 @@
 Qué hace hoy la Caja de Aranceles. Describe lo implementado.
 
 **Estado: en construcción.** Están el catálogo, el cobro en efectivo con su recibo, la
-anulación, el reemplazo del recibo, la corrección y la caja del día con su arqueo, cierre y
-planilla. Todavía no están el depósito al banco, el pago por depósito ni el informe mensual.
+anulación, el reemplazo del recibo, la corrección, la caja del día con su arqueo, cierre y
+planilla, y el depósito del efectivo. Todavía no están el pago por depósito ni el informe mensual.
 
 Las reglas con su origen están fuera del repo, en `Relevamiento/Aranceles/Reglas-y-DER-Aranceles-v1.md`.
 Varias son provisorias: no salen del relevamiento y están para confirmar con el área.
@@ -56,7 +56,7 @@ Son las pantallas de caja de siempre, con la caja de Aranceles y permisos propio
   declarando que no hay, y la cuenta con la que opera. Sin saldo bancario: la cuenta es
   compartida con Multas y su saldo no se reparte. El efectivo declarado lleva una recepción
   sobre el mismo evento de apertura, sin asiento nuevo: no es recaudación ni respalda un
-  cobro, y es lo que va a permitir depositarlo.
+  cobro, y es lo que permite depositarlo.
 - **Serie:** los recibos numeran con `0110`, configurable en Numeración.
 - **Arqueo:** además de los billetes de las otras cajas ofrece 20, 10, 5, 2 y 1, porque las tasas
   son chicas. Qué denominaciones circulan **no está relevado**. Un importe con centavos no se
@@ -112,11 +112,11 @@ Son hechos distintos:
 
 | Situación | Operación | Permiso | El dinero |
 |---|---|---|---|
-| Nunca entró | **Anular**, sin depósito vigente | `aranceles.anular` | Se revierte; el recibo queda anulado con su número |
+| Nunca entró | **Anular**, sin traspaso vigente | `aranceles.anular` | Se revierte; el recibo queda anulado con su número |
 | Error en nombre, CUIT o redacción | **Reemplazar el recibo**, también después de depositar | `aranceles.reemplazar-recibos` | No se mueve; hay número nuevo, y el anterior queda `replaced` |
 | Otro tipo o cantidad, mismo importe | **Corregir** | `aranceles.corregir` | No se mueve: la misma recepción se aplica al cobro nuevo |
-| Otro importe, sin depositar | **Corregir** | `aranceles.corregir` | Se revierte la recepción y se registra la correcta |
-| Otro importe, depósito sin acreditar | Cancelar el depósito y **corregir** | | |
+| Otro importe, sin traspasar | **Corregir** | `aranceles.corregir` | Se revierte la recepción y se registra la correcta |
+| Otro importe, traspaso sin acreditar | Cancelar todo el traspaso y **corregir** | | |
 | Otro importe, depósito acreditado | **Sin operación**: pendiente con el área | | |
 
 Corregir pasa en una transacción: el cobro anterior queda anulado y a la vista, nace otro
@@ -128,3 +128,54 @@ Una devolución de dinero no existe todavía: no se resuelve anulando.
 **En el libro del día,** anular o corregir el importe otro día deja el recibo en la fecha en que
 entró el dinero y agrega una fila «Anulación del recibo N» que resta en la fecha de la reversión.
 Con el mismo importe el dinero no se mueve: el renglón de ese día pasa a ser el del recibo nuevo.
+
+<a id="deposito"></a>
+
+## Depósito del efectivo · `/aranceles/depositos`
+
+El efectivo se acumula y se deposita junto, en dos pasos. El circuito es una decisión del
+usuario, **sin relevar con el área**: falta saber cuándo sale el efectivo, quién lo registra y si
+se lleva siempre todo.
+
+1. **Traspaso** (`aranceles.depositar`): se registra cuando el efectivo sale. Propone todo lo
+   disponible y se puede bajar el importe; el resto sigue en caja. El sistema lo reparte desde la
+   recepción más antigua, incluida la de la apertura, y muestra de qué recibos sale antes de
+   confirmar. Asienta `cash_deposited_to_bank`: D tránsito / C efectivo. No pide foto.
+2. **Comprobante** (`aranceles.depositar`): se carga después, con foto obligatoria, sin asiento.
+   El importe debe ser el del traspaso: si difiere se rechaza, y se cancela para registrar otro.
+3. **Acreditación** (`aranceles.verificar-pagos`): con el comprobante cargado, se asocia con un
+   crédito del extracto por el mismo importe. Se busca alrededor de la fecha del comprobante.
+
+Con el comprobante pendiente el día se arquea y se cierra, y al otro día se sigue cobrando:
+cargarlo no toca el día ya cerrado. Depositar no suma recaudación: solo cambia dónde está la plata.
+
+- **Fecha:** la toma el sistema al iniciar el traspaso, con su hora de registro. Solo
+  `aranceles.fechar-traspaso` (administrador) puede indicar un día pasado que siga abierto, y entonces
+  solo toma recepciones hasta esa fecha. Un día cerrado se reabre o el traspaso se registra hoy.
+- **Tope:** lo disponible por recepciones y el saldo de efectivo del libro **desde esa fecha en
+  adelante, día por día** (`DepositableCash::maximum`). La pantalla, la vista previa y el traspaso
+  usan el mismo cálculo. Así, un faltante ajustado no deja trasladar más de lo que hay, y una fecha
+  pasada no deja negativo un día intermedio. Después de cancelar un traspaso, su asiento inverso
+  queda con fecha de la cancelación: si no hay otro efectivo que lo cubra, el nuevo no puede ir con
+  fecha anterior a ella.
+- **Comprobante:** lleva la fecha del papel. Puede ser anterior al traspaso (un traspaso cancelado
+  por error se registra de nuevo con la fecha del día), pero no al último cobro que lleva.
+- **Sobrante de arqueo ajustado:** no tiene recepción y queda en la caja. **Sin decidir** si se
+  puede depositar.
+- **Cancelar** (`aranceles.cancelar-traspaso`: administrador, contador, administrativo): mientras no
+  esté acreditado, con o sin comprobante, con motivo auditado. Vuelve el efectivo a la caja y libera
+  todo el reparto, aunque el error sea de un solo cobro.
+- **Mismo formulario enviado dos veces**, aun a la vez: devuelve el mismo traspaso.
+
+La fecha automática, el permiso para otra fecha y quién cancela son decisión del usuario, **sin
+relevar con el área**, igual que el tope y el comprobante anterior al traspaso (**provisorios**).
+
+**Base:** `cash_transfer_item_within_receipt` impide que un traslado lleve recepciones de otra caja,
+en todas las cajas, que el efectivo viaje por más que el importe de su recepción, y que salga de
+esta caja efectivo que no sea vigente; `cash_transfer_ticket_after_cash` impide un comprobante
+anterior al efectivo que lleva; `fund_receipts_keep_fee_transfers` impide revertir una
+recepción con traslado vigente; `cash_transfer_items_match_amount_*` exige que los ítems sumen el
+traslado, en todas las cajas. `cash_transfer_follows_two_steps` hace nacer `awaiting_ticket` solo a
+las cajas con `deposits_in_two_steps`, y las transiciones de `cash_to_bank_transfers_append_only`
+impiden acreditar sin comprobante y editar uno cargado. `cash_transfer_ticket_has_photo` exige la
+foto.

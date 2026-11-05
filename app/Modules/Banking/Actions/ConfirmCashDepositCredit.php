@@ -143,6 +143,12 @@ final class ConfirmCashDepositCredit
     /** @throws ValidationException */
     private function assertConfirmable(CashToBankTransfer $transfer, BankTransaction $transaction): void
     {
+        if ($transfer->status === CashTransferStatus::AwaitingTicket) {
+            throw ValidationException::withMessages([
+                'transferId' => 'Primero se carga el comprobante del banco.',
+            ]);
+        }
+
         if ($transfer->status !== CashTransferStatus::Deposited) {
             throw ValidationException::withMessages([
                 'transferId' => 'Ese traslado no está esperando acreditación.',
@@ -199,7 +205,7 @@ final class ConfirmCashDepositCredit
          */
         $fecha = $transaction->transaction_date;
 
-        if ($fecha !== null && $fecha->lt($transfer->deposit_date->copy()->subDay())) {
+        if ($fecha !== null && $fecha->lt($transfer->bankDate()->copy()->subDay())) {
             throw ValidationException::withMessages([
                 'bankTransactionId' => 'Ese crédito es anterior al depósito: no puede ser su acreditación.',
             ]);

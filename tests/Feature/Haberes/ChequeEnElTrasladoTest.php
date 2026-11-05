@@ -405,7 +405,8 @@ class ChequeEnElTrasladoTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        // Solo esta guarda: el renglón de más también rompe la suma del traslado.
+        DB::statement('SET CONSTRAINTS cheque_travels_whole IMMEDIATE');
     }
 
     public function test_la_base_rechaza_un_cheque_depositado_sin_traslado(): void

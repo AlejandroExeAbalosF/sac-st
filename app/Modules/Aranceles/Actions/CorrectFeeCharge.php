@@ -181,7 +181,7 @@ final class CorrectFeeCharge
 
             if ($this->fondos->isDeposited((int) $id)) {
                 throw ValidationException::withMessages([
-                    'items' => 'Ese efectivo está en un depósito sin acreditar: cancelá el depósito y corregí el cobro.',
+                    'items' => 'Ese efectivo está en un traspaso sin acreditar: cancelá el traspaso y corregí el cobro.',
                 ]);
             }
         }

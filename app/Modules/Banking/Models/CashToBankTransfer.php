@@ -34,6 +34,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $deposited_by
  * @property string|null $notes
  * @property CashTransferStatus $status
+ * @property CarbonInterface|null $ticket_date La fecha del comprobante, en las cajas que depositan en dos pasos.
+ * @property CarbonInterface|null $ticket_loaded_at
+ * @property int|null $ticket_loaded_by
+ * @property string|null $ticket_idempotency_key
  */
 final class CashToBankTransfer extends Model
 {
@@ -50,7 +54,20 @@ final class CashToBankTransfer extends Model
         'deposited_by',
         'notes',
         'status',
+        'ticket_date',
+        'ticket_loaded_at',
+        'ticket_loaded_by',
+        'ticket_idempotency_key',
     ];
+
+    /**
+     * El día con el que se busca el crédito en el extracto: el del comprobante,
+     * si lo tiene. El traspaso puede ser anterior al día en que se llegó al banco.
+     */
+    public function bankDate(): CarbonInterface
+    {
+        return $this->ticket_date ?? $this->deposit_date;
+    }
 
     /** @return BelongsTo<FinancialEvent, $this> */
     public function depositEvent(): BelongsTo
@@ -116,6 +133,8 @@ final class CashToBankTransfer extends Model
         return [
             'amount' => 'decimal:2',
             'deposit_date' => 'date',
+            'ticket_date' => 'date',
+            'ticket_loaded_at' => 'datetime',
             'status' => CashTransferStatus::class,
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
