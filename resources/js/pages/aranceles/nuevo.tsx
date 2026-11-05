@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import DateInput from '@/components/date-input';
 import DocumentInput from '@/components/document-input';
+import FormRowField from '@/components/form-row-field';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
@@ -17,7 +18,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import FeeLineEditor, {
     importeDeLinea,
 } from '@/features/aranceles/components/fee-line-editor';
@@ -298,8 +298,7 @@ export default function NuevoCobro({
                     )}
 
                     <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="payerName">Recibí de</Label>
+                        <FormRowField htmlFor="payerName" label="Recibí de">
                             <Input
                                 id="payerName"
                                 maxLength={200}
@@ -309,9 +308,11 @@ export default function NuevoCobro({
                                 }
                             />
                             <InputError message={form.errors.payerName} />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="payerCuit">CUIT (opcional)</Label>
+                        </FormRowField>
+                        <FormRowField
+                            htmlFor="payerCuit"
+                            label="CUIT (opcional)"
+                        >
                             <DocumentInput
                                 id="payerCuit"
                                 maxDigits={11}
@@ -321,7 +322,7 @@ export default function NuevoCobro({
                                 }
                             />
                             <InputError message={form.errors.payerCuit} />
-                        </div>
+                        </FormRowField>
                     </div>
 
                     <div className="flex flex-col gap-3">
@@ -371,10 +372,10 @@ export default function NuevoCobro({
 
                     {!corrects && !porDeposito && (
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="receivedOn">
-                                    Fecha del cobro
-                                </Label>
+                            <FormRowField
+                                htmlFor="receivedOn"
+                                label="Fecha del cobro"
+                            >
                                 <DateInput
                                     id="receivedOn"
                                     max={hoy}
@@ -387,12 +388,15 @@ export default function NuevoCobro({
                                     }
                                 />
                                 <InputError message={form.errors.receivedOn} />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="talonarioNumber">
-                                    N.º de talonario
-                                    {!atrasado && ' (opcional)'}
-                                </Label>
+                            </FormRowField>
+                            <FormRowField
+                                htmlFor="talonarioNumber"
+                                label={
+                                    atrasado
+                                        ? 'N.º de talonario'
+                                        : 'N.º de talonario (opcional)'
+                                }
+                            >
                                 <Input
                                     id="talonarioNumber"
                                     maxLength={20}
@@ -420,7 +424,7 @@ export default function NuevoCobro({
                                 <InputError
                                     message={form.errors.talonarioNumber}
                                 />
-                            </div>
+                            </FormRowField>
                         </div>
                     )}
 

@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import AmountInput from '@/components/amount-input';
+import FormRowField from '@/components/form-row-field';
 import InputError from '@/components/input-error';
 import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
@@ -130,10 +131,10 @@ export default function FeeLineEditor({
                 <>
                     <div className="grid gap-3 sm:grid-cols-3">
                         {porcentual ? (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`linea-${linea.key}-base`}>
-                                    Monto del acuerdo
-                                </Label>
+                            <FormRowField
+                                htmlFor={`linea-${linea.key}-base`}
+                                label="Monto del acuerdo"
+                            >
                                 <AmountInput
                                     id={`linea-${linea.key}-base`}
                                     value={linea.baseAmount}
@@ -145,13 +146,16 @@ export default function FeeLineEditor({
                                     Tasa: {percent(precio?.rate)}
                                 </p>
                                 <InputError message={error('baseAmount')} />
-                            </div>
+                            </FormRowField>
                         ) : (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`linea-${linea.key}-cantidad`}>
-                                    Cantidad
-                                    {tipo.unitLabel && ` (${tipo.unitLabel})`}
-                                </Label>
+                            <FormRowField
+                                htmlFor={`linea-${linea.key}-cantidad`}
+                                label={
+                                    tipo.unitLabel
+                                        ? `Cantidad (${tipo.unitLabel})`
+                                        : 'Cantidad'
+                                }
+                            >
                                 <Input
                                     id={`linea-${linea.key}-cantidad`}
                                     inputMode="numeric"
@@ -164,21 +168,26 @@ export default function FeeLineEditor({
                                     Precio: {money(precio?.unitPrice)}
                                 </p>
                                 <InputError message={error('quantity')} />
-                            </div>
+                            </FormRowField>
                         )}
 
-                        <div className="grid gap-1.5">
-                            <Label>Calculado</Label>
-                            <p className="flex h-9 items-center text-sm tabular-nums">
+                        <FormRowField
+                            htmlFor={`linea-${linea.key}-calculado`}
+                            label="Calculado"
+                        >
+                            <output
+                                id={`linea-${linea.key}-calculado`}
+                                className="flex min-h-9 items-center text-sm tabular-nums max-sm:min-h-11"
+                            >
                                 {money(calculado)}
-                            </p>
-                        </div>
+                            </output>
+                        </FormRowField>
 
                         {canChangeAmount && (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={`linea-${linea.key}-importe`}>
-                                    Importe a cobrar (opcional)
-                                </Label>
+                            <FormRowField
+                                htmlFor={`linea-${linea.key}-importe`}
+                                label="Importe a cobrar (opcional)"
+                            >
                                 <AmountInput
                                     id={`linea-${linea.key}-importe`}
                                     value={linea.amount}
@@ -187,7 +196,7 @@ export default function FeeLineEditor({
                                     }
                                 />
                                 <InputError message={error('amount')} />
-                            </div>
+                            </FormRowField>
                         )}
                     </div>
 

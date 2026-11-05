@@ -2,12 +2,12 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { useState } from 'react';
 import DocumentInput from '@/components/document-input';
+import FormRowField from '@/components/form-row-field';
 import InputError from '@/components/input-error';
 import ListViewTab from '@/components/list-view-tab';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import FeeCreditPicker from '@/features/aranceles/components/fee-credit-picker';
 import type { Credito } from '@/features/aranceles/components/fee-credit-picker';
 import FeeLineEditor, {
@@ -291,8 +291,7 @@ function CobroNuevo({
     return (
         <form onSubmit={enviar} className="flex flex-col gap-5">
             <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                <div className="grid gap-1.5">
-                    <Label htmlFor="payerName">Recibí de</Label>
+                <FormRowField htmlFor="payerName" label="Recibí de">
                     <Input
                         id="payerName"
                         maxLength={200}
@@ -302,9 +301,8 @@ function CobroNuevo({
                         }
                     />
                     <InputError message={form.errors.payerName} />
-                </div>
-                <div className="grid gap-1.5">
-                    <Label htmlFor="payerCuit">CUIT (opcional)</Label>
+                </FormRowField>
+                <FormRowField htmlFor="payerCuit" label="CUIT (opcional)">
                     <DocumentInput
                         id="payerCuit"
                         maxDigits={11}
@@ -312,7 +310,7 @@ function CobroNuevo({
                         onChange={(valor) => form.setData('payerCuit', valor)}
                     />
                     <InputError message={form.errors.payerCuit} />
-                </div>
+                </FormRowField>
             </div>
 
             <div className="flex flex-col gap-3">
