@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Support;
 
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
+use App\Modules\Ledger\Data\CashMonthLinkData;
 use App\Modules\Ledger\Data\CashMonthPanelData;
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
@@ -78,9 +79,20 @@ final class FeeCashBoxModule implements CashBoxModule
         return 'Reconocido en el libro de Aranceles';
     }
 
+    /** Sin papeles: el informe es una consulta y no hay modelo de rendición (regla A105). */
     public function monthPanel(CarbonImmutable $month, ?PeriodClosing $closing, ?Authorizable $viewer): ?CashMonthPanelData
     {
-        return null;
+        if (! ($viewer?->can('aranceles.ver') ?? false)) {
+            return null;
+        }
+
+        return new CashMonthPanelData(
+            title: 'Informe del mes',
+            documents: [],
+            emptyText: 'Es una consulta con Excel: el área todavía no definió un modelo de rendición.',
+            emit: null,
+            links: [new CashMonthLinkData('Movimientos del mes', route('aranceles.movimientos.index', ['mes' => $month->format('Y-m')], absolute: false))],
+        );
     }
 
     /** Cada recibo abre su cobro en el listado, a quien puede ver aranceles. */

@@ -2,9 +2,9 @@
 
 Qué hace hoy la Caja de Aranceles. Describe lo implementado.
 
-**Estado: en construcción.** Están el catálogo, el cobro en efectivo con su recibo, la
-anulación, el reemplazo del recibo, la corrección, la caja del día con su arqueo, cierre y
-planilla, el depósito del efectivo y el pago por depósito. Todavía no está el informe mensual.
+**Estado:** están el catálogo, el cobro en efectivo con su recibo, la anulación, el reemplazo
+del recibo, la corrección, la caja del día con su arqueo, cierre y planilla, el depósito del
+efectivo, el pago por depósito y la consulta del mes.
 
 Las reglas con su origen están fuera del repo, en `Relevamiento/Aranceles/Reglas-y-DER-Aranceles-v1.md`.
 Varias son provisorias: no salen del relevamiento y están para confirmar con el área.
@@ -174,6 +174,36 @@ aplicado, y que un pagado tenga todo aplicado; `fee_charge_funding_coherent` imp
 recepción; `fee_charge_funding_born_unapplied` hace nacer un vínculo sin aplicar;
 `fund_receipts_fee_bank_has_a_charge` exige que una recepción por banco de la caja esté vinculada por
 todo su importe o revertida. Los bloqueos van en orden: cobro, créditos y recepciones.
+
+<a id="movimientos"></a>
+
+## Movimientos del mes · `/aranceles/movimientos`
+
+Se llega desde el mes del calendario de la caja, con `aranceles.ver`. **Es una consulta con Excel, no
+una rendición formal:** el área todavía no dio un modelo (**provisorio**). Cada sección dice qué fecha
+filtra y se suma sola, sin total general: un cobro y su traspaso son hechos distintos del mismo dinero.
+Pantalla y Excel leen todas las secciones de una misma foto: si alguien cobra mientras se arma, el
+resumen y el detalle siguen coincidiendo.
+
+- **Recaudación por tipo:** cantidad, efectivo, banco y total de cada arancel, con su detalle por
+  renglón. Cuenta por la fecha del primer recibo, con el importe vigente. Coincide con lo que el libro
+  aplicó en el mes.
+- **Anulaciones y correcciones:** son filas negativas en su propio mes. El mes anterior no cambia, y
+  anulado en el mismo mes da cero. Un reemplazo no mueve nada: solo muestra el recibo y el nombre vigentes.
+- **Ingresos parciales:** lo que entró por el banco y no tenía recibo al terminar el mes. No es
+  recaudación. Sigue en su mes aunque el cobro se complete después, y su reversión resta en la suya.
+- **Traspasos y acreditaciones:** movimiento de fondos, no recaudación. Un traspaso figura en su mes
+  y su cancelación es una fila negativa en la suya: el mes del traspaso no cambia, y cancelado en el
+  mismo mes da cero.
+- **Importes distintos de lo calculado:** cada renglón que cambió alguna vez, por el mes del recibo,
+  con su neto y lo que aportó cada motivo. También uno que volvió a lo calculado: el neto da cero, pero
+  hubo cambios. Los totales por motivo suman cada paso por separado, así que ajustar de $ 120 a $ 100
+  por pago menor y a $ 99,50 por redondeo da − $ 20 y − $ 0,50, y entre todos dan el total de la
+  sección. Es para control: la diferencia ya está dentro de la recaudación.
+
+Los filtros de medio y tipo aplican a la recaudación y a las diferencias; el resto muestra el mes
+entero. La pantalla muestra hasta 100 filas por sección, y el Excel las trae todas, con el rótulo de
+que es una consulta.
 
 <a id="deposito"></a>
 

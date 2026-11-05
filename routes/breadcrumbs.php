@@ -162,6 +162,11 @@ Breadcrumbs::for('aranceles.pendientes.index', fn (): array => [
     Crumb::make('Pendientes'),
 ]);
 
+Breadcrumbs::for('aranceles.movimientos.index', fn (): array => [
+    Crumb::make('Aranceles'),
+    Crumb::make('Movimientos del mes'),
+]);
+
 Breadcrumbs::for('aranceles.creditos.identificar', fn (): array => [
     Crumb::make('Banco'),
     Crumb::make('Movimientos', route('banco.movimientos.index')),

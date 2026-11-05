@@ -94,6 +94,7 @@ const RUTAS_SIN_PANTALLA = [
     'aranceles.depositos.candidates',
     'aranceles.depositos.reparto',
     'aranceles.creditos.index',
+    'aranceles.movimientos.exportar',
     'multas.pagos.rechazo.debitos',
     'multas.rechazos.movimientos.index',
     'haberes.installments.history',

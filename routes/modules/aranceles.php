@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Aranceles\Http\Controllers\FeeCashController;
 use App\Modules\Aranceles\Http\Controllers\FeeChargeController;
 use App\Modules\Aranceles\Http\Controllers\FeeDepositController;
+use App\Modules\Aranceles\Http\Controllers\FeeMovementController;
 use App\Modules\Aranceles\Http\Controllers\FeePendingController;
 use App\Modules\Aranceles\Http\Controllers\FeeTypeController;
 use App\Modules\Banking\Http\Controllers\CashBoxAccountController;
@@ -25,6 +26,8 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
         Route::get('cobros', [FeeChargeController::class, 'index'])->name('cobros.index');
         Route::get('pendientes', [FeePendingController::class, 'index'])->name('pendientes.index');
         Route::get('depositos', [FeeDepositController::class, 'index'])->name('depositos.index');
+        Route::get('movimientos', [FeeMovementController::class, 'index'])->name('movimientos.index');
+        Route::get('movimientos/exportar', [FeeMovementController::class, 'export'])->name('movimientos.exportar');
         Route::get('caja/apertura', [FeeCashController::class, 'apertura'])->name('caja.apertura.index');
         // El recibo: el mismo papel en el visor y en la impresora.
         Route::get('recibos/{receipt}/ver', [FeeChargeController::class, 'viewReceipt'])->whereNumber('receipt')->name('recibos.view');
