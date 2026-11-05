@@ -17,7 +17,11 @@ import SignerSelect, {
     SIN_FIRMANTE,
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
-import { itemsDeLineas, lineaVacia } from '@/features/aranceles/lib/fee-form';
+import {
+    conLineaNueva,
+    itemsDeLineas,
+    lineaVacia,
+} from '@/features/aranceles/lib/fee-form';
 import { compareAmounts, date, money, sumAmounts } from '@/lib/format';
 import { registrar } from '@/routes/aranceles/creditos';
 import { identificar } from '@/routes/aranceles/pendientes';
@@ -344,10 +348,10 @@ function CobroNuevo({
                         type="button"
                         variant="outline"
                         onClick={() =>
-                            form.setData('lineas', [
-                                ...form.data.lineas,
-                                lineaVacia(),
-                            ])
+                            form.setData(
+                                'lineas',
+                                conLineaNueva(form.data.lineas),
+                            )
                         }
                     >
                         <Plus className="size-4" aria-hidden="true" />

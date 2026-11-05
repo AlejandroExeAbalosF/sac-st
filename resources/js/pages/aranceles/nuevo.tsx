@@ -25,7 +25,11 @@ import SignerSelect, {
     SIN_FIRMANTE,
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
-import { itemsDeLineas, lineaVacia } from '@/features/aranceles/lib/fee-form';
+import {
+    conLineaNueva,
+    itemsDeLineas,
+    lineaVacia,
+} from '@/features/aranceles/lib/fee-form';
 import { consultaDeCobro } from '@/features/aranceles/lib/fee-query';
 import DocumentFrame, {
     HOJA_ALTO_A5,
@@ -57,8 +61,8 @@ type Props = {
 };
 
 const lineasDe = (cobro: Cobro): LineaDeCobro[] =>
-    cobro.lines.map((l) => ({
-        ...lineaVacia(),
+    cobro.lines.map((l, i) => ({
+        ...lineaVacia(i + 1),
         feeTypeId: l.feeTypeId,
         quantity: l.quantity === null ? '1' : String(l.quantity),
         baseAmount: l.baseAmount ?? '',
@@ -344,10 +348,10 @@ export default function NuevoCobro({
                                 type="button"
                                 variant="outline"
                                 onClick={() =>
-                                    form.setData('lineas', [
-                                        ...form.data.lineas,
-                                        lineaVacia(),
-                                    ])
+                                    form.setData(
+                                        'lineas',
+                                        conLineaNueva(form.data.lineas),
+                                    )
                                 }
                             >
                                 <Plus className="size-4" aria-hidden="true" />
