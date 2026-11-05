@@ -110,6 +110,7 @@ export default function FeeLineEditor({
                     id={`linea-${linea.key}-tipo`}
                     types={types}
                     value={linea.feeTypeId}
+                    fecha={fecha}
                     invalid={Boolean(error('feeTypeId'))}
                     onChange={(elegido) =>
                         onChange({

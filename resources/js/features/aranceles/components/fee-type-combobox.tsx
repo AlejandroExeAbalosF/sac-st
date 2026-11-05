@@ -13,7 +13,9 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { precioEn } from '@/features/aranceles/lib/fee-line';
 import { coincideTipo } from '@/features/aranceles/lib/fee-type-search';
+import { feeTypeValue } from '@/features/aranceles/lib/fee-type-value';
 import { cn } from '@/lib/utils';
 
 type Tipo = App.Modules.Aranceles.Data.FeeTypeData;
@@ -23,6 +25,8 @@ type Props = {
     types: Tipo[];
     value: number | null;
     onChange: (tipo: Tipo) => void;
+    /** La fecha que elige la tarifa. Sin ella se muestra la vigente hoy. */
+    fecha?: string;
     placeholder?: string;
     invalid?: boolean;
     className?: string;
@@ -30,6 +34,7 @@ type Props = {
 
 /**
  * El select con buscador de los tipos de arancel: por código, inciso o concepto.
+ * Cada opción muestra lo que vale: el importe o, si es porcentual, la tasa.
  *
  * La lista viene entera en las props —son pocas decenas—, así que busca en el
  * navegador sin consultar al servidor. Quien usa el componente decide qué tipos
@@ -40,6 +45,7 @@ export default function FeeTypeCombobox({
     types,
     value,
     onChange,
+    fecha,
     placeholder = 'Buscá por código, inciso o concepto…',
     invalid = false,
     className,
@@ -52,6 +58,11 @@ export default function FeeTypeCombobox({
         () => types.filter((tipo) => coincideTipo(tipo, consulta)),
         [types, consulta],
     );
+    const valorDe = (tipo: Tipo) =>
+        feeTypeValue(
+            tipo.calculationMode,
+            fecha === undefined ? tipo.currentPrice : precioEn(tipo, fecha),
+        );
 
     return (
         <Popover
@@ -78,11 +89,16 @@ export default function FeeTypeCombobox({
                         className,
                     )}
                 >
-                    <span className="truncate text-left">
+                    <span className="min-w-0 flex-1 truncate text-left">
                         {seleccionado
                             ? `${seleccionado.code} · ${seleccionado.name}`
                             : placeholder}
                     </span>
+                    {seleccionado && (
+                        <span className="shrink-0 tabular-nums">
+                            {valorDe(seleccionado)}
+                        </span>
+                    )}
                     <ChevronDown
                         className="size-4 shrink-0 opacity-50"
                         aria-hidden="true"
@@ -122,12 +138,16 @@ export default function FeeTypeCombobox({
                                     <span className="min-w-0 flex-1">
                                         {tipo.name}
                                     </span>
-                                    {tipo.id === value && (
-                                        <Check
-                                            className="size-4 shrink-0"
-                                            aria-hidden="true"
-                                        />
-                                    )}
+                                    <span className="shrink-0 text-right tabular-nums">
+                                        {valorDe(tipo)}
+                                    </span>
+                                    <Check
+                                        className={cn(
+                                            'size-4 shrink-0',
+                                            tipo.id !== value && 'invisible',
+                                        )}
+                                        aria-hidden="true"
+                                    />
                                 </CommandItem>
                             ))}
                         </CommandGroup>
