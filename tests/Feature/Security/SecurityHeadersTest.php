@@ -40,6 +40,15 @@ class SecurityHeadersTest extends TestCase
         $this->assertStringContainsString("object-src 'none'", $csp);
     }
 
+    /** El PDF recién elegido se mira en un iframe propio: nada de otro origen. */
+    public function test_frames_only_admit_the_system_and_a_local_file()
+    {
+        $csp = $this->get(route('login'))->headers->get('Content-Security-Policy');
+
+        $this->assertIsString($csp);
+        $this->assertStringContainsString("frame-src 'self' blob:;", $csp.';');
+    }
+
     /**
      * La suite no depende de que el desarrollador tenga Vite apagado.
      *

@@ -152,11 +152,16 @@ export default function TicketPhotoPanel({
                         </div>
 
                         {esPdf ? (
-                            <object
-                                data={vistaPrevia}
-                                type="application/pdf"
+                            /*
+                             * Un iframe y no un `<object>`, que la CSP prohíbe
+                             * (`object-src 'none'`). No va por `DocumentFrame`:
+                             * ese coteja una dirección del servidor, y este
+                             * archivo todavía está solo en el navegador.
+                             */
+                            <iframe
+                                src={vistaPrevia}
+                                title="Comprobante en PDF"
                                 className="h-[32rem] w-full rounded"
-                                aria-label="Comprobante en PDF"
                             />
                         ) : (
                             <img

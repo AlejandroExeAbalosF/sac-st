@@ -97,6 +97,13 @@ return [
             'form-action' => ["'self'"],
             'frame-ancestors' => ["'none'"],
             'object-src' => ["'none'"],
+            /*
+             * `blob:` es el PDF que el operador acaba de elegir, antes de
+             * subirlo, en `TicketPhotoPanel`. Es un archivo de su propio
+             * navegador: no carga nada de otro origen, y hereda esta misma
+             * política. `object-src` sigue cerrado.
+             */
+            'frame-src' => ["'self'", 'blob:'],
             'img-src' => ["'self'", 'data:', 'blob:'],
             'font-src' => ["'self'", 'data:'],
             /*

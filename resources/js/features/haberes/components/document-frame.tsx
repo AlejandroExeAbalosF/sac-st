@@ -36,7 +36,9 @@ const SOPORTA_ZOOM =
  * La hoja adentro de su marco, escalada al ancho disponible.
  *
  * **Es el único lugar del sistema donde se arma un `<iframe>` de
- * documento.** No es prolijidad: enmarcar un documento exige que su ruta
+ * documento del servidor.** (`TicketPhotoPanel` enmarca un archivo que
+ * todavía está en el navegador: no tiene ruta que declarar.) No es
+ * prolijidad: enmarcar un documento exige que su ruta
  * esté declarada en `security.headers.same_origin_frame_routes`, y esa
  * condición vive en un archivo de PHP que ningún test del front puede
  * mirar. Tres veces se agregó un visor sin declarar la ruta, y las tres el
