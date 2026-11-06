@@ -32,6 +32,7 @@ enum HaberesReasonCode: string implements ReasonCode
     case DepositNotMade = 'deposit_not_made';
     case WrongReceipt = 'wrong_receipt';
     case WrongExpediente = 'wrong_expediente';
+    case WrongCredit = 'wrong_credit';
     /**
      * Lo pone el sistema: el papel cae porque se anuló el pago fuera del
      * circuito que respaldaba. El motivo de fondo es el del pago.
@@ -56,6 +57,7 @@ enum HaberesReasonCode: string implements ReasonCode
             self::DepositNotMade => 'El depósito no se hizo',
             self::WrongReceipt => 'Comprobante equivocado o ilegible',
             self::WrongExpediente => 'Era de otro expediente',
+            self::WrongCredit => 'Era otro movimiento del extracto',
             self::SettlementVoided => 'Se anuló el pago que respaldaba',
             self::Other => 'Otro',
         };

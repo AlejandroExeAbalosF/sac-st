@@ -8,24 +8,33 @@ use App\Modules\Banking\Actions\CancelCashToBankTransfer;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\CancelExpediente;
 use App\Modules\Haberes\Actions\CancelHaber;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
+use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\VoidCashCollection;
+use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Ledger\Actions\PostJournalEntry;
+use App\Modules\Ledger\Enums\FinancialEventType;
+use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashDayBook;
+use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -133,7 +142,7 @@ class GuardasDelCircuitoTest extends TestCase
             allocation: FundingAllocation::query()->live()->firstOrFail(),
             amount: '100.00',
             idempotencyKey: 'liberar-en-transito',
-            notes: 'Prueba de la guarda.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Prueba de la guarda.'),
             actorId: $this->operador()->id,
         );
     }
@@ -173,13 +182,164 @@ class GuardasDelCircuitoTest extends TestCase
             allocation: FundingAllocation::query()->live()->firstOrFail(),
             amount: $cuota->expected_amount,
             idempotencyKey: 'liberar-para-anular',
-            notes: 'Prueba de la guarda.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Prueba de la guarda.'),
             actorId: $this->operador()->id,
         );
+
+        $this->anular($cuota);
 
         $anulado = app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
 
         $this->assertSame('cancelled', $anulado->workflow_status->value);
+    }
+
+    /** Liberar no da de baja el recibo: anular el haber lo pide primero. */
+    public function test_no_se_anula_un_haber_con_el_recibo_vigente(): void
+    {
+        $cuota = $this->cuotaLiberada();
+
+        $this->expectExceptionMessageMatches('/recibo de ingreso vigente/u');
+
+        app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
+    }
+
+    /** Ni un expediente. */
+    public function test_no_se_anula_un_expediente_con_el_recibo_vigente(): void
+    {
+        $cuota = $this->cuotaLiberada();
+
+        $this->expectExceptionMessageMatches('/recibo de ingreso vigente/u');
+
+        app(CancelExpediente::class)->handle($cuota->haber->expediente, new Reason(HaberesReasonCode::DataEntryError));
+    }
+
+    /** La base tampoco deja anular la cuota con el recibo vigente. */
+    public function test_la_base_rechaza_anular_una_cuota_con_el_recibo_vigente(): void
+    {
+        $cuota = $this->cuotaLiberada();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/recibo de ingreso vigente/u');
+
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'cancelled']);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | La cuota ya entregada
+    |--------------------------------------------------------------------------
+    */
+
+    /** El mostrador no lleva Orden: la plata entregada tampoco se libera. */
+    public function test_no_se_libera_la_plata_de_una_cuota_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        try {
+            $this->liberarTodo($cuota);
+            $this->fail('Liberó dinero que ya se entregó.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('egreso registrado', $e->errors()['allocationId'][0]);
+        }
+
+        $this->assertSame('0.00', $this->saldo('BENEFICIARY_FUNDS'));
+    }
+
+    /** La base también lo rechaza, sin pasar por el Action. */
+    public function test_la_base_rechaza_liberar_la_plata_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+        $original = FundingAllocation::query()->live()->where('beneficiary_installment_id', $cuota->id)->firstOrFail();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/egreso registrado/u');
+
+        FundingAllocation::query()->create([
+            'allocation_event_id' => $original->allocation_event_id,
+            'fund_receipt_id' => $original->fund_receipt_id,
+            'haber_id' => $original->haber_id,
+            'beneficiary_installment_id' => $original->beneficiary_installment_id,
+            'allocation_kind' => AllocationKind::Reversal,
+            'reversal_of_id' => $original->id,
+            'amount' => $original->amount,
+            'allocated_by' => $this->operador()->id,
+            'allocated_at' => now(),
+            'notes' => 'Prueba de la base.',
+        ]);
+    }
+
+    /** Ni se anula su cobro: el dinero entró y salió. */
+    public function test_no_se_anula_el_cobro_de_una_cuota_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        try {
+            $this->anular($cuota);
+            $this->fail('Anuló el cobro de una cuota ya entregada.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('egreso registrado', $e->errors()['installmentId'][0]);
+        }
+
+        $this->assertSame(
+            ReceiptStatus::Issued,
+            Receipt::query()->where('receipt_type', ReceiptType::Income)->firstOrFail()->status,
+        );
+    }
+
+    /** Lo que se entregó en mano ya no está en la caja para llevarlo al banco. */
+    public function test_no_se_deposita_el_efectivo_de_una_cuota_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        try {
+            $this->depositar($cuota);
+            $this->fail('Depositó un efectivo que ya se entregó.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('ya se entregó', $e->errors()['installmentId'][0]);
+        }
+
+        $this->assertSame(0, CashToBankTransfer::query()->count());
+    }
+
+    /** La base tampoco deja sumarla a un traslado. */
+    public function test_la_base_rechaza_trasladar_el_efectivo_entregado(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $traslado = $this->depositar($cuota);
+
+        app(CancelCashToBankTransfer::class)->handle(
+            transfer: $traslado,
+            reason: 'El depósito se cargó sobre la cuota equivocada.',
+            idempotencyKey: 'cancelar-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+        app(DeliverToBeneficiary::class)->handle(
+            installment: $cuota->refresh(),
+            idempotencyKey: 'entrega-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+
+        $imputacion = FundingAllocation::query()->live()->where('beneficiary_installment_id', $cuota->id)->firstOrFail();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/egreso registrado/u');
+
+        DB::table('cash_to_bank_transfer_items')->insert([
+            'cash_to_bank_transfer_id' => $traslado->id,
+            'fund_receipt_id' => $imputacion->fund_receipt_id,
+            'funding_allocation_id' => $imputacion->id,
+            'amount' => $imputacion->amount,
+        ]);
+    }
+
+    /** Y el haber sigue sin poder anularse. */
+    public function test_no_se_anula_un_haber_con_una_cuota_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        $this->expectExceptionMessageMatches('/dinero imputado/u');
+
+        app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
     }
 
     /*
@@ -202,7 +362,7 @@ class GuardasDelCircuitoTest extends TestCase
             allocation: FundingAllocation::query()->live()->firstOrFail(),
             amount: $cuota->expected_amount,
             idempotencyKey: 'liberar-todo-antes-de-anular',
-            notes: 'Prueba de la guarda.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Prueba de la guarda.'),
             actorId: $this->operador()->id,
         );
 
@@ -211,6 +371,97 @@ class GuardasDelCircuitoTest extends TestCase
         $this->anular($cuota);
 
         $this->assertSame(ReceiptStatus::Voided, Receipt::query()->firstOrFail()->status);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | La recepción del cobro anulado
+    |--------------------------------------------------------------------------
+    */
+
+    /** Anular el cobro saca la recepción de los libros: queda revertida, con su motivo. */
+    public function test_anular_el_cobro_revierte_la_recepcion(): void
+    {
+        $this->anular($this->cuotaCobrada());
+
+        $recepcion = FundReceipt::query()->firstOrFail();
+
+        $this->assertNotNull($recepcion->reversal_event_id);
+        $this->assertNotNull($recepcion->reversed_at);
+        $this->assertSame('wrong_amount', $recepcion->reversal_reason_code);
+        $this->assertSame('Importe equivocado: El importe se cargó con un cero de más.', $recepcion->reversal_reason);
+    }
+
+    /** Ese dinero nunca entró: no se puede volver a imputar. */
+    public function test_la_recepcion_del_cobro_anulado_no_se_vuelve_a_imputar(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $this->anular($cuota);
+
+        try {
+            app(AllocateFundsToInstallment::class)->handle(
+                FundReceipt::query()->firstOrFail(),
+                $cuota->refresh(),
+                $cuota->expected_amount,
+                'reimputar-'.Str::random(8),
+                $this->operador()->id,
+            );
+            $this->fail('Imputó una recepción cuyo dinero salió de los libros.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('revertida', $e->errors()['receiptId'][0]);
+        }
+
+        $this->assertSame('0.00', app(InstallmentFunding::class)->allocated($cuota->refresh()));
+    }
+
+    /** Cobrar de nuevo crea otra recepción, y la cuota queda financiada con esa. */
+    public function test_el_cobro_anulado_se_vuelve_a_cobrar_con_otra_recepcion(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $this->anular($cuota);
+
+        app(CollectAndIssueReceipt::class)->handle(
+            installment: $cuota->refresh(),
+            idempotencyKey: 'cobro-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+
+        $this->assertSame(2, FundReceipt::query()->count());
+        $this->assertSame(1, FundReceipt::query()->whereNull('reversal_event_id')->count());
+        $this->assertSame($cuota->expected_amount, app(InstallmentFunding::class)->allocated($cuota->refresh()));
+    }
+
+    /** La migración marca los cobros ya anulados, salvo el que se volvió a imputar. */
+    public function test_la_migracion_repara_los_cobros_ya_anulados(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $recepcion = FundReceipt::query()->firstOrFail();
+        $this->liberarTodo($cuota);
+        $this->revertirSinMarcar($recepcion);
+
+        $migracion = require database_path('migrations/2026_11_06_050000_mark_voided_cash_collections_as_reversed.php');
+        $migracion->up();
+
+        $this->assertNotNull($recepcion->refresh()->reversal_event_id);
+        $this->assertSame('other', $recepcion->reversal_reason_code);
+        $this->assertSame('Anulado antes de marcar la recepción.', $recepcion->reversal_reason);
+    }
+
+    public function test_la_migracion_no_toca_la_recepcion_que_se_volvio_a_imputar(): void
+    {
+        $cuota = $this->cuotaCobrada();
+        $recepcion = FundReceipt::query()->firstOrFail();
+        $importe = $cuota->expected_amount;
+        $this->liberarTodo($cuota);
+        $this->revertirSinMarcar($recepcion);
+
+        // Lo que permitía el error: sin marca, la recepción seguía imputable.
+        app(AllocateFundsToInstallment::class)->handle($recepcion, $cuota->refresh(), $importe, 'reimputar-'.Str::random(8), $this->operador()->id);
+
+        $migracion = require database_path('migrations/2026_11_06_050000_mark_voided_cash_collections_as_reversed.php');
+        $migracion->up();
+
+        $this->assertNull($recepcion->refresh()->reversal_event_id);
     }
 
     /** Sin plata ni recibo no hay nada que anular. */
@@ -286,6 +537,55 @@ class GuardasDelCircuitoTest extends TestCase
         return $cuota->refresh();
     }
 
+    private function cuotaLiberada(): BeneficiaryInstallment
+    {
+        $cuota = $this->cuotaCobrada();
+
+        $this->liberarTodo($cuota);
+
+        return $cuota->refresh();
+    }
+
+    private function cuotaEntregada(): BeneficiaryInstallment
+    {
+        $cuota = $this->cuotaCobrada();
+
+        app(DeliverToBeneficiary::class)->handle(
+            installment: $cuota,
+            idempotencyKey: 'entrega-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+
+        return $cuota->refresh();
+    }
+
+    /** El asiento inverso sin marcar la recepción: lo que hacía antes anular un cobro. */
+    private function revertirSinMarcar(FundReceipt $recepcion): void
+    {
+        app(PostJournalEntry::class)->handle(
+            type: FinancialEventType::Reversal,
+            idempotencyKey: 'revertir-'.Str::random(8),
+            lines: app(InverseEntry::class)->of($recepcion->financial_event_id),
+            date: BusinessDate::today(),
+            cashBoxId: $recepcion->cash_box_id,
+            description: 'Anulado antes de marcar la recepción.',
+            actorId: $this->operador()->id,
+            reversalOfId: $recepcion->financial_event_id,
+            reversalReason: 'Anulado antes de marcar la recepción.',
+        );
+    }
+
+    private function liberarTodo(BeneficiaryInstallment $cuota): void
+    {
+        app(UnallocateFunds::class)->handle(
+            allocation: FundingAllocation::query()->live()->where('beneficiary_installment_id', $cuota->id)->firstOrFail(),
+            amount: $cuota->expected_amount,
+            idempotencyKey: 'liberar-'.Str::random(8),
+            motivo: new Reason(HaberesReasonCode::Other, 'Prueba de la guarda.'),
+            actorId: $this->operador()->id,
+        );
+    }
+
     private function depositar(BeneficiaryInstallment $cuota): CashToBankTransfer
     {
         return app(DepositCashToBank::class)->handle(
@@ -320,7 +620,7 @@ class GuardasDelCircuitoTest extends TestCase
     {
         app(VoidCashCollection::class)->handle(
             installment: $cuota,
-            reason: 'El importe se cargó con un cero de más.',
+            motivo: new Reason(HaberesReasonCode::WrongAmount, 'El importe se cargó con un cero de más.'),
             idempotencyKey: 'anular-'.Str::random(8),
             actorId: $this->operador()->id,
         );

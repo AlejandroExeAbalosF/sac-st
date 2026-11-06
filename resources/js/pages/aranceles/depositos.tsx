@@ -345,7 +345,6 @@ function FilaDeDeposito({
                     url={cancel(deposito.id).url}
                     titulo="Cancelar el traspaso"
                     consecuencia="El efectivo vuelve a figurar en la caja y todo su reparto queda libre."
-                    ejemplo="El comprobante dice otro importe."
                     abierto
                     onCerrar={() => setDialogo(null)}
                 />

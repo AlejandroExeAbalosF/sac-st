@@ -106,6 +106,7 @@ export default function InstallmentCard({
     atenuada,
     cuentas,
     puedeEditarTicket,
+    puedeBuscarTicket,
     puedeEmitirRecibo,
     puedeRegistrarPago,
     puedeTrasladar,
@@ -124,6 +125,7 @@ export default function InstallmentCard({
     atenuada: boolean;
     cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
+    puedeBuscarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;
     puedeTrasladar: boolean;
@@ -376,6 +378,7 @@ export default function InstallmentCard({
                             cuota={cuota}
                             cuentas={cuentas}
                             puedeEditarTicket={puedeEditarTicket}
+                            puedeBuscarTicket={puedeBuscarTicket}
                             puedeEmitirRecibo={puedeEmitirRecibo}
                             puedeRegistrarPago={puedeRegistrarPago}
                             puedeTrasladar={puedeTrasladar}
@@ -434,7 +437,7 @@ export default function InstallmentCard({
                 </>
             )}
 
-            <div className="flex items-center justify-end gap-1 border-t bg-muted/20 px-4 py-2.5 sm:px-5">
+            <div className="flex flex-wrap items-center justify-end gap-1 border-t bg-muted/20 px-4 py-2.5 sm:px-5">
                 {/*
                  * El historial va al lado de editar y no escondido: la
                  * pregunta «¿esta cuota decía otra cosa?» aparece justo

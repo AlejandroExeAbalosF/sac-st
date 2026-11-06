@@ -18,6 +18,7 @@ use App\Modules\Haberes\Actions\VoidCashCollection;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentTerms;
@@ -27,6 +28,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\HaberManagementLabel;
 use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Shared\Models\Person;
+use App\Modules\Shared\Support\Reason;
 use Database\Seeders\Concerns\SplitsPersonName;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
@@ -439,7 +441,7 @@ final class EscenariosDemoSeeder extends Seeder
 
         app(VoidCashCollection::class)->handle(
             installment: $rehecha->refresh(),
-            reason: 'El importe se tipeó con un dígito de más y el recibo salió por $ 1.805.000.',
+            motivo: new Reason(HaberesReasonCode::WrongAmount, 'Se tipeó con un dígito de más y el recibo salió por $ 1.805.000.'),
             idempotencyKey: 'demo:anulacion:'.$rehecha->id,
             actorId: $this->operador->id,
         );

@@ -20,6 +20,7 @@ use App\Support\BusinessDate;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -435,6 +436,30 @@ class PantallasDeDepositosTest extends TestCase
         $this->assertSame('72000.00', $ticket->refresh()->amount);
     }
 
+    /** El motivo de desvincular sale de la lista del acto, y su código queda en la auditoría. */
+    public function test_desvincular_pide_un_motivo_de_la_lista(): void
+    {
+        $ticket = $this->ticket();
+        $movimiento = $this->movimiento($ticket);
+
+        $this->actingAs($this->operador())
+            ->post(route('depositos.link', $ticket), ['bankTransactionId' => $movimiento->id]);
+
+        $desvincular = fn (array $datos) => $this->actingAs($this->operador())->patch(route('depositos.unlink', $ticket), $datos);
+
+        $desvincular([])->assertSessionHasErrors('reasonCode');
+        $desvincular(['reasonCode' => 'deposit_not_made'])->assertSessionHasErrors('reasonCode');
+        $desvincular(['reasonCode' => 'other'])->assertSessionHasErrors('reason');
+
+        $desvincular(['reasonCode' => 'wrong_credit'])->assertSessionHasNoErrors();
+
+        $this->assertNull($ticket->refresh()->bank_transaction_id);
+        $this->assertStringContainsString(
+            'wrong_credit',
+            (string) DB::table('audit_events')->where('action', 'ticket.desvinculado')->value('metadata'),
+        );
+    }
+
     /** Desvinculado vuelve a ser corregible: es el camino que la pantalla indica. */
     public function test_desvincular_devuelve_la_posibilidad_de_corregir(): void
     {
@@ -445,7 +470,7 @@ class PantallasDeDepositosTest extends TestCase
             ->post(route('depositos.link', $ticket), ['bankTransactionId' => $movimiento->id]);
 
         $this->actingAs($this->operador())
-            ->patch(route('depositos.unlink', $ticket), ['reason' => 'El importe estaba mal copiado.']);
+            ->patch(route('depositos.unlink', $ticket), ['reasonCode' => 'wrong_credit', 'reason' => 'El importe estaba mal copiado.']);
 
         $this->actingAs($this->operador())
             ->post(route('depositos.update', $ticket), [

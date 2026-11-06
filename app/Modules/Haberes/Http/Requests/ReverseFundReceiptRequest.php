@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Http\Requests;
 
+use App\Modules\Haberes\Enums\HaberesReasonAct;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
+use LogicException;
 
 /**
  * Deshacer una recepción exige decir por qué.
@@ -21,8 +24,7 @@ final class ReverseFundReceiptRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'reason' => ['required', 'string', 'min:10', 'max:500'],
+        return Reason::rules(HaberesReasonAct::FundReceiptReversal, max: 250) + [
             'idempotencyKey' => ['required', 'string', 'max:120'],
         ];
     }
@@ -32,10 +34,7 @@ final class ReverseFundReceiptRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'reason.required' => 'Hace falta decir por qué se revierte esta recepción.',
-            'reason.min' => 'El motivo tiene que explicar qué pasó, no alcanzan unas pocas letras.',
-        ];
+        return Reason::messages();
     }
 
     /**
@@ -44,8 +43,15 @@ final class ReverseFundReceiptRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'reason' => 'motivo',
+            'reasonCode' => 'motivo',
+            'reason' => 'detalle',
             'idempotencyKey' => 'clave de idempotencia',
         ];
+    }
+
+    public function motivo(): Reason
+    {
+        return Reason::fromValidated($this->validated(), HaberesReasonAct::FundReceiptReversal)
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
     }
 }

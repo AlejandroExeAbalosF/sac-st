@@ -125,6 +125,14 @@ final class AllocateFundsToInstallment
             $recepcionBloqueada = FundReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
             $this->assertPuedeRecibirFondos($expedienteBloqueado, $haberBloqueado, $cuotaBloqueada);
+
+            // La base lo rechaza igual (`funding_allocations_receipt_live`), sin explicar por qué.
+            if ($recepcionBloqueada->reversal_event_id !== null) {
+                throw ValidationException::withMessages([
+                    'receiptId' => 'Esa recepción está revertida: su dinero salió de los libros.',
+                ]);
+            }
+
             $this->assertDineroDelCircuito($recepcionBloqueada, $cuotaBloqueada);
             $this->assertFits($recepcionBloqueada, $cuotaBloqueada, $importe);
             $this->assertSameMedium($recepcionBloqueada, $cuotaBloqueada);

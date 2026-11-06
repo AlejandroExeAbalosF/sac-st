@@ -26,6 +26,10 @@ enum HaberesReasonAct: string implements ReasonAct
     case LegacySettlementVoid = 'legacy_settlement_void';
     case LegacyDocumentVoid = 'legacy_document_void';
     case DepositTicketDiscard = 'deposit_ticket_discard';
+    case CollectionVoid = 'collection_void';
+    case FundsRelease = 'funds_release';
+    case FundReceiptReversal = 'fund_receipt_reversal';
+    case DepositTicketUnlink = 'deposit_ticket_unlink';
 
     /**
      * @return list<HaberesReasonCode>
@@ -40,6 +44,10 @@ enum HaberesReasonAct: string implements ReasonAct
             self::LegacySettlementVoid => [HaberesReasonCode::WrongInstallment, HaberesReasonCode::WrongAmount, HaberesReasonCode::Duplicate, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
             self::LegacyDocumentVoid => [HaberesReasonCode::MistypedNumber, HaberesReasonCode::WrongInstallment, HaberesReasonCode::Duplicate, HaberesReasonCode::Other],
             self::DepositTicketDiscard => [HaberesReasonCode::DepositNotMade, HaberesReasonCode::WrongReceipt, HaberesReasonCode::WrongExpediente, HaberesReasonCode::Duplicate, HaberesReasonCode::Other],
+            self::CollectionVoid => [HaberesReasonCode::WrongAmount, HaberesReasonCode::WrongInstallment, HaberesReasonCode::Duplicate, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
+            self::FundsRelease => [HaberesReasonCode::WrongAmount, HaberesReasonCode::WrongInstallment, HaberesReasonCode::WrongExpediente, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
+            self::FundReceiptReversal => [HaberesReasonCode::Duplicate, HaberesReasonCode::WrongExpediente, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
+            self::DepositTicketUnlink => [HaberesReasonCode::WrongCredit, HaberesReasonCode::WrongReceipt, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
         };
     }
 

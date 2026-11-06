@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Haberes\Models\DepositTicket;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -17,6 +22,7 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Collection;
@@ -24,7 +30,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Anula un cobro por mostrador: el dinero nunca entró.
+ * Anula el cobro de una cuota y su recibo.
+ *
+ * **Por banco, deshace la conciliación entera** con un solo motivo: libera la
+ * cuota, revierte la recepción, anula el recibo y desvincula el comprobante. El
+ * depósito existe, así que el movimiento vuelve a quedar libre en el extracto
+ * para conciliarlo con la cuota que corresponda.
+ *
+ * **Por mostrador, el dinero nunca entró.**
  *
  * **No es lo mismo que liberar.** Liberar mueve plata que existe de una
  * cuota al pozo de no identificados. Esto deshace la afirmación de que
@@ -54,16 +67,23 @@ final class VoidCashCollection
         private readonly UnallocateFunds $liberar,
         private readonly RecordAuditEvent $auditar,
         private readonly InverseEntry $inverso,
+        private readonly ReverseFundReceipt $revertir,
+        private readonly LinkDepositTicket $vinculo,
+        private readonly AllocatableAmount $disponible,
     ) {}
 
     /** @throws ValidationException */
     public function handle(
         BeneficiaryInstallment $installment,
-        string $reason,
+        Reason $motivo,
         string $idempotencyKey,
         ?int $actorId = null,
     ): void {
-        DB::transaction(function () use ($installment, $reason, $idempotencyKey, $actorId): void {
+        DB::transaction(function () use ($installment, $motivo, $idempotencyKey, $actorId): void {
+            $this->assertNoSeEntrego($installment);
+
+            $reason = $motivo->describe();
+
             /*
              * Las que todavía sostienen plata.
              *
@@ -95,12 +115,23 @@ final class VoidCashCollection
              */
             if ($imputaciones->isEmpty()) {
                 $this->assertHayReciboQueAnular($installment);
-                $this->anularElRecibo($installment, $reason, $actorId);
+                $this->anularElRecibo($installment, $motivo, $actorId);
 
                 $this->auditar->handle('cobro.anulado', $installment, null, null, [
                     'sin_reversiones' => 'la plata ya estaba liberada',
-                    'motivo' => $reason,
+                    ...$motivo->auditMetadata('motivo'),
                 ], actorId: $actorId);
+
+                return;
+            }
+
+            $recepciones = $imputaciones
+                ->map(fn (FundingAllocation $a): FundReceipt => $a->fundReceipt)
+                ->unique('id')
+                ->values();
+
+            if ($recepciones->every(fn (FundReceipt $r): bool => $r->medium === PaymentMedium::Bank)) {
+                $this->deshacerLaConciliacion($installment, $imputaciones, $recepciones, $motivo, $idempotencyKey, $actorId);
 
                 return;
             }
@@ -108,37 +139,126 @@ final class VoidCashCollection
             $recepcion = $this->recepcionDeMostrador($imputaciones);
 
             $this->assertSigueEnLaCaja($imputaciones);
-
-            /*
-             * Primero la imputación y después la recepción, en ese orden:
-             * al revés, el pozo de no identificados quedaría en descubierto
-             * en el medio de la transacción.
-             */
-            foreach ($imputaciones as $i => $imputacion) {
-                $vigente = $this->liberar->vigente($imputacion);
-
-                if (Decimal::equals($vigente, '0')) {
-                    continue;
-                }
-
-                $this->liberar->handle(
-                    allocation: $imputacion,
-                    amount: $vigente,
-                    idempotencyKey: $idempotencyKey.':imputacion:'.$i,
-                    notes: $reason,
-                    actorId: $actorId,
-                );
-            }
-
-            $this->revertirLaRecepcion($recepcion, $idempotencyKey, $actorId, $reason);
-            $this->anularElRecibo($installment, $reason, $actorId);
+            $this->liberarLaCuota($imputaciones, $motivo, $idempotencyKey, $actorId);
+            $this->assertSinOtraCuota($recepcion);
+            $this->revertirLaRecepcion($recepcion, $idempotencyKey, $actorId, $motivo);
+            $this->anularElRecibo($installment, $motivo, $actorId);
 
             $this->auditar->handle('cobro.anulado', $installment, null, null, [
                 'fund_receipt_id' => $recepcion->id,
                 'amount' => $recepcion->amount,
-                'motivo' => $reason,
+                ...$motivo->auditMetadata('motivo'),
             ], actorId: $actorId);
         });
+    }
+
+    /**
+     * Deshace un cobro por banco: el movimiento vuelve a quedar libre.
+     *
+     * @param  Collection<int, FundingAllocation>  $imputaciones
+     * @param  Collection<int, FundReceipt>  $recepciones
+     *
+     * @throws ValidationException
+     */
+    private function deshacerLaConciliacion(
+        BeneficiaryInstallment $installment,
+        Collection $imputaciones,
+        Collection $recepciones,
+        Reason $motivo,
+        string $idempotencyKey,
+        ?int $actorId,
+    ): void {
+        foreach ($recepciones as $recepcion) {
+            $this->assertNoEsDelSistemaAnterior($recepcion);
+        }
+
+        $this->liberarLaCuota($imputaciones, $motivo, $idempotencyKey, $actorId);
+
+        foreach ($recepciones as $recepcion) {
+            $this->assertSinOtraCuota($recepcion);
+            $this->revertir->handle($recepcion, $motivo, $idempotencyKey.':recepcion:'.$recepcion->id, $actorId);
+        }
+
+        $this->anularElRecibo($installment, $motivo, $actorId);
+        $this->desvincularLosComprobantes($installment, $motivo, $actorId);
+
+        $this->auditar->handle('cobro.anulado', $installment, null, null, [
+            'fund_receipt_ids' => $recepciones->pluck('id')->all(),
+            'conciliacion_deshecha' => true,
+            ...$motivo->auditMetadata('motivo'),
+        ], actorId: $actorId);
+    }
+
+    /**
+     * Primero la imputación y después la recepción, en ese orden: al revés, el
+     * pozo de no identificados quedaría en descubierto en el medio de la
+     * transacción.
+     *
+     * @param  Collection<int, FundingAllocation>  $imputaciones
+     */
+    private function liberarLaCuota(Collection $imputaciones, Reason $motivo, string $idempotencyKey, ?int $actorId): void
+    {
+        foreach ($imputaciones as $i => $imputacion) {
+            $this->liberar->handle(
+                allocation: $imputacion,
+                amount: $this->liberar->vigente($imputacion),
+                idempotencyKey: $idempotencyKey.':imputacion:'.$i,
+                motivo: $motivo,
+                actorId: $actorId,
+            );
+        }
+    }
+
+    /**
+     * El comprobante vuelve a la cola de espera. Si el depósito también
+     * respalda otra recepción, el comprobante sigue siendo su papel y se queda.
+     */
+    private function desvincularLosComprobantes(BeneficiaryInstallment $installment, Reason $motivo, ?int $actorId): void
+    {
+        $comprobantes = DepositTicket::query()
+            ->where('beneficiary_installment_id', $installment->id)
+            ->where('status', DepositTicketStatus::Matched)
+            ->get();
+
+        foreach ($comprobantes as $comprobante) {
+            $movimiento = BankTransaction::query()->findOrFail($comprobante->bank_transaction_id);
+
+            if (Decimal::equals($this->disponible->allocated($movimiento), '0')) {
+                $this->vinculo->unlink($comprobante, $motivo->describe(), (int) $actorId, $motivo->code);
+            }
+        }
+    }
+
+    /** @throws ValidationException */
+    private function assertNoEsDelSistemaAnterior(FundReceipt $recepcion): void
+    {
+        if ($recepcion->origin->isLegacy()) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'Esa plata es del sistema anterior: no se cobró acá. Lo que se puede hacer es liberarla de esta cuota.',
+            ]);
+        }
+    }
+
+    /**
+     * Un cobro no se anula después de pagarle al beneficiario.
+     *
+     * Anular afirma que el dinero nunca entró, y el egreso afirma que salió:
+     * quedarían los dos en pie, sin recibo que explique lo que se entregó.
+     *
+     * @throws ValidationException
+     */
+    private function assertNoSeEntrego(BeneficiaryInstallment $installment): void
+    {
+        $entregada = Disbursement::query()
+            ->live()
+            ->where('beneficiary_installment_id', $installment->id)
+            ->exists();
+
+        if ($entregada) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'Esta cuota tiene un egreso registrado: no se puede anular su cobro ni su recibo.',
+            ]);
+        }
     }
 
     /**
@@ -190,19 +310,8 @@ final class VoidCashCollection
         /** @var FundReceipt $recepcion */
         $recepcion = $recepciones->first();
 
-        if ($recepcion->medium === PaymentMedium::Bank) {
-            throw ValidationException::withMessages([
-                'installmentId' => 'Ese dinero entró por el banco y el extracto lo confirma: '
-                    .'existe. Lo que se puede hacer es liberarlo de esta cuota.',
-            ]);
-        }
-
         // Anular el cobro saca efectivo del cajón: lo del sistema anterior no se cobró acá.
-        if ($recepcion->origin->isLegacy()) {
-            throw ValidationException::withMessages([
-                'installmentId' => 'Esa plata es del sistema anterior: no se cobró acá. Lo que se puede hacer es liberarla de esta cuota.',
-            ]);
-        }
+        $this->assertNoEsDelSistemaAnterior($recepcion);
 
         return $recepcion;
     }
@@ -237,16 +346,47 @@ final class VoidCashCollection
         }
     }
 
-    /** El asiento inverso al de la recepción: ese dinero no está en la caja. */
+    /**
+     * Revertir saca toda la recepción: no puede estar financiando otra cuota.
+     *
+     * @throws ValidationException
+     */
+    private function assertSinOtraCuota(FundReceipt $recepcion): void
+    {
+        $otra = FundingAllocation::query()
+            ->withRemainingBalance()
+            ->where('fund_receipt_id', $recepcion->id)
+            ->with(['installment', 'haber.expediente'])
+            ->first();
+
+        if ($otra !== null) {
+            throw ValidationException::withMessages([
+                'installmentId' => sprintf(
+                    'Esa recepción también financia la cuota %s del expediente %s: hay que liberarla de ahí antes de anular este cobro.',
+                    $otra->installment->installment_number,
+                    $otra->haber->expediente->display_number,
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * El asiento inverso al de la recepción, y la marca en la recepción.
+     *
+     * Sin la marca seguía ofreciendo un dinero que ya salió de los libros, y
+     * volver a imputarla dejaba la cuota financiada con plata que no existe.
+     */
     private function revertirLaRecepcion(
         FundReceipt $recepcion,
         string $idempotencyKey,
         ?int $actorId,
-        string $reason,
+        Reason $motivo,
     ): void {
+        $reason = $motivo->describe();
+
         // El cheque vuelve a salir de custodia y el efectivo de la caja, en
         // la moneda en que entraron: lo dice el asiento original.
-        $this->asentar->handle(
+        $evento = $this->asentar->handle(
             type: FinancialEventType::Reversal,
             idempotencyKey: $idempotencyKey.':recepcion',
             lines: $this->inverso->of($recepcion->financial_event_id),
@@ -257,6 +397,14 @@ final class VoidCashCollection
             reversalOfId: $recepcion->financial_event_id,
             reversalReason: $reason,
         );
+
+        $recepcion->forceFill([
+            'reversal_event_id' => $evento->id,
+            'reversed_at' => now(),
+            'reversed_by' => $actorId,
+            'reversal_reason' => $reason,
+            'reversal_reason_code' => $motivo->code->value,
+        ])->save();
     }
 
     /**
@@ -268,7 +416,7 @@ final class VoidCashCollection
      */
     private function anularElRecibo(
         BeneficiaryInstallment $installment,
-        string $reason,
+        Reason $motivo,
         ?int $actorId,
     ): void {
         $recibo = Receipt::query()
@@ -283,7 +431,8 @@ final class VoidCashCollection
 
         $recibo->forceFill([
             'status' => ReceiptStatus::Voided,
-            'void_reason' => $reason,
+            'void_reason' => $motivo->describe(),
+            'void_reason_code' => $motivo->code->value,
             'voided_by' => $actorId,
             'voided_at' => now(),
         ])->save();

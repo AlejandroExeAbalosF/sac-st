@@ -29,6 +29,7 @@ export default function InstallmentCards({
     haberNumber,
     cuentas,
     puedeEditarTicket,
+    puedeBuscarTicket,
     puedeEmitirRecibo,
     puedeRegistrarPago,
     puedeTrasladar,
@@ -52,6 +53,7 @@ export default function InstallmentCards({
     /** Para el modal del comprobante, que deja corregir la cuenta. */
     cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
+    puedeBuscarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;
     puedeTrasladar: boolean;
@@ -129,6 +131,7 @@ export default function InstallmentCards({
                             editable={editable}
                             cuentas={cuentas}
                             puedeEditarTicket={puedeEditarTicket}
+                            puedeBuscarTicket={puedeBuscarTicket}
                             puedeEmitirRecibo={puedeEmitirRecibo}
                             puedeRegistrarPago={puedeRegistrarPago}
                             puedeTrasladar={puedeTrasladar}

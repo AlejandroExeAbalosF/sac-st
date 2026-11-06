@@ -171,7 +171,7 @@ function AnularDialog({
                     </DialogTitle>
                     <DialogDescription>
                         La cuota vuelve a quedar por pagar y sus papeles quedan
-                        anulados, con su motivo. No se borra nada.
+                        anulados.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -198,7 +198,6 @@ function AnularDialog({
                         codeError={form.errors.reasonCode}
                         detailError={form.errors.reason}
                         idPrefix={`motivo-pago-anterior-${cuotaId}`}
-                        detailPlaceholder="Se cargó en la cuota 2 y el recibo es de la cuota 1."
                     />
 
                     <DialogFooter className="gap-2">

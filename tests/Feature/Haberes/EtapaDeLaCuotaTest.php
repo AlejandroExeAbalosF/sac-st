@@ -16,6 +16,8 @@ use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Support\InstallmentStages;
+use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Collection;
@@ -112,6 +114,15 @@ class EtapaDeLaCuotaTest extends TestCase
     public function test_una_cuota_anulada_lo_dice(): void
     {
         $cuota = $this->cuotaCobrada();
+
+        // La plata sigue imputada; el recibo vigente la base no lo dejaría pasar.
+        Receipt::query()->where('beneficiary_installment_id', $cuota->id)->firstOrFail()->forceFill([
+            'status' => ReceiptStatus::Voided,
+            'void_reason_code' => 'other', 'void_reason' => 'Prueba de la etapa.',
+            'voided_by' => $this->operador()->id,
+            'voided_at' => now(),
+        ])->save();
+
         $cuota->forceFill(['workflow_status' => 'cancelled'])->save();
 
         $this->assertSame(

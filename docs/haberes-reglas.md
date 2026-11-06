@@ -110,6 +110,30 @@ en snapshots. En mostrador, el cobro y la emisión pueden ser un solo acto atóm
 la cantidad a cobrar se deriva del pendiente de la cuota. En banco, el ticket
 requiere identificar el crédito y registrar su recepción/asignación.
 
+El ticket no se desvincula mientras su movimiento tenga imputado neto distinto de
+cero, y el cobro desde el ticket ignora las recepciones revertidas. **Action**
+(`LinkDepositTicket::unlink`, `ReceiveAndAllocateTicket`). La base solo impide imputar
+una recepción revertida (`funding_allocations_receipt_live`): el vínculo del ticket
+no tiene guarda propia. Anular el haber no revierte la recepción ni libera el crédito.
+
+Una cuota no se anula con su recibo de ingreso vigente, de sistema o de papel: liberar
+la plata no lo da de baja. **Action** (`CancelHaber`, `CancelExpediente`) y **base**
+(`beneficiary_installments_cancel_without_receipt`). Con un egreso vivo no se libera
+su dinero ni se anula su cobro. **Action** (`UnallocateFunds`, `VoidCashCollection`);
+la base impide la liberación (`funding_allocations_reversal_without_disbursement`),
+no la baja del recibo por fuera del Action. Tampoco se deposita lo que ya se entregó:
+**Action** (`DepositCashToBank`) y **base** (`cash_to_bank_transfer_items_not_delivered`).
+
+Anular un cobro de mostrador deja su recepción revertida, con el motivo, y no se puede
+volver a imputar. **Action** (`VoidCashCollection`, `AllocateFundsToInstallment`) y
+**base** (`funding_allocations_receipt_live`). Cobrar de nuevo crea otra recepción.
+Se rechaza si la recepción también financia otra cuota. **Action.**
+
+Por banco, anular el recibo deshace la conciliación en un solo acto: libera, revierte
+la recepción, anula el recibo y desvincula el comprobante, salvo que el movimiento
+también respalde otra recepción. Alcanza con `recibos.anular`. **Action**
+(`VoidCashCollection`). Sin confirmar con el área.
+
 Una corrección posterior de cuota no modifica el comprobante anterior. Esto explica
 por qué el recibo no congela la cuota; no autoriza editar un recibo emitido.
 
@@ -132,6 +156,7 @@ también se elimina. **Action y validación HTTP.**
 Evidencia: [cobro y emisión](../app/Modules/Haberes/Actions/CollectAndIssueReceipt.php),
 [emisión](../app/Modules/Haberes/Actions/IssueIncomeReceipt.php),
 [recepción desde ticket](../app/Modules/Haberes/Actions/ReceiveAndAllocateTicket.php),
+[reversión y comprobante](../tests/Feature/Haberes/RegistrarYAsignarTest.php),
 [recibo de ingreso](../tests/Feature/Haberes/ReciboDeIngresoTest.php) y
 [conservación del recibo](../tests/Feature/Haberes/CuotaConReciboTest.php).
 
@@ -403,6 +428,10 @@ usa Multas ([Multas](multas-reglas.md#motivos)).
 | Habilitar la edición de una cuota trabada | `beneficiary_installments.edit_unlock_reason_code` | CHECK `beneficiary_installments_edit_unlock_check` |
 | Anular un pago fuera del circuito | `legacy_settlements.void_reason_code` | CHECK `legacy_settlements_void_check` |
 | Anular un recibo de papel | `legacy_documents.void_reason_code` | CHECK `legacy_documents_void_check` |
+| Anular un cobro o su recibo | `receipts.void_reason_code` | CHECK `receipts_void_reason_code_check`: exige código y forma, no la lista |
+| Liberar dinero de una cuota | `funding_allocations.reversal_reason_code` | CHECK `funding_allocations_reversal_reason_code_check`, con la lista |
+| Revertir una recepción | `fund_receipts.reversal_reason_code` | CHECK `fund_receipts_reversal_reason_code_check`: exige código y forma, no la lista |
+| Desvincular un comprobante de su movimiento | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
 | Descartar un comprobante de depósito | `deposit_tickets.discarded_reason_code` | CHECK `deposit_tickets_discarded_check` |
 
 - Cada columna acepta solo los códigos de su acto, y hay código exactamente
@@ -423,10 +452,14 @@ usa Multas ([Multas](multas-reglas.md#motivos)).
 - En pantalla y en la auditoría el motivo se lee junto: «Observación del SAF: el
   concepto no coincide con la resolución a fs. 24». Con «Otro» se lee solo el
   detalle.
+- `receipts` y `fund_receipts` las comparten varios módulos: la base no conoce la
+  lista de cada uno y el texto guarda la lectura completa, no solo el detalle. Lo
+  anulado o revertido antes de existir la columna quedó con `other`. **Base.**
 - Anular y reactivar un expediente o un haber no tienen columna: el motivo y su
   código quedan en la auditoría y la validación es solo del Form Request.
 - Las listas no salen del relevamiento: son un punto de partida para ajustar con
-  el área. Desvincular un comprobante de su movimiento sigue con texto libre.
+  el área. Cancelar un traslado sigue con texto libre: el diálogo y el Action son de
+  Banking, que no conoce las listas de cada caja.
 
 Evidencia: [migración](../database/migrations/2026_10_27_030000_add_reason_codes_to_haberes.php),
 [listas](../app/Modules/Haberes/Enums/HaberesReasonAct.php),

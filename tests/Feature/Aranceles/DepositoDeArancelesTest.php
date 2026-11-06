@@ -747,7 +747,7 @@ class DepositoDeArancelesTest extends TestCase
         );
 
         $this->assertLaBaseRechaza(fn () => $apertura->forceFill([
-            'reversal_event_id' => $evento->id, 'reversed_at' => now(), 'reversed_by' => $this->admin->id, 'reversal_reason' => 'Prueba',
+            'reversal_reason_code' => 'other', 'reversal_event_id' => $evento->id, 'reversed_at' => now(), 'reversed_by' => $this->admin->id, 'reversal_reason' => 'Prueba',
         ])->save(), 'viajó en un traslado vigente');
     }
 

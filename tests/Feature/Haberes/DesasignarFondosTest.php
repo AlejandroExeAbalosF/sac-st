@@ -172,8 +172,27 @@ class DesasignarFondosTest extends TestCase
     {
         $cuota = $this->cuotaFinanciada();
 
-        $this->devolver($cuota, '250.00', reason: '')
-            ->assertSessionHasErrors('reason');
+        $this->devolver($cuota, '250.00', codigo: '')
+            ->assertSessionHasErrors('reasonCode');
+    }
+
+    /** Sale de la lista del acto, con «Otro» pide detalle, y el código queda en la auditoría. */
+    public function test_el_motivo_sale_de_la_lista_del_acto(): void
+    {
+        $cuota = $this->cuotaFinanciada();
+
+        $this->devolver($cuota, '250.00', codigo: 'deposit_not_made')->assertSessionHasErrors('reasonCode');
+        $this->devolver($cuota, '250.00', reason: '', codigo: 'other')->assertSessionHasErrors('reason');
+
+        $this->devolver($cuota, '250.00', reason: '', codigo: 'wrong_installment')->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            'Era de otra cuota',
+            FundingAllocation::query()->where('allocation_kind', AllocationKind::Reversal)->firstOrFail()->notes,
+        );
+
+        $evento = DB::table('audit_events')->where('action', 'asignacion.desasignada')->first();
+        $this->assertStringContainsString('wrong_installment', (string) $evento?->metadata);
     }
 
     /** Y queda en el rastro, con el motivo adentro. */
@@ -217,7 +236,7 @@ class DesasignarFondosTest extends TestCase
             ->post(route('haberes.installments.unallocate', $cuota), [
                 'allocationId' => FundingAllocation::query()->live()->firstOrFail()->id,
                 'amount' => '250.00',
-                'reason' => 'Un motivo cualquiera.',
+                'reasonCode' => 'wrong_amount',
                 'idempotencyKey' => 'devolucion-sin-permiso',
             ])
             ->assertForbidden();
@@ -272,11 +291,13 @@ class DesasignarFondosTest extends TestCase
         string $importe,
         string $reason = 'El importe de la cuota se corrigió.',
         ?string $clave = null,
+        string $codigo = 'wrong_amount',
     ): TestResponse {
         return $this->actingAs($this->operador('contador'))
             ->post(route('haberes.installments.unallocate', $cuota), [
                 'allocationId' => FundingAllocation::query()->live()->firstOrFail()->id,
                 'amount' => $importe,
+                'reasonCode' => $codigo,
                 'reason' => $reason,
                 'idempotencyKey' => $clave ?? 'devolucion-'.uniqid(),
             ]);

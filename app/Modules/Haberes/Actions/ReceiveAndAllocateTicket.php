@@ -133,6 +133,10 @@ final class ReceiveAndAllocateTicket
      * Es el caso de quien hizo el paso largo a medias: registró y no
      * asignó. El botón tiene que terminar el trabajo, no empezarlo de
      * nuevo ni asentar el dinero dos veces.
+     *
+     * Una recepción revertida ya no está: su imputación original sigue en
+     * el extracto, pero de ella no se puede tomar dinero y el crédito volvió
+     * a quedar libre para registrar otra.
      */
     private function recepcionDe(BankTransaction $movimiento): ?FundReceipt
     {
@@ -148,6 +152,7 @@ final class ReceiveAndAllocateTicket
 
         $recepciones = FundReceipt::query()
             ->whereIn('financial_event_id', $eventos)
+            ->whereNull('reversal_event_id')
             ->orderBy('id')
             ->get();
 

@@ -174,7 +174,7 @@ class FondosAnterioresTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('se libera entero');
 
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '5000.00', 'test-parcial-231', 'La cuota bajó.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '5000.00', 'test-parcial-231', new Reason(HaberesReasonCode::Other, 'La cuota bajó.'));
     }
 
     /**
@@ -190,7 +190,7 @@ class FondosAnterioresTest extends TestCase
         $this->apartar($primera, PaymentMedium::Cheque, sources: [
             ['amount' => '85000.00', 'newCheque' => ['number' => '00045871', 'bank' => null, 'issueDate' => null]],
         ]);
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-232', 'Era de otra cuota.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-232', new Reason(HaberesReasonCode::Other, 'Era de otra cuota.'));
 
         $cheque = FundReceipt::query()->where('origin', 'legacy')->sole();
         $opciones = app(LegacyFundsOptions::class)->for($segunda->haber);
@@ -245,7 +245,7 @@ class FondosAnterioresTest extends TestCase
             FundingAllocation::query()->where('beneficiary_installment_id', $primera->id)->sole(),
             '200000.00',
             'test-liberar-301',
-            'Se apartó para la cuota equivocada.',
+            new Reason(HaberesReasonCode::Other, 'Se apartó para la cuota equivocada.'),
         );
 
         $this->apartar($segunda, PaymentMedium::Cash, talonario: '3122');
@@ -378,7 +378,7 @@ class FondosAnterioresTest extends TestCase
             $this->assertStringContainsString('primero hay que quitar la reserva', $e->errors()['reason'][0]);
         }
 
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-236', 'El papel estaba mal cargado.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-libera-236', new Reason(HaberesReasonCode::Other, 'El papel estaba mal cargado.'));
 
         $this->actingAs($this->operador('contador'))
             ->post("/haberes/cuotas/{$cuota->id}/recibo-de-papel/anular", ['reasonCode' => 'mistyped_number', 'reason' => 'Es el 0072190.'])
@@ -546,7 +546,7 @@ class FondosAnterioresTest extends TestCase
         $this->apartar($cuota, PaymentMedium::Cash);
         $asignacion = FundingAllocation::query()->sole();
 
-        app(UnallocateFunds::class)->handle($asignacion, '85000.00', 'test-liberar-207', 'Se apartó para la cuota equivocada.');
+        app(UnallocateFunds::class)->handle($asignacion, '85000.00', 'test-liberar-207', new Reason(HaberesReasonCode::Other, 'Se apartó para la cuota equivocada.'));
 
         // Liberada, la cuota conserva su recibo de papel: solo admite plata anterior.
         $this->expectException(ValidationException::class);
@@ -579,7 +579,7 @@ class FondosAnterioresTest extends TestCase
 
         // La cuota baja a 80.000: los 20.000 de más se devuelven.
         DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['expected_amount' => '80000.00']);
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '20000.00', 'test-parcial-209', 'La cuota bajó a 80.000.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '20000.00', 'test-parcial-209', new Reason(HaberesReasonCode::Other, 'La cuota bajó a 80.000.'));
 
         $saldos = app(CashBalance::class);
 
@@ -595,7 +595,7 @@ class FondosAnterioresTest extends TestCase
         $cuota = $this->cuota('210/2024', '85000.00');
         $this->apartar($cuota, PaymentMedium::Cash);
 
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-total-210', 'Se apartó de más por error.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-total-210', new Reason(HaberesReasonCode::Other, 'Se apartó de más por error.'));
 
         $this->assertSame($this->restoDelSistemaAnterior('0.00'), app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja()));
 
@@ -616,7 +616,7 @@ class FondosAnterioresTest extends TestCase
         $this->abrirLibros();
         $cuota = $this->cuota('211/2024', '85000.00');
         $this->apartar($cuota, PaymentMedium::Cash);
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-reuso-211', 'Se liberó para probar.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '85000.00', 'test-reuso-211', new Reason(HaberesReasonCode::Other, 'Se liberó para probar.'));
         $recepcion = FundReceipt::query()->where('origin', 'legacy')->sole();
         $otro = $this->eventoApartado($cuota, '85000.00');
 
@@ -790,7 +790,7 @@ class FondosAnterioresTest extends TestCase
         $cuota = $this->cuota('222/2024', '100000.00');
         $this->apartar($cuota, PaymentMedium::Cash);
         DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['expected_amount' => '80000.00']);
-        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '20000.00', 'test-lista-222', 'La cuota bajó a 80.000.');
+        app(UnallocateFunds::class)->handle(FundingAllocation::query()->sole(), '20000.00', 'test-lista-222', new Reason(HaberesReasonCode::Other, 'La cuota bajó a 80.000.'));
 
         $this->actingAs($this->operador('contador'))
             ->get('/caja/saldo-anterior')

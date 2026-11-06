@@ -294,12 +294,14 @@ final class DepositTicketController extends Controller
 
     public function unlink(Request $request, DepositTicket $ticket, LinkDepositTicket $vincular): RedirectResponse
     {
-        $validado = $request->validate([
-            'reason' => ['required', 'string', 'min:5', 'max:300'],
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::DepositTicketUnlink, max: 250),
+            Reason::messages(),
+        );
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::DepositTicketUnlink) ?? throw new LogicException('El motivo ya se validó.');
 
         try {
-            $vincular->unlink($ticket, $validado['reason'], (int) $request->user()?->id);
+            $vincular->unlink($ticket, $motivo->describe(), (int) $request->user()?->id, $motivo->code);
         } catch (RuntimeException $e) {
             return $this->backWithError($e);
         }

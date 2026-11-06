@@ -9,6 +9,7 @@ use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
@@ -20,6 +21,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -77,13 +79,14 @@ final class UnallocateFunds
          * frase — el contrato del Action tiene que decir lo mismo que la
          * base, no menos.
          */
-        string $notes,
+        Reason $motivo,
         ?int $actorId = null,
     ): FundingAllocation {
         $importe = Decimal::scale($amount);
+        $notes = $motivo->describe();
 
         return DB::transaction(function () use (
-            $allocation, $importe, $idempotencyKey, $actorId, $notes
+            $allocation, $importe, $idempotencyKey, $actorId, $notes, $motivo
         ): FundingAllocation {
             $yaRevertida = FundingAllocation::query()
                 ->whereRelation('allocationEvent', 'idempotency_key', $idempotencyKey)
@@ -114,6 +117,7 @@ final class UnallocateFunds
             $this->assertReversible($original, $importe);
             $this->assertChequeEntero($original, $importe);
             $this->assertNoRespaldaOrden($cuotaBloqueada);
+            $this->assertNoSeEntrego($cuotaBloqueada);
             $this->assertSigueEnLaCaja($original);
 
             $receipt = $original->fundReceipt;
@@ -162,6 +166,7 @@ final class UnallocateFunds
                 'allocated_by' => $actorId,
                 'allocated_at' => now(),
                 'notes' => $notes,
+                'reversal_reason_code' => $motivo->code->value,
             ]);
 
             $this->auditar->handle(
@@ -172,7 +177,7 @@ final class UnallocateFunds
                 [
                     'beneficiary_installment_id' => $original->beneficiary_installment_id,
                     'devuelto' => $importe,
-                    'motivo' => $notes,
+                    ...$motivo->auditMetadata('motivo'),
                 ],
                 actorId: $actorId,
             );
@@ -246,6 +251,29 @@ final class UnallocateFunds
         throw ValidationException::withMessages([
             'allocationId' => "La imputación respalda la Orden {$orden->formatted_number}. {$accion}",
         ]);
+    }
+
+    /**
+     * La plata de un egreso vivo ya no está para volver al pozo.
+     *
+     * El mostrador no pasa por ninguna Orden, así que la guarda anterior no
+     * lo cubre: liberar dejaba al beneficiario en negativo y el pozo
+     * ofreciendo un dinero que ya salió del organismo.
+     *
+     * @throws ValidationException
+     */
+    private function assertNoSeEntrego(BeneficiaryInstallment $installment): void
+    {
+        $entregada = Disbursement::query()
+            ->live()
+            ->where('beneficiary_installment_id', $installment->id)
+            ->exists();
+
+        if ($entregada) {
+            throw ValidationException::withMessages([
+                'allocationId' => 'Esta cuota tiene un egreso registrado: esos fondos ya no pueden volver a quedar sin asignar.',
+            ]);
+        }
     }
 
     /** @throws ValidationException */

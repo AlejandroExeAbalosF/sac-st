@@ -69,38 +69,14 @@ export default function VoidOrderDialog({
                         Anular la Orden de Pago {orden.number}
                     </DialogTitle>
                     <DialogDescription>
-                        Para cuando el organismo la devolvió, o cuando está mal
-                        el dinero o las partes. Si lo que falta es solo una
-                        aclaración, el otro camino es agregar la foja y corregir
-                        las observaciones, sin rehacer nada.
+                        Su número queda consumido
+                        {orden.pase !== null &&
+                            ` y su Pase a ${orden.pase.destination} también se anula`}
+                        . El recibo de ingreso y el dinero no cambian.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="mt-4 space-y-4">
-                    <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive-soft p-3 text-xs">
-                        <p className="font-medium">Al confirmar:</p>
-                        <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
-                            <li>
-                                La Orden{' '}
-                                <strong className="font-mono">
-                                    {orden.number}
-                                </strong>{' '}
-                                queda anulada y su número, consumido.
-                            </li>
-                            {orden.pase !== null && (
-                                <li>
-                                    Su Pase a {orden.pase.destination} queda
-                                    anulado con ella: los dos viajan juntos.
-                                </li>
-                            )}
-                            <li>
-                                El recibo de ingreso y el dinero recibido no se
-                                tocan: lo que se deshace es el pedido de pago,
-                                no el ingreso que lo respalda.
-                            </li>
-                        </ul>
-                    </div>
-
                     <ReasonFields
                         act="payment_order_void"
                         code={form.data.reasonCode}
@@ -115,7 +91,6 @@ export default function VoidOrderDialog({
                         detailError={form.errors.reason}
                         idPrefix={`motivo-orden-${orden.id}`}
                         maxLength={300}
-                        detailPlaceholder="El CBU impreso es el de otra cuenta del trabajador; el expediente informa el correcto a fs. 19."
                     />
 
                     <InputError message={errors?.orderId} />

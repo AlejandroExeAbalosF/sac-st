@@ -3,6 +3,7 @@ import { CheckCircle2, Search, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import PageHeader from '@/components/page-header';
+import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +16,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { compareAmounts, date, dateTime, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { allocate, reverse, show } from '@/routes/recepciones';
@@ -500,7 +500,11 @@ function DialogoDeReversion({
     idempotencyKey: string;
     onClose: () => void;
 }) {
-    const form = useForm({ reason: '', idempotencyKey });
+    const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
+        idempotencyKey,
+    });
 
     /*
      * El rechazo por tener plata ya repartida no habla de ningún campo del
@@ -524,34 +528,29 @@ function DialogoDeReversion({
                         Revertir la recepción de {money(receipt.amount)}
                     </DialogTitle>
                     <DialogDescription>
-                        El asiento inverso saca ese dinero de los libros y el
-                        movimiento del extracto vuelve a quedar sin imputar,
-                        listo para imputarlo bien. La recepción no se borra:
-                        queda con su motivo.
+                        {receipt.medium === 'bank'
+                            ? 'El dinero sale de los libros y el movimiento del extracto vuelve a quedar sin imputar.'
+                            : 'El dinero sale de los libros.'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="grid gap-4">
                     <div>
-                        <Label htmlFor="reason">Motivo</Label>
-                        <Textarea
-                            id="reason"
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
+                        <ReasonFields
+                            act="fund_receipt_reversal"
+                            code={form.data.reasonCode}
+                            detail={form.data.reason}
+                            onCodeChange={(codigo) =>
+                                form.setData('reasonCode', codigo)
                             }
-                            className="mt-1"
-                            rows={3}
-                            maxLength={500}
-                            autoFocus
-                            aria-invalid={Boolean(form.errors.reason)}
-                            placeholder="Qué pasó. Por ejemplo: era la acreditación de nuestro propio depósito, no plata nueva."
+                            onDetailChange={(detalle) =>
+                                form.setData('reason', detalle)
+                            }
+                            codeError={form.errors.reasonCode}
+                            detailError={form.errors.reason}
+                            idPrefix="motivo-reversion"
+                            maxLength={250}
                         />
-                        {form.errors.reason && (
-                            <p className="mt-1 text-xs text-destructive-strong">
-                                {form.errors.reason}
-                            </p>
-                        )}
                         {errors?.receiptId !== undefined && (
                             <p className="mt-1 text-xs text-destructive-strong">
                                 {errors.receiptId}

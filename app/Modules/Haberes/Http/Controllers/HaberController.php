@@ -697,6 +697,8 @@ final class HaberController extends Controller
              * bien un dato de un papel— y llevan el mismo permiso.
              */
             'canManageTickets' => request()->user()?->can('depositos.registrar') ?? false,
+            // Lo que exige la conciliación del comprobante: sin esto el enlace termina en 403.
+            'canSearchTickets' => request()->user()?->can('depositos.ver') ?? false,
             'canIssueReceipt' => request()->user()?->can('recibos.emitir') ?? false,
             'canRegisterPayment' => request()->user()->can('recepciones.registrar')
                 && request()->user()->can('recepciones.asignar'),

@@ -81,6 +81,7 @@ final class ReplaceFeeReceipt
             $anterior->forceFill([
                 'status' => ReceiptStatus::Replaced,
                 'void_reason' => mb_substr($motivo->describe(), 0, 300),
+                'void_reason_code' => $motivo->code->value,
                 'voided_by' => $actorId,
                 'voided_at' => now(),
             ])->save();

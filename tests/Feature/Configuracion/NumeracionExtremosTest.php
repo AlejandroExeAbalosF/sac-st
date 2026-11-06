@@ -109,7 +109,7 @@ class NumeracionExtremosTest extends TestCase
             app(VoidPaymentOrder::class)->handle($document, new Reason(HaberesReasonCode::WrongAmount, 'Corrección del comprobante.'), $this->fixture->actorId);
         } else {
             // Anulación del papel; no se revierte el hecho monetario para probar la numeración.
-            $document->forceFill(['status' => 'voided', 'voided_by' => $this->fixture->actorId, 'voided_at' => now(), 'void_reason' => 'Corrección del comprobante.'])->save();
+            $document->forceFill(['status' => 'voided', 'voided_by' => $this->fixture->actorId, 'voided_at' => now(), 'void_reason_code' => 'other', 'void_reason' => 'Corrección del comprobante.'])->save();
         }
         try {
             $this->configure($type, ['nextNumber' => 1]);

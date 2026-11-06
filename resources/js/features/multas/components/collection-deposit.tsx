@@ -182,7 +182,6 @@ export default function CollectionDeposit({
                     url={cancelarDeposito(traslado.id).url}
                     titulo="Cancelar el depósito"
                     consecuencia="El cobro vuelve a figurar en la caja, para depositarlo de nuevo."
-                    ejemplo="Se cargó el ticket de otro depósito."
                     abierto
                     onCerrar={() => setDialogo(null)}
                 />

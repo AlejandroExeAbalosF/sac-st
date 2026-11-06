@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Banking\Models\BankTransaction;
-use App\Modules\Banking\Models\BankTransactionAllocation;
+use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\ReasonCode;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -32,6 +33,7 @@ final class LinkDepositTicket
     public function __construct(
         private readonly RecordAuditEvent $auditar,
         private readonly FindTicketCandidates $buscar,
+        private readonly AllocatableAmount $disponible,
     ) {}
 
     public function handle(DepositTicket $ticket, BankTransaction $movimiento, int $userId): DepositTicket
@@ -59,7 +61,7 @@ final class LinkDepositTicket
     }
 
     /** Deshace el vínculo, dejando el ticket otra vez a la espera. */
-    public function unlink(DepositTicket $ticket, string $reason, int $userId): DepositTicket
+    public function unlink(DepositTicket $ticket, string $reason, int $userId, ?ReasonCode $reasonCode = null): DepositTicket
     {
         if ($ticket->status !== DepositTicketStatus::Matched) {
             throw new RuntimeException('El ticket no está vinculado a ningún movimiento.');
@@ -70,12 +72,14 @@ final class LinkDepositTicket
          * ser una propuesta: es el respaldo de dinero asentado. Desvincular
          * no rompe el rastro —la recepción apunta al movimiento, no al
          * ticket— pero deja el asiento sin el papel que lo explica.
+         *
+         * Se mira lo imputado **neto**: revertir no borra la imputación, le
+         * agrega su reversa. Preguntar si existe una fila dejaba el ticket
+         * atado para siempre a un crédito que ya no respalda nada.
          */
-        $respalda = BankTransactionAllocation::query()
-            ->where('bank_transaction_id', $ticket->bank_transaction_id)
-            ->exists();
+        $movimiento = BankTransaction::query()->findOrFail($ticket->bank_transaction_id);
 
-        if ($respalda) {
+        if (! Decimal::equals($this->disponible->allocated($movimiento), '0')) {
             throw new RuntimeException(
                 'Ese movimiento ya tiene una recepción registrada: el ticket es su respaldo. '
                 .'Hay que revertir la recepción antes de desvincularlo.'
@@ -84,7 +88,7 @@ final class LinkDepositTicket
 
         $anterior = $ticket->bank_transaction_id;
 
-        return DB::transaction(function () use ($ticket, $anterior, $reason, $userId): DepositTicket {
+        return DB::transaction(function () use ($ticket, $anterior, $reason, $userId, $reasonCode): DepositTicket {
             $ticket->forceFill([
                 'bank_transaction_id' => null,
                 'status' => DepositTicketStatus::Waiting,
@@ -97,7 +101,11 @@ final class LinkDepositTicket
                 'ticket.desvinculado',
                 $ticket,
                 before: ['bank_transaction_id' => $anterior],
-                metadata: ['motivo' => $reason, 'usuario' => $userId],
+                metadata: [
+                    'motivo' => $reason,
+                    'usuario' => $userId,
+                    ...($reasonCode === null ? [] : ['motivo_codigo' => $reasonCode->value]),
+                ],
                 actorId: $userId,
             );
 

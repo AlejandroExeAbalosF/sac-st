@@ -11,6 +11,7 @@ use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Banking\Support\TransferredCheques;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DepositItem;
 use App\Modules\Haberes\Support\IncomeEvidence;
@@ -279,6 +280,18 @@ final class DepositCashToBank
         if ($yaDepositada) {
             throw ValidationException::withMessages([
                 'installmentId' => 'Ese efectivo ya se depositó en el banco.',
+            ]);
+        }
+
+        // Lo entregado en mano ya no está en la caja: el asiento sacaría un dinero que no hay.
+        $entregada = Disbursement::query()
+            ->live()
+            ->where('beneficiary_installment_id', $installment->id)
+            ->exists();
+
+        if ($entregada) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'Ese efectivo ya se entregó al beneficiario: no está en la caja.',
             ]);
         }
 

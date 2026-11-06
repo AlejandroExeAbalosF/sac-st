@@ -5,18 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Haberes;
 
 use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Support\InstallmentFunding;
-use App\Modules\Ledger\Actions\PostJournalEntry;
-use App\Modules\Ledger\Enums\FinancialEventType;
-use App\Modules\Ledger\Enums\LedgerAccount;
-use App\Modules\Ledger\Enums\PaymentMedium;
-use App\Modules\Ledger\Models\FundReceipt;
-use App\Modules\Ledger\Support\EntryLine;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
@@ -116,7 +109,7 @@ class AnularCobroTest extends TestCase
 
         $this->assertSame(ReceiptStatus::Voided, $recibo->status);
         $this->assertSame($numero, $recibo->formatted_number);
-        $this->assertSame('Se cargó un cero de más.', $recibo->void_reason);
+        $this->assertSame('Importe equivocado: Se cargó un cero de más.', $recibo->void_reason);
         $this->assertNotNull($recibo->voided_at);
     }
 
@@ -196,13 +189,6 @@ class AnularCobroTest extends TestCase
     |--------------------------------------------------------------------------
     */
 
-    /** Lo que entró por el banco no se anula: ese dinero existe. */
-    public function test_no_se_anula_un_cobro_bancario(): void
-    {
-        $this->anular($this->cuotaFinanciadaPorBanco())
-            ->assertSessionHasErrors('installmentId');
-    }
-
     /**
      * No se anula un cobro cuyo efectivo ya se fue al banco.
      *
@@ -249,8 +235,23 @@ class AnularCobroTest extends TestCase
     /** El motivo es obligatorio. */
     public function test_anular_exige_un_motivo(): void
     {
-        $this->anular($this->cuotaCobrada(), motivo: '')
-            ->assertSessionHasErrors('reason');
+        $this->anular($this->cuotaCobrada(), codigo: '')
+            ->assertSessionHasErrors('reasonCode');
+
+        $this->assertSame(ReceiptStatus::Issued, Receipt::query()->firstOrFail()->status);
+    }
+
+    /** Solo se aceptan los motivos de este acto, y el detalle es opcional. */
+    public function test_el_motivo_sale_de_la_lista_del_acto(): void
+    {
+        $cuota = $this->cuotaCobrada();
+
+        $this->anular($cuota, codigo: 'deposit_not_made')->assertSessionHasErrors('reasonCode');
+        $this->anular($cuota, motivo: '', codigo: 'other')->assertSessionHasErrors('reason');
+
+        $this->anular($cuota, motivo: '', codigo: 'duplicate')->assertSessionHasNoErrors();
+
+        $this->assertSame('Cargado dos veces', Receipt::query()->firstOrFail()->void_reason);
     }
 
     /** Quien no puede anular recibos, no anula cobros. */
@@ -260,7 +261,7 @@ class AnularCobroTest extends TestCase
 
         $this->actingAs($this->operador('administrativo'))
             ->post(route('haberes.installments.void-collection', $cuota), [
-                'reason' => 'Un motivo cualquiera.',
+                'reasonCode' => 'wrong_amount',
                 'idempotencyKey' => 'anular-sin-permiso',
             ])
             ->assertForbidden();
@@ -291,7 +292,7 @@ class AnularCobroTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->has('haber.installments.0.voidedReceipts', 1)
                 ->where('haber.installments.0.voidedReceipts.0.formattedNumber', $anulado->formatted_number)
-                ->where('haber.installments.0.voidedReceipts.0.voidReason', 'Un cero de mas al cargar.')
+                ->where('haber.installments.0.voidedReceipts.0.voidReason', 'Importe equivocado: Un cero de mas al cargar.')
                 ->where('haber.installments.0.voidedReceipts.0.voidedByName', $anulado->refresh()->voidedBy?->name),
             );
     }
@@ -305,6 +306,7 @@ class AnularCobroTest extends TestCase
 
         $this->assertNotNull($evento);
         $this->assertStringContainsString('Un cero de más al cargar.', (string) $evento->metadata);
+        $this->assertStringContainsString('wrong_amount', (string) $evento->metadata);
     }
 
     /*
@@ -357,45 +359,6 @@ class AnularCobroTest extends TestCase
      * es append-only, y cambiarle el medio a una recepción de mostrador
      * sería justamente lo que el sistema impide.
      */
-    private function cuotaFinanciadaPorBanco(): BeneficiaryInstallment
-    {
-        $cuota = $this->cuotaEnEfectivo();
-        $importe = $cuota->importeEsperado();
-        $cuenta = BankAccount::query()->create([
-            'label' => 'Cta. Cte. — pruebas',
-            'bank_name' => 'Banco Macro',
-            'account_number' => '310000123456789',
-            'currency' => 'ARS',
-            'is_active' => true,
-        ]);
-
-        $evento = app(PostJournalEntry::class)->handle(
-            type: FinancialEventType::FundsReceived,
-            idempotencyKey: 'recepcion-bancaria-de-prueba',
-            lines: [
-                EntryLine::debit(LedgerAccount::BankAccount, $importe)->onBankAccount($cuenta->id),
-                EntryLine::credit(LedgerAccount::UnassignedFunds, $importe),
-            ],
-            date: now(),
-        );
-
-        $recepcion = FundReceipt::query()->create([
-            'financial_event_id' => $evento->id,
-            'medium' => PaymentMedium::Bank,
-            'amount' => $importe,
-            'received_date' => now(),
-        ]);
-
-        app(AllocateFundsToInstallment::class)->handle(
-            receipt: $recepcion,
-            installment: $cuota,
-            amount: $importe,
-            idempotencyKey: 'imputacion-bancaria-de-prueba',
-        );
-
-        return $cuota->refresh();
-    }
-
     private function cuotaCobrada(): BeneficiaryInstallment
     {
         $cuota = $this->cuotaEnEfectivo();
@@ -416,9 +379,11 @@ class AnularCobroTest extends TestCase
     private function anular(
         BeneficiaryInstallment $cuota,
         string $motivo = 'El importe se cargó con un cero de más.',
+        string $codigo = 'wrong_amount',
     ): TestResponse {
         return $this->actingAs($this->operador('contador'))
             ->post(route('haberes.installments.void-collection', $cuota), [
+                'reasonCode' => $codigo,
                 'reason' => $motivo,
                 'idempotencyKey' => 'anular-'.Str::random(10),
             ]);

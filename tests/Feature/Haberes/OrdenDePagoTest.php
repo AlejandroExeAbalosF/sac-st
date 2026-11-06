@@ -157,7 +157,7 @@ class OrdenDePagoTest extends TestCase
                 'status' => 'voided',
                 'voided_by' => $this->operador()->id,
                 'voided_at' => now(),
-                'void_reason' => 'El importe se cargó con un cero de más.',
+                'void_reason_code' => 'other', 'void_reason' => 'El importe se cargó con un cero de más.',
             ]);
 
         $estado = $this->estadoDe($cuota->refresh());
@@ -721,7 +721,7 @@ class OrdenDePagoTest extends TestCase
             app(UnallocateFunds::class)->handle(
                 allocation: $asignacion,
                 amount: '1.00',
-                notes: 'Intento de liberar fondos con documento vigente.',
+                motivo: new Reason(HaberesReasonCode::Other, 'Intento de liberar fondos con documento vigente.'),
                 idempotencyKey: 'liberar-con-orden-'.Str::random(8),
                 actorId: $this->operador()->id,
             );

@@ -19,6 +19,7 @@ use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\IssueIncomeReceipt;
 use App\Modules\Haberes\Actions\RegisterCashPayment;
 use App\Modules\Haberes\Actions\UnallocateFunds;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
@@ -32,6 +33,7 @@ use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\CashBalance;
+use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Builder;
@@ -204,7 +206,7 @@ class ChequeEnElTrasladoTest extends TestCase
             allocation: $primera,
             amount: $cuota->importeEsperado(),
             idempotencyKey: 'liberar-'.Str::random(8),
-            notes: 'Se cargó en la cuota equivocada.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Se cargó en la cuota equivocada.'),
             actorId: $this->operador->id,
         );
 
@@ -523,7 +525,7 @@ class ChequeEnElTrasladoTest extends TestCase
                 ->firstOrFail(),
             amount: '1000.00',
             idempotencyKey: 'excedente-'.Str::random(8),
-            notes: 'La cuota se corrigió a la baja.',
+            motivo: new Reason(HaberesReasonCode::Other, 'La cuota se corrigió a la baja.'),
             actorId: $this->operador->id,
         );
     }

@@ -938,7 +938,7 @@ class CobroDeArancelesTest extends TestCase
         $recepcion = $this->recepcionDe($this->cobrar());
 
         $this->assertLaBaseRechaza(fn () => DB::table('fund_receipts')->where('id', $recepcion->id)->update([
-            'reversal_event_id' => $recepcion->financial_event_id,
+            'reversal_reason_code' => 'other', 'reversal_event_id' => $recepcion->financial_event_id,
             'reversed_at' => now(),
             'reversal_reason' => 'Directo',
         ]), 'primero se libera');

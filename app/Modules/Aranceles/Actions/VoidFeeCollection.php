@@ -98,6 +98,7 @@ final class VoidFeeCollection
             $recibo->forceFill([
                 'status' => ReceiptStatus::Voided,
                 'void_reason' => mb_substr($motivo->describe(), 0, 300),
+                'void_reason_code' => $motivo->code->value,
                 'voided_by' => $actorId,
                 'voided_at' => now(),
             ])->save();

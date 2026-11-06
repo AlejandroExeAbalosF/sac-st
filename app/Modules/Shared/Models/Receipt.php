@@ -53,6 +53,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $voided_by
  * @property CarbonInterface|null $voided_at
  * @property string|null $void_reason
+ * @property string|null $void_reason_code
  * @property int|null $replaces_receipt_id
  */
 final class Receipt extends Model
@@ -87,6 +88,7 @@ final class Receipt extends Model
         'voided_by',
         'voided_at',
         'void_reason',
+        'void_reason_code',
         'replaces_receipt_id',
     ];
 

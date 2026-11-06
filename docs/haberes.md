@@ -69,6 +69,21 @@ y el medio de la cuota, no de un importe libre enviado por el navegador.
 permite buscar y vincular el crédito del extracto. La recepción y la asignación
 registran el dinero identificado; la foto del ticket por sí sola no financia la cuota.
 
+**Anular el recibo de una cuota cobrada por banco deshace la conciliación.** Con un
+solo motivo libera la cuota, revierte la recepción, anula el recibo y devuelve el
+comprobante a la cola; el movimiento del extracto queda libre para conciliarlo otra
+vez. Se rechaza si esa recepción también financia otra cuota, o si hay una Orden o un
+egreso.
+
+**Anular un haber no libera el crédito del extracto.** Se desarma en pasos, cada uno
+con su motivo: liberar la imputación deja el dinero en la recepción, sin dueño, y
+desde ahí puede asignarse a otra cuota; anular el haber exige que ya no haya dinero
+imputado ni recibo de ingreso vigente; revertir la recepción saca el dinero de los
+libros y deja libre el crédito. Una cuota con egreso registrado no se desarma: ni se
+libera su dinero ni se anula su cobro, así que su haber tampoco se anula.
+Con la recepción revertida, el comprobante puede volver a cobrar la cuota o
+desvincularse para que el crédito se cruce con otro.
+
 El recibo de ingreso requiere financiación completa y conserva los datos impresos
 en columnas de snapshot. Corregir luego la cuota no reescribe el recibo. El cobro
 de un cheque por mostrador no espera su posterior acreditación bancaria para emitirlo.

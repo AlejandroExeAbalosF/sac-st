@@ -11,6 +11,7 @@ use App\Modules\Ledger\Enums\FinancialEventType;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Support\InverseEntry;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -56,21 +57,23 @@ final class ReverseFundReceipt
     ) {}
 
     /**
-     * @param  string  $reason  Obligatorio: el CHECK
-     *                          `financial_events_reversal_reason_check` ata
-     *                          el motivo a toda reversión, y el contrato
-     *                          del Action tiene que decir lo mismo que la
-     *                          base.
+     * @param  Reason  $motivo  Obligatorio: los CHECK
+     *                          `financial_events_reversal_reason_check` y
+     *                          `fund_receipts_reversal_reason_code_check` atan
+     *                          el motivo a toda reversión, y el contrato del
+     *                          Action tiene que decir lo mismo que la base.
      *
      * @throws ValidationException
      */
     public function handle(
         FundReceipt $receipt,
-        string $reason,
+        Reason $motivo,
         string $idempotencyKey,
         ?int $actorId = null,
     ): FundReceipt {
-        return DB::transaction(function () use ($receipt, $reason, $idempotencyKey, $actorId): FundReceipt {
+        $reason = $motivo->describe();
+
+        return DB::transaction(function () use ($receipt, $reason, $motivo, $idempotencyKey, $actorId): FundReceipt {
             $bloqueada = FundReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
             // Un segundo envío del mismo formulario.
@@ -99,12 +102,13 @@ final class ReverseFundReceipt
                 'reversed_at' => now(),
                 'reversed_by' => $actorId,
                 'reversal_reason' => $reason,
+                'reversal_reason_code' => $motivo->code->value,
             ])->save();
 
             $this->auditar->handle('recepcion.revertida', $bloqueada, null, null, [
                 'amount' => $bloqueada->amount,
                 'reversal_event_id' => $evento->id,
-                'motivo' => $reason,
+                ...$motivo->auditMetadata('motivo'),
             ], actorId: $actorId);
 
             return $bloqueada->refresh();

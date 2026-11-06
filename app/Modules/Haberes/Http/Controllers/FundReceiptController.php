@@ -13,6 +13,7 @@ use App\Modules\Haberes\Data\FundReceiptListItemData;
 use App\Modules\Haberes\Data\InstallmentCandidateData;
 use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Http\Requests\AllocateFundsRequest;
@@ -178,6 +179,8 @@ final class FundReceiptController extends Controller
                 expedienteNumber: $origen['expedienteNumber'] ?? null,
                 employerName: $origen['employerName'] ?? null,
             ),
+            // Las listas de motivos de cada acto: la pantalla no las repite.
+            'motivos' => HaberesReasonAct::options(),
             'allocations' => $this->asignacionesDe($receipt),
             'candidates' => $this->cuotasCandidatas($receipt, $origen['expedienteId'] ?? null, $request),
             'searchedExpediente' => trim((string) $request->query('expediente', '')) ?: null,
@@ -232,7 +235,7 @@ final class FundReceiptController extends Controller
 
         $revertir->handle(
             receipt: $receipt,
-            reason: (string) $request->validated('reason'),
+            motivo: $request->motivo(),
             idempotencyKey: (string) $request->validated('idempotencyKey'),
             actorId: $request->user()?->id,
         );

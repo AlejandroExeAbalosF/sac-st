@@ -4,30 +4,47 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Haberes;
 
+use App\Models\User;
 use App\Modules\Banking\Actions\RegisterBankFundReceipt;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
+use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
+use App\Modules\Haberes\Actions\CancelHaber;
+use App\Modules\Haberes\Actions\DiscardDepositTicket;
+use App\Modules\Haberes\Actions\FindTicketCandidates;
+use App\Modules\Haberes\Actions\IssueIncomeReceipt;
+use App\Modules\Haberes\Actions\LinkDepositTicket;
+use App\Modules\Haberes\Actions\ListAvailableCredits;
 use App\Modules\Haberes\Actions\ReceiveAndAllocateTicket;
+use App\Modules\Haberes\Actions\ReverseFundReceipt;
 use App\Modules\Haberes\Actions\UnallocateFunds;
+use App\Modules\Haberes\Actions\VoidCashCollection;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Reason;
+use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -223,7 +240,7 @@ class RegistrarYAsignarTest extends TestCase
             allocation: $original,
             amount: '40.00',
             idempotencyKey: 'liberar-parcial-'.Str::random(8),
-            notes: 'Corrección parcial para probar el saldo documental.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Corrección parcial para probar el saldo documental.'),
             actorId: $this->operador()->id,
         );
         app(AllocateFundsToInstallment::class)->handle(
@@ -256,7 +273,7 @@ class RegistrarYAsignarTest extends TestCase
             allocation: $original,
             amount: $original->amount,
             idempotencyKey: 'liberar-total-'.Str::random(8),
-            notes: 'Corrección total para probar el saldo documental.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Corrección total para probar el saldo documental.'),
             actorId: $this->operador()->id,
         );
 
@@ -294,11 +311,328 @@ class RegistrarYAsignarTest extends TestCase
         $this->assertSame(0, FundReceipt::query()->count());
     }
 
+    /** La conciliación se ofrece desde la cuota solo a quien puede entrar. */
+    public function test_la_pantalla_del_haber_dice_si_se_puede_buscar_el_comprobante(): void
+    {
+        $haber = $this->cuota()->haber;
+        $sinPermiso = User::factory()->create();
+        $sinPermiso->givePermissionTo('expedientes.ver');
+
+        $this->actingAs($this->operador())
+            ->get(route('haberes.haber.show', [$haber->expediente, $haber]))
+            ->assertInertia(fn (Assert $page) => $page->where('canSearchTickets', true));
+
+        $this->actingAs($sinPermiso)
+            ->get(route('haberes.haber.show', [$haber->expediente, $haber]))
+            ->assertInertia(fn (Assert $page) => $page->where('canSearchTickets', false));
+    }
+
+    /*
+    |---------------------------------------------------------------------
+    | Después de revertir la recepción
+    |---------------------------------------------------------------------
+    |
+    | La reversión promete que el crédito «vuelve a quedar sin imputar». Las
+    | imputaciones no se borran —se les agrega la reversa—, así que preguntar
+    | si existe una fila, o tomar la recepción sin mirar si sigue viva, deja
+    | el crédito libre en el extracto y sin ningún camino para usarlo.
+    */
+
+    /** La misma cuota se vuelve a cobrar: nace otra recepción. */
+    public function test_tras_revertir_el_ticket_vuelve_a_cobrar_con_una_recepcion_nueva(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $revertida = $this->cobrarYRevertir($cuota);
+
+        $nueva = app(ReceiveAndAllocateTicket::class)->handle(
+            $cuota->refresh(),
+            'atajo-'.Str::random(8),
+            $this->operador()->id,
+        );
+
+        $this->assertNotSame($revertida->id, $nueva->id);
+        $this->assertNull($nueva->reversal_event_id);
+        $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota->refresh()));
+
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+        $this->assertSame('0.00', app(AllocatableAmount::class)->for($movimiento));
+    }
+
+    /**
+     * La tarjeta no presenta como vigente una recepción revertida.
+     *
+     * Es el dato que le dice al operador si falta registrar o falta asignar:
+     * con la revertida adentro lo mandaba a asignar algo que la base rechaza.
+     */
+    public function test_el_vinculo_del_ticket_ignora_la_recepcion_revertida(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $this->cobrarYRevertir($cuota);
+
+        $this->assertSame([], app(DepositTicketLinks::class)->receipts([$cuota->id]));
+
+        $nueva = app(ReceiveAndAllocateTicket::class)->handle(
+            $cuota->refresh(),
+            'atajo-'.Str::random(8),
+            $this->operador()->id,
+        );
+
+        $this->assertSame(
+            [$ticket->id => $nueva->id],
+            app(DepositTicketLinks::class)->receipts([$cuota->id]),
+        );
+    }
+
+    /** El ticket se suelta y el crédito queda disponible para otro. */
+    public function test_tras_revertir_el_ticket_se_desvincula_y_libera_el_credito(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+        $this->cobrarYRevertir($cuota);
+
+        app(LinkDepositTicket::class)->unlink($ticket, 'Era el depósito de otro expediente', $this->operador()->id);
+
+        $this->assertSame(DepositTicketStatus::Waiting, $ticket->refresh()->status);
+        $this->assertNull($ticket->bank_transaction_id);
+
+        $otro = $this->otroTicket($movimiento);
+        $this->assertSame(1, app(ListAvailableCredits::class)->handle($otro)->total());
+        $this->assertCount(1, app(FindTicketCandidates::class)->handle($otro)->candidates);
+
+        app(LinkDepositTicket::class)->handle($otro, $movimiento, $this->operador()->id);
+        $this->assertSame($movimiento->id, $otro->refresh()->bank_transaction_id);
+    }
+
+    /** Sigue sin soltarse mientras la recepción esté viva, aunque sin dueño. */
+    public function test_con_la_recepcion_viva_el_ticket_no_se_desvincula(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $this->cobrarYLiberar($cuota);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('revertir la recepción');
+
+        app(LinkDepositTicket::class)->unlink($ticket, 'Era el depósito de otro expediente', $this->operador()->id);
+    }
+
+    /** Con dos recepciones y una sola revertida, el crédito sigue respaldando dinero. */
+    public function test_con_una_recepcion_viva_de_dos_el_ticket_no_se_desvincula(): void
+    {
+        $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->valueOrFail('id');
+
+        foreach (['primera', 'segunda'] as $clave) {
+            $recepcion = app(RegisterBankFundReceipt::class)->handle(
+                transaction: $movimiento,
+                amount: '1.00',
+                idempotencyKey: "dividida-{$clave}",
+                cashBoxId: $caja,
+                actorId: $this->operador()->id,
+            );
+        }
+
+        app(ReverseFundReceipt::class)->handle($recepcion, new Reason(HaberesReasonCode::Other, 'Se registró de más.'), 'revertir-segunda');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('revertir la recepción');
+
+        app(LinkDepositTicket::class)->unlink($ticket->refresh(), 'Era el depósito de otro expediente', $this->operador()->id);
+    }
+
+    /**
+     * El recorrido completo de un haber cargado de más.
+     *
+     * Anular no libera el depósito, y eso es deliberado: cada paso es una
+     * decisión con su motivo. Lo que se prueba es que al final de esos pasos
+     * el crédito queda de verdad disponible y el comprobante se puede dar de
+     * baja.
+     */
+    public function test_anular_el_haber_y_desarmar_el_dinero_deja_el_credito_disponible(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+        $recepcion = $this->cobrarYLiberar($cuota);
+
+        app(CancelHaber::class)->handle($cuota->haber->refresh(), new Reason(HaberesReasonCode::DataEntryError));
+
+        // Anular no toca el banco: el crédito sigue tomado por la recepción.
+        $this->assertSame('0.00', app(AllocatableAmount::class)->for($movimiento->refresh()));
+
+        app(ReverseFundReceipt::class)->handle($recepcion, new Reason(HaberesReasonCode::Other, 'El haber se cargó por error.'), 'revertir-'.Str::random(8));
+        app(LinkDepositTicket::class)->unlink($ticket, 'El haber se cargó por error.', $this->operador()->id);
+        app(DiscardDepositTicket::class)->handle(
+            $ticket->refresh(),
+            new Reason(HaberesReasonCode::WrongExpediente),
+            $this->operador()->id,
+        );
+
+        $this->assertSame(DepositTicketStatus::Discarded, $ticket->refresh()->status);
+        $this->assertSame($movimiento->amount, app(AllocatableAmount::class)->for($movimiento->refresh()));
+        $this->assertSame(1, app(ListAvailableCredits::class)->handle($this->otroTicket($movimiento))->total());
+    }
+
+    /*
+    |---------------------------------------------------------------------
+    | Anular el recibo deshace la conciliación
+    |---------------------------------------------------------------------
+    */
+
+    /** Un solo acto, con un solo motivo, y el movimiento queda libre en el extracto. */
+    public function test_anular_el_recibo_deshace_toda_la_conciliacion(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+
+        $recepcion = app(ReceiveAndAllocateTicket::class)->handle($cuota, 'atajo-'.Str::random(8), $this->operador()->id);
+        $recibo = $this->emitirRecibo($cuota);
+
+        $this->assertSame('0.00', app(AllocatableAmount::class)->for($movimiento->refresh()));
+
+        $this->actingAs($this->operador('contador'))
+            ->post(route('haberes.installments.void-collection', $cuota), [
+                'reasonCode' => 'wrong_installment',
+                'reason' => 'Era de la cuota siguiente.',
+                'idempotencyKey' => 'anular-'.Str::random(8),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('0.00', app(InstallmentFunding::class)->allocated($cuota->refresh()));
+        $this->assertSame('voided', $recibo->refresh()->status->value);
+        $this->assertSame('wrong_installment', $recibo->void_reason_code);
+        $this->assertNotNull($recepcion->refresh()->reversal_event_id);
+        $this->assertSame('wrong_installment', $recepcion->reversal_reason_code);
+
+        $this->assertSame(DepositTicketStatus::Waiting, $ticket->refresh()->status);
+        $this->assertNull($ticket->bank_transaction_id);
+        $this->assertSame($movimiento->amount, app(AllocatableAmount::class)->for($movimiento->refresh()));
+    }
+
+    /** Lo deshecho se puede volver a conciliar: el depósito no se perdió. */
+    public function test_el_movimiento_liberado_se_vuelve_a_conciliar(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $ticket = DepositTicket::query()->latest('id')->firstOrFail();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+
+        app(ReceiveAndAllocateTicket::class)->handle($cuota, 'atajo-'.Str::random(8), $this->operador()->id);
+        $this->anularElCobro($cuota);
+
+        app(LinkDepositTicket::class)->handle($ticket->refresh(), $movimiento->refresh(), $this->operador()->id);
+        $nueva = app(ReceiveAndAllocateTicket::class)->handle($cuota->refresh(), 'atajo-'.Str::random(8), $this->operador()->id);
+
+        $this->assertNull($nueva->reversal_event_id);
+        $this->assertSame($cuota->importeEsperado(), app(InstallmentFunding::class)->allocated($cuota->refresh()));
+        $this->assertSame(2, FundReceipt::query()->where('medium', 'bank')->count());
+    }
+
+    /** Sin deshacer: si la recepción también financia otra cuota, se rechaza y dice cuál. */
+    public function test_no_se_anula_si_la_recepcion_financia_otra_cuota(): void
+    {
+        $cuota = $this->cuotaConTicketCruzado();
+        $movimiento = BankTransaction::query()->latest('id')->firstOrFail();
+        $otra = BeneficiaryInstallment::query()
+            ->where('id', '!=', $cuota->id)
+            ->where('workflow_status', 'active')
+            ->where('expected_medium', 'bank')
+            ->orderBy('id')
+            ->firstOrFail();
+
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->valueOrFail('id');
+        $recepcion = app(RegisterBankFundReceipt::class)->handle(
+            transaction: $movimiento,
+            amount: $movimiento->amount,
+            idempotencyKey: 'compartida-'.Str::random(8),
+            cashBoxId: $caja,
+            actorId: $this->operador()->id,
+        );
+        $parte = Decimal::scale('10.00');
+        app(AllocateFundsToInstallment::class)->handle($recepcion, $cuota, $parte, 'parte-1', $this->operador()->id);
+        app(AllocateFundsToInstallment::class)->handle($recepcion, $otra, $parte, 'parte-2', $this->operador()->id);
+
+        try {
+            $this->anularElCobro($cuota);
+            $this->fail('Anuló una recepción que también financia otra cuota.');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('también financia la cuota', $e->errors()['installmentId'][0]);
+        }
+
+        $this->assertNull($recepcion->refresh()->reversal_event_id);
+        $this->assertSame($parte, app(InstallmentFunding::class)->allocated($cuota->refresh()));
+    }
+
     /*
     |---------------------------------------------------------------------
     | Andamiaje
     |---------------------------------------------------------------------
     */
+
+    private function anularElCobro(BeneficiaryInstallment $cuota): void
+    {
+        app(VoidCashCollection::class)->handle(
+            installment: $cuota->refresh(),
+            motivo: new Reason(HaberesReasonCode::WrongInstallment),
+            idempotencyKey: 'anular-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+    }
+
+    private function emitirRecibo(BeneficiaryInstallment $cuota): Receipt
+    {
+        return app(IssueIncomeReceipt::class)->handle(
+            installment: $cuota->refresh(),
+            actorId: $this->operador()->id,
+        );
+    }
+
+    private function cobrarYLiberar(BeneficiaryInstallment $cuota): FundReceipt
+    {
+        $recepcion = app(ReceiveAndAllocateTicket::class)->handle(
+            $cuota,
+            'atajo-'.Str::random(8),
+            $this->operador()->id,
+        );
+        $imputacion = FundingAllocation::query()->live()->firstOrFail();
+
+        app(UnallocateFunds::class)->handle(
+            allocation: $imputacion,
+            amount: $imputacion->amount,
+            idempotencyKey: 'liberar-'.Str::random(8),
+            motivo: new Reason(HaberesReasonCode::Other, 'Se cobró en la cuota equivocada.'),
+            actorId: $this->operador()->id,
+        );
+
+        return $recepcion;
+    }
+
+    private function cobrarYRevertir(BeneficiaryInstallment $cuota): FundReceipt
+    {
+        return app(ReverseFundReceipt::class)->handle(
+            $this->cobrarYLiberar($cuota),
+            new Reason(HaberesReasonCode::Other, 'No correspondía a este expediente.'),
+            'revertir-'.Str::random(8),
+        );
+    }
+
+    /** Un comprobante en espera, de otro expediente, por el mismo depósito. */
+    private function otroTicket(BankTransaction $movimiento): DepositTicket
+    {
+        return DepositTicket::query()->create([
+            'expediente_id' => Expediente::query()->whereNotNull('employer_id')->orderByDesc('id')->firstOrFail()->id,
+            'bank_account_id' => $movimiento->bank_account_id,
+            'amount' => $movimiento->amount,
+            'deposited_at' => '2026-08-21',
+            'deposit_kind' => DepositKind::Transfer,
+            'status' => DepositTicketStatus::Waiting,
+            'created_by' => $this->operador()->id,
+        ]);
+    }
 
     private function cuota(): BeneficiaryInstallment
     {

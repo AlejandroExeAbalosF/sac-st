@@ -50,17 +50,16 @@ final class InstallmentController extends Controller
         BeneficiaryInstallment $installment,
         VoidCashCollection $anular,
     ): RedirectResponse {
-        $validado = $request->validate([
-            'reason' => ['required', 'string', 'min:5', 'max:500'],
-            'idempotencyKey' => ['required', 'string', 'max:120'],
-        ], [
-            'reason.required' => 'Hay que decir por qué se anula el cobro.',
-            'reason.min' => 'El motivo tiene que explicar algo: un par de palabras no alcanzan.',
-        ]);
+        // 250 y no 300: el recibo guarda «motivo: detalle» en una columna de 300.
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::CollectionVoid, max: 250)
+            + ['idempotencyKey' => ['required', 'string', 'max:120']],
+            Reason::messages(),
+        );
 
         $anular->handle(
             installment: $installment,
-            reason: (string) $validado['reason'],
+            motivo: Reason::fromValidated($validado, HaberesReasonAct::CollectionVoid) ?? throw new LogicException('El motivo ya se validó.'),
             idempotencyKey: (string) $validado['idempotencyKey'],
             actorId: $request->user()?->id,
         );
@@ -89,15 +88,15 @@ final class InstallmentController extends Controller
         BeneficiaryInstallment $installment,
         UnallocateFunds $desasignar,
     ): RedirectResponse {
-        $validado = $request->validate([
-            'allocationId' => ['required', 'integer', 'exists:funding_allocations,id'],
-            'amount' => ['required', 'string', 'regex:/^\d{1,17}(\.\d{1,2})?$/'],
-            'reason' => ['required', 'string', 'min:5', 'max:500'],
-            'idempotencyKey' => ['required', 'string', 'max:120'],
-        ], [
-            'reason.required' => 'Hay que decir por qué se libera ese dinero.',
-            'reason.min' => 'El motivo tiene que explicar algo: un par de palabras no alcanzan.',
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::FundsRelease, max: 250) + [
+                'allocationId' => ['required', 'integer', 'exists:funding_allocations,id'],
+                'amount' => ['required', 'string', 'regex:/^\d{1,17}(\.\d{1,2})?$/'],
+                'idempotencyKey' => ['required', 'string', 'max:120'],
+            ],
+            Reason::messages(),
+        );
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::FundsRelease) ?? throw new LogicException('El motivo ya se validó.');
 
         /** @var FundingAllocation $asignacion */
         $asignacion = FundingAllocation::query()
@@ -109,7 +108,7 @@ final class InstallmentController extends Controller
             amount: $validado['amount'],
             idempotencyKey: (string) $validado['idempotencyKey'],
             actorId: $request->user()?->id,
-            notes: (string) $validado['reason'],
+            motivo: $motivo,
         );
 
         return back()->with(

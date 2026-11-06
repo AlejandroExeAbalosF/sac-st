@@ -440,14 +440,12 @@ function DialogoDeBaja({
                     </DialogTitle>
                     <DialogDescription>
                         {esReactivacion
-                            ? 'Cada haber y cada cuota vuelven al estado que tenían antes de anularse, no a activo.'
+                            ? 'Cada haber y cada cuota vuelven a su estado anterior.'
                             : cuantos === 0
-                              ? 'No se borra: queda registrado como anulado.'
-                              : `No se borra: queda registrado como anulado, y ${
-                                    cuantos === 1
-                                        ? 'su haber pasa'
-                                        : `sus ${cuantos} haberes pasan`
-                                } al mismo estado junto con sus cuotas.`}
+                              ? 'Queda registrado como anulado.'
+                              : cuantos === 1
+                                ? 'Su haber y sus cuotas también quedan anulados.'
+                                : `Sus ${cuantos} haberes y sus cuotas también quedan anulados.`}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -461,11 +459,6 @@ function DialogoDeBaja({
                         codeError={errors.reasonCode}
                         detailError={errors.reason}
                         idPrefix="baja-expediente"
-                        detailPlaceholder={
-                            esReactivacion
-                                ? 'Por qué vuelve a estar vigente.'
-                                : 'Qué pasó.'
-                        }
                     />
 
                     <DialogFooter>

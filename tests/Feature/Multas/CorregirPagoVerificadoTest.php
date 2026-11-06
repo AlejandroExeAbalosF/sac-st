@@ -783,10 +783,10 @@ class CorregirPagoVerificadoTest extends TestCase
                 'funds_exit_event_id' => $reversion,
             ]);
             DB::table('fund_receipts')->where('id', $recepcion->id)->update([
-                'reversal_event_id' => $reversion, 'reversed_at' => now(), 'reversal_reason' => 'Directo',
+                'reversal_reason_code' => 'other', 'reversal_event_id' => $reversion, 'reversed_at' => now(), 'reversal_reason' => 'Directo',
             ]);
             DB::table('receipts')->where('id', $this->reciboDe($pago)->id)->update([
-                'status' => 'voided', 'void_reason' => 'Directo', 'voided_at' => now(), 'voided_by' => $this->quienAbre(),
+                'status' => 'voided', 'void_reason_code' => 'other', 'void_reason' => 'Directo', 'voided_at' => now(), 'voided_by' => $this->quienAbre(),
             ]);
             DB::table('fine_payments')->where('id', $pago->id)->update(['status' => 'voided']);
         });
@@ -802,10 +802,10 @@ class CorregirPagoVerificadoTest extends TestCase
         $this->rechazaLaBase('no se revierte', function () use ($pago, $recepcion): void {
             $this->anulacionDirectaDeRechazado($pago);
             DB::table('fund_receipts')->where('id', $recepcion->id)->update([
-                'reversal_event_id' => $this->reversion($recepcion->financial_event_id), 'reversed_at' => now(), 'reversal_reason' => 'Directo',
+                'reversal_reason_code' => 'other', 'reversal_event_id' => $this->reversion($recepcion->financial_event_id), 'reversed_at' => now(), 'reversal_reason' => 'Directo',
             ]);
             DB::table('receipts')->where('id', $this->reciboDe($pago)->id)->update([
-                'status' => 'voided', 'void_reason' => 'Directo', 'voided_at' => now(), 'voided_by' => $this->quienAbre(),
+                'status' => 'voided', 'void_reason_code' => 'other', 'void_reason' => 'Directo', 'voided_at' => now(), 'voided_by' => $this->quienAbre(),
             ]);
             DB::table('fine_payments')->where('id', $pago->id)->update(['status' => 'voided']);
         });

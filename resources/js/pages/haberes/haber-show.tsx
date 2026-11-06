@@ -53,6 +53,7 @@ type Props = {
     canEdit: boolean;
     canCancel: boolean;
     canManageTickets: boolean;
+    canSearchTickets: boolean;
     canIssueReceipt: boolean;
     canRegisterPayment: boolean;
     canTransferCash: boolean;
@@ -120,6 +121,7 @@ export default function MostrarHaber({
     canEdit,
     canCancel,
     canManageTickets,
+    canSearchTickets,
     canIssueReceipt,
     canRegisterPayment,
     canTransferCash,
@@ -473,6 +475,7 @@ export default function MostrarHaber({
                         haberNumber={haber.haberNumber}
                         cuentas={cuentas}
                         puedeEditarTicket={canManageTickets}
+                        puedeBuscarTicket={canSearchTickets}
                         puedeEmitirRecibo={canIssueReceipt}
                         puedeRegistrarPago={canRegisterPayment}
                         puedeTrasladar={canTransferCash}

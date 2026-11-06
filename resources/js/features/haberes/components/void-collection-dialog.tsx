@@ -2,6 +2,7 @@ import { useForm, usePage } from '@inertiajs/react';
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -11,17 +12,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { money } from '@/lib/format';
 import { voidCollection as anularCobro } from '@/routes/haberes/installments';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
 
 /**
- * Anular el cobro: el dinero nunca entró.
- *
- * No es liberar: la diferencia está en `VoidCashCollection`.
+ * Anular el cobro: por mostrador el dinero nunca entró; por banco se deshace
+ * la conciliación. La diferencia está en `VoidCashCollection`.
  *
  * Deja la cuota sin cobrar y el recibo anulado con su número. Después el
  * circuito normal la cobra bien y emite uno nuevo que apunta al anulado.
@@ -40,6 +38,7 @@ export default function VoidCollectionDialog({
     );
 
     const form = useForm({
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
         reason: '',
         idempotencyKey: clave,
     });
@@ -47,6 +46,9 @@ export default function VoidCollectionDialog({
     const { errors } = usePage().props as unknown as {
         errors?: Record<string, string>;
     };
+
+    // Con la plata ya liberada no sale nada de la caja: solo cae el recibo.
+    const conPlata = Number(cuota.fundedAmount) > 0;
 
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,51 +65,30 @@ export default function VoidCollectionDialog({
                 <DialogHeader>
                     <DialogTitle>Anular el recibo de ingreso</DialogTitle>
                     <DialogDescription>
-                        Para cuando el dinero nunca entró — un importe mal
-                        tipeado, por ejemplo. Si el dinero sí entró y solo está
-                        en la cuota equivocada, lo que corresponde es liberarlo,
-                        no anular.
+                        {!conPlata
+                            ? 'El recibo queda anulado con su número.'
+                            : cuota.effectiveMedium === 'bank'
+                              ? 'La cuota queda sin cobrar y el movimiento del extracto vuelve a quedar disponible para conciliar.'
+                              : `Salen ${money(cuota.fundedAmount)} de la caja y la cuota queda sin cobrar. Si el dinero entró, corresponde liberarlo.`}
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="mt-4 space-y-4">
-                    <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive-soft p-3 text-xs">
-                        <p className="font-medium">Al confirmar:</p>
-                        <ul className="ml-4 list-disc space-y-1 text-muted-foreground">
-                            <li>
-                                Salen {money(cuota.fundedAmount)} de la caja: el
-                                libro deja de afirmar que ese dinero está.
-                            </li>
-                            <li>La cuota vuelve a quedar sin cobrar.</li>
-                            {cuota.incomeReceipt !== null && (
-                                <li>
-                                    El recibo{' '}
-                                    <strong className="font-mono">
-                                        {cuota.incomeReceipt.formattedNumber}
-                                    </strong>{' '}
-                                    queda anulado, con su número. El que se
-                                    emita después toma el siguiente libre de la
-                                    serie y lo referencia.
-                                </li>
-                            )}
-                        </ul>
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-anular-${cuota.id}`}>
-                            Por qué se anula
-                        </Label>
-                        <Textarea
-                            id={`motivo-anular-${cuota.id}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="El importe se cargó con un cero de más; el empleador trajo $ 100.000."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="collection_void"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-anular-${cuota.id}`}
+                        maxLength={250}
+                    />
 
                     <InputError message={errors?.installmentId} />
 

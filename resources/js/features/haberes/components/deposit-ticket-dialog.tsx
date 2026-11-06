@@ -53,12 +53,14 @@ export default function DepositTicketDialog({
     ticket,
     cuentas,
     puedeEditar,
+    puedeBuscar,
     abierto,
     onCerrar,
 }: {
     ticket: Ticket;
     cuentas: PeriodoDeCuenta[];
     puedeEditar: boolean;
+    puedeBuscar: boolean;
     abierto: boolean;
     onCerrar: () => void;
 }) {
@@ -134,13 +136,15 @@ export default function DepositTicketDialog({
                                     Corregir
                                 </Button>
                             )}
-                            <Button asChild>
-                                <Link href={buscarTicket(ticket.id)}>
-                                    {ticket.bankTransactionId === null
-                                        ? 'Buscar en el extracto'
-                                        : 'Ver el cruce'}
-                                </Link>
-                            </Button>
+                            {puedeBuscar && (
+                                <Button asChild>
+                                    <Link href={buscarTicket(ticket.id)}>
+                                        {ticket.bankTransactionId === null
+                                            ? 'Buscar en el extracto'
+                                            : 'Ver el cruce'}
+                                    </Link>
+                                </Button>
+                            )}
                         </div>
                     </DialogFooter>
                 )}

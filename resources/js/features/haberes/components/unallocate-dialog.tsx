@@ -3,6 +3,7 @@ import { Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -20,7 +21,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { date, money, parseAmount } from '@/lib/format';
 import { unallocate as desasignar } from '@/routes/haberes/installments';
 
@@ -77,6 +77,7 @@ export default function UnallocateDialog({
                 : cuota.overAllocatedAmount,
             { symbol: false },
         ),
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
         reason: '',
         idempotencyKey: clave,
     });
@@ -106,8 +107,8 @@ export default function UnallocateDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {delSistemaAnterior
-                            ? 'El dinero se queda en el organismo: deja de estar reservado para este beneficiario y vuelve al saldo del sistema anterior, para reservarlo para la cuota que corresponda. Un cheque se libera entero. El asiento se registra con la fecha de hoy.'
-                            : 'El dinero se queda en el organismo: deja de estar imputado a este beneficiario y vuelve a la cola de fondos sin identificar, para que lo tome la cuota que corresponda. El asiento se registra con la fecha de hoy.'}
+                            ? 'El dinero vuelve al saldo del sistema anterior, con fecha de hoy. Un cheque se libera entero.'
+                            : 'El dinero vuelve a los fondos sin identificar, con fecha de hoy.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -188,37 +189,30 @@ export default function UnallocateDialog({
                         <InputError message={form.errors.amount} />
                     </div>
 
-                    {/*
-                     * El motivo es obligatorio: es lo
-                     * único que va a explicar el movimiento cuando nadie se
-                     * acuerde de por qué se hizo.
-                     */}
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`motivo-${cuota.id}`}>
-                            Por qué se libera
-                        </Label>
-                        <Textarea
-                            id={`motivo-${cuota.id}`}
-                            rows={3}
-                            value={form.data.reason}
-                            onChange={(e) =>
-                                form.setData('reason', e.target.value)
-                            }
-                            placeholder="El importe de la cuota se corrigió; el excedente vuelve al pozo."
-                        />
-                        <InputError message={form.errors.reason} />
-                    </div>
+                    <ReasonFields
+                        act="funds_release"
+                        code={form.data.reasonCode}
+                        detail={form.data.reason}
+                        onCodeChange={(codigo) =>
+                            form.setData('reasonCode', codigo)
+                        }
+                        onDetailChange={(detalle) =>
+                            form.setData('reason', detalle)
+                        }
+                        codeError={form.errors.reasonCode}
+                        detailError={form.errors.reason}
+                        idPrefix={`motivo-liberar-${cuota.id}`}
+                        maxLength={250}
+                    />
 
                     {cuota.incomeReceipt !== null && (
                         <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs">
-                            Esta cuota tiene el recibo{' '}
+                            El recibo{' '}
                             <strong className="font-mono">
                                 {cuota.incomeReceipt.formattedNumber}
                             </strong>{' '}
-                            emitido por {money(cuota.incomeReceipt.amount)}. No
-                            se toca: documenta lo que el empleador pagó, que
-                            sigue siendo cierto. Después de liberar, la cuota va
-                            a esperar menos que eso.
+                            por {money(cuota.incomeReceipt.amount)} sigue
+                            vigente.
                         </p>
                     )}
 

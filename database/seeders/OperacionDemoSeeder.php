@@ -516,7 +516,7 @@ class OperacionDemoSeeder extends Seeder
 
             app(VoidCashCollection::class)->handle(
                 installment: $this->cuotas['nieva-2']->refresh(),
-                reason: 'El beneficiario no llegó a firmar y el dinero volvió al cajón.',
+                motivo: new Reason(HaberesReasonCode::Other, 'El beneficiario no llegó a firmar y el dinero volvió al cajón.'),
                 idempotencyKey: 'demo:operacion:anulacion:nieva-2',
                 actorId: $this->contadora->id,
             );

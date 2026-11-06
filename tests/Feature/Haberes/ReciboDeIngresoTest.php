@@ -205,7 +205,7 @@ class ReciboDeIngresoTest extends TestCase
             'status' => 'voided',
             'voided_by' => $this->operador()->id,
             'voided_at' => now(),
-            'void_reason' => 'La hoja se arruinó al escribirla.',
+            'void_reason_code' => 'other', 'void_reason' => 'La hoja se arruinó al escribirla.',
         ]);
 
         $otra = $this->otraCuotaFinanciada();

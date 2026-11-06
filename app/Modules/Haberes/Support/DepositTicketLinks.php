@@ -54,6 +54,8 @@ final class DepositTicketLinks
             ->whereNotNull('deposit_tickets.bank_transaction_id')
             // Una reversión no registra nada: deshace.
             ->whereNull('bank_transaction_allocations.reversal_of_id')
+            // Y una recepción revertida no es una «ya registrada».
+            ->whereNull('fund_receipts.reversal_event_id')
             ->orderBy('fund_receipts.id')
             ->get([
                 'deposit_tickets.id as ticket',

@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $match_score
  * @property array<string, mixed>|null $match_explanation
  * @property string|null $notes
+ * @property string|null $reversal_reason_code
  */
 final class FundingAllocation extends Model
 {
@@ -49,6 +50,7 @@ final class FundingAllocation extends Model
         'match_score',
         'match_explanation',
         'notes',
+        'reversal_reason_code',
     ];
 
     /** @return BelongsTo<FinancialEvent, $this> */

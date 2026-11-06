@@ -56,8 +56,8 @@ export default function HaberCancelDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {esReactivacion
-                            ? 'Sus cuotas vuelven al estado que tenían antes, y el importe vuelve a contar en lo reconocido.'
-                            : 'No se borra: queda registrado como anulado, sus cuotas pasan al mismo estado y el importe deja de contar en lo reconocido del expediente.'}
+                            ? 'Sus cuotas vuelven a su estado anterior y el importe vuelve a contar en lo reconocido.'
+                            : 'Sus cuotas también quedan anuladas y el importe deja de contar en lo reconocido.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -71,11 +71,6 @@ export default function HaberCancelDialog({
                         codeError={errors.reasonCode}
                         detailError={errors.reason}
                         idPrefix={`motivo-${haber.id}`}
-                        detailPlaceholder={
-                            esReactivacion
-                                ? 'Por qué vuelve a estar vigente.'
-                                : 'Qué pasó.'
-                        }
                     />
 
                     <DialogFooter>

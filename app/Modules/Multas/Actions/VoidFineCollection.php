@@ -118,6 +118,7 @@ final class VoidFineCollection
                     'reversed_at' => now(),
                     'reversed_by' => $actorId,
                     'reversal_reason' => $motivo->describe(),
+                    'reversal_reason_code' => $motivo->code->value,
                 ])->save();
             }
 
@@ -125,6 +126,7 @@ final class VoidFineCollection
             $recibo->forceFill([
                 'status' => ReceiptStatus::Voided,
                 'void_reason' => $motivo->describe(),
+                'void_reason_code' => $motivo->code->value,
                 'voided_by' => $actorId,
                 'voided_at' => now(),
             ])->save();

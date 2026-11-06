@@ -6,9 +6,11 @@ namespace Tests\Feature\Haberes;
 
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\VoidCashCollection;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
+use App\Modules\Shared\Support\Reason;
 use Database\Seeders\CashBoxSeeder;
 use Database\Seeders\DocumentSeriesSeeder;
 use Database\Seeders\HaberesDemoSeeder;
@@ -156,7 +158,7 @@ class VerHaberTest extends TestCase
 
         app(VoidCashCollection::class)->handle(
             installment: $primera->refresh(),
-            reason: 'El importe se cargo con un cero de mas.',
+            motivo: new Reason(HaberesReasonCode::WrongAmount, 'El importe se cargo con un cero de mas.'),
             idempotencyKey: 'ver-haber:anular',
             actorId: $operador->id,
         );

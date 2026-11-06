@@ -11,6 +11,7 @@ use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Actions\ReverseFundReceipt;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
@@ -20,8 +21,10 @@ use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Person;
+use App\Modules\Shared\Support\Reason;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -67,7 +70,7 @@ class PantallasDeRecepcionesTest extends TestCase
 
         app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'No correspondía asentarla: era un depósito nuestro.',
+            motivo: new Reason(HaberesReasonCode::Other, 'No correspondía asentarla: era un depósito nuestro.'),
             idempotencyKey: 'reversion-'.$recepcion->id,
             actorId: $this->operador()->id,
         );
@@ -85,6 +88,35 @@ class PantallasDeRecepcionesTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->has('receipts.data', 1)
                 ->whereNot('receipts.data.0.reversedAt', null));
+    }
+
+    /** El motivo de revertir sale de la lista del acto, que la pantalla recibe. */
+    public function test_revertir_pide_un_motivo_de_la_lista(): void
+    {
+        $recepcion = $this->recepcion('1000.00');
+        $operador = $this->operador('contador');
+        $revertir = fn (array $datos) => $this->actingAs($operador)->post(
+            route('recepciones.reverse', $recepcion),
+            $datos + ['idempotencyKey' => 'reversion-'.$recepcion->id],
+        );
+
+        $this->actingAs($operador)
+            ->get(route('recepciones.show', $recepcion))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('motivos.fund_receipt_reversal.0.value', 'duplicate'));
+
+        $revertir([])->assertSessionHasErrors('reasonCode');
+        $revertir(['reasonCode' => 'wrong_amount'])->assertSessionHasErrors('reasonCode');
+        $revertir(['reasonCode' => 'other'])->assertSessionHasErrors('reason');
+
+        $revertir(['reasonCode' => 'duplicate'])->assertSessionHasNoErrors();
+
+        $this->assertSame('Cargado dos veces', $recepcion->refresh()->reversal_reason);
+        $this->assertStringContainsString(
+            'duplicate',
+            (string) DB::table('audit_events')->where('action', 'recepcion.revertida')->value('metadata'),
+        );
     }
 
     /*

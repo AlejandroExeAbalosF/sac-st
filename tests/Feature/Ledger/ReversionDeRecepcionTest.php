@@ -13,6 +13,7 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\ReverseFundReceipt;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -21,6 +22,7 @@ use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\JournalLine;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Reason;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,7 +60,7 @@ class ReversionDeRecepcionTest extends TestCase
 
         $revertida = app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'Era la acreditación de nuestro propio depósito, no plata nueva.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Era la acreditación de nuestro propio depósito, no plata nueva.'),
             idempotencyKey: 'reversion-'.Str::random(8),
             actorId: $this->operador()->id,
         );
@@ -112,7 +114,7 @@ class ReversionDeRecepcionTest extends TestCase
 
         app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'Se imputó al lugar equivocado y hay que volver a empezar.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Se imputó al lugar equivocado y hay que volver a empezar.'),
             idempotencyKey: 'reversion-'.Str::random(8),
         );
 
@@ -145,7 +147,7 @@ class ReversionDeRecepcionTest extends TestCase
 
         app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion->refresh(),
-            reason: 'Quiero deshacerla con la plata todavía repartida.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Quiero deshacerla con la plata todavía repartida.'),
             idempotencyKey: 'reversion-'.Str::random(8),
         );
     }
@@ -160,7 +162,7 @@ class ReversionDeRecepcionTest extends TestCase
 
         app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'No correspondía registrarla como recepción.',
+            motivo: new Reason(HaberesReasonCode::Other, 'No correspondía registrarla como recepción.'),
             idempotencyKey: 'reversion-'.Str::random(8),
         );
 
@@ -187,12 +189,12 @@ class ReversionDeRecepcionTest extends TestCase
 
         $primera = app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'Cargada contra el movimiento equivocado.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Cargada contra el movimiento equivocado.'),
             idempotencyKey: $clave,
         );
         $segunda = app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion->refresh(),
-            reason: 'Cargada contra el movimiento equivocado.',
+            motivo: new Reason(HaberesReasonCode::Other, 'Cargada contra el movimiento equivocado.'),
             idempotencyKey: $clave,
         );
 
@@ -213,7 +215,7 @@ class ReversionDeRecepcionTest extends TestCase
 
         app(ReverseFundReceipt::class)->handle(
             receipt: $recepcion,
-            reason: 'No correspondía registrarla como recepción.',
+            motivo: new Reason(HaberesReasonCode::Other, 'No correspondía registrarla como recepción.'),
             idempotencyKey: 'reversion-'.Str::random(8),
         );
 

@@ -36,7 +36,6 @@ export default function CancelTransferDialog({
     url,
     titulo = 'Cancelar el traslado',
     consecuencia = 'El efectivo vuelve a figurar en la caja.',
-    ejemplo = 'El depósito se cargó sobre la cuota equivocada.',
     abierto,
     onCerrar,
 }: {
@@ -45,7 +44,6 @@ export default function CancelTransferDialog({
     titulo?: string;
     /** Qué pasa con la plata al cancelar. */
     consecuencia?: string;
-    ejemplo?: string;
     abierto: boolean;
     onCerrar: () => void;
 }) {
@@ -73,10 +71,7 @@ export default function CancelTransferDialog({
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>{titulo}</DialogTitle>
-                    <DialogDescription>
-                        Para cuando el depósito no ocurrió o se cargó
-                        equivocado. {consecuencia}
-                    </DialogDescription>
+                    <DialogDescription>{consecuencia}</DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={enviar} className="mt-4 space-y-4">
@@ -108,7 +103,6 @@ export default function CancelTransferDialog({
                             onChange={(e) =>
                                 form.setData('reason', e.target.value)
                             }
-                            placeholder={ejemplo}
                         />
                         <InputError message={form.errors.reason} />
                     </div>

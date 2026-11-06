@@ -172,6 +172,7 @@ final class FeeChargeFunds
             'reversed_at' => now(),
             'reversed_by' => $actorId,
             'reversal_reason' => $motivo->describe(),
+            'reversal_reason_code' => $motivo->code->value,
         ])->save();
 
         if ($recepcion->medium === PaymentMedium::Bank) {

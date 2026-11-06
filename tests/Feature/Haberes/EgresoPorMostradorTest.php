@@ -257,7 +257,7 @@ class EgresoPorMostradorTest extends TestCase
             'status' => ReceiptStatus::Voided,
             'voided_by' => $this->operador()->id,
             'voided_at' => now(),
-            'void_reason' => 'Prueba: el comprobante del ingreso deja de estar vigente.',
+            'void_reason_code' => 'other', 'void_reason' => 'Prueba: el comprobante del ingreso deja de estar vigente.',
         ])->save();
 
         $this->entregar($cuota)->assertSessionHasErrors('installmentId');

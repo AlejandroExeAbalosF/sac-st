@@ -8,10 +8,14 @@ use App\Modules\Haberes\Enums\AllocationKind;
 use App\Modules\Haberes\Enums\ExpedienteStatus;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
+use App\Modules\Haberes\Enums\LegacyDocumentKind;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +56,7 @@ final class CancelExpediente
 
             $this->assertSinDineroImputado($cuotaIds);
             $this->assertSinPagosFueraDelCircuito($cuotaIds);
+            $this->assertSinRecibosVigentes($cuotaIds);
 
             $estadoAnterior = $bloqueado->status;
 
@@ -185,6 +190,40 @@ final class CancelExpediente
                 'reason' => $saldadas === 1
                     ? 'Una cuota ya se pagó fuera del circuito. Hay que anular ese registro antes.'
                     : "Hay {$saldadas} cuotas pagadas fuera del circuito. Hay que anular esos registros antes.",
+            ]);
+        }
+    }
+
+    /**
+     * Liberar la plata no da de baja el recibo: anularlo es otra decisión,
+     * con su motivo, y sin ella quedaría firme sobre una cuota anulada.
+     *
+     * @param  Collection<int, mixed>  $cuotaIds
+     *
+     * @throws ValidationException
+     */
+    private function assertSinRecibosVigentes(Collection $cuotaIds): void
+    {
+        $conRecibo = Receipt::query()
+            ->issued()
+            ->where('receipt_type', ReceiptType::Income)
+            ->whereIn('beneficiary_installment_id', $cuotaIds)
+            ->pluck('beneficiary_installment_id')
+            ->merge(
+                LegacyDocument::query()
+                    ->current()
+                    ->where('kind', LegacyDocumentKind::IncomeReceipt->value)
+                    ->whereIn('beneficiary_installment_id', $cuotaIds)
+                    ->pluck('beneficiary_installment_id'),
+            )
+            ->unique()
+            ->count();
+
+        if ($conRecibo > 0) {
+            throw ValidationException::withMessages([
+                'reason' => $conRecibo === 1
+                    ? 'Una cuota todavía tiene su recibo de ingreso vigente. Hay que anularlo antes.'
+                    : "Hay {$conRecibo} cuotas con el recibo de ingreso vigente. Hay que anularlos antes.",
             ]);
         }
     }

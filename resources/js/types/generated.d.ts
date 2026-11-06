@@ -793,7 +793,11 @@ declare namespace App {
                     | 'installment_unlock'
                     | 'legacy_settlement_void'
                     | 'legacy_document_void'
-                    | 'deposit_ticket_discard';
+                    | 'deposit_ticket_discard'
+                    | 'collection_void'
+                    | 'funds_release'
+                    | 'fund_receipt_reversal'
+                    | 'deposit_ticket_unlink';
                 export type HaberesReasonCode =
                     | 'data_entry_error'
                     | 'duplicate'
@@ -809,6 +813,7 @@ declare namespace App {
                     | 'deposit_not_made'
                     | 'wrong_receipt'
                     | 'wrong_expediente'
+                    | 'wrong_credit'
                     | 'settlement_voided'
                     | 'other';
                 export type InstallmentStage =

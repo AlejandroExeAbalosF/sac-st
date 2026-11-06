@@ -31,6 +31,7 @@ import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { preview } from '@/routes/adjuntos';
+import { search as buscarTicket } from '@/routes/depositos';
 import { receiveAndAllocate as registrarIngreso } from '@/routes/haberes/installments';
 import { voidPaper as anularPapel } from '@/routes/haberes/installments/legacy-funds';
 import { create as nuevoTicket } from '@/routes/haberes/installments/ticket';
@@ -65,6 +66,7 @@ export default function InstallmentIncome({
     cuota,
     cuentas,
     puedeEditarTicket,
+    puedeBuscarTicket,
     puedeEmitirRecibo,
     puedeRegistrarPago,
     puedeTrasladar,
@@ -78,6 +80,7 @@ export default function InstallmentIncome({
     cuota: Cuota;
     cuentas: PeriodoDeCuenta[];
     puedeEditarTicket: boolean;
+    puedeBuscarTicket: boolean;
     puedeEmitirRecibo: boolean;
     puedeRegistrarPago: boolean;
     puedeTrasladar: boolean;
@@ -112,6 +115,7 @@ export default function InstallmentIncome({
                     cuota={cuota}
                     cuentas={cuentas}
                     puedeEditar={puedeEditarTicket}
+                    puedeBuscar={puedeBuscarTicket}
                 />
             )}
 
@@ -129,7 +133,9 @@ export default function InstallmentIncome({
                 conRecibo={
                     cuota.incomeReceipt !== null || reciboDePapel !== null
                 }
-                puedeTrasladar={puedeTrasladar && !anulada}
+                puedeTrasladar={
+                    puedeTrasladar && !anulada && cuota.status !== 'paid'
+                }
                 puedeAcreditar={puedeAcreditar}
             />
 
@@ -155,6 +161,7 @@ export default function InstallmentIncome({
                     puedeLiberar={
                         puedeDesasignar &&
                         !anulada &&
+                        cuota.status !== 'paid' &&
                         !sinFinanciar &&
                         cuota.cashTransfer === null &&
                         cuota.allocations.length > 0
@@ -165,6 +172,7 @@ export default function InstallmentIncome({
                     cuota={cuota}
                     firmantes={firmantes}
                     puedeAnular={puedeAnular}
+                    puedeBuscarTicket={puedeBuscarTicket && !anulada}
                     puedeRegistrarPago={puedeRegistrarPago}
                     /*
                      * Con la cuota sin financiar el mismo boton cobra, y
@@ -299,8 +307,7 @@ function AnularPapelDialog({
                         Anular el recibo de papel n.º {numero}
                     </DialogTitle>
                     <DialogDescription>
-                        Queda anulado con su motivo, no se borra. Al volver a
-                        reservar fondos se carga el papel correcto.
+                        Al volver a reservar fondos se carga el papel correcto.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -326,7 +333,6 @@ function AnularPapelDialog({
                         codeError={form.errors.reasonCode}
                         detailError={form.errors.reason}
                         idPrefix={`motivo-papel-${cuotaId}`}
-                        detailPlaceholder="El número del talonario estaba mal tipeado: es 0072190."
                     />
                     <DialogFooter className="gap-2">
                         <Button
@@ -404,17 +410,19 @@ function Financiacion({
                             </span>
                         </span>
                     </p>
-                    {puedeDesasignar && cuota.allocations.length > 0 && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="min-h-11 text-xs sm:min-h-8"
-                            onClick={() => setDevolviendo(true)}
-                        >
-                            <Undo2 className="size-3.5" />
-                            Liberar el excedente
-                        </Button>
-                    )}
+                    {puedeDesasignar &&
+                        cuota.status !== 'paid' &&
+                        cuota.allocations.length > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-11 text-xs sm:min-h-8"
+                                onClick={() => setDevolviendo(true)}
+                            >
+                                <Undo2 className="size-3.5" />
+                                Liberar el excedente
+                            </Button>
+                        )}
                 </div>
 
                 {devolviendo && (
@@ -538,12 +546,15 @@ function ReciboDeIngreso({
     firmantes,
     puedeEmitir,
     puedeAnular,
+    puedeBuscarTicket,
     puedeRegistrarPago,
 }: {
     cuota: Cuota;
     firmantes: Firmante[];
     puedeEmitir: boolean;
     puedeAnular: boolean;
+    /** Para ofrecer la conciliación mientras el comprobante siga sin cruzar. */
+    puedeBuscarTicket: boolean;
     /** Para ofrecer el paso que falta cuando el crédito ya está cruzado. */
     puedeRegistrarPago: boolean;
 }) {
@@ -644,17 +655,19 @@ function ReciboDeIngreso({
                          * el depósito ocurrió. Se oculta el botón en vez de
                          * dejar que el operador lo apriete para enterarse.
                          */}
-                        {puedeAnular && !enTransito && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-xs text-destructive-strong hover:bg-destructive-soft"
-                                onClick={() => setAnulando(true)}
-                            >
-                                <Ban className="size-3.5" />
-                                Anular el recibo
-                            </Button>
-                        )}
+                        {puedeAnular &&
+                            !enTransito &&
+                            cuota.status !== 'paid' && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 text-xs text-destructive-strong hover:bg-destructive-soft"
+                                    onClick={() => setAnulando(true)}
+                                >
+                                    <Ban className="size-3.5" />
+                                    Anular el recibo
+                                </Button>
+                            )}
                     </div>
 
                     <ReceiptViewerDialog
@@ -720,7 +733,7 @@ function ReciboDeIngreso({
         return (
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <Receipt className="mt-0.5 size-3.5 shrink-0" />
-                <div className="space-y-1.5">
+                <div className="min-w-0 flex-1 space-y-1.5">
                     {registrada !== null ? (
                         <p>
                             El dinero ya está registrado como recepción, pero
@@ -735,11 +748,25 @@ function ReciboDeIngreso({
                             el crédito son el mismo hecho; no asienta la plata.
                         </p>
                     ) : ticket !== null ? (
-                        <p>
-                            El comprobante todavía no apareció en el extracto.
-                            Hasta que el crédito no figure no hay recepción, y
-                            sin recepción no hay recibo.
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="min-w-56 flex-1">
+                                Falta realizar la conciliación bancaria. Hasta
+                                hacerla no hay recepción, y sin recepción no hay
+                                recibo.
+                            </p>
+                            {puedeBuscarTicket && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="min-h-11 shrink-0 bg-accent text-xs text-accent-foreground hover:bg-accent/80 sm:min-h-8"
+                                >
+                                    <Link href={buscarTicket(ticket.id)}>
+                                        Buscar en el extracto
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
                     ) : (
                         <p>
                             El recibo de ingreso se emite cuando la cuota queda
@@ -791,7 +818,17 @@ function ReciboDeIngreso({
                         </div>
                     )}
 
-                    <InputError message={errores?.installmentId} />
+                    {/*
+                     * El rechazo puede venir con otra clave —`amount`,
+                     * `bankTransactionId`— según qué Action lo frene. Sin
+                     * mostrarlas, el botón parecía no hacer nada.
+                     */}
+                    <InputError
+                        message={
+                            Object.values(form.errors)[0] ??
+                            errores?.installmentId
+                        }
+                    />
                 </div>
             </div>
         );
@@ -840,10 +877,12 @@ function Comprobante({
     cuota,
     cuentas,
     puedeEditar,
+    puedeBuscar,
 }: {
     cuota: Cuota;
     cuentas: PeriodoDeCuenta[];
     puedeEditar: boolean;
+    puedeBuscar: boolean;
 }) {
     const [abierto, setAbierto] = useState(false);
     const anulada = cuota.status === 'cancelled';
@@ -878,6 +917,7 @@ function Comprobante({
                     ticket={ticket}
                     cuentas={cuentas}
                     puedeEditar={puedeEditar}
+                    puedeBuscar={puedeBuscar}
                     abierto={abierto}
                     onCerrar={() => setAbierto(false)}
                 />

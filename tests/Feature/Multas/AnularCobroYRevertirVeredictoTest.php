@@ -399,11 +399,11 @@ class AnularCobroYRevertirVeredictoTest extends TestCase
         $this->verificarPendientes();
 
         $this->rechazaLaBase('anulando el cobro', fn () => DB::table('receipts')->where('id', $recibo->id)->update([
-            'status' => 'voided', 'void_reason' => 'Directo', 'voided_by' => $this->quienAbre(), 'voided_at' => now(),
+            'status' => 'voided', 'void_reason_code' => 'other', 'void_reason' => 'Directo', 'voided_by' => $this->quienAbre(), 'voided_at' => now(),
         ]));
 
         $this->rechazaLaBase('sin anular el cobro', fn () => DB::table('fund_receipts')->where('id', $recepcion->id)->update([
-            'reversal_event_id' => $this->reversion($recepcion->financial_event_id),
+            'reversal_reason_code' => 'other', 'reversal_event_id' => $this->reversion($recepcion->financial_event_id),
             'reversed_at' => now(), 'reversed_by' => $this->quienAbre(), 'reversal_reason' => 'Directo',
         ]));
     }
