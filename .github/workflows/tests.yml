@@ -85,5 +85,18 @@ jobs:
       - name: Audit Dependencies
         run: composer audit && pnpm audit --audit-level high
 
-      - name: Run CI Checks
-        run: composer ci:check
+      # Las mismas etapas de ci:check, visibles por separado con sus tiempos.
+      - name: Check Frontend
+        run: composer ci:frontend
+
+      - name: Check PHP Style and Types
+        run: composer ci:php
+
+      - name: Run Parallel Tests
+        run: composer test:parallel:main
+
+      - name: Run Exclusive Tests
+        run: composer test:exclusive
+
+      - name: Check Architecture
+        run: composer test:arch

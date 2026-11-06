@@ -29,6 +29,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
@@ -40,6 +41,7 @@ use Tests\TestCase;
  *
  * Sin `RefreshDatabase`: el segundo proceso necesita ver los datos confirmados.
  */
+#[Group('serial')]
 class DepositoConcurrenteDeArancelesTest extends TestCase
 {
     use BuildsSharedBankAccount;

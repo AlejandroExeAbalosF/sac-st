@@ -26,9 +26,10 @@
              módulos, y eso crece con el sistema: al entrar Banking, los
              128 MB por defecto de PHP dejaron de alcanzar. No es una fuga:
              es el costo de que las fronteras se verifiquen de verdad.
-             Corren al final, en el mismo proceso que toda la suite, y en
-             octubre de 2026 el pico llegó a 520 MB: se subió a 1 GB, el
-             mismo margen que tiene phpstan. -->
+             Con test:serial comparten proceso con toda la suite, y en
+             octubre de 2026 el pico llegó a 520 MB. ci:check ahora los
+             ejecuta en una etapa aparte; se mantiene 1 GB para admitir
+             también la corrida completa en serie, igual que phpstan. -->
         <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_TIMEZONE" value="UTC" force="true"/>

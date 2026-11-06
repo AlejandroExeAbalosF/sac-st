@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\TestCase;
 
@@ -24,6 +25,7 @@ use Tests\TestCase;
  *
  * Sin `RefreshDatabase`: el cobro entra por otra conexión, que solo ve lo confirmado.
  */
+#[Group('serial')]
 class MovimientosConcurrentesDeMultasTest extends TestCase
 {
     use BuildsSharedBankAccount;

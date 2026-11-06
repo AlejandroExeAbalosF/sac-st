@@ -31,6 +31,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\TestCase;
@@ -42,6 +43,7 @@ use Tests\TestCase;
  * Sin `RefreshDatabase`, como `AnulacionConcurrenteDeMultasTest`: el segundo
  * proceso necesita ver los datos confirmados.
  */
+#[Group('serial')]
 class CorreccionConcurrenteDeMultasTest extends TestCase
 {
     use BuildsSharedBankAccount;

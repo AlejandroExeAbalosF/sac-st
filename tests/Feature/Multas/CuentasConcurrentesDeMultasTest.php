@@ -18,6 +18,7 @@ use Database\Seeders\CatalogosSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\TestCase;
@@ -30,6 +31,7 @@ use Tests\TestCase;
  * de la vigencia. Sin `RefreshDatabase`, como `DepositoConcurrenteDeMultasTest`:
  * el segundo proceso necesita ver los datos confirmados.
  */
+#[Group('serial')]
 class CuentasConcurrentesDeMultasTest extends TestCase
 {
     use BuildsSharedBankAccount;

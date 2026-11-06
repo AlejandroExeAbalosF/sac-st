@@ -13,9 +13,12 @@ use Database\Seeders\DocumentSeriesSeeder;
 use Database\Seeders\EscenariosDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Tests\TestCase;
 
+// Compara el inventario global de temporales: ningún otro test debe cambiarlo.
+#[Group('serial')]
 final class EscenariosDemoSeederTest extends TestCase
 {
     use RefreshDatabase;

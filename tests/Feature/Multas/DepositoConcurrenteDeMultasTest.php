@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Support\RawCashDeposit;
@@ -38,6 +39,7 @@ use Tests\TestCase;
  * confirmados. La base se recrea al empezar y se marca para que el próximo
  * test la vuelva a recrear.
  */
+#[Group('serial')]
 class DepositoConcurrenteDeMultasTest extends TestCase
 {
     use BuildsSharedBankAccount;

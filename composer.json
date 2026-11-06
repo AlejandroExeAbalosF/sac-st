@@ -74,11 +74,22 @@
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
+            "@ci:frontend",
+            "@ci:php",
+            "@test:parallel"
+        ],
+        "ci:frontend": [
+            "Composer\\Config::disableProcessTimeout",
             "pnpm run lint:check",
             "pnpm run format:check",
             "pnpm run types:check",
-            "pnpm run test",
-            "@test"
+            "pnpm run test"
+        ],
+        "ci:php": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan config:clear --ansi",
+            "@lint:check",
+            "@types:check"
         ],
         "types:check": [
             "phpstan analyse --memory-limit=1G"
@@ -87,10 +98,61 @@
             "@php artisan typescript:transform"
         ],
         "test": [
-            "@php artisan config:clear --ansi",
-            "@lint:check",
-            "@types:check",
+            "Composer\\Config::disableProcessTimeout",
+            "@ci:php",
+            "@test:serial"
+        ],
+        "test:serial": [
+            "Composer\\Config::disableProcessTimeout",
             "@php artisan test"
+        ],
+        "test:parallel": [
+            "Composer\\Config::disableProcessTimeout",
+            "@test:parallel:main",
+            "@test:exclusive",
+            "@test:arch"
+        ],
+        "test:parallel:main": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test --parallel --processes=4 --testsuite=Unit,Feature --exclude-group=serial"
+        ],
+        "test:exclusive": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test --testsuite=Unit,Feature --group=serial"
+        ],
+        "test:arch": "@php artisan test --testsuite=Arch",
+        "test:unit": "@php artisan test --testsuite=Unit",
+        "test:haberes": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Haberes tests/Unit/Haberes"
+        ],
+        "test:multas": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Multas"
+        ],
+        "test:aranceles": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Aranceles"
+        ],
+        "test:banking": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Banking tests/Unit/Banking"
+        ],
+        "test:ledger": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Ledger"
+        ],
+        "test:shared": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Shared tests/Unit/Shared"
+        ],
+        "test:configuracion": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Configuracion"
+        ],
+        "test:security": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test tests/Feature/Auth tests/Feature/Security tests/Feature/MiCuenta tests/Feature/Navigation"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

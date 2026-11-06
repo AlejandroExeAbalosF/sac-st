@@ -191,15 +191,8 @@ composer setup && composer dev
 composer ci:check
 ```
 
-Es lo mismo que corre CI: Pint, PHPStan sin baseline, Pest **contra PostgreSQL
-real** — nunca SQLite: lo que se prueba son constraints, triggers y tipos que
-SQLite no tiene —, ESLint, Prettier, `tsc` y Vitest.
-
-Hoy son **1003 tests** con 4898 aserciones.
-
-> [!WARNING]
-> Una sola corrida de Pest a la vez: todas comparten la base `sacst_test` y dos
-> corridas simultáneas se traban entre sí.
+Ejecuta los controles de código y las pruebas del proyecto, igual que CI.
+Los comandos por área, requisitos y tiempos están en la [guía de pruebas](docs/pruebas.md).
 
 ## Documentación
 

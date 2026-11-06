@@ -11,6 +11,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -21,6 +22,7 @@ use Tests\TestCase;
  * borrar —la obligación es append-only—, así que la base se recrea al
  * empezar y se marca para que el próximo test la vuelva a recrear.
  */
+#[Group('serial')]
 class ExporteConcurrenteDeMultasTest extends TestCase
 {
     private const SIN_FILTROS = ['q' => '', 'estado' => '', 'anio' => null];
