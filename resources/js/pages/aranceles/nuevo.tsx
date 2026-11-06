@@ -1,6 +1,6 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Banknote, Landmark, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import DateInput from '@/components/date-input';
 import DocumentInput from '@/components/document-input';
 import FormRowField from '@/components/form-row-field';
@@ -18,6 +18,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import FeeLineEditor, {
     importeDeLinea,
 } from '@/features/aranceles/components/fee-line-editor';
@@ -50,6 +51,11 @@ type Tipo = App.Modules.Aranceles.Data.FeeTypeData;
 type Cobro = App.Modules.Aranceles.Data.FeeChargeListItemData;
 type Acto = App.Modules.Aranceles.Enums.FeeReasonAct;
 type Codigo = App.Modules.Aranceles.Enums.FeeReasonCode;
+
+const mediosDePago = [
+    ['cash', 'Efectivo', Banknote],
+    ['bank', 'Depósito o transferencia', Landmark],
+] as const;
 
 type Props = {
     feeTypes: Tipo[];
@@ -104,8 +110,18 @@ export default function NuevoCobro({
     const [revision, setRevision] = useState<{
         url: string;
         numero: string;
+        cargado: boolean;
     } | null>(null);
     const [revisando, setRevisando] = useState(false);
+    const ocupado = revisando || form.processing;
+    const formulario = useRef<HTMLFormElement>(null);
+    useEffect(() => {
+        if (!ocupado && Object.keys(form.errors).length > 0) {
+            formulario.current
+                ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+                ?.focus();
+        }
+    }, [form.errors, ocupado]);
     const [medio, setMedio] = useState<'cash' | 'bank'>('cash');
     const porDeposito = !corrects && medio === 'bank';
 
@@ -135,17 +151,15 @@ export default function NuevoCobro({
 
     const items = () => itemsDeLineas(form.data.lineas);
 
-    const registrarPendiente = () =>
-        router.post(
-            guardarPendiente().url,
-            {
-                payerName: form.data.payerName,
-                payerCuit: form.data.payerCuit || null,
-                items: items(),
-                idempotencyKey,
-            },
-            { onError: (e) => form.setError(e as never) },
-        );
+    const registrarPendiente = () => {
+        form.transform(() => ({
+            payerName: form.data.payerName,
+            payerCuit: form.data.payerCuit || null,
+            items: items(),
+            idempotencyKey,
+        }));
+        form.post(guardarPendiente().url);
+    };
 
     const datos = () => ({
         payerName: form.data.payerName,
@@ -159,25 +173,20 @@ export default function NuevoCobro({
         items: items(),
     });
 
-    const enviarCorreccion = () =>
-        corrects &&
-        router.post(
-            corregir(corrects.id).url,
-            {
-                payerName: form.data.payerName,
-                payerCuit: form.data.payerCuit || null,
-                signedById:
-                    form.data.signedById === SIN_FIRMANTE
-                        ? null
-                        : Number(form.data.signedById),
-                items: items(),
-                reasonCode: form.data.reasonCode,
-                reason: form.data.reason,
-            },
-            {
-                onError: (e) => form.setError(e as never),
-            },
-        );
+    const enviarCorreccion = (id: number) => {
+        form.transform(() => ({
+            payerName: form.data.payerName,
+            payerCuit: form.data.payerCuit || null,
+            signedById:
+                form.data.signedById === SIN_FIRMANTE
+                    ? null
+                    : Number(form.data.signedById),
+            items: items(),
+            reasonCode: form.data.reasonCode,
+            reason: form.data.reason,
+        }));
+        form.post(corregir(id).url);
+    };
 
     // Antes de cambiar de paso, el servidor comprueba con las reglas del cobro.
     const revisar = () => {
@@ -186,7 +195,7 @@ export default function NuevoCobro({
         form.clearErrors();
         setRevisando(true);
         apiGet<{ numero: string }>(url)
-            .then(({ numero }) => setRevision({ url, numero }))
+            .then(({ numero }) => setRevision({ url, numero, cargado: false }))
             .catch((error: unknown) => {
                 if (error instanceof ApiError && error.hasFieldErrors) {
                     form.setError(error.fieldErrors as never);
@@ -204,27 +213,20 @@ export default function NuevoCobro({
             .finally(() => setRevisando(false));
     };
 
-    const cobrar = () =>
-        router.post(
-            store().url,
-            {
-                ...datos(),
-                idempotencyKey,
-                talonarioPhoto: form.data.talonarioPhoto,
-            },
-            {
-                onError: (e) => {
-                    form.setError(e as never);
-                    setRevision(null);
-                },
-            },
-        );
+    const cobrar = () => {
+        form.transform(() => ({
+            ...datos(),
+            idempotencyKey,
+            talonarioPhoto: form.data.talonarioPhoto,
+        }));
+        form.post(store().url, { onError: () => setRevision(null) });
+    };
 
     return (
         <>
             <Head title={corrects ? 'Corregir cobro' : 'Nuevo cobro'} />
 
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Aranceles"
                     title={
@@ -256,12 +258,18 @@ export default function NuevoCobro({
                 )}
 
                 <form
-                    className="flex flex-col gap-5"
+                    ref={formulario}
+                    className="standard-form min-w-0 rounded-xl border bg-card shadow-xs"
+                    aria-busy={ocupado}
                     onSubmit={(e) => {
                         e.preventDefault();
 
+                        if (ocupado) {
+                            return;
+                        }
+
                         if (corrects) {
-                            enviarCorreccion();
+                            enviarCorreccion(corrects.id);
                         } else if (porDeposito) {
                             registrarPendiente();
                         } else {
@@ -269,220 +277,309 @@ export default function NuevoCobro({
                         }
                     }}
                 >
-                    {!corrects && (
-                        <fieldset className="grid gap-1.5">
-                            <legend className="text-sm font-medium">
-                                Cómo paga
-                            </legend>
-                            <div className="flex flex-wrap gap-4 text-sm">
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        name="medio"
-                                        checked={medio === 'cash'}
-                                        onChange={() => setMedio('cash')}
+                    <fieldset disabled={ocupado} className="min-w-0 divide-y">
+                        <div className="grid gap-5 px-4 py-5 sm:px-6">
+                            {!corrects && (
+                                <fieldset className="min-w-0">
+                                    <legend className="mb-2 text-sm font-semibold">
+                                        Medio de pago
+                                    </legend>
+                                    <div className="grid gap-2 sm:flex sm:flex-wrap">
+                                        {mediosDePago.map(
+                                            ([valor, texto, Icono]) => (
+                                                <label
+                                                    key={valor}
+                                                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium has-checked:border-primary has-checked:bg-primary/10 has-checked:text-primary has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 motion-safe:transition-colors"
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="medio"
+                                                        className="size-3.5 accent-primary"
+                                                        checked={
+                                                            medio === valor
+                                                        }
+                                                        onChange={() => {
+                                                            form.clearErrors();
+                                                            setMedio(valor);
+                                                        }}
+                                                    />
+                                                    <Icono
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    {texto}
+                                                </label>
+                                            ),
+                                        )}
+                                    </div>
+                                </fieldset>
+                            )}
+
+                            <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+                                <FormRowField
+                                    htmlFor="payerName"
+                                    label="Recibí de"
+                                >
+                                    <Input
+                                        id="payerName"
+                                        aria-invalid={Boolean(
+                                            form.errors.payerName,
+                                        )}
+                                        aria-describedby={
+                                            form.errors.payerName
+                                                ? 'payerName-error'
+                                                : undefined
+                                        }
+                                        maxLength={200}
+                                        value={form.data.payerName}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'payerName',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    Efectivo
-                                </label>
-                                <label className="flex items-center gap-2">
-                                    <input
-                                        type="radio"
-                                        name="medio"
-                                        checked={medio === 'bank'}
-                                        onChange={() => setMedio('bank')}
+                                    <InputError
+                                        id="payerName-error"
+                                        message={form.errors.payerName}
                                     />
-                                    Depósito o transferencia
-                                </label>
+                                </FormRowField>
+                                <FormRowField
+                                    htmlFor="payerCuit"
+                                    label="CUIT (opcional)"
+                                >
+                                    <DocumentInput
+                                        id="payerCuit"
+                                        aria-invalid={Boolean(
+                                            form.errors.payerCuit,
+                                        )}
+                                        aria-describedby={
+                                            form.errors.payerCuit
+                                                ? 'payerCuit-error'
+                                                : undefined
+                                        }
+                                        maxDigits={11}
+                                        value={form.data.payerCuit}
+                                        onChange={(valor) =>
+                                            form.setData('payerCuit', valor)
+                                        }
+                                    />
+                                    <InputError
+                                        id="payerCuit-error"
+                                        message={form.errors.payerCuit}
+                                    />
+                                </FormRowField>
                             </div>
-                        </fieldset>
-                    )}
-
-                    <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                        <FormRowField htmlFor="payerName" label="Recibí de">
-                            <Input
-                                id="payerName"
-                                maxLength={200}
-                                value={form.data.payerName}
-                                onChange={(e) =>
-                                    form.setData('payerName', e.target.value)
-                                }
-                            />
-                            <InputError message={form.errors.payerName} />
-                        </FormRowField>
-                        <FormRowField
-                            htmlFor="payerCuit"
-                            label="CUIT (opcional)"
-                        >
-                            <DocumentInput
-                                id="payerCuit"
-                                maxDigits={11}
-                                value={form.data.payerCuit}
-                                onChange={(valor) =>
-                                    form.setData('payerCuit', valor)
-                                }
-                            />
-                            <InputError message={form.errors.payerCuit} />
-                        </FormRowField>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        {form.data.lineas.map((linea, indice) => (
-                            <FeeLineEditor
-                                key={linea.key}
-                                index={indice}
-                                linea={linea}
-                                types={feeTypes}
-                                fecha={fecha}
-                                canChangeAmount={canChangeAmount}
-                                removable={form.data.lineas.length > 1}
-                                errors={errores}
-                                onChange={(cambios) =>
-                                    cambiarLinea(indice, cambios)
-                                }
-                                onRemove={() =>
-                                    form.setData(
-                                        'lineas',
-                                        form.data.lineas.filter(
-                                            (_, i) => i !== indice,
-                                        ),
-                                    )
-                                }
-                            />
-                        ))}
-                        <InputError message={errores['items']} />
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    form.setData(
-                                        'lineas',
-                                        conLineaNueva(form.data.lineas),
-                                    )
-                                }
-                            >
-                                <Plus className="size-4" aria-hidden="true" />
-                                Agregar otro arancel
-                            </Button>
-                            <p className="text-lg font-semibold tabular-nums">
-                                Total: {money(total)}
-                            </p>
                         </div>
-                    </div>
-
-                    {!corrects && !porDeposito && (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <FormRowField
-                                htmlFor="receivedOn"
-                                label="Fecha del cobro"
-                            >
-                                <DateInput
-                                    id="receivedOn"
-                                    max={hoy}
-                                    value={form.data.receivedOn}
-                                    onChange={(e) =>
+                        <section className="grid min-w-0 gap-3 px-4 py-5 sm:px-6">
+                            <h2 className="text-base font-semibold">
+                                Aranceles a cobrar
+                            </h2>
+                            {form.data.lineas.map((linea, indice) => (
+                                <FeeLineEditor
+                                    key={linea.key}
+                                    index={indice}
+                                    linea={linea}
+                                    types={feeTypes}
+                                    fecha={fecha}
+                                    canChangeAmount={canChangeAmount}
+                                    removable={form.data.lineas.length > 1}
+                                    errors={errores}
+                                    onChange={(cambios) =>
+                                        cambiarLinea(indice, cambios)
+                                    }
+                                    onRemove={() =>
                                         form.setData(
-                                            'receivedOn',
-                                            e.target.value,
+                                            'lineas',
+                                            form.data.lineas.filter(
+                                                (_, i) => i !== indice,
+                                            ),
                                         )
                                     }
                                 />
-                                <InputError message={form.errors.receivedOn} />
-                            </FormRowField>
-                            <FormRowField
-                                htmlFor="talonarioNumber"
-                                label={
-                                    atrasado
-                                        ? 'N.º de talonario'
-                                        : 'N.º de talonario (opcional)'
-                                }
-                            >
-                                <Input
-                                    id="talonarioNumber"
-                                    maxLength={20}
-                                    value={form.data.talonarioNumber}
-                                    onChange={(e) => {
+                            ))}
+                            <InputError message={errores['items']} />
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
                                         form.setData(
-                                            'talonarioNumber',
-                                            e.target.value,
-                                        );
+                                            'lineas',
+                                            conLineaNueva(form.data.lineas),
+                                        )
+                                    }
+                                >
+                                    <Plus
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
+                                    Agregar otro arancel
+                                </Button>
+                            </div>
+                        </section>
 
-                                        if (e.target.value.trim() === '') {
-                                            form.setData(
-                                                'talonarioPhoto',
-                                                null,
-                                            );
-                                        }
-                                    }}
-                                />
-                                {atrasado && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Un cobro de un día anterior se carga con
-                                        la hoja que se entregó ese día.
-                                    </p>
+                        {!porDeposito && (
+                            <section className="grid gap-4 px-4 py-5 sm:px-6">
+                                <h2 className="text-base font-semibold">
+                                    {corrects
+                                        ? 'Datos de la corrección'
+                                        : 'Datos del recibo'}
+                                </h2>
+                                {!corrects && (
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormRowField
+                                            htmlFor="receivedOn"
+                                            label="Fecha del cobro"
+                                        >
+                                            <DateInput
+                                                id="receivedOn"
+                                                aria-invalid={Boolean(
+                                                    form.errors.receivedOn,
+                                                )}
+                                                max={hoy}
+                                                value={form.data.receivedOn}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'receivedOn',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={form.errors.receivedOn}
+                                            />
+                                        </FormRowField>
+                                        <FormRowField
+                                            htmlFor="talonarioNumber"
+                                            label={
+                                                atrasado
+                                                    ? 'N.º de talonario'
+                                                    : 'N.º de talonario (opcional)'
+                                            }
+                                        >
+                                            <Input
+                                                id="talonarioNumber"
+                                                aria-invalid={Boolean(
+                                                    form.errors.talonarioNumber,
+                                                )}
+                                                maxLength={20}
+                                                value={
+                                                    form.data.talonarioNumber
+                                                }
+                                                onChange={(e) => {
+                                                    form.setData(
+                                                        'talonarioNumber',
+                                                        e.target.value,
+                                                    );
+
+                                                    if (
+                                                        e.target.value.trim() ===
+                                                        ''
+                                                    ) {
+                                                        form.setData(
+                                                            'talonarioPhoto',
+                                                            null,
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                            {atrasado && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Un cobro de un día anterior
+                                                    se carga con la hoja que se
+                                                    entregó ese día.
+                                                </p>
+                                            )}
+                                            <InputError
+                                                message={
+                                                    form.errors.talonarioNumber
+                                                }
+                                            />
+                                        </FormRowField>
+                                    </div>
                                 )}
-                                <InputError
-                                    message={form.errors.talonarioNumber}
+
+                                {!corrects &&
+                                    form.data.talonarioNumber.trim() !== '' && (
+                                        <PaperPhotoDropzone
+                                            id="foto-talonario"
+                                            foto={form.data.talonarioPhoto}
+                                            onElegir={(archivo) =>
+                                                form.setData(
+                                                    'talonarioPhoto',
+                                                    archivo,
+                                                )
+                                            }
+                                            error={form.errors.talonarioPhoto}
+                                            label="Foto del talonario"
+                                        />
+                                    )}
+
+                                <SignerSelect
+                                    id="signedById"
+                                    firmantes={firmantes}
+                                    value={form.data.signedById}
+                                    error={form.errors.signedById}
+                                    onChange={(valor) =>
+                                        form.setData('signedById', valor)
+                                    }
                                 />
-                            </FormRowField>
-                        </div>
-                    )}
 
-                    {!corrects &&
-                        !porDeposito &&
-                        form.data.talonarioNumber.trim() !== '' && (
-                            <PaperPhotoDropzone
-                                id="foto-talonario"
-                                foto={form.data.talonarioPhoto}
-                                onElegir={(archivo) =>
-                                    form.setData('talonarioPhoto', archivo)
-                                }
-                                error={form.errors.talonarioPhoto}
-                                label="Foto del talonario"
-                            />
+                                {corrects && (
+                                    <ReasonFields<Acto, Codigo>
+                                        act="charge_correction"
+                                        idPrefix="correccion"
+                                        code={form.data.reasonCode}
+                                        detail={form.data.reason}
+                                        maxLength={300}
+                                        onCodeChange={(c) =>
+                                            form.setData('reasonCode', c)
+                                        }
+                                        onDetailChange={(d) =>
+                                            form.setData('reason', d)
+                                        }
+                                        codeError={errores['reasonCode']}
+                                        detailError={errores['reason']}
+                                    />
+                                )}
+                            </section>
                         )}
-
-                    {!porDeposito && (
-                        <SignerSelect
-                            id="signedById"
-                            firmantes={firmantes}
-                            value={form.data.signedById}
-                            onChange={(valor) =>
-                                form.setData('signedById', valor)
-                            }
-                        />
-                    )}
-
-                    {corrects && (
-                        <ReasonFields<Acto, Codigo>
-                            act="charge_correction"
-                            idPrefix="correccion"
-                            code={form.data.reasonCode}
-                            detail={form.data.reason}
-                            maxLength={300}
-                            onCodeChange={(c) => form.setData('reasonCode', c)}
-                            onDetailChange={(d) => form.setData('reason', d)}
-                            codeError={errores['reasonCode']}
-                            detailError={errores['reason']}
-                        />
-                    )}
-
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" asChild>
-                            <Link href={cobros()}>Cancelar</Link>
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={revisando || (!isOpen && !corrects)}
-                        >
-                            {corrects
-                                ? 'Corregir y emitir recibo'
-                                : porDeposito
-                                  ? 'Registrar pendiente'
-                                  : revisando
-                                    ? 'Comprobando…'
-                                    : 'Revisar recibo'}
-                        </Button>
+                    </fieldset>
+                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-b-xl border-t bg-primary/5 px-4 py-4 sm:px-6">
+                        <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                Total
+                            </p>
+                            <p className="text-2xl font-semibold tracking-tight text-primary tabular-nums">
+                                {money(total)}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" variant="ghost" asChild>
+                                <Link href={cobros()}>Cancelar</Link>
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={ocupado || (!isOpen && !corrects)}
+                            >
+                                {ocupado && (
+                                    <Spinner
+                                        aria-hidden="true"
+                                        className="motion-reduce:animate-none"
+                                    />
+                                )}
+                                {form.processing
+                                    ? 'Guardando…'
+                                    : corrects
+                                      ? 'Corregir y emitir recibo'
+                                      : porDeposito
+                                        ? 'Registrar pendiente'
+                                        : revisando
+                                          ? 'Comprobando…'
+                                          : 'Revisar recibo'}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -490,7 +587,9 @@ export default function NuevoCobro({
             {revision && (
                 <Dialog
                     open
-                    onOpenChange={(abierto) => !abierto && setRevision(null)}
+                    onOpenChange={(abierto) =>
+                        !abierto && !form.processing && setRevision(null)
+                    }
                 >
                     <DialogContent className="sm:max-w-5xl">
                         <DialogHeader>
@@ -504,6 +603,13 @@ export default function NuevoCobro({
                             </DialogDescription>
                         </DialogHeader>
                         <DocumentFrame
+                            mostrarCarga
+                            onCargado={() =>
+                                setRevision(
+                                    (actual) =>
+                                        actual && { ...actual, cargado: true },
+                                )
+                            }
                             url={revision.url}
                             titulo={`Recibo ${revision.numero}, sin emitir`}
                             hojaAlto={HOJA_ALTO_A5}
@@ -515,11 +621,23 @@ export default function NuevoCobro({
                                 variant="outline"
                                 className="sm:mr-auto"
                                 onClick={() => setRevision(null)}
+                                disabled={form.processing}
                             >
                                 Volver
                             </Button>
-                            <Button onClick={cobrar}>
-                                Cobrar y emitir recibo
+                            <Button
+                                onClick={cobrar}
+                                disabled={form.processing || !revision.cargado}
+                            >
+                                {form.processing && (
+                                    <Spinner
+                                        aria-hidden="true"
+                                        className="motion-reduce:animate-none"
+                                    />
+                                )}
+                                {form.processing
+                                    ? 'Emitiendo recibo…'
+                                    : 'Cobrar y emitir recibo'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

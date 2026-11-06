@@ -1,6 +1,7 @@
 import { usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 /*
@@ -55,6 +56,7 @@ export default function DocumentFrame({
     maxAlto,
     creceHasta,
     onCargado,
+    mostrarCarga = false,
     sinInteraccion = false,
 }: {
     url: string;
@@ -90,11 +92,15 @@ export default function DocumentFrame({
      */
     creceHasta?: string;
     onCargado?: () => void;
+    mostrarCarga?: boolean;
     /** Al lado de un formulario, el marco no debe robar el foco ni el clic. */
     sinInteraccion?: boolean;
 }) {
     const [escala, setEscala] = useState(1);
-    const [bloqueado, setBloqueado] = useState(false);
+    const [carga, setCarga] = useState<{
+        url: string;
+        bloqueado: boolean;
+    } | null>(null);
     const observador = useRef<ResizeObserver | null>(null);
 
     useDocumentoDeclarado(url);
@@ -139,13 +145,13 @@ export default function DocumentFrame({
                 accesible = false;
             }
 
-            setBloqueado(!accesible);
+            setCarga({ url, bloqueado: !accesible });
 
             if (accesible) {
                 onCargado?.();
             }
         },
-        [onCargado],
+        [onCargado, url],
     );
 
     return (
@@ -217,7 +223,25 @@ export default function DocumentFrame({
                     }}
                 />
 
-                {bloqueado && <MarcoBloqueado url={url} />}
+                {mostrarCarga && carga?.url !== url && (
+                    <div
+                        role="status"
+                        className="pointer-events-none absolute inset-0 grid content-start gap-3 bg-card p-6 sm:p-10"
+                    >
+                        <span className="text-sm text-muted-foreground">
+                            Cargando vista previa…
+                        </span>
+                        <Skeleton
+                            aria-hidden="true"
+                            className="mb-3 h-5 w-2/5"
+                        />
+                        <Skeleton aria-hidden="true" className="h-3 w-4/5" />
+                        <Skeleton aria-hidden="true" className="h-3 w-3/5" />
+                    </div>
+                )}
+                {carga?.url === url && carga.bloqueado && (
+                    <MarcoBloqueado url={url} />
+                )}
             </div>
         </div>
     );

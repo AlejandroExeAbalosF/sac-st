@@ -81,6 +81,7 @@ export default function FeeTypeCombobox({
                     type="button"
                     variant="outline"
                     role="combobox"
+                    data-placeholder={seleccionado === null || undefined}
                     aria-expanded={abierto}
                     aria-invalid={invalid}
                     className={cn(

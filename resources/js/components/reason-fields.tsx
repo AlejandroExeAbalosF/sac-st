@@ -123,6 +123,7 @@ export default function ReasonFields<A extends string, C extends string>({
                     rows={2}
                     maxLength={maxLength}
                     value={detail}
+                    data-filled={detail !== '' || undefined}
                     onChange={(e) => onDetailChange(e.target.value)}
                     placeholder={detailPlaceholder}
                     aria-invalid={Boolean(detailError)}

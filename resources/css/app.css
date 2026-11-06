@@ -383,6 +383,48 @@
     --sidebar-brand: oklch(0.74 0.085 249.6); /* #81AFDF */
 }
 
+/* Estados compartidos de los campos en formularios que siguen la guía de interfaz. */
+@layer utilities {
+    .standard-form
+        :is(
+            input:not(
+                [type='radio'],
+                [type='file'],
+                [type='hidden'],
+                [type='date'],
+                [type='checkbox'],
+                [readonly]
+            ),
+            textarea,
+            button[role='combobox']
+        ) {
+        background-color: var(--card);
+        &:is(
+                input[value]:not([value='']),
+                input:autofill,
+                textarea[data-filled],
+                button:not([data-placeholder])
+            ):not(:disabled, :focus-visible, [aria-invalid='true']) {
+            border-color: color-mix(
+                in oklab,
+                var(--muted-foreground) 80%,
+                var(--card)
+            );
+        }
+        &:focus-visible:not(:disabled, [aria-invalid='true']) {
+            @apply ring-2 ring-ring/25;
+            border-color: color-mix(in oklab, var(--ring) 72%, var(--card));
+        }
+        &:disabled {
+            background-color: var(--muted);
+            border-color: var(--input);
+            color: var(--muted-foreground);
+            box-shadow: none;
+            opacity: 1;
+        }
+    }
+}
+
 @layer base {
     * {
         @apply border-border;

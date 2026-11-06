@@ -465,6 +465,7 @@ export default function PersonPicker({
                     type="button"
                     variant="outline"
                     role="combobox"
+                    data-placeholder={value === null || undefined}
                     aria-expanded={open}
                     aria-controls={listId}
                     aria-invalid={invalid}

@@ -1,3 +1,4 @@
+import InputError from '@/components/input-error';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -17,17 +18,25 @@ export default function SignerSelect({
     firmantes,
     value,
     onChange,
+    error,
 }: {
     id: string;
     firmantes: Firmante[];
     value: string;
     onChange: (valor: string) => void;
+    error?: string;
 }) {
     return (
         <div className="grid gap-1.5">
             <Label htmlFor={id}>Firma</Label>
             <Select value={value} onValueChange={onChange}>
-                <SelectTrigger id={id} className="w-full">
+                <SelectTrigger
+                    id={id}
+                    className="w-full"
+                    data-placeholder={value === SIN_FIRMANTE || undefined}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${id}-error` : undefined}
+                >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -42,6 +51,7 @@ export default function SignerSelect({
                     ))}
                 </SelectContent>
             </Select>
+            <InputError id={`${id}-error`} message={error} />
         </div>
     );
 }

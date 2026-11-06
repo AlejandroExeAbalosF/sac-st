@@ -89,7 +89,7 @@ export default function FeeLineEditor({
     const error = (campo: string) => errors[`items.${index}.${campo}`];
 
     return (
-        <div className="grid grid-cols-1 gap-3 rounded-lg border bg-card p-3">
+        <div className="grid grid-cols-1 gap-3 rounded-lg border bg-card p-3 motion-safe:animate-in motion-safe:duration-150 motion-safe:fade-in motion-safe:slide-in-from-bottom-1">
             <div className="grid grid-cols-1 gap-1.5">
                 <div className="flex items-center justify-between gap-2">
                     <Label htmlFor={`linea-${linea.key}-tipo`}>
@@ -129,7 +129,13 @@ export default function FeeLineEditor({
 
             {tipo !== undefined && (
                 <>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div
+                        className={
+                            canChangeAmount
+                                ? 'grid gap-3 sm:grid-cols-3'
+                                : 'grid gap-3 sm:grid-cols-2'
+                        }
+                    >
                         {porcentual ? (
                             <FormRowField
                                 htmlFor={`linea-${linea.key}-base`}
@@ -137,6 +143,7 @@ export default function FeeLineEditor({
                             >
                                 <AmountInput
                                     id={`linea-${linea.key}-base`}
+                                    aria-invalid={Boolean(error('baseAmount'))}
                                     value={linea.baseAmount}
                                     onChange={(valor) =>
                                         onChange({ baseAmount: valor })
@@ -158,6 +165,7 @@ export default function FeeLineEditor({
                             >
                                 <Input
                                     id={`linea-${linea.key}-cantidad`}
+                                    aria-invalid={Boolean(error('quantity'))}
                                     inputMode="numeric"
                                     value={linea.quantity}
                                     onChange={(e) =>
@@ -190,6 +198,7 @@ export default function FeeLineEditor({
                             >
                                 <AmountInput
                                     id={`linea-${linea.key}-importe`}
+                                    aria-invalid={Boolean(error('amount'))}
                                     value={linea.amount}
                                     onChange={(valor) =>
                                         onChange({ amount: valor })

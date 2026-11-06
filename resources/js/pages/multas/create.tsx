@@ -2,6 +2,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     ArrowRight,
     FolderOpen,
+    LoaderCircle,
     Plus,
     Trash2,
     TriangleAlert,
@@ -9,6 +10,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
+import FormRowField from '@/components/form-row-field';
+import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import PersonPicker from '@/components/person-picker';
@@ -92,12 +95,6 @@ function DocumentoCargado({
             onUse={documento === null ? undefined : () => onUse(documento)}
         />
     );
-}
-
-function FieldError({ message }: { message?: string }) {
-    return message ? (
-        <p className="mt-1 text-xs text-destructive-strong">{message}</p>
-    ) : null;
 }
 
 /**
@@ -273,6 +270,10 @@ export default function NuevaMulta({
     const enviar = (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (processing) {
+            return;
+        }
+
         transform((datos) => ({
             ...(fijo && existente
                 ? { fineCaseId: existente.id }
@@ -339,762 +340,908 @@ export default function NuevaMulta({
                     }
                 />
 
-                <form onSubmit={enviar} className="grid gap-6">
-                    <section className="rounded-lg border bg-card p-5 shadow-raised">
-                        <h2 className="text-sm font-semibold">Expediente</h2>
-                        <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-12">
-                            <div className="sm:col-span-5">
-                                <Label htmlFor="caseNumber">
-                                    Número de expediente
-                                </Label>
-                                {fijo && existente ? (
-                                    /*
-                                     * Desde la ficha el expediente ya está
-                                     * elegido: se muestra, no se escribe.
-                                     */
-                                    <Input
-                                        id="caseNumber"
-                                        className="mt-1 bg-muted/50 font-mono text-muted-foreground"
-                                        value={existente.label}
-                                        readOnly
-                                        aria-readonly="true"
-                                    />
-                                ) : (
-                                    <Input
-                                        id="caseNumber"
-                                        className="mt-1 font-mono"
-                                        value={data.caseNumber}
-                                        onChange={(e) =>
-                                            actualizarCampo(
-                                                'caseNumber',
-                                                e.target.value,
-                                                'caseNumber',
-                                                'fineCaseId',
-                                            )
-                                        }
-                                        onBlur={consultarExpediente}
-                                        placeholder="169607/24-0"
-                                        maxLength={60}
-                                        autoFocus
-                                        aria-invalid={Boolean(
-                                            errors.caseNumber,
-                                        )}
-                                    />
-                                )}
-                                <FieldError
-                                    message={
-                                        errors.caseNumber ?? errores.fineCaseId
-                                    }
-                                />
-                                {!fijo && (
-                                    <NumberReadingHint
-                                        reading={readCaseNumber(
-                                            data.caseNumber,
-                                        )}
-                                        text={data.caseNumber}
-                                    />
-                                )}
-                                {!existente && (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Como en el papel. Si no está cargado, se
-                                        crea con la multa.
-                                    </p>
-                                )}
-                            </div>
-
-                            {existente && !fijo && (
-                                /*
-                                 * Un expediente ya cargado no es un error: la
-                                 * multa se le agrega. Pero conviene mirarlo
-                                 * antes —qué multas tiene, qué documentos—, y
-                                 * el aviso entero lleva a su ficha.
-                                 */
-                                <Link
-                                    href={showCase(existente.routeKey)}
-                                    className="group flex gap-2 self-start rounded-md border border-info-strong/30 bg-info-soft p-3 text-xs text-info-strong hover:border-info-strong/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-7"
+                <form
+                    onSubmit={enviar}
+                    className="standard-form"
+                    aria-busy={processing}
+                >
+                    <fieldset
+                        disabled={processing}
+                        className="grid min-w-0 gap-6"
+                    >
+                        <section className="rounded-lg border bg-card p-5 shadow-raised">
+                            <h2 className="text-sm font-semibold">
+                                Expediente
+                            </h2>
+                            <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-12">
+                                <FormRowField
+                                    htmlFor="caseNumber"
+                                    label="Número de expediente"
+                                    className="sm:col-span-5"
                                 >
-                                    <FolderOpen
-                                        className="size-4 shrink-0"
-                                        aria-hidden="true"
-                                    />
-                                    <span className="grid flex-1 gap-0.5">
-                                        <span className="font-semibold">
-                                            El expediente{' '}
-                                            <span className="font-mono">
-                                                {existente.label}
-                                            </span>{' '}
-                                            ya está cargado
-                                        </span>
-                                        <span>
-                                            La multa se le va a agregar, y abajo
-                                            podés usar su resolución y sus
-                                            actas. Hacé clic para ver el
-                                            expediente.
-                                        </span>
-                                    </span>
-                                    <ArrowRight
-                                        className="size-4 shrink-0 self-center transition-transform group-hover:translate-x-0.5"
-                                        aria-hidden="true"
-                                    />
-                                </Link>
-                            )}
-
-                            {similares.length > 0 && (
-                                <div className="flex gap-2 rounded-md border border-warning-strong/30 bg-warning-soft p-3 text-xs text-warning-strong sm:col-span-7">
-                                    <TriangleAlert
-                                        className="size-4 shrink-0"
-                                        aria-hidden="true"
-                                    />
-                                    <p>
-                                        Hay otro expediente con el mismo número
-                                        y año y distinto sufijo:{' '}
-                                        {similares.map((otro, i) => (
-                                            <span key={otro.id}>
-                                                {i > 0 && ', '}
-                                                <Link
-                                                    href={create({
-                                                        query: {
-                                                            expediente:
-                                                                otro.label,
-                                                        },
-                                                    })}
-                                                    className="font-mono underline"
-                                                >
-                                                    {otro.label}
-                                                </Link>
-                                            </span>
-                                        ))}
-                                        . No se fusionan solos: revisá cuál
-                                        corresponde.
-                                    </p>
-                                </div>
-                            )}
-
-                            {!existente && (
-                                <div className="sm:col-span-12">
-                                    <Label htmlFor="caseNotes">
-                                        Observaciones del expediente
-                                        <span className="ml-1 font-normal text-muted-foreground">
-                                            (opcional)
-                                        </span>
-                                    </Label>
-                                    <Textarea
-                                        id="caseNotes"
-                                        className="mt-1 max-w-3xl"
-                                        rows={2}
-                                        maxLength={500}
-                                        value={data.caseNotes}
-                                        onChange={(e) =>
-                                            setData('caseNotes', e.target.value)
-                                        }
-                                    />
-                                </div>
-                            )}
-
-                            {/* Desde la ficha, el archivo del expediente se adjunta en la ficha. */}
-                            {!fijo && (
-                                <div className="sm:col-span-12 lg:col-span-7">
-                                    <PaperPhotoDropzone
-                                        id="caseFile"
-                                        label="Archivo del expediente"
-                                        foto={data.caseFile}
-                                        onElegir={(archivo) =>
-                                            actualizarCampo('caseFile', archivo)
-                                        }
-                                        error={errores.caseFile}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </section>
-
-                    <section className="rounded-lg border bg-card p-5 shadow-raised">
-                        <h2 className="text-sm font-semibold">
-                            Resolución y actas
-                        </h2>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {actasFijas
-                                ? 'Vienen fijos desde la ficha del expediente. Para otra combinación, usá «Agregar multa».'
-                                : 'La resolución impone la multa: su fecha es la del importe original.'}
-                        </p>
-                        <FieldError message={errores.fixedDocuments} />
-
-                        <div className="mt-4 grid gap-5">
-                            {resolucionFija ? (
-                                <DocumentosFijos
-                                    titulo="Resolución"
-                                    documentos={[resolucionFija]}
-                                />
-                            ) : (
-                                resoluciones.length > 0 && (
-                                    <div className="grid gap-1.5">
-                                        <Label htmlFor="resolutionId">
-                                            Resolución
-                                        </Label>
-                                        <Select
-                                            value={
-                                                data.resolutionId !== null
-                                                    ? String(data.resolutionId)
-                                                    : cargarNueva
-                                                      ? 'nueva'
-                                                      : ''
-                                            }
-                                            onValueChange={(valor) => {
-                                                setCargarNueva(
-                                                    valor === 'nueva',
-                                                );
-                                                actualizarCampo(
-                                                    'resolutionId',
-                                                    valor === 'nueva'
-                                                        ? null
-                                                        : Number(valor),
-                                                    'resolutionId',
-                                                    'resolution.text',
-                                                );
-                                            }}
-                                        >
-                                            <SelectTrigger
-                                                id="resolutionId"
-                                                className="max-w-md"
-                                                aria-invalid={Boolean(
-                                                    errors.resolutionId ??
-                                                    (!resolucionNueva &&
-                                                        errores[
-                                                            'resolution.text'
-                                                        ]),
-                                                )}
-                                            >
-                                                <SelectValue placeholder="Elegí la resolución" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {resoluciones.map((r) => (
-                                                    <SelectItem
-                                                        key={r.id}
-                                                        value={String(r.id)}
-                                                    >
-                                                        {r.label} ·{' '}
-                                                        {partialDate(
-                                                            r.issuedOn,
-                                                            r.issuedPrecision,
-                                                        )}
-                                                    </SelectItem>
-                                                ))}
-                                                <SelectItem value="nueva">
-                                                    Otra resolución, que no está
-                                                    cargada
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FieldError
-                                            message={
-                                                errors.resolutionId ??
-                                                (resolucionNueva
-                                                    ? undefined
-                                                    : errores[
-                                                          'resolution.text'
-                                                      ])
-                                            }
-                                        />
-                                    </div>
-                                )
-                            )}
-
-                            {data.resolutionId === null && resolucionNueva && (
-                                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-12">
-                                    <div className="sm:col-span-5">
-                                        <Label htmlFor="resolutionText">
-                                            Resolución
-                                        </Label>
+                                    {fijo && existente ? (
+                                        /*
+                                         * Desde la ficha el expediente ya está
+                                         * elegido: se muestra, no se escribe.
+                                         */
                                         <Input
-                                            id="resolutionText"
-                                            className="mt-1 font-mono"
-                                            value={data.resolution.text}
+                                            id="caseNumber"
+                                            className="bg-muted/50 font-mono text-muted-foreground"
+                                            value={existente.label}
+                                            readOnly
+                                            aria-readonly="true"
+                                        />
+                                    ) : (
+                                        <Input
+                                            id="caseNumber"
+                                            className="font-mono"
+                                            value={data.caseNumber}
                                             onChange={(e) =>
                                                 actualizarCampo(
-                                                    'resolution',
-                                                    {
-                                                        ...data.resolution,
-                                                        text: e.target.value,
-                                                    },
-                                                    'resolution.text',
+                                                    'caseNumber',
+                                                    e.target.value,
+                                                    'caseNumber',
+                                                    'fineCaseId',
                                                 )
                                             }
-                                            placeholder="N°0649/26"
-                                            maxLength={120}
+                                            onBlur={consultarExpediente}
+                                            placeholder="169607/24-0"
+                                            maxLength={60}
+                                            autoFocus
                                             aria-invalid={Boolean(
-                                                errores['resolution.text'],
+                                                errors.caseNumber,
                                             )}
                                         />
-                                        <FieldError
-                                            message={errores['resolution.text']}
-                                        />
-                                        <NumberReadingHint
-                                            reading={readDocumentNumber(
-                                                data.resolution.text,
-                                                'resolution',
-                                                data.resolution.issuedOn,
-                                            )}
-                                            text={data.resolution.text}
-                                        />
-                                        <DocumentoCargado
-                                            documento={findLoadedDocument(
-                                                resoluciones,
-                                                'resolution',
-                                                data.resolution.text,
-                                            )}
-                                            onUse={(cargada) => {
-                                                setCargarNueva(false);
-                                                actualizarCampo(
-                                                    'resolutionId',
-                                                    cargada.id,
-                                                    'resolutionId',
-                                                    'resolution.text',
-                                                );
-                                            }}
-                                        />
-                                        <YearWarning
-                                            message={documentYearWarning(
-                                                data.resolution.text,
-                                                data.resolution.issuedOn,
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-3">
-                                        <Label htmlFor="resolutionDate">
-                                            Fecha de la resolución
-                                        </Label>
-                                        <DateInput
-                                            id="resolutionDate"
-                                            className="mt-1"
-                                            value={data.resolution.issuedOn}
-                                            onChange={(e) =>
-                                                actualizarCampo(
-                                                    'resolution',
-                                                    {
-                                                        ...data.resolution,
-                                                        issuedOn:
-                                                            e.target.value,
-                                                    },
-                                                    'resolution.issuedOn',
-                                                )
-                                            }
-                                            aria-invalid={Boolean(
-                                                errores['resolution.issuedOn'],
-                                            )}
-                                        />
-                                        <FieldError
-                                            message={
-                                                errores['resolution.issuedOn']
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                                    )}
 
-                            {!resolucionFija &&
-                                (data.resolutionId !== null ||
-                                    resolucionNueva) && (
-                                    <div className="lg:max-w-[58%]">
+                                    {!fijo && (
+                                        <NumberReadingHint
+                                            reading={readCaseNumber(
+                                                data.caseNumber,
+                                            )}
+                                            text={data.caseNumber}
+                                        />
+                                    )}
+                                    {!existente && (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Como en el papel. Si no está
+                                            cargado, se crea con la multa.
+                                        </p>
+                                    )}
+
+                                    <InputError
+                                        message={
+                                            errors.caseNumber ??
+                                            errores.fineCaseId
+                                        }
+                                    />
+                                </FormRowField>
+
+                                {existente && !fijo && (
+                                    /*
+                                     * Un expediente ya cargado no es un error: la
+                                     * multa se le agrega. Pero conviene mirarlo
+                                     * antes —qué multas tiene, qué documentos—, y
+                                     * el aviso entero lleva a su ficha.
+                                     */
+                                    <Link
+                                        aria-disabled={processing}
+                                        tabIndex={processing ? -1 : undefined}
+                                        onClick={(event) => {
+                                            if (processing) {
+                                                event.preventDefault();
+                                            }
+                                        }}
+                                        href={showCase(existente.routeKey)}
+                                        className="group flex gap-2 self-start rounded-md border border-info-strong/30 bg-info-soft p-3 text-xs text-info-strong hover:border-info-strong/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-7"
+                                    >
+                                        <FolderOpen
+                                            className="size-4 shrink-0"
+                                            aria-hidden="true"
+                                        />
+                                        <span className="grid flex-1 gap-0.5">
+                                            <span className="font-semibold">
+                                                El expediente{' '}
+                                                <span className="font-mono">
+                                                    {existente.label}
+                                                </span>{' '}
+                                                ya está cargado
+                                            </span>
+                                            <span>
+                                                La multa se le va a agregar, y
+                                                abajo podés usar su resolución y
+                                                sus actas. Hacé clic para ver el
+                                                expediente.
+                                            </span>
+                                        </span>
+                                        <ArrowRight
+                                            className="size-4 shrink-0 self-center transition-transform group-hover:translate-x-0.5"
+                                            aria-hidden="true"
+                                        />
+                                    </Link>
+                                )}
+
+                                {similares.length > 0 && (
+                                    <div className="flex gap-2 rounded-md border border-warning-strong/30 bg-warning-soft p-3 text-xs text-warning-strong sm:col-span-7">
+                                        <TriangleAlert
+                                            className="size-4 shrink-0"
+                                            aria-hidden="true"
+                                        />
+                                        <p>
+                                            Hay otro expediente con el mismo
+                                            número y año y distinto sufijo:{' '}
+                                            {similares.map((otro, i) => (
+                                                <span key={otro.id}>
+                                                    {i > 0 && ', '}
+                                                    <Link
+                                                        href={create({
+                                                            query: {
+                                                                expediente:
+                                                                    otro.label,
+                                                            },
+                                                        })}
+                                                        className="font-mono underline"
+                                                    >
+                                                        {otro.label}
+                                                    </Link>
+                                                </span>
+                                            ))}
+                                            . No se fusionan solos: revisá cuál
+                                            corresponde.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!existente && (
+                                    <FormRowField
+                                        htmlFor="caseNotes"
+                                        label={
+                                            <>
+                                                {' '}
+                                                Observaciones del expediente
+                                                <span className="ml-1 font-normal text-muted-foreground">
+                                                    (opcional)
+                                                </span>{' '}
+                                            </>
+                                        }
+                                        className="sm:col-span-12"
+                                    >
+                                        <Textarea
+                                            id="caseNotes"
+                                            className="max-w-3xl"
+                                            rows={2}
+                                            maxLength={500}
+                                            value={data.caseNotes}
+                                            data-filled={
+                                                data.caseNotes !== '' ||
+                                                undefined
+                                            }
+                                            aria-invalid={Boolean(
+                                                errors.caseNotes,
+                                            )}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'caseNotes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+
+                                        <InputError
+                                            message={errors.caseNotes}
+                                        />
+                                    </FormRowField>
+                                )}
+
+                                {/* Desde la ficha, el archivo del expediente se adjunta en la ficha. */}
+                                {!fijo && (
+                                    <div className="sm:col-span-12 lg:col-span-7">
                                         <PaperPhotoDropzone
-                                            id="resolutionFile"
-                                            label="Archivo de la resolución"
-                                            foto={data.resolutionFile}
+                                            id="caseFile"
+                                            label="Archivo del expediente"
+                                            foto={data.caseFile}
                                             onElegir={(archivo) =>
                                                 actualizarCampo(
-                                                    'resolutionFile',
+                                                    'caseFile',
                                                     archivo,
                                                 )
                                             }
-                                            error={errores.resolutionFile}
+                                            error={errores.caseFile}
                                         />
                                     </div>
                                 )}
+                            </div>
+                        </section>
 
-                            {actasFijas ? (
-                                <DocumentosFijos
-                                    titulo="Actas"
-                                    documentos={actas.filter((acta) =>
-                                        preseleccion.actIds.includes(acta.id),
-                                    )}
-                                    vacio="Sin actas: la multa se carga solo con la resolución."
-                                />
-                            ) : (
-                                <>
-                                    {actas.length > 0 && (
-                                        <fieldset>
-                                            <legend className="text-sm font-medium">
-                                                Actas del expediente
-                                            </legend>
-                                            <div className="mt-2 grid gap-2">
-                                                {actas.map((acta) => (
-                                                    <label
-                                                        key={acta.id}
-                                                        className="flex items-center gap-2 text-sm"
-                                                    >
-                                                        <Checkbox
-                                                            checked={data.actIds.includes(
-                                                                acta.id,
+                        <section className="rounded-lg border bg-card p-5 shadow-raised">
+                            <h2 className="text-sm font-semibold">
+                                Resolución y actas
+                            </h2>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {actasFijas
+                                    ? 'Vienen fijos desde la ficha del expediente. Para otra combinación, usá «Agregar multa».'
+                                    : 'La resolución impone la multa: su fecha es la del importe original.'}
+                            </p>
+                            <InputError message={errores.fixedDocuments} />
+
+                            <div className="mt-4 grid gap-5">
+                                {resolucionFija ? (
+                                    <DocumentosFijos
+                                        titulo="Resolución"
+                                        documentos={[resolucionFija]}
+                                    />
+                                ) : (
+                                    resoluciones.length > 0 && (
+                                        <div className="grid gap-1.5">
+                                            <Label htmlFor="resolutionId">
+                                                Resolución
+                                            </Label>
+                                            <Select
+                                                value={
+                                                    data.resolutionId !== null
+                                                        ? String(
+                                                              data.resolutionId,
+                                                          )
+                                                        : cargarNueva
+                                                          ? 'nueva'
+                                                          : ''
+                                                }
+                                                onValueChange={(valor) => {
+                                                    setCargarNueva(
+                                                        valor === 'nueva',
+                                                    );
+                                                    actualizarCampo(
+                                                        'resolutionId',
+                                                        valor === 'nueva'
+                                                            ? null
+                                                            : Number(valor),
+                                                        'resolutionId',
+                                                        'resolution.text',
+                                                    );
+                                                }}
+                                            >
+                                                <SelectTrigger
+                                                    id="resolutionId"
+                                                    className="max-w-md"
+                                                    aria-invalid={Boolean(
+                                                        errors.resolutionId ??
+                                                        (!resolucionNueva &&
+                                                            errores[
+                                                                'resolution.text'
+                                                            ]),
+                                                    )}
+                                                >
+                                                    <SelectValue placeholder="Elegí la resolución" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {resoluciones.map((r) => (
+                                                        <SelectItem
+                                                            key={r.id}
+                                                            value={String(r.id)}
+                                                        >
+                                                            {r.label} ·{' '}
+                                                            {partialDate(
+                                                                r.issuedOn,
+                                                                r.issuedPrecision,
                                                             )}
-                                                            onCheckedChange={(
-                                                                marcada,
-                                                            ) =>
-                                                                actualizarCampo(
-                                                                    'actIds',
-                                                                    marcada ===
-                                                                        true
-                                                                        ? [
-                                                                              ...data.actIds,
-                                                                              acta.id,
-                                                                          ]
-                                                                        : data.actIds.filter(
-                                                                              (
-                                                                                  id,
-                                                                              ) =>
-                                                                                  id !==
-                                                                                  acta.id,
-                                                                          ),
-                                                                    'actIds',
-                                                                    'acts',
-                                                                )
-                                                            }
-                                                        />
-                                                        {acta.label}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </fieldset>
-                                    )}
+                                                        </SelectItem>
+                                                    ))}
+                                                    <SelectItem value="nueva">
+                                                        Otra resolución, que no
+                                                        está cargada
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError
+                                                message={
+                                                    errors.resolutionId ??
+                                                    (resolucionNueva
+                                                        ? undefined
+                                                        : errores[
+                                                              'resolution.text'
+                                                          ])
+                                                }
+                                            />
+                                        </div>
+                                    )
+                                )}
 
-                                    {data.acts.map((acta, i) => (
-                                        <div
-                                            key={i}
-                                            className="grid items-start gap-x-6 gap-y-3 rounded-md border border-dashed p-3 sm:grid-cols-12"
-                                        >
-                                            <div className="sm:col-span-4">
-                                                <Label
-                                                    htmlFor={`acta-tipo-${i}`}
-                                                >
-                                                    Tipo de acta
-                                                </Label>
-                                                <Select
-                                                    value={acta.actType}
-                                                    onValueChange={(valor) =>
-                                                        cambiarActa(i, {
-                                                            actType:
-                                                                valor as ActType,
-                                                        })
-                                                    }
-                                                >
-                                                    <SelectTrigger
-                                                        id={`acta-tipo-${i}`}
-                                                        className="mt-1"
-                                                    >
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {(
-                                                            Object.keys(
-                                                                ACT_TYPE,
-                                                            ) as ActType[]
-                                                        ).map((tipo) => (
-                                                            <SelectItem
-                                                                key={tipo}
-                                                                value={tipo}
-                                                            >
-                                                                {tipo} ·{' '}
-                                                                {ACT_TYPE[tipo]}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="sm:col-span-4">
-                                                <Label htmlFor={`acta-${i}`}>
-                                                    Acta
-                                                </Label>
+                                {data.resolutionId === null &&
+                                    resolucionNueva && (
+                                        <div className="grid gap-x-8 gap-y-5 sm:grid-cols-12">
+                                            <FormRowField
+                                                htmlFor="resolutionText"
+                                                label="Resolución"
+                                                className="sm:col-span-5"
+                                            >
                                                 <Input
-                                                    id={`acta-${i}`}
-                                                    className="mt-1 font-mono"
-                                                    value={acta.text}
+                                                    id="resolutionText"
+                                                    className="font-mono"
+                                                    value={data.resolution.text}
                                                     onChange={(e) =>
-                                                        cambiarActa(i, {
-                                                            text: e.target
-                                                                .value,
-                                                        })
+                                                        actualizarCampo(
+                                                            'resolution',
+                                                            {
+                                                                ...data.resolution,
+                                                                text: e.target
+                                                                    .value,
+                                                            },
+                                                            'resolution.text',
+                                                        )
                                                     }
-                                                    placeholder="N°1025288/25"
+                                                    placeholder="N°0649/26"
                                                     maxLength={120}
                                                     aria-invalid={Boolean(
                                                         errores[
-                                                            `acts.${i}.text`
+                                                            'resolution.text'
                                                         ],
                                                     )}
                                                 />
-                                                <FieldError
-                                                    message={
-                                                        errores[
-                                                            `acts.${i}.text`
-                                                        ]
-                                                    }
-                                                />
+
                                                 <NumberReadingHint
                                                     reading={readDocumentNumber(
-                                                        acta.text,
-                                                        'act',
-                                                        acta.issuedOn,
-                                                        acta.actType,
-                                                        anioDeLaResolucion,
+                                                        data.resolution.text,
+                                                        'resolution',
+                                                        data.resolution
+                                                            .issuedOn,
                                                     )}
-                                                    text={acta.text}
+                                                    text={data.resolution.text}
                                                 />
                                                 <DocumentoCargado
                                                     documento={findLoadedDocument(
-                                                        actas,
-                                                        'act',
-                                                        acta.text,
-                                                        acta.actType,
+                                                        resoluciones,
+                                                        'resolution',
+                                                        data.resolution.text,
                                                     )}
-                                                    onUse={(cargada) =>
-                                                        setData({
-                                                            ...data,
-                                                            actIds: data.actIds.includes(
-                                                                cargada.id,
-                                                            )
-                                                                ? data.actIds
-                                                                : [
-                                                                      ...data.actIds,
-                                                                      cargada.id,
-                                                                  ],
-                                                            acts: data.acts.filter(
-                                                                (_, j) =>
-                                                                    j !== i,
-                                                            ),
-                                                        })
-                                                    }
+                                                    onUse={(cargada) => {
+                                                        setCargarNueva(false);
+                                                        actualizarCampo(
+                                                            'resolutionId',
+                                                            cargada.id,
+                                                            'resolutionId',
+                                                            'resolution.text',
+                                                        );
+                                                    }}
                                                 />
                                                 <YearWarning
                                                     message={documentYearWarning(
-                                                        acta.text,
-                                                        acta.issuedOn,
+                                                        data.resolution.text,
+                                                        data.resolution
+                                                            .issuedOn,
                                                     )}
                                                 />
-                                            </div>
-                                            <div className="sm:col-span-3">
-                                                <Label
-                                                    htmlFor={`acta-fecha-${i}`}
-                                                >
-                                                    Fecha
-                                                    <span className="ml-1 font-normal text-muted-foreground">
-                                                        (opcional)
-                                                    </span>
-                                                </Label>
-                                                <DateInput
-                                                    id={`acta-fecha-${i}`}
-                                                    className="mt-1"
-                                                    value={acta.issuedOn}
-                                                    onChange={(e) =>
-                                                        cambiarActa(i, {
-                                                            issuedOn:
-                                                                e.target.value,
-                                                        })
-                                                    }
-                                                />
-                                                <FieldError
+
+                                                <InputError
                                                     message={
                                                         errores[
-                                                            `acts.${i}.issuedOn`
+                                                            'resolution.text'
                                                         ]
                                                     }
                                                 />
-                                            </div>
-                                            <div className="flex sm:col-span-1 sm:justify-end sm:pt-6">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label={`Quitar el acta ${i + 1}`}
-                                                    onClick={() =>
-                                                        setData(
-                                                            'acts',
-                                                            data.acts.filter(
-                                                                (_, j) =>
-                                                                    j !== i,
-                                                            ),
+                                            </FormRowField>
+                                            <FormRowField
+                                                htmlFor="resolutionDate"
+                                                label="Fecha de la resolución"
+                                                className="sm:col-span-3"
+                                            >
+                                                <DateInput
+                                                    id="resolutionDate"
+
+                                                    value={
+                                                        data.resolution.issuedOn
+                                                    }
+                                                    onChange={(e) =>
+                                                        actualizarCampo(
+                                                            'resolution',
+                                                            {
+                                                                ...data.resolution,
+                                                                issuedOn:
+                                                                    e.target
+                                                                        .value,
+                                                            },
+                                                            'resolution.issuedOn',
                                                         )
                                                     }
-                                                >
-                                                    <Trash2 aria-hidden="true" />
-                                                </Button>
-                                            </div>
-                                            <div className="sm:col-span-11">
-                                                <PaperPhotoDropzone
-                                                    id={`acta-archivo-${i}`}
-                                                    label="Archivo del acta"
-                                                    foto={acta.file}
-                                                    onElegir={(archivo) =>
-                                                        cambiarActa(i, {
-                                                            file: archivo,
-                                                        })
-                                                    }
-                                                    error={
+                                                    aria-invalid={Boolean(
                                                         errores[
-                                                            `acts.${i}.file`
+                                                            'resolution.issuedOn'
+                                                        ],
+                                                    )}
+                                                />
+
+                                                <InputError
+                                                    message={
+                                                        errores[
+                                                            'resolution.issuedOn'
                                                         ]
                                                     }
                                                 />
-                                            </div>
+                                            </FormRowField>
                                         </div>
-                                    ))}
+                                    )}
 
-                                    <div>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setData('acts', [
-                                                    ...data.acts,
-                                                    {
-                                                        actType: 'HYS',
-                                                        text: '',
-                                                        issuedOn: '',
-                                                        file: null,
-                                                    },
-                                                ])
-                                            }
-                                        >
-                                            <Plus aria-hidden="true" />
-                                            {actas.length > 0
-                                                ? 'Agregar un acta que no está cargada'
-                                                : 'Agregar un acta'}
-                                        </Button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </section>
+                                {!resolucionFija &&
+                                    (data.resolutionId !== null ||
+                                        resolucionNueva) && (
+                                        <div className="lg:max-w-[58%]">
+                                            <PaperPhotoDropzone
+                                                id="resolutionFile"
+                                                label="Archivo de la resolución"
+                                                foto={data.resolutionFile}
+                                                onElegir={(archivo) =>
+                                                    actualizarCampo(
+                                                        'resolutionFile',
+                                                        archivo,
+                                                    )
+                                                }
+                                                error={errores.resolutionFile}
+                                            />
+                                        </div>
+                                    )}
 
-                    <section className="rounded-lg border bg-card shadow-raised">
-                        <div className="p-5">
-                            <h2 className="text-sm font-semibold">Multa</h2>
-                            <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-12">
-                                <div className="sm:col-span-12">
-                                    <Label htmlFor="caption">Carátula</Label>
-                                    <Input
-                                        id="caption"
-                                        className="mt-1 max-w-3xl"
-                                        value={data.caption}
-                                        onChange={(e) =>
-                                            actualizarCampo(
-                                                'caption',
-                                                e.target.value,
-                                            )
-                                        }
-                                        maxLength={300}
-                                        placeholder="Como figura en la resolución"
-                                        aria-invalid={Boolean(errors.caption)}
-                                    />
-                                    <FieldError message={errors.caption} />
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Es el nombre con que se emiten los
-                                        recibos. No hace falta que la persona
-                                        esté en el maestro.
-                                    </p>
-                                </div>
-
-                                <div className="sm:col-span-6 lg:col-span-5">
-                                    <Label htmlFor="personId">
-                                        Persona
-                                        <span className="ml-1 font-normal text-muted-foreground">
-                                            (opcional)
-                                        </span>
-                                    </Label>
-                                    <div className="mt-1">
-                                        <PersonPicker
-                                            id="personId"
-                                            value={data.personId}
-                                            onChange={(id) =>
-                                                actualizarCampo('personId', id)
-                                            }
-                                            options={[]}
-                                            role={null}
-                                            invalid={Boolean(errors.personId)}
-                                            placeholder="Buscar en Personas…"
-                                        />
-                                    </div>
-                                    <FieldError message={errors.personId} />
-                                </div>
-
-                                <div className="sm:col-span-3">
-                                    <Label htmlFor="registeredOn">
-                                        Fecha de registro
-                                    </Label>
-                                    <DateInput
-                                        id="registeredOn"
-                                        className="mt-1"
-                                        value={data.registeredOn}
-                                        onChange={(e) =>
-                                            actualizarCampo(
-                                                'registeredOn',
-                                                e.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            errors.registeredOn,
+                                {actasFijas ? (
+                                    <DocumentosFijos
+                                        titulo="Actas"
+                                        documentos={actas.filter((acta) =>
+                                            preseleccion.actIds.includes(
+                                                acta.id,
+                                            ),
                                         )}
+                                        vacio="Sin actas: la multa se carga solo con la resolución."
                                     />
-                                    <FieldError message={errors.registeredOn} />
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Su mes es el período de origen.
-                                    </p>
-                                </div>
+                                ) : (
+                                    <>
+                                        {actas.length > 0 && (
+                                            <fieldset>
+                                                <legend className="text-sm font-medium">
+                                                    Actas del expediente
+                                                </legend>
+                                                <div className="mt-2 grid gap-2">
+                                                    {actas.map((acta) => (
+                                                        <label
+                                                            key={acta.id}
+                                                            className="flex items-center gap-2 text-sm"
+                                                        >
+                                                            <Checkbox
+                                                                checked={data.actIds.includes(
+                                                                    acta.id,
+                                                                )}
+                                                                onCheckedChange={(
+                                                                    marcada,
+                                                                ) =>
+                                                                    actualizarCampo(
+                                                                        'actIds',
+                                                                        marcada ===
+                                                                            true
+                                                                            ? [
+                                                                                  ...data.actIds,
+                                                                                  acta.id,
+                                                                              ]
+                                                                            : data.actIds.filter(
+                                                                                  (
+                                                                                      id,
+                                                                                  ) =>
+                                                                                      id !==
+                                                                                      acta.id,
+                                                                              ),
+                                                                        'actIds',
+                                                                        'acts',
+                                                                    )
+                                                                }
+                                                            />
+                                                            {acta.label}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </fieldset>
+                                        )}
 
-                                <div className="sm:col-span-3 lg:col-span-4">
-                                    <Label htmlFor="amount">Importe</Label>
-                                    <div className="mt-1">
-                                        <AmountInput
-                                            id="amount"
-                                            value={data.amount}
-                                            onChange={(valor) =>
-                                                actualizarCampo('amount', valor)
+                                        {data.acts.map((acta, i) => (
+                                            <div
+                                                key={i}
+                                                className="grid gap-x-6 gap-y-3 rounded-md border border-dashed p-3 motion-safe:animate-in motion-safe:duration-150 motion-safe:fade-in motion-safe:slide-in-from-bottom-1 sm:grid-cols-12"
+                                            >
+                                                <FormRowField
+                                                    htmlFor={`acta-tipo-${i}`}
+                                                    label="Tipo de acta"
+                                                    className="sm:col-span-4"
+                                                >
+                                                    <Select
+                                                        value={acta.actType}
+                                                        onValueChange={(
+                                                            valor,
+                                                        ) =>
+                                                            cambiarActa(i, {
+                                                                actType:
+                                                                    valor as ActType,
+                                                            })
+                                                        }
+                                                    >
+                                                        <SelectTrigger
+                                                            id={`acta-tipo-${i}`}
+                                                            aria-invalid={Boolean(
+                                                                errores[
+                                                                    `acts.${i}.actType`
+                                                                ],
+                                                            )}
+                                                        >
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {(
+                                                                Object.keys(
+                                                                    ACT_TYPE,
+                                                                ) as ActType[]
+                                                            ).map((tipo) => (
+                                                                <SelectItem
+                                                                    key={tipo}
+                                                                    value={tipo}
+                                                                >
+                                                                    {tipo} ·{' '}
+                                                                    {
+                                                                        ACT_TYPE[
+                                                                            tipo
+                                                                        ]
+                                                                    }
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <InputError
+                                                        message={
+                                                            errores[
+                                                                `acts.${i}.actType`
+                                                            ]
+                                                        }
+                                                    />
+                                                </FormRowField>
+                                                <FormRowField
+                                                    htmlFor={`acta-${i}`}
+                                                    label="Acta"
+                                                    className="sm:col-span-4"
+                                                >
+                                                    <Input
+                                                        id={`acta-${i}`}
+                                                        className="font-mono"
+                                                        value={acta.text}
+                                                        onChange={(e) =>
+                                                            cambiarActa(i, {
+                                                                text: e.target
+                                                                    .value,
+                                                            })
+                                                        }
+                                                        placeholder="N°1025288/25"
+                                                        maxLength={120}
+                                                        aria-invalid={Boolean(
+                                                            errores[
+                                                                `acts.${i}.text`
+                                                            ],
+                                                        )}
+                                                    />
+
+                                                    <NumberReadingHint
+                                                        reading={readDocumentNumber(
+                                                            acta.text,
+                                                            'act',
+                                                            acta.issuedOn,
+                                                            acta.actType,
+                                                            anioDeLaResolucion,
+                                                        )}
+                                                        text={acta.text}
+                                                    />
+                                                    <DocumentoCargado
+                                                        documento={findLoadedDocument(
+                                                            actas,
+                                                            'act',
+                                                            acta.text,
+                                                            acta.actType,
+                                                        )}
+                                                        onUse={(cargada) =>
+                                                            setData({
+                                                                ...data,
+                                                                actIds: data.actIds.includes(
+                                                                    cargada.id,
+                                                                )
+                                                                    ? data.actIds
+                                                                    : [
+                                                                          ...data.actIds,
+                                                                          cargada.id,
+                                                                      ],
+                                                                acts: data.acts.filter(
+                                                                    (_, j) =>
+                                                                        j !== i,
+                                                                ),
+                                                            })
+                                                        }
+                                                    />
+                                                    <YearWarning
+                                                        message={documentYearWarning(
+                                                            acta.text,
+                                                            acta.issuedOn,
+                                                        )}
+                                                    />
+
+                                                    <InputError
+                                                        message={
+                                                            errores[
+                                                                `acts.${i}.text`
+                                                            ]
+                                                        }
+                                                    />
+                                                </FormRowField>
+                                                <FormRowField
+                                                    htmlFor={`acta-fecha-${i}`}
+                                                    label={
+                                                        <>
+                                                            {' '}
+                                                            Fecha
+                                                            <span className="ml-1 font-normal text-muted-foreground">
+                                                                (opcional)
+                                                            </span>{' '}
+                                                        </>
+                                                    }
+                                                    className="sm:col-span-3"
+                                                >
+                                                    <DateInput
+                                                        id={`acta-fecha-${i}`}
+                                                        aria-invalid={Boolean(
+                                                            errores[
+                                                                `acts.${i}.issuedOn`
+                                                            ],
+                                                        )}
+
+                                                        value={acta.issuedOn}
+                                                        onChange={(e) =>
+                                                            cambiarActa(i, {
+                                                                issuedOn:
+                                                                    e.target
+                                                                        .value,
+                                                            })
+                                                        }
+                                                    />
+
+                                                    <InputError
+                                                        message={
+                                                            errores[
+                                                                `acts.${i}.issuedOn`
+                                                            ]
+                                                        }
+                                                    />
+                                                </FormRowField>
+                                                <div className="flex items-start sm:col-span-1 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:justify-end">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="sm:row-start-2"
+                                                        aria-label={`Quitar el acta ${i + 1}`}
+                                                        onClick={() =>
+                                                            setData(
+                                                                'acts',
+                                                                data.acts.filter(
+                                                                    (_, j) =>
+                                                                        j !== i,
+                                                                ),
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 aria-hidden="true" />
+                                                    </Button>
+                                                </div>
+                                                <div className="sm:col-span-11">
+                                                    <PaperPhotoDropzone
+                                                        id={`acta-archivo-${i}`}
+                                                        label="Archivo del acta"
+                                                        foto={acta.file}
+                                                        onElegir={(archivo) =>
+                                                            cambiarActa(i, {
+                                                                file: archivo,
+                                                            })
+                                                        }
+                                                        error={
+                                                            errores[
+                                                                `acts.${i}.file`
+                                                            ]
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setData('acts', [
+                                                        ...data.acts,
+                                                        {
+                                                            actType: 'HYS',
+                                                            text: '',
+                                                            issuedOn: '',
+                                                            file: null,
+                                                        },
+                                                    ])
+                                                }
+                                            >
+                                                <Plus aria-hidden="true" />
+                                                {actas.length > 0
+                                                    ? 'Agregar un acta que no está cargada'
+                                                    : 'Agregar un acta'}
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="rounded-lg border bg-card shadow-raised">
+                            <div className="p-5">
+                                <h2 className="text-sm font-semibold">Multa</h2>
+                                <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-12">
+                                    <FormRowField
+                                        htmlFor="caption"
+                                        label="Carátula"
+                                        className="sm:col-span-12"
+                                    >
+                                        <Input
+                                            id="caption"
+                                            className="max-w-3xl"
+                                            value={data.caption}
+                                            onChange={(e) =>
+                                                actualizarCampo(
+                                                    'caption',
+                                                    e.target.value,
+                                                )
                                             }
-                                            words="below"
-                                            placeholder="0,00"
+                                            maxLength={300}
+                                            placeholder="Como figura en la resolución"
                                             aria-invalid={Boolean(
-                                                errors.amount,
+                                                errors.caption,
                                             )}
                                         />
-                                    </div>
-                                    <FieldError message={errors.amount} />
+
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Es el nombre con que se emiten los
+                                            recibos. No hace falta que la
+                                            persona esté en el maestro.
+                                        </p>
+
+                                        <InputError message={errors.caption} />
+                                    </FormRowField>
+
+                                    <FormRowField
+                                        htmlFor="personId"
+                                        label={
+                                            <>
+                                                {' '}
+                                                Persona
+                                                <span className="ml-1 font-normal text-muted-foreground">
+                                                    (opcional)
+                                                </span>{' '}
+                                            </>
+                                        }
+                                        className="sm:col-span-6 lg:col-span-5"
+                                    >
+                                        <div>
+                                            <PersonPicker
+                                                id="personId"
+                                                value={data.personId}
+                                                onChange={(id) =>
+                                                    actualizarCampo(
+                                                        'personId',
+                                                        id,
+                                                    )
+                                                }
+                                                options={[]}
+                                                role={null}
+                                                invalid={Boolean(
+                                                    errors.personId,
+                                                )}
+                                                placeholder="Buscar en Personas…"
+                                            />
+                                        </div>
+
+                                        <InputError message={errors.personId} />
+                                    </FormRowField>
+
+                                    <FormRowField
+                                        htmlFor="registeredOn"
+                                        label="Fecha de registro"
+                                        className="sm:col-span-3"
+                                    >
+                                        <DateInput
+                                            id="registeredOn"
+
+                                            value={data.registeredOn}
+                                            onChange={(e) =>
+                                                actualizarCampo(
+                                                    'registeredOn',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            aria-invalid={Boolean(
+                                                errors.registeredOn,
+                                            )}
+                                        />
+
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Su mes es el período de origen.
+                                        </p>
+
+                                        <InputError
+                                            message={errors.registeredOn}
+                                        />
+                                    </FormRowField>
+
+                                    <FormRowField
+                                        htmlFor="amount"
+                                        label="Importe"
+                                        className="sm:col-span-3 lg:col-span-4"
+                                    >
+                                        <div>
+                                            <AmountInput
+                                                id="amount"
+                                                value={data.amount}
+                                                onChange={(valor) =>
+                                                    actualizarCampo(
+                                                        'amount',
+                                                        valor,
+                                                    )
+                                                }
+                                                words="below"
+                                                placeholder="0,00"
+                                                aria-invalid={Boolean(
+                                                    errors.amount,
+                                                )}
+                                            />
+                                        </div>
+
+                                        <InputError message={errors.amount} />
+                                    </FormRowField>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="flex flex-wrap justify-end gap-2 border-t bg-muted/40 px-5 py-4">
-                            <Button
-                                variant="ghost"
-                                asChild
-                                disabled={processing}
-                            >
-                                <Link
-                                    href={
-                                        fijo && existente
-                                            ? showCase(existente.routeKey)
-                                            : index()
-                                    }
+                            <div className="flex flex-wrap justify-end gap-2 border-t bg-muted/40 px-5 py-4">
+                                <Button
+                                    variant="ghost"
+                                    asChild
+                                    disabled={processing}
                                 >
-                                    Cancelar
-                                </Link>
-                            </Button>
-                            <Button type="submit" disabled={processing}>
-                                {processing
-                                    ? 'Guardando…'
-                                    : fijo
-                                      ? 'Agregar multa'
-                                      : 'Registrar multa'}
-                            </Button>
-                        </div>
-                    </section>
+                                    <Link
+                                        aria-disabled={processing}
+                                        tabIndex={processing ? -1 : undefined}
+                                        onClick={(event) => {
+                                            if (processing) {
+                                                event.preventDefault();
+                                            }
+                                        }}
+                                        href={
+                                            fijo && existente
+                                                ? showCase(existente.routeKey)
+                                                : index()
+                                        }
+                                    >
+                                        Cancelar
+                                    </Link>
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing && (
+                                        <LoaderCircle
+                                            className="size-4 motion-safe:animate-spin"
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    {processing
+                                        ? 'Guardando…'
+                                        : fijo
+                                          ? 'Agregar multa'
+                                          : 'Registrar multa'}
+                                </Button>
+                            </div>
+                        </section>
+                    </fieldset>
                 </form>
             </div>
         </>

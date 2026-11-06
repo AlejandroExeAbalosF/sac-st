@@ -29,3 +29,38 @@ el valor verticalmente a la altura del input vecino.
    campo, seguido de la etiqueta del siguiente.
 
 [Componente compartido para campos en una fila](../resources/js/components/form-row-field.tsx)
+
+## Tarjeta y estados de los campos
+
+Agrupá los campos que se completan juntos en una sección reconocible. Usá la
+superficie de tarjeta del tema (`bg-card`), blanca en el tema claro. Los controles
+editables pueden compartir ese fondo si su borde los delimita con claridad.
+
+Aplicá estas reglas a los campos de texto, las áreas de texto y los selectores.
+Usá los colores del tema para que la distinción funcione en claro y oscuro.
+Aplicá la clase compartida `standard-form` al formulario para reutilizar estos
+estilos. En grillas de columnas desiguales, usá `className` de `FormRowField`
+para definir cuántas columnas ocupa cada campo.
+
+| Estado | Aspecto y comportamiento |
+| --- | --- |
+| Vacío | Conservá el borde suave habitual del control. El texto de ejemplo y los prefijos, como el signo de moneda, cuentan como campo vacío mientras falte el valor. |
+| Con valor | Marcá el borde con una mezcla de `--muted-foreground` al 80 % y `--card`. Vale para datos escritos, precargados, autocompletados o seleccionados, incluido el cero. Al vaciar el campo, recuperá el borde suave. |
+| Con foco | Usá un borde de `--ring` al 72 % mezclado con `--card` y un halo de 2 px de `--ring` al 25 %. Al salir del campo, recuperá el borde que corresponda a su contenido. |
+| Con error | Aplicá `aria-invalid`, usá el color de error del tema y mostrá el mensaje debajo del control. En un campo habilitado, el error tiene prioridad sobre el color de foco y el de campo con valor. |
+| Deshabilitado | Usá fondo `--muted`, borde `--input` y texto `--muted-foreground`, sin sombra y con opacidad completa. Aplicalo también cuando el control herede `:disabled` de un `fieldset`. |
+
+Para comprobarlo, recorré los campos con Tab, escribí un valor, salí del campo
+y volvé a vaciarlo. Repetí la prueba con un valor precargado y con un error de
+validación. En ambos temas debe poder ubicarse el foco durante todo el recorrido.
+
+## Envío, carga y movimiento
+
+Mientras se procesa el envío, marcá el formulario con `aria-busy`, deshabilitá
+los campos que se están enviando y evitá el envío repetido. En el botón, mostrá
+un indicador de actividad y el texto de la acción en curso.
+
+Si una vista previa tarda en cargar, reservá su espacio y mostrá un esqueleto de
+carga (`Skeleton`) hasta que aparezca el contenido o el aviso de error. Para la
+entrada de una fila nueva, usá una transición breve con `motion-safe`. Con la
+preferencia de movimiento reducido, la fila debe aparecer de inmediato.
