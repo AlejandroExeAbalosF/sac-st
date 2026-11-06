@@ -113,6 +113,23 @@ class CatalogoDeArancelesTest extends TestCase
         $this->assertFalse($this->tipo(25)->is_active);
     }
 
+    /** Cada publicación corre el seeder: un código renumerado no puede volver a nacer. */
+    public function test_seeding_again_does_not_bring_back_a_code_that_was_changed(): void
+    {
+        app(UpdateFeeType::class)->handle($this->tipo(25), [
+            'code' => 30,
+            'decreeLetter' => 'y',
+            'name' => 'Notificaciones',
+            'unitLabel' => null,
+            'isActive' => true,
+        ], $this->admin->id);
+
+        $this->seed(FeeTypeSeeder::class);
+
+        $this->assertSame(25, FeeType::query()->count());
+        $this->assertFalse(FeeType::query()->where('code', 25)->exists());
+    }
+
     // ── La pantalla y sus permisos ────────────────────────
 
     public function test_whoever_can_see_fees_opens_the_catalog_but_does_not_manage_it(): void

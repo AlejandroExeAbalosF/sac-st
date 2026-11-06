@@ -17,7 +17,7 @@ Lo que se cobra y cuánto vale desde cada fecha. Lo mira quien tiene `aranceles.
 cambia quien tiene `aranceles.catalogo`, sensible y de entrada solo del administrador.
 
 El catálogo arranca con las 25 tasas del Anexo del Decreto 1202/2019 (Boletín Oficial
-N.º 20.577, págs. 13-14), con `FeeTypeSeeder`, que no pisa lo que el área haya cambiado.
+N.º 20.577, págs. 13-14), con `FeeTypeSeeder`. Carga una sola vez, con el catálogo vacío: aunque corre en cada publicación, no vuelve a tocar lo que el área haya cambiado.
 Dos puntos están **sin confirmar con el área**: que el código numérico sea la posición en
 el anexo (n = 14, y = 25), como sugiere la foto de un recibo, y que esos valores sigan
 vigentes. La vigencia inicial es la fecha del decreto, el 02/09/2019: desde cuándo se

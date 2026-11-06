@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\DB;
  * El catálogo inicial: las 25 tasas del Anexo del Decreto 1202/2019 (Boletín
  * Oficial N.º 20.577, págs. 13-14).
  *
- * **Idempotente y sin pisar.** Un código que ya existe no se toca: lo que el
- * área corrigió desde la pantalla no vuelve al valor del decreto.
+ * **Carga una sola vez, con el catálogo vacío.** Corre en cada publicación, y de
+ * ahí en adelante el catálogo es del área. Mirar código por código no alcanzaba: un
+ * código renumerado parecía faltar, y volver a crearlo chocaba con la letra del
+ * decreto y frenaba la publicación, o duplicaba el tipo si la letra también cambió.
  *
  * El código numérico como posición en el anexo es una interpretación de la foto
  * del recibo (códigos 14 y 25): está para confirmar con el área. La vigencia
@@ -58,18 +60,17 @@ class FeeTypeSeeder extends Seeder
 
     public function run(): void
     {
-        foreach (self::TIPOS as $indice => $fila) {
-            $codigo = $indice + 1;
+        if (FeeType::query()->exists()) {
+            return;
+        }
 
-            if (FeeType::query()->where('code', $codigo)->exists()) {
-                continue;
-            }
+        // Todo o nada: una carga a medias dejaría el catálogo incompleto para siempre.
+        DB::transaction(function (): void {
+            foreach (self::TIPOS as $indice => $fila) {
+                $esPorcentaje = $fila[0] === 'o';
 
-            $esPorcentaje = $fila[0] === 'o';
-
-            DB::transaction(function () use ($codigo, $fila, $esPorcentaje): void {
                 $tipo = FeeType::query()->create([
-                    'code' => $codigo,
+                    'code' => $indice + 1,
                     'decree_letter' => $fila[0],
                     'name' => $fila[1],
                     'calculation_mode' => $esPorcentaje ? FeeCalculationMode::Percentage : FeeCalculationMode::Unit,
@@ -83,7 +84,7 @@ class FeeTypeSeeder extends Seeder
                     'rate' => $esPorcentaje ? $fila[2] : null,
                     'legal_reference' => self::REFERENCIA,
                 ]);
-            });
-        }
+            }
+        });
     }
 }
