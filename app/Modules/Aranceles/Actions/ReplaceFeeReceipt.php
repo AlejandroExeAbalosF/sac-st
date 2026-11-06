@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Corrige lo que dice un recibo sin mover dinero: nombre, CUIT o redacción
+ * Corrige lo que dice un recibo sin mover dinero: nombre, CUIT o DNI o redacción
  * (regla A72). También después de depositar.
  *
  * Hay recibo nuevo con número nuevo, y el anterior queda `replaced` a la vista.
@@ -39,13 +39,13 @@ final class ReplaceFeeReceipt
     public function handle(
         FeeCharge $cobro,
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $wording,
         Reason $motivo,
         ?int $signedById,
         ?int $actorId,
     ): FeeChargeReceipt {
-        return DB::transaction(function () use ($cobro, $payerName, $payerCuit, $wording, $motivo, $signedById, $actorId): FeeChargeReceipt {
+        return DB::transaction(function () use ($cobro, $payerName, $payerDocument, $wording, $motivo, $signedById, $actorId): FeeChargeReceipt {
             $cobro = FeeCharge::query()->whereKey($cobro->id)->lockForUpdate()->firstOrFail();
 
             if ($cobro->status !== FeeChargeStatus::Paid) {
@@ -60,7 +60,7 @@ final class ReplaceFeeReceipt
                 ->firstOrFail();
             $anterior = $vigente->receipt;
             $papel = $vigente->snapshot;
-            $cambio = trim($payerName) !== $papel['payerName'] || ($payerCuit ?: null) !== ($papel['payerCuit'] ?? null);
+            $cambio = trim($payerName) !== $papel['payerName'] || ($payerDocument ?: null) !== ($papel['payerDocument'] ?? null);
 
             foreach ($papel['lines'] as $indice => $linea) {
                 $texto = trim($wording[$indice + 1] ?? '');
@@ -76,7 +76,7 @@ final class ReplaceFeeReceipt
             }
 
             $papel['payerName'] = trim($payerName);
-            $papel['payerCuit'] = $payerCuit ?: null;
+            $papel['payerDocument'] = $payerDocument ?: null;
 
             $anterior->forceFill([
                 'status' => ReceiptStatus::Replaced,

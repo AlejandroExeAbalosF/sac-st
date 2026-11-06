@@ -9,14 +9,14 @@ use App\Modules\Shared\Support\Reason;
 use Illuminate\Foundation\Http\FormRequest;
 use LogicException;
 
-/** Lo que cambia un recibo de reemplazo: nombre, CUIT y redacción. */
+/** Lo que cambia un recibo de reemplazo: nombre, CUIT o DNI y redacción. */
 final class ReplaceFeeReceiptRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
         $this->merge([
             'payerName' => trim((string) $this->input('payerName')),
-            'payerCuit' => preg_replace('/\D+/', '', (string) $this->input('payerCuit')) ?: null,
+            'payerDocument' => preg_replace('/\D+/', '', (string) $this->input('payerDocument')) ?: null,
         ]);
     }
 
@@ -27,7 +27,7 @@ final class ReplaceFeeReceiptRequest extends FormRequest
     {
         return [
             'payerName' => ['required', 'string', 'max:200'],
-            'payerCuit' => ['nullable', 'digits:11'],
+            'payerDocument' => ['nullable', 'regex:/^(\d{6,8}|\d{11})$/'],
             'wording' => ['nullable', 'array'],
             'wording.*' => ['nullable', 'string', 'max:300'],
             'signedById' => ['nullable', 'integer', 'exists:users,id'],
@@ -50,7 +50,7 @@ final class ReplaceFeeReceiptRequest extends FormRequest
     {
         return [
             'payerName' => 'quién paga',
-            'payerCuit' => 'CUIT',
+            'payerDocument' => 'CUIT o DNI',
             'wording' => 'concepto',
             'wording.*' => 'concepto',
             'signedById' => 'firma',

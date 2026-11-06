@@ -38,7 +38,7 @@ final class RecordVerifiedFeeBankPayment
      */
     public function handle(
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $lineas,
         array $creditos,
         string $idempotencyKey,
@@ -47,7 +47,7 @@ final class RecordVerifiedFeeBankPayment
         bool $puedeCambiarImporte,
     ): FeeCharge {
         try {
-            return DB::transaction(function () use ($payerName, $payerCuit, $lineas, $creditos, $idempotencyKey, $signedById, $actorId, $puedeCambiarImporte): FeeCharge {
+            return DB::transaction(function () use ($payerName, $payerDocument, $lineas, $creditos, $idempotencyKey, $signedById, $actorId, $puedeCambiarImporte): FeeCharge {
                 $yaRegistrado = FeeCharge::query()->where('idempotency_key', $idempotencyKey)->first();
 
                 if ($yaRegistrado !== null) {
@@ -67,7 +67,7 @@ final class RecordVerifiedFeeBankPayment
                 $fechaDeTarifa = CarbonImmutable::parse((string) $masAntiguo);
                 ['items' => $items] = $this->calcular->build($lineas, $fechaDeTarifa, $puedeCambiarImporte);
 
-                $cobro = $this->cobros->crear($payerName, $payerCuit, $items, $fechaDeTarifa, null, $idempotencyKey, $actorId, FeeChargeMedium::Bank);
+                $cobro = $this->cobros->crear($payerName, $payerDocument, $items, $fechaDeTarifa, null, $idempotencyKey, $actorId, FeeChargeMedium::Bank);
 
                 $this->identificar->within($cobro, $creditos, $idempotencyKey, $signedById, $actorId);
 

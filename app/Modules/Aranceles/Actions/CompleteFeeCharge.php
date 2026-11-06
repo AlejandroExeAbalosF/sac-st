@@ -76,7 +76,7 @@ final class CompleteFeeCharge
      * Lo que va a decir el papel, con el importe vigente de cada renglón.
      *
      * @param  list<int>  $recepciones
-     * @return array{payerName: string, payerCuit: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
+     * @return array{payerName: string, payerDocument: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
      */
     private function papel(FeeCharge $cobro, array $recepciones): array
     {
@@ -84,7 +84,7 @@ final class CompleteFeeCharge
 
         return [
             'payerName' => $cobro->payer_name,
-            'payerCuit' => $cobro->payer_cuit,
+            'payerDocument' => $cobro->payer_document,
             'lines' => array_values($cobro->items()->get()->map(fn (FeeChargeItem $i): array => [
                 'code' => $i->code_snapshot,
                 'name' => $i->name_snapshot,

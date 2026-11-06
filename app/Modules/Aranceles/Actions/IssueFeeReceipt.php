@@ -28,7 +28,7 @@ use RuntimeException;
  * Una sola definición para la emisión y la vista previa: lo que se mira es lo
  * que se imprime (A95). El número de la vista previa es un anticipo.
  *
- * @phpstan-type Papel array{payerName: string, payerCuit: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
+ * @phpstan-type Papel array{payerName: string, payerDocument: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
  */
 final class IssueFeeReceipt
 {

@@ -72,7 +72,7 @@ Son las pantallas de caja de siempre, con la caja de Aranceles y permisos propio
 Con `aranceles.cobrar` y la caja abierta. Crear, recibir, aplicar y emitir el recibo van en
 una sola transacción.
 
-- **Quién paga:** nombre obligatorio y CUIT opcional. No se crea en el maestro de personas.
+- **Quién paga:** nombre obligatorio y CUIT o DNI opcional: una persona o una empresa, sin suponer cuál (**sin relevar**). El recibo lo muestra solo si se cargó, con su rótulo según los dígitos. **Base:** `fee_charges_payer_document_format`. No se crea en el maestro de personas.
 - **Renglones:** uno o más, sin tope, cada uno con su tipo. El precio lo pone el servidor,
   según la fecha: la pantalla solo muestra un anticipo. Cantidad por precio, o el porcentaje
   sobre un monto, redondeado una vez, al final, al centavo más cercano (**sin confirmar**).
@@ -109,8 +109,11 @@ ese total, y se comprueba también al agregar un renglón o un ajuste;
 ## Recibo
 
 En papel en blanco, A5 apaisado, con la misma plantilla para la pantalla y la impresora. El
-diseño es provisorio: falta el visto bueno del área. Lleva el Expte. tachado, el Período vacío
-y la firma vacía, u opcionalmente el nombre y cargo del firmante elegido. Si los renglones no
+diseño es provisorio: sigue el talonario del área con el marco de los otros recibos, y falta el
+visto bueno. Lleva el Expte. tachado, el Período vacío, el CUIT o DNI solo si se cargó, el total
+a la derecha y la firma vacía, u opcionalmente el nombre y cargo del firmante elegido. El precio
+es el que resulta del importe cobrado: si se cambió, el motivo queda en el sistema y no en el papel,
+y si no da justo al centavo va vacío. Si los renglones no
 entran, sigue en otra hoja con el mismo número. Lo que dice queda congelado al emitir. Uno
 anulado o reemplazado sale marcado así, para que no se imprima como si valiera.
 
@@ -123,7 +126,7 @@ Son hechos distintos:
 | Situación | Operación | Permiso | El dinero |
 |---|---|---|---|
 | Nunca entró | **Anular**, sin traspaso vigente | `aranceles.anular` | Se revierte; el recibo queda anulado con su número |
-| Error en nombre, CUIT o redacción | **Reemplazar el recibo**, también después de depositar | `aranceles.reemplazar-recibos` | No se mueve; hay número nuevo, y el anterior queda `replaced` |
+| Error en nombre, CUIT o DNI o redacción | **Reemplazar el recibo**, también después de depositar | `aranceles.reemplazar-recibos` | No se mueve; hay número nuevo, y el anterior queda `replaced` |
 | Otro tipo o cantidad, mismo importe | **Corregir** | `aranceles.corregir` | No se mueve: la misma recepción se aplica al cobro nuevo |
 | Otro importe, sin traspasar | **Corregir** | `aranceles.corregir` | Se revierte la recepción y se registra la correcta |
 | Otro importe, traspaso sin acreditar | Cancelar todo el traspaso y **corregir** | | |

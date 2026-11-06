@@ -38,7 +38,7 @@ declare namespace App {
                 export type FeeChargeListItemData = {
                     readonly id: number;
                     readonly payerName: string;
-                    readonly payerCuit: string | null;
+                    readonly payerDocument: string | null;
                     readonly medium: App.Modules.Aranceles.Enums.FeeChargeMedium;
                     readonly status: App.Modules.Aranceles.Enums.FeeChargeStatus;
                     readonly requestedOn: string;

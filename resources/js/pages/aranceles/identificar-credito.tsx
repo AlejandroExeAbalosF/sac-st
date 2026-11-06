@@ -255,7 +255,7 @@ function CobroNuevo({
     const [otros, setOtros] = useState<Credito[]>([]);
     const form = useForm({
         payerName: credito.counterparty ?? '',
-        payerCuit: '',
+        payerDocument: '',
         lineas: [lineaVacia()],
     });
     const errores = form.errors as unknown as Record<
@@ -278,7 +278,7 @@ function CobroNuevo({
             registrar().url,
             {
                 payerName: form.data.payerName,
-                payerCuit: form.data.payerCuit || null,
+                payerDocument: form.data.payerDocument || null,
                 items: itemsDeLineas(form.data.lineas),
                 credits: [credito.id, ...otros.map((c) => c.id)],
                 signedById: firmanteDe(firmante),
@@ -302,14 +302,19 @@ function CobroNuevo({
                     />
                     <InputError message={form.errors.payerName} />
                 </FormRowField>
-                <FormRowField htmlFor="payerCuit" label="CUIT (opcional)">
+                <FormRowField
+                    htmlFor="payerDocument"
+                    label="CUIT o DNI (opcional)"
+                >
                     <DocumentInput
-                        id="payerCuit"
+                        id="payerDocument"
                         maxDigits={11}
-                        value={form.data.payerCuit}
-                        onChange={(valor) => form.setData('payerCuit', valor)}
+                        value={form.data.payerDocument}
+                        onChange={(valor) =>
+                            form.setData('payerDocument', valor)
+                        }
                     />
-                    <InputError message={form.errors.payerCuit} />
+                    <InputError message={form.errors.payerDocument} />
                 </FormRowField>
             </div>
 

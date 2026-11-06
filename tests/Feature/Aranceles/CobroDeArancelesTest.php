@@ -618,7 +618,7 @@ class CobroDeArancelesTest extends TestCase
         $this->actingAs($this->admin)
             ->post(route('aranceles.cobros.store'), [
                 'payerName' => ' AG Max SRL ',
-                'payerCuit' => '30-71044289-2',
+                'payerDocument' => '30-71044289-2',
                 'idempotencyKey' => 'pantalla-1',
                 'items' => [$this->linea(14)],
             ])
@@ -629,7 +629,7 @@ class CobroDeArancelesTest extends TestCase
         $recibo = (int) FeeChargeReceipt::query()->where('fee_charge_id', $cobro->id)->value('receipt_id');
 
         $this->assertSame('AG Max SRL', $cobro->payer_name);
-        $this->assertSame('30710442892', $cobro->payer_cuit);
+        $this->assertSame('30710442892', $cobro->payer_document);
 
         $this->actingAs($this->operador('consulta'))
             ->get(route('aranceles.cobros.index'))
@@ -1262,9 +1262,92 @@ class CobroDeArancelesTest extends TestCase
         app(ReplaceFeeReceipt::class)->handle($cobro, 'Empresa', null, [], $this->motivo(FeeReasonCode::WrongPayer), null, $this->admin->id);
 
         $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.payerCuit', null));
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.payerDocument', null));
         $this->actingAs($this->admin)->get(route('aranceles.cobros.corregir.edit', $cobro))->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->where('corrects.payerCuit', null));
+            ->assertInertia(fn (Assert $p) => $p->where('corrects.payerDocument', null));
+    }
+
+    /** A01: quien paga puede ser una persona o una empresa, y el documento es opcional. */
+    public function test_the_payer_is_identified_with_cuit_or_dni(): void
+    {
+        $this->abrir();
+        $cobrar = fn (string $clave, ?string $documento) => $this->actingAs($this->admin)->post(route('aranceles.cobros.store'), [
+            'payerName' => 'Quien paga',
+            'payerDocument' => $documento,
+            'idempotencyKey' => $clave,
+            'items' => [$this->linea(14)],
+        ]);
+
+        $cobrar('con-dni', '12.345.678')->assertSessionHasNoErrors();
+        $cobrar('dni-corto', '123456')->assertSessionHasNoErrors();
+        $cobrar('con-cuit', '30-71044289-2')->assertSessionHasNoErrors();
+        $cobrar('sin-documento', null)->assertSessionHasNoErrors();
+        $cobrar('nueve', '123456789')->assertSessionHasErrors('payerDocument');
+        $cobrar('cinco', '12345')->assertSessionHasErrors('payerDocument');
+
+        $this->assertSame(
+            ['12345678', '123456', '30710442892', null],
+            FeeCharge::query()->orderBy('id')->pluck('payer_document')->all(),
+        );
+    }
+
+    public function test_the_database_refuses_a_document_of_another_length(): void
+    {
+        $this->abrir();
+        $cobro = $this->cobrar([$this->linea(14)]);
+        $base = collect($cobro->getAttributes())->only(['payer_name', 'medium', 'status', 'requested_on', 'pricing_date'])->all();
+
+        $this->assertLaBaseRechaza(
+            fn () => DB::table('fee_charges')->insert([...$base, 'status' => 'pending', 'idempotency_key' => 'nueve-digitos', 'payer_document' => '123456789']),
+            'fee_charges_payer_document_format',
+        );
+    }
+
+    /** El recibo muestra el documento solo si se cargó, con el rótulo según los dígitos. */
+    public function test_the_receipt_labels_the_document_by_its_digits(): void
+    {
+        $this->abrir();
+        $recibo = function (string $clave, ?string $documento): string {
+            $cobro = app(CollectFeeInCash::class)->handle('Quien paga', $documento, [$this->linea(14)], $clave, $this->admin->id, null, null, null, true);
+
+            return app(FeeReceiptPdf::class)
+                ->preview(FeeChargeReceipt::query()->where('fee_charge_id', $cobro->id)->firstOrFail())
+                ->render();
+        };
+
+        $conDni = $recibo('con-dni', '12345678');
+        $this->assertStringContainsString('DNI:', $conDni);
+        $this->assertStringContainsString('12.345.678', $conDni);
+
+        $conCuit = $recibo('con-cuit', '30710442892');
+        $this->assertStringContainsString('CUIT:', $conCuit);
+        $this->assertStringContainsString('30-71044289-2', $conCuit);
+
+        $sinDocumento = $recibo('sin-documento', null);
+        $this->assertStringNotContainsString('DNI:', $sinDocumento);
+        $this->assertStringNotContainsString('CUIT:', $sinDocumento);
+    }
+
+    /** En el papel, cantidad por precio da el importe, aunque se haya cambiado. */
+    public function test_the_receipt_price_follows_the_amount_charged(): void
+    {
+        $this->abrir();
+        $precioDe = function (string $clave, array $renglon): string {
+            $cobro = app(CollectFeeInCash::class)->handle('Quien paga', null, [$renglon], $clave, $this->admin->id, null, null, null, true);
+            $html = app(FeeReceiptPdf::class)
+                ->preview(FeeChargeReceipt::query()->where('fee_charge_id', $cobro->id)->firstOrFail())
+                ->render();
+
+            preg_match('/<tbody>.*?<\/tr>/s', $html, $fila);
+            preg_match_all('/<td class="n">\s*(.*?)\s*<\/td>/s', $fila[0], $celdas);
+
+            return $celdas[1][1];
+        };
+
+        $this->assertSame('$ 120,00', $precioDe('sin-cambio', $this->linea(14)));
+        $this->assertSame('$ 100,00', $precioDe('cambiado', $this->linea(14, ['amount' => '100', 'reasonCode' => 'rounding'])));
+        $this->assertSame('$ 75,00', $precioDe('por-dos', $this->linea(25, ['quantity' => 2, 'amount' => '150', 'reasonCode' => 'rounding'])));
+        $this->assertSame('', $precioDe('no-da-justo', $this->linea(25, ['quantity' => 3, 'amount' => '100', 'reasonCode' => 'rounding'])));
     }
 
     public function test_decimal_multiplies_and_takes_percentages_without_float(): void

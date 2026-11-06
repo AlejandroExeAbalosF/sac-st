@@ -62,7 +62,7 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             new PermissionDefinition(
                 'aranceles.reemplazar-recibos',
                 'Reemplazar recibos de aranceles',
-                'Corregir el nombre, el CUIT o la redacción de un recibo con otro, sin mover dinero.',
+                'Corregir el nombre, el CUIT o DNI o la redacción de un recibo con otro, sin mover dinero.',
                 'aranceles',
                 ['administrador', 'contador'],
                 sensitive: true,

@@ -377,7 +377,7 @@ function ReemplazarDialog({
 }) {
     const form = useForm({
         payerName: cobro.payerName,
-        payerCuit: cobro.payerCuit ?? '',
+        payerDocument: cobro.payerDocument ?? '',
         wording: Object.fromEntries(
             cobro.lines.map((l, i) => [i + 1, l.name]),
         ) as Record<number, string>,
@@ -407,8 +407,8 @@ function ReemplazarDialog({
                     <DialogHeader>
                         <DialogTitle>Reemplazar el recibo</DialogTitle>
                         <DialogDescription>
-                            Corrige el nombre, el CUIT o la redacción con un
-                            recibo de número nuevo, sin mover dinero. Para
+                            Corrige el nombre, el CUIT o DNI o la redacción con
+                            un recibo de número nuevo, sin mover dinero. Para
                             cambiar el tipo, la cantidad o el importe, corregí
                             el cobro.
                         </DialogDescription>
@@ -427,14 +427,18 @@ function ReemplazarDialog({
                             <InputError message={form.errors.payerName} />
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="r-cuit">CUIT (opcional)</Label>
+                            <Label htmlFor="r-cuit">
+                                CUIT o DNI (opcional)
+                            </Label>
                             <DocumentInput
                                 id="r-cuit"
                                 maxDigits={11}
-                                value={form.data.payerCuit}
-                                onChange={(v) => form.setData('payerCuit', v)}
+                                value={form.data.payerDocument}
+                                onChange={(v) =>
+                                    form.setData('payerDocument', v)
+                                }
                             />
-                            <InputError message={form.errors.payerCuit} />
+                            <InputError message={form.errors.payerDocument} />
                         </div>
                         {cobro.lines.map((linea, i) => (
                             <div key={i} className="grid gap-1.5">

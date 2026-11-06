@@ -35,7 +35,7 @@ enum FeeReasonCode: string implements ReasonCode
             self::DataEntryError => 'Error de carga',
             self::Duplicate => 'Cargado dos veces',
             self::WrongPayer => 'Nombre equivocado',
-            self::WrongCuit => 'CUIT equivocado',
+            self::WrongCuit => 'CUIT o DNI equivocado',
             self::WrongWording => 'Error de redacción',
             self::WrongType => 'Tipo de arancel equivocado',
             self::WrongQuantity => 'Cantidad equivocada',

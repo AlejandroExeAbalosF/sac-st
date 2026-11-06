@@ -40,14 +40,14 @@ final class CreateFeeCharge
      */
     public function handle(
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $lineas,
         string $idempotencyKey,
         ?int $actorId,
         bool $puedeCambiarImporte,
     ): FeeCharge {
         try {
-            return DB::transaction(function () use ($payerName, $payerCuit, $lineas, $idempotencyKey, $actorId, $puedeCambiarImporte): FeeCharge {
+            return DB::transaction(function () use ($payerName, $payerDocument, $lineas, $idempotencyKey, $actorId, $puedeCambiarImporte): FeeCharge {
                 $yaCreado = FeeCharge::query()->where('idempotency_key', $idempotencyKey)->first();
 
                 if ($yaCreado !== null) {
@@ -61,7 +61,7 @@ final class CreateFeeCharge
                 $hoy = BusinessDate::today();
                 ['items' => $items, 'total' => $total] = $this->calcular->build($lineas, $hoy, $puedeCambiarImporte);
 
-                $cobro = $this->cobros->crear($payerName, $payerCuit, $items, $hoy, null, $idempotencyKey, $actorId, FeeChargeMedium::Bank);
+                $cobro = $this->cobros->crear($payerName, $payerDocument, $items, $hoy, null, $idempotencyKey, $actorId, FeeChargeMedium::Bank);
 
                 $this->auditar->handle('arancel.pendiente-creado', $cobro, metadata: ['amount' => $total], actorId: $actorId);
 

@@ -58,7 +58,7 @@ final class CollectFeeInCash
      */
     public function preview(
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $lineas,
         ?CarbonImmutable $receivedOn,
         ?string $talonarioNumber,
@@ -71,9 +71,9 @@ final class CollectFeeInCash
         $this->assertCollectable($fecha, $talonario);
         ['items' => $items, 'total' => $total] = $this->calcular->build($lineas, $fecha, $puedeCambiarImporte);
 
-        $cobro = new FeeCharge(['payer_name' => $payerName, 'payer_cuit' => $payerCuit, 'medium' => FeeChargeMedium::Cash]);
+        $cobro = new FeeCharge(['payer_name' => $payerName, 'payer_document' => $payerDocument, 'medium' => FeeChargeMedium::Cash]);
 
-        return $this->emitir->preview($cobro, self::papel($payerName, $payerCuit, $items), $total, $fecha, $talonario, $signedById);
+        return $this->emitir->preview($cobro, self::papel($payerName, $payerDocument, $items), $total, $fecha, $talonario, $signedById);
     }
 
     /**
@@ -83,7 +83,7 @@ final class CollectFeeInCash
      */
     public function handle(
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $lineas,
         string $idempotencyKey,
         ?int $actorId,
@@ -105,7 +105,7 @@ final class CollectFeeInCash
         $adjunto = null;
 
         try {
-            return DB::transaction(function () use ($payerName, $payerCuit, $lineas, $idempotencyKey, $actorId, $fecha, $talonario, $signedById, $puedeCambiarImporte, $talonarioPhoto, &$adjunto): FeeCharge {
+            return DB::transaction(function () use ($payerName, $payerDocument, $lineas, $idempotencyKey, $actorId, $fecha, $talonario, $signedById, $puedeCambiarImporte, $talonarioPhoto, &$adjunto): FeeCharge {
                 $yaCobrado = FeeCharge::query()->where('idempotency_key', $idempotencyKey)->first();
 
                 if ($yaCobrado !== null) {
@@ -115,7 +115,7 @@ final class CollectFeeInCash
                 $this->assertCollectable($fecha, $talonario);
                 ['items' => $items, 'total' => $total] = $this->calcular->build($lineas, $fecha, $puedeCambiarImporte);
 
-                $cobro = $this->crear($payerName, $payerCuit, $items, $fecha, $fecha, $idempotencyKey, $actorId);
+                $cobro = $this->crear($payerName, $payerDocument, $items, $fecha, $fecha, $idempotencyKey, $actorId);
 
                 $recepcion = $this->recibir->handle(
                     amount: $total,
@@ -132,7 +132,7 @@ final class CollectFeeInCash
 
                 $comprobante = $this->emitir->handle(
                     $cobro,
-                    self::papel($payerName, $payerCuit, $items),
+                    self::papel($payerName, $payerDocument, $items),
                     $total,
                     $fecha,
                     [$recepcion->financial_event_id, $aplicacion->id],
@@ -188,11 +188,11 @@ final class CollectFeeInCash
      *
      * @param  list<Renglon>  $items
      */
-    public function crear(string $payerName, ?string $payerCuit, array $items, CarbonImmutable $fechaDeTarifa, ?CarbonImmutable $pagadoEl, string $idempotencyKey, ?int $actorId, FeeChargeMedium $medio = FeeChargeMedium::Cash): FeeCharge
+    public function crear(string $payerName, ?string $payerDocument, array $items, CarbonImmutable $fechaDeTarifa, ?CarbonImmutable $pagadoEl, string $idempotencyKey, ?int $actorId, FeeChargeMedium $medio = FeeChargeMedium::Cash): FeeCharge
     {
         $cobro = FeeCharge::query()->create([
             'payer_name' => $payerName,
-            'payer_cuit' => $payerCuit,
+            'payer_document' => $payerDocument,
             'medium' => $medio,
             'status' => $pagadoEl === null ? FeeChargeStatus::Pending : FeeChargeStatus::Paid,
             'requested_on' => BusinessDate::today(),
@@ -213,13 +213,13 @@ final class CollectFeeInCash
      * Lo que va a decir el papel.
      *
      * @param  list<Renglon>  $items
-     * @return array{payerName: string, payerCuit: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
+     * @return array{payerName: string, payerDocument: string|null, lines: list<array{code: int, name: string, unitLabel: string|null, quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}>, bankAccountNumber: string|null}
      */
-    public static function papel(string $payerName, ?string $payerCuit, array $items): array
+    public static function papel(string $payerName, ?string $payerDocument, array $items): array
     {
         return [
             'payerName' => $payerName,
-            'payerCuit' => $payerCuit,
+            'payerDocument' => $payerDocument,
             'lines' => array_map(fn (array $r): array => [
                 'code' => $r['code_snapshot'],
                 'name' => $r['name_snapshot'],

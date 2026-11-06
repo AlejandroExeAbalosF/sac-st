@@ -104,7 +104,7 @@ final class FeeChargeController extends Controller
 
         $cobro = $cobrar->handle(
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             array_values($datos['items']),
             (string) $datos['idempotencyKey'],
             $request->user()?->id,
@@ -125,7 +125,7 @@ final class FeeChargeController extends Controller
 
         $comprobante = $cobrar->preview(
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             array_values($datos['items']),
             $this->fecha($datos),
             $datos['talonarioNumber'] ?? null,
@@ -168,7 +168,7 @@ final class FeeChargeController extends Controller
         $comprobante = $reemplazar->handle(
             $feeCharge,
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             $redaccion,
             $request->reason(),
             isset($datos['signedById']) ? (int) $datos['signedById'] : null,
@@ -187,7 +187,7 @@ final class FeeChargeController extends Controller
         $nuevo = $corregir->handle(
             $feeCharge,
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             array_values($datos['items']),
             $request->reason(),
             isset($datos['signedById']) ? (int) $datos['signedById'] : null,

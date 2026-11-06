@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * @property int $id
  * @property string $payer_name
- * @property string|null $payer_cuit
+ * @property string|null $payer_document
  * @property FeeChargeMedium $medium
  * @property FeeChargeStatus $status
  * @property CarbonImmutable $requested_on
@@ -42,7 +42,7 @@ class FeeCharge extends Model
 
     protected $fillable = [
         'payer_name',
-        'payer_cuit',
+        'payer_document',
         'medium',
         'status',
         'requested_on',

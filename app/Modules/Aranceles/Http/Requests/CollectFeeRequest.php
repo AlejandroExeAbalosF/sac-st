@@ -18,7 +18,7 @@ class CollectFeeRequest extends FormRequest
     {
         $this->merge([
             'payerName' => trim((string) $this->input('payerName')),
-            'payerCuit' => preg_replace('/\D+/', '', (string) $this->input('payerCuit')) ?: null,
+            'payerDocument' => preg_replace('/\D+/', '', (string) $this->input('payerDocument')) ?: null,
         ]);
     }
 
@@ -29,7 +29,7 @@ class CollectFeeRequest extends FormRequest
     {
         return [
             'payerName' => ['required', 'string', 'max:200'],
-            'payerCuit' => ['nullable', 'digits:11'],
+            'payerDocument' => ['nullable', 'regex:/^(\d{6,8}|\d{11})$/'],
             'receivedOn' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'talonarioNumber' => ['nullable', 'string', 'max:20', 'required_with:talonarioPhoto'],
             'talonarioPhoto' => ScannedDocument::rules(required: false),
@@ -52,7 +52,7 @@ class CollectFeeRequest extends FormRequest
     {
         return [
             'payerName' => 'quién paga',
-            'payerCuit' => 'CUIT',
+            'payerDocument' => 'CUIT o DNI',
             'receivedOn' => 'fecha del cobro',
             'talonarioNumber' => 'número de talonario',
             'talonarioPhoto' => 'foto del talonario',

@@ -62,14 +62,14 @@ final class CorrectFeeCharge
     public function handle(
         FeeCharge $cobro,
         string $payerName,
-        ?string $payerCuit,
+        ?string $payerDocument,
         array $lineas,
         Reason $motivo,
         ?int $signedById,
         ?int $actorId,
         bool $puedeCambiarImporte,
     ): FeeCharge {
-        return DB::transaction(function () use ($cobro, $payerName, $payerCuit, $lineas, $motivo, $signedById, $actorId, $puedeCambiarImporte): FeeCharge {
+        return DB::transaction(function () use ($cobro, $payerName, $payerDocument, $lineas, $motivo, $signedById, $actorId, $puedeCambiarImporte): FeeCharge {
             $cobro = FeeCharge::query()->whereKey($cobro->id)->lockForUpdate()->firstOrFail();
 
             $yaCorregido = FeeChargeCorrection::query()->where('corrected_charge_id', $cobro->id)->value('new_charge_id');
@@ -111,7 +111,7 @@ final class CorrectFeeCharge
                     $this->fondos->reverseReceipt($recepcion, $clave.':recepcion-'.$recepcion->id, $motivo, $actorId);
                 }
 
-                $nuevo = $this->cobrar->crear($payerName, $payerCuit, $items, $cobro->pricing_date, null, $clave, $actorId, FeeChargeMedium::Bank);
+                $nuevo = $this->cobrar->crear($payerName, $payerDocument, $items, $cobro->pricing_date, null, $clave, $actorId, FeeChargeMedium::Bank);
                 $this->identificar->within($nuevo, $creditos, $clave, $signedById, $actorId, usaSoloLoNecesario: true);
                 $this->registrarCorreccion($cobro, $nuevo, $motivo, $actorId);
 
@@ -125,7 +125,7 @@ final class CorrectFeeCharge
                 return $nuevo->refresh();
             }
 
-            $nuevo = $this->cobrar->crear($payerName, $payerCuit, $items, $cobro->pricing_date, $hoy, $clave, $actorId, $cobro->medium);
+            $nuevo = $this->cobrar->crear($payerName, $payerDocument, $items, $cobro->pricing_date, $hoy, $clave, $actorId, $cobro->medium);
 
             if ($mismoImporte) {
                 $eventos = [];
@@ -159,7 +159,7 @@ final class CorrectFeeCharge
             $comprobante = $this->emitir->handle(
                 $nuevo,
                 [
-                    ...CollectFeeInCash::papel($payerName, $payerCuit, $items),
+                    ...CollectFeeInCash::papel($payerName, $payerDocument, $items),
                     'bankAccountNumber' => $porBanco ? $this->fondos->accountNumbersOf($recepciones->pluck('id')) : null,
                 ],
                 $total,

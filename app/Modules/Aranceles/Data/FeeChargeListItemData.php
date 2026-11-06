@@ -19,7 +19,7 @@ final readonly class FeeChargeListItemData
     public function __construct(
         public int $id,
         public string $payerName,
-        public ?string $payerCuit,
+        public ?string $payerDocument,
         public FeeChargeMedium $medium,
         public FeeChargeStatus $status,
         public string $requestedOn,

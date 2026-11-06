@@ -103,8 +103,8 @@ final class FeeChargeRows
         return new FeeChargeListItemData(
             id: $cobro->id,
             payerName: $papel['payerName'] ?? $cobro->payer_name,
-            // Un CUIT quitado en el reemplazo es nulo en el papel: no vuelve el original.
-            payerCuit: $papel === null ? $cobro->payer_cuit : ($papel['payerCuit'] ?? null),
+            // Un documento quitado en el reemplazo es nulo en el papel: no vuelve el original.
+            payerDocument: $papel === null ? $cobro->payer_document : ($papel['payerDocument'] ?? null),
             medium: $cobro->medium,
             status: $cobro->status,
             requestedOn: $cobro->requested_on->toDateString(),

@@ -71,7 +71,7 @@ final class FeePendingController extends Controller
 
         $crear->handle(
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             array_values($datos['items']),
             (string) $datos['idempotencyKey'],
             $request->user()?->id,
@@ -175,7 +175,7 @@ final class FeePendingController extends Controller
 
         $cobro = $registrar->handle(
             (string) $datos['payerName'],
-            $datos['payerCuit'] ?? null,
+            $datos['payerDocument'] ?? null,
             array_values($datos['items']),
             array_values(array_map('intval', $datos['credits'])),
             (string) $datos['idempotencyKey'],

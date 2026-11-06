@@ -98,7 +98,7 @@ export default function NuevoCobro({
     const hoy = businessToday();
     const form = useForm({
         payerName: corrects?.payerName ?? '',
-        payerCuit: corrects?.payerCuit ?? '',
+        payerDocument: corrects?.payerDocument ?? '',
         receivedOn: hoy,
         talonarioNumber: '',
         talonarioPhoto: null as File | null,
@@ -154,7 +154,7 @@ export default function NuevoCobro({
     const registrarPendiente = () => {
         form.transform(() => ({
             payerName: form.data.payerName,
-            payerCuit: form.data.payerCuit || null,
+            payerDocument: form.data.payerDocument || null,
             items: items(),
             idempotencyKey,
         }));
@@ -163,7 +163,7 @@ export default function NuevoCobro({
 
     const datos = () => ({
         payerName: form.data.payerName,
-        payerCuit: form.data.payerCuit || null,
+        payerDocument: form.data.payerDocument || null,
         receivedOn: form.data.receivedOn === hoy ? null : form.data.receivedOn,
         talonarioNumber: form.data.talonarioNumber.trim() || null,
         signedById:
@@ -176,7 +176,7 @@ export default function NuevoCobro({
     const enviarCorreccion = (id: number) => {
         form.transform(() => ({
             payerName: form.data.payerName,
-            payerCuit: form.data.payerCuit || null,
+            payerDocument: form.data.payerDocument || null,
             signedById:
                 form.data.signedById === SIN_FIRMANTE
                     ? null
@@ -345,28 +345,28 @@ export default function NuevoCobro({
                                     />
                                 </FormRowField>
                                 <FormRowField
-                                    htmlFor="payerCuit"
-                                    label="CUIT (opcional)"
+                                    htmlFor="payerDocument"
+                                    label="CUIT o DNI (opcional)"
                                 >
                                     <DocumentInput
-                                        id="payerCuit"
+                                        id="payerDocument"
                                         aria-invalid={Boolean(
-                                            form.errors.payerCuit,
+                                            form.errors.payerDocument,
                                         )}
                                         aria-describedby={
-                                            form.errors.payerCuit
-                                                ? 'payerCuit-error'
+                                            form.errors.payerDocument
+                                                ? 'payerDocument-error'
                                                 : undefined
                                         }
                                         maxDigits={11}
-                                        value={form.data.payerCuit}
+                                        value={form.data.payerDocument}
                                         onChange={(valor) =>
-                                            form.setData('payerCuit', valor)
+                                            form.setData('payerDocument', valor)
                                         }
                                     />
                                     <InputError
-                                        id="payerCuit-error"
-                                        message={form.errors.payerCuit}
+                                        id="payerDocument-error"
+                                        message={form.errors.payerDocument}
                                     />
                                 </FormRowField>
                             </div>
