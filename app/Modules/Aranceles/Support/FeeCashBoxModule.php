@@ -43,14 +43,16 @@ final class FeeCashBoxModule implements CashBoxModule
     }
 
     /**
-     * Los billetes de las demás cajas: no circula nada menor de $ 50 (decisión del
-     * usuario, 05/11/2026; **sin relevar con el área**). Lo que no se pueda pagar justo
+     * Los billetes de las demás cajas y, en pesos, los de $ 20 y $ 10 (decisión del
+     * usuario, 06/11/2026; **sin relevar con el área**). Lo que no se pueda pagar justo
      * se redondea al cobrar, con su motivo. Un importe sin redondear, como el del
      * 0,07 %, queda como diferencia explicada.
      */
     public function countDenominations(Currency $currency): array
     {
-        return CashCountLine::suggestedDenominations($currency);
+        $billetes = CashCountLine::suggestedDenominations($currency);
+
+        return $currency === Currency::Ars ? [...$billetes, 20, 10] : $billetes;
     }
 
     public function chequesInCustody(PeriodClosing $closing): array

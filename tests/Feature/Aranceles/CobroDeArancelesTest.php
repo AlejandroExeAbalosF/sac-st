@@ -1082,13 +1082,13 @@ class CobroDeArancelesTest extends TestCase
         $this->assertSame([1.0, 20.0, 20.0], array_map(floatval(...), array_slice($fila, 0, 3)));
     }
 
-    /** No circula nada menor de $ 50: el arqueo ofrece lo mismo que las otras cajas. */
-    public function test_the_count_offers_no_bill_under_fifty(): void
+    /** Aranceles suma los billetes de $ 20 y $ 10; las otras cajas siguen hasta $ 50. */
+    public function test_the_count_offers_twenty_and_ten_only_here(): void
     {
         $this->abrir();
 
         $this->actingAs($this->admin)->get(route('aranceles.caja.dia'))->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->min() === 50));
+            ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->take(-3)->values()->all() === [50, 20, 10]));
 
         $this->actingAs($this->admin)->get(route('caja.dia'))->assertOk()
             ->assertInertia(fn (Assert $p) => $p->where('suggestedDenominations', fn ($d): bool => collect($d)->min() === 50));
