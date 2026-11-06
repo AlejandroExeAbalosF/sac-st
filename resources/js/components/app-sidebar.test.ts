@@ -71,8 +71,7 @@ describe('el grupo Aranceles de la barra', () => {
     it('ofrece el catálogo a quien puede ver aranceles', () => {
         expect(hijosPara('Aranceles', { 'aranceles.ver': true })).toEqual([
             'Cobros',
-            'Pendientes',
-            'Depósitos',
+            'Traspasos',
             'Tipos de arancel',
         ]);
         expect(
@@ -82,8 +81,7 @@ describe('el grupo Aranceles de la barra', () => {
             }),
         ).toEqual([
             'Cobros',
-            'Pendientes',
-            'Depósitos',
+            'Traspasos',
             'Caja del día',
             'Calendario',
             'Tipos de arancel',

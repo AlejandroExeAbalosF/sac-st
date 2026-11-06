@@ -19,29 +19,44 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    FeeAdjustDialog,
+    FeeIdentifyDialog,
+} from '@/features/aranceles/components/fee-pending-dialogs';
 import FeeReceiptDialog from '@/features/aranceles/components/fee-receipt-dialog';
 import SignerSelect, {
     SIN_FIRMANTE,
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
-import { date, money } from '@/lib/format';
+import { compareAmounts, date, money } from '@/lib/format';
 import { preview as verAdjunto } from '@/routes/adjuntos';
 import { anular, create, index, reemplazar } from '@/routes/aranceles/cobros';
+import { create as cargarComprobante } from '@/routes/aranceles/cobros/comprobante';
 import { edit as corregir } from '@/routes/aranceles/cobros/corregir';
-import { index as pendientes } from '@/routes/aranceles/pendientes';
 
 type Cobro = App.Modules.Aranceles.Data.FeeChargeListItemData;
+type Estado = App.Modules.Aranceles.Enums.FeeChargeStatus;
 type Acto = App.Modules.Aranceles.Enums.FeeReasonAct;
 type Codigo = App.Modules.Aranceles.Enums.FeeReasonCode;
 
 type Props = {
     charges: PaginationData & { data: Cobro[] };
-    filters: { q: string; cobro: number | null };
+    filters: { q: string; cobro: number | null; estado: Estado | null };
+    pendingCount: number;
     openReceipt: number | null;
     firmantes: Firmante[];
     can: {
         collect: boolean;
+        identify: boolean;
+        adjust: boolean;
         void: boolean;
         replace: boolean;
         correct: boolean;
@@ -49,10 +64,16 @@ type Props = {
     };
 };
 
-/** Los cobros de aranceles, del más nuevo al más viejo, y lo que se hace con cada uno. */
+/**
+ * Los cobros de aranceles, del más nuevo al más viejo, y lo que se hace con cada uno.
+ * Filtrados por pendientes son la cola de lo que espera un pago por el banco (reglas
+ * A50 a A63), del que más espera al más nuevo. Un pendiente no vence y conserva su
+ * precio, y el recibo sale al completar el total.
+ */
 export default function Cobros({
     charges,
     filters,
+    pendingCount,
     openReceipt,
     firmantes,
     can,
@@ -69,14 +90,23 @@ export default function Cobros({
 
     const [anulando, setAnulando] = useState<Cobro | null>(null);
     const [reemplazando, setReemplazando] = useState<Cobro | null>(null);
+    const [identificando, setIdentificando] = useState<Cobro | null>(null);
+    const [ajustando, setAjustando] = useState<Cobro | null>(null);
+
+    const listar = (q: string, estado: Estado | null) => {
+        router.get(
+            index().url,
+            {
+                ...(q === '' ? {} : { q }),
+                ...(estado === null ? {} : { estado }),
+            },
+            { preserveState: true },
+        );
+    };
 
     const buscar = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get(
-            index().url,
-            buscado.trim() === '' ? {} : { q: buscado.trim() },
-            { preserveState: true },
-        );
+        listar(buscado.trim(), filters.estado);
     };
 
     return (
@@ -87,7 +117,7 @@ export default function Cobros({
                 <PageHeader
                     eyebrow="Aranceles"
                     title="Cobros"
-                    description="Lo cobrado, con su recibo. Un cobro anulado o corregido queda a la vista."
+                    description="Lo cobrado, con su recibo, y lo que espera un pago por el banco. Un cobro anulado o corregido queda a la vista."
                     actions={
                         can.collect ? (
                             <Button asChild>
@@ -103,18 +133,50 @@ export default function Cobros({
                     }
                 />
 
-                <form onSubmit={buscar} className="flex max-w-xl gap-2">
-                    <Input
-                        aria-label="Buscar por quién paga o por recibo"
-                        placeholder="Quién paga, recibo o talonario"
-                        value={buscado}
-                        onChange={(e) => setBuscado(e.target.value)}
-                    />
-                    <Button type="submit" variant="outline">
-                        <Search className="size-4" aria-hidden="true" />
-                        Buscar
-                    </Button>
-                </form>
+                <div className="flex flex-wrap items-end gap-3">
+                    <form
+                        onSubmit={buscar}
+                        className="flex max-w-xl min-w-64 flex-1 gap-2"
+                    >
+                        <Input
+                            aria-label="Buscar por quién paga o por recibo"
+                            placeholder="Quién paga, recibo o talonario"
+                            value={buscado}
+                            onChange={(e) => setBuscado(e.target.value)}
+                        />
+                        <Button type="submit" variant="outline">
+                            <Search className="size-4" aria-hidden="true" />
+                            Buscar
+                        </Button>
+                    </form>
+
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="estado" className="text-xs">
+                            Estado
+                        </Label>
+                        <Select
+                            value={filters.estado ?? 'all'}
+                            onValueChange={(valor) =>
+                                listar(
+                                    buscado.trim(),
+                                    valor === 'all' ? null : (valor as Estado),
+                                )
+                            }
+                        >
+                            <SelectTrigger id="estado" className="min-w-44">
+                                <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="pending">
+                                    Pendientes ({pendingCount})
+                                </SelectItem>
+                                <SelectItem value="paid">Pagados</SelectItem>
+                                <SelectItem value="voided">Anulados</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
 
                 {filters.cobro !== null && (
                     <p className="text-sm">
@@ -135,7 +197,9 @@ export default function Cobros({
                             aria-hidden="true"
                         />
                         <p className="mt-3 font-medium">
-                            No hay cobros para mostrar.
+                            {filters.estado === 'pending'
+                                ? 'No hay cobros pendientes.'
+                                : 'No hay cobros para mostrar.'}
                         </p>
                     </div>
                 ) : (
@@ -148,6 +212,8 @@ export default function Cobros({
                                 onVerRecibo={setRecibo}
                                 onAnular={setAnulando}
                                 onReemplazar={setReemplazando}
+                                onIdentificar={setIdentificando}
+                                onAjustar={setAjustando}
                             />
                         ))}
                     </ul>
@@ -181,6 +247,20 @@ export default function Cobros({
                     onClose={() => setReemplazando(null)}
                 />
             )}
+            {identificando && (
+                <FeeIdentifyDialog
+                    cobro={identificando}
+                    firmantes={firmantes}
+                    onClose={() => setIdentificando(null)}
+                />
+            )}
+            {ajustando && (
+                <FeeAdjustDialog
+                    cobro={ajustando}
+                    firmantes={firmantes}
+                    onClose={() => setAjustando(null)}
+                />
+            )}
         </>
     );
 }
@@ -191,15 +271,22 @@ function FilaDeCobro({
     onVerRecibo,
     onAnular,
     onReemplazar,
+    onIdentificar,
+    onAjustar,
 }: {
     cobro: Cobro;
     can: Props['can'];
     onVerRecibo: (id: number) => void;
     onAnular: (cobro: Cobro) => void;
     onReemplazar: (cobro: Cobro) => void;
+    onIdentificar: (cobro: Cobro) => void;
+    onAjustar: (cobro: Cobro) => void;
 }) {
     const pagado = cobro.status === 'paid';
     const anulado = cobro.status === 'voided';
+    const pendiente = cobro.status === 'pending';
+    const comprobante = cobro.depositProof;
+    const porBanco = cobro.medium === 'bank';
 
     return (
         <li className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-start">
@@ -216,7 +303,7 @@ function FilaDeCobro({
                         {money(cobro.total)}
                     </span>
                     {anulado && <StatusBadge label="Anulado" voided />}
-                    {cobro.status === 'pending' && (
+                    {pendiente && (
                         <StatusBadge
                             label={`Pendiente: faltan ${money(cobro.missing)}`}
                             tone="action"
@@ -231,7 +318,7 @@ function FilaDeCobro({
                 </div>
                 <ul className="text-sm text-muted-foreground">
                     {cobro.lines.map((linea) => (
-                        <li key={`${cobro.id}-${linea.code}-${linea.amount}`}>
+                        <li key={linea.itemId}>
                             {linea.code} · {linea.name}
                             {linea.quantity !== null &&
                                 linea.quantity > 1 &&
@@ -242,17 +329,47 @@ function FilaDeCobro({
                     ))}
                 </ul>
                 <p className="text-xs text-muted-foreground">
+                    {pendiente && 'Registrado el '}
                     {date(cobro.paidOn ?? cobro.requestedOn)}
+                    {pendiente &&
+                        cobro.fundings.map((vinculo, i) => (
+                            <span key={i}>
+                                {' '}
+                                · Entraron {money(vinculo.amount)} el{' '}
+                                {date(vinculo.receivedOn)}
+                            </span>
+                        ))}
                     {cobro.receiptNumber && ` · Recibo ${cobro.receiptNumber}`}
                     {cobro.talonarioNumber &&
                         ` · Talonario ${cobro.talonarioNumber}`}
                     {cobro.voidReason && ` · ${cobro.voidReason}`}
+                    {comprobante &&
+                        ` · Comprobante por ${money(comprobante.amount)} del ${date(comprobante.depositDate)}`}
+                    {comprobante?.operationNumber &&
+                        `, operación ${comprobante.operationNumber}`}
+                    {pendiente && !comprobante && ' · Falta el comprobante'}
                 </p>
             </div>
             <div className="flex flex-wrap gap-1 sm:justify-end">
-                {cobro.status === 'pending' && (
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href={pendientes()}>Ver en pendientes</Link>
+                {pendiente && !comprobante && can.collect && (
+                    <Button size="sm" asChild>
+                        <Link href={cargarComprobante(cobro.id)}>
+                            Cargar comprobante
+                        </Link>
+                    </Button>
+                )}
+                {pendiente && comprobante && can.identify && (
+                    <Button size="sm" onClick={() => onIdentificar(cobro)}>
+                        Identificar crédito
+                    </Button>
+                )}
+                {pendiente && can.adjust && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onAjustar(cobro)}
+                    >
+                        Ajustar importe
                     </Button>
                 )}
                 {cobro.receiptId !== null && (
@@ -262,6 +379,31 @@ function FilaDeCobro({
                         onClick={() => onVerRecibo(cobro.receiptId as number)}
                     >
                         Ver recibo
+                    </Button>
+                )}
+                {can.viewAttachments && comprobante && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <a
+                            href={verAdjunto(comprobante.attachmentId).url}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            Ver comprobante
+                        </a>
+                    </Button>
+                )}
+                {can.collect && porBanco && pagado && !comprobante && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <Link href={cargarComprobante(cobro.id)}>
+                            Cargar comprobante
+                        </Link>
+                    </Button>
+                )}
+                {can.collect && porBanco && !anulado && comprobante && (
+                    <Button variant="ghost" size="sm" asChild>
+                        <Link href={cargarComprobante(cobro.id)}>
+                            Cambiar comprobante
+                        </Link>
                     </Button>
                 )}
                 {can.viewAttachments && cobro.talonarioPhotoId !== null && (
@@ -289,7 +431,7 @@ function FilaDeCobro({
                         <Link href={corregir(cobro.id)}>Corregir</Link>
                     </Button>
                 )}
-                {pagado && can.void && !cobro.deposited && (
+                {can.void && (pendiente || (pagado && !cobro.deposited)) && (
                     <Button
                         variant="ghost"
                         size="sm"
@@ -311,6 +453,7 @@ function AnularDialog({
     onClose: () => void;
 }) {
     const form = useForm({ reasonCode: '' as Codigo | '', reason: '' });
+    const pendiente = cobro.status === 'pending';
 
     return (
         <Dialog open onOpenChange={(abierto) => !abierto && onClose()}>
@@ -325,11 +468,19 @@ function AnularDialog({
                     }}
                 >
                     <DialogHeader>
-                        <DialogTitle>Anular el cobro</DialogTitle>
+                        <DialogTitle>
+                            {pendiente
+                                ? 'Anular el cobro pendiente'
+                                : 'Anular el cobro'}
+                        </DialogTitle>
                         <DialogDescription>
-                            {cobro.medium === 'bank'
-                                ? 'Es para un crédito que no era de este cobro. El crédito vuelve a quedar libre en el extracto y el recibo queda anulado con su número. Si el crédito era correcto y hay un error, corregí el cobro o reemplazá su recibo.'
-                                : 'Es para un cobro cuyo dinero nunca entró. El efectivo sale de la caja y el recibo queda anulado con su número. Si el dinero entró y hay un error, corregí el cobro o reemplazá su recibo.'}
+                            {pendiente
+                                ? compareAmounts(cobro.funded, '0') > 0
+                                    ? `Se revierte el ingreso de ${money(cobro.funded)} y el crédito vuelve a quedar libre en el extracto.`
+                                    : 'Todavía no entró dinero: el cobro queda anulado y a la vista.'
+                                : cobro.medium === 'bank'
+                                  ? 'Es para un crédito que no era de este cobro. El crédito vuelve a quedar libre en el extracto y el recibo queda anulado con su número. Si el crédito era correcto y hay un error, corregí el cobro o reemplazá su recibo.'
+                                  : 'Es para un cobro cuyo dinero nunca entró. El efectivo sale de la caja y el recibo queda anulado con su número. Si el dinero entró y hay un error, corregí el cobro o reemplazá su recibo.'}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">

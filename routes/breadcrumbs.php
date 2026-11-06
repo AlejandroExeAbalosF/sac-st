@@ -157,9 +157,10 @@ Breadcrumbs::for('aranceles.cobros.corregir.edit', fn (): array => [
     Crumb::make('Corregir cobro'),
 ]);
 
-Breadcrumbs::for('aranceles.pendientes.index', fn (): array => [
+Breadcrumbs::for('aranceles.cobros.comprobante.create', fn (): array => [
     Crumb::make('Aranceles'),
-    Crumb::make('Pendientes'),
+    Crumb::make('Cobros', route('aranceles.cobros.index')),
+    Crumb::make('Comprobante del depósito'),
 ]);
 
 Breadcrumbs::for('aranceles.movimientos.index', fn (): array => [
@@ -175,12 +176,12 @@ Breadcrumbs::for('aranceles.creditos.identificar', fn (): array => [
 
 Breadcrumbs::for('aranceles.depositos.index', fn (): array => [
     Crumb::make('Aranceles'),
-    Crumb::make('Depósitos'),
+    Crumb::make('Traspasos'),
 ]);
 
 Breadcrumbs::for('aranceles.depositos.comprobante.create', fn (): array => [
     Crumb::make('Aranceles'),
-    Crumb::make('Depósitos', route('aranceles.depositos.index')),
+    Crumb::make('Traspasos', route('aranceles.depositos.index')),
     Crumb::make('Cargar comprobante'),
 ]);
 

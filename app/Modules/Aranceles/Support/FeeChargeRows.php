@@ -8,10 +8,12 @@ use App\Models\User;
 use App\Modules\Aranceles\Data\FeeChargeFundingData;
 use App\Modules\Aranceles\Data\FeeChargeLineData;
 use App\Modules\Aranceles\Data\FeeChargeListItemData;
+use App\Modules\Aranceles\Data\FeeChargeProofData;
 use App\Modules\Aranceles\Enums\FeeReasonCode;
 use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeFunding;
 use App\Modules\Aranceles\Models\FeeChargeItem;
+use App\Modules\Aranceles\Models\FeeChargeProof;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
@@ -71,6 +73,8 @@ final class FeeChargeRows
             ->where('document_type', 'talonario_photo')
             ->orderBy('id')
             ->pluck('id', 'subject_id');
+        // En orden, el último pisa a los anteriores.
+        $comprobantes = FeeChargeProof::query()->whereIn('fee_charge_id', $ids)->orderBy('id')->get()->keyBy('fee_charge_id');
 
         $filas = [];
 
@@ -81,6 +85,7 @@ final class FeeChargeRows
                 $vinculos->where('fee_charge_id', $cobro->id)->values(),
                 $depositadas,
                 $cobro->chargeReceipts->map(fn (FeeChargeReceipt $c): ?int => $fotos[$c->receipt_id] ?? null)->filter()->first(),
+                $comprobantes[$cobro->id] ?? null,
             );
         }
 
@@ -92,7 +97,7 @@ final class FeeChargeRows
      * @param  Collection<int, FeeChargeFunding>  $vinculos
      * @param  list<int>  $depositadas
      */
-    private function build(FeeCharge $cobro, BaseCollection $importes, Collection $vinculos, array $depositadas, ?int $foto): FeeChargeListItemData
+    private function build(FeeCharge $cobro, BaseCollection $importes, Collection $vinculos, array $depositadas, ?int $foto, ?FeeChargeProof $comprobante): FeeChargeListItemData
     {
         $vigente = $cobro->chargeReceipts->first(fn (FeeChargeReceipt $c): bool => $c->receipt->status === ReceiptStatus::Issued);
         $ultimo = $vigente ?? $cobro->chargeReceipts->first();
@@ -133,6 +138,12 @@ final class FeeChargeRows
             receiptNumber: $ultimo?->receipt->formatted_number,
             talonarioNumber: $ultimo?->receipt->talonario_number,
             talonarioPhotoId: $foto,
+            depositProof: $comprobante === null ? null : new FeeChargeProofData(
+                attachmentId: $comprobante->attachment_id,
+                amount: Decimal::scale((string) $comprobante->amount),
+                depositDate: $comprobante->deposit_date->toDateString(),
+                operationNumber: $comprobante->operation_number,
+            ),
             voidReason: $this->motivoDeAnulacion($cobro),
             deposited: $vinculos->contains(fn (FeeChargeFunding $v): bool => in_array($v->fund_receipt_id, $depositadas, true)),
         );

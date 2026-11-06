@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Aranceles\Http\Controllers\FeeCashController;
 use App\Modules\Aranceles\Http\Controllers\FeeChargeController;
+use App\Modules\Aranceles\Http\Controllers\FeeChargeProofController;
 use App\Modules\Aranceles\Http\Controllers\FeeDepositController;
 use App\Modules\Aranceles\Http\Controllers\FeeMovementController;
 use App\Modules\Aranceles\Http\Controllers\FeePendingController;
@@ -24,7 +25,6 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
     Route::middleware('can:aranceles.ver')->group(function (): void {
         Route::get('tipos', [FeeTypeController::class, 'index'])->name('tipos.index');
         Route::get('cobros', [FeeChargeController::class, 'index'])->name('cobros.index');
-        Route::get('pendientes', [FeePendingController::class, 'index'])->name('pendientes.index');
         Route::get('depositos', [FeeDepositController::class, 'index'])->name('depositos.index');
         Route::get('movimientos', [FeeMovementController::class, 'index'])->name('movimientos.index');
         Route::get('movimientos/exportar', [FeeMovementController::class, 'export'])->name('movimientos.exportar');
@@ -47,6 +47,8 @@ Route::middleware(['auth', 'verified'])->prefix('aranceles')->name('aranceles.')
         Route::get('cobros/previsualizar', [FeeChargeController::class, 'preview'])->name('cobros.preview');
         Route::post('cobros', [FeeChargeController::class, 'store'])->name('cobros.store');
         Route::post('pendientes', [FeePendingController::class, 'store'])->name('pendientes.store');
+        Route::get('cobros/{feeCharge}/comprobante', [FeeChargeProofController::class, 'create'])->whereNumber('feeCharge')->name('cobros.comprobante.create');
+        Route::post('cobros/{feeCharge}/comprobante', [FeeChargeProofController::class, 'store'])->whereNumber('feeCharge')->name('cobros.comprobante.store');
     });
 
     Route::middleware('can:aranceles.verificar-pagos')->group(function (): void {

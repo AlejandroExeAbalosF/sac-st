@@ -32,8 +32,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Lo que espera un pago por el banco: el alta en ventanilla, la cola con lo que
- * falta, identificar los créditos y aceptar otro importe (reglas A50 a A63).
+ * Lo que espera un pago por el banco: el alta en ventanilla, identificar los
+ * créditos y aceptar otro importe (reglas A50 a A63). La cola con lo que falta es
+ * el listado de cobros, filtrado por estado.
  *
  * Valida y delega: lo que mueve dinero o emite un comprobante vive en los Actions.
  */
@@ -44,32 +45,11 @@ final class FeePendingController extends Controller
         private readonly FeeBankCredits $creditos,
     ) {}
 
-    public function index(Request $request): Response
-    {
-        $usuario = $request->user();
-
-        return Inertia::render('aranceles/pendientes', [
-            'charges' => $this->filas->page(FeeCharge::query()
-                ->where('status', FeeChargeStatus::Pending)
-                ->with(['items', 'balance', 'chargeReceipts.receipt'])
-                ->orderBy('id')
-                ->paginate(25)),
-            'firmantes' => $this->filas->signers(),
-            'motivos' => FeeReasonAct::options(),
-            'can' => [
-                'create' => $usuario?->can('aranceles.cobrar') ?? false,
-                'identify' => $usuario?->can('aranceles.verificar-pagos') ?? false,
-                'adjust' => $usuario?->can('aranceles.modificar-importe') ?? false,
-                'void' => $usuario?->can('aranceles.anular') ?? false,
-            ],
-        ]);
-    }
-
     public function store(CreateFeeChargeRequest $request, CreateFeeCharge $crear): RedirectResponse
     {
         $datos = $request->validated();
 
-        $crear->handle(
+        $cobro = $crear->handle(
             (string) $datos['payerName'],
             $datos['payerDocument'] ?? null,
             array_values($datos['items']),
@@ -78,9 +58,9 @@ final class FeePendingController extends Controller
             $request->user()?->can('aranceles.modificar-importe') ?? false,
         );
 
-        Toast::success('Cobro pendiente registrado.', 'El recibo sale cuando se identifique el depósito en el extracto.');
+        Toast::success('Cobro pendiente registrado.', 'Para identificar el depósito hace falta su comprobante.');
 
-        return to_route('aranceles.pendientes.index');
+        return to_route('aranceles.cobros.comprobante.create', $cobro);
     }
 
     /** Los créditos para elegir, por importe, operación, descripción o quien depositó. */
@@ -121,7 +101,7 @@ final class FeePendingController extends Controller
                 'Faltan $ '.Decimal::format(Decimal::sub((string) $cobro->balance?->total, (string) $cobro->balance?->funded)).' para emitir el recibo.',
             );
 
-            return to_route('aranceles.pendientes.index');
+            return $this->aLosPendientes();
         }
 
         return $this->segun($cobro);
@@ -163,6 +143,7 @@ final class FeePendingController extends Controller
                 ->values()
                 ->all(),
             'canChangeAmount' => $usuario?->can('aranceles.modificar-importe') ?? false,
+            'canLoadProof' => $usuario?->can('aranceles.cobrar') ?? false,
             'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),
             'backHref' => $lista,
@@ -198,7 +179,7 @@ final class FeePendingController extends Controller
                 'Faltan $ '.Decimal::format(Decimal::sub((string) $cobro->balance?->total, (string) $cobro->balance?->funded)).' para emitir el recibo.',
             );
 
-            return to_route('aranceles.pendientes.index');
+            return $this->aLosPendientes();
         }
 
         $recibo = $cobro->chargeReceipts()
@@ -209,6 +190,12 @@ final class FeePendingController extends Controller
         Toast::success('Pago identificado.', 'Se emitió el recibo '.$recibo->receipt->formatted_number.'.');
 
         return to_route('aranceles.cobros.index', ['recibo' => $recibo->receipt_id]);
+    }
+
+    /** La cola es el listado de cobros, filtrado. */
+    private function aLosPendientes(): RedirectResponse
+    {
+        return to_route('aranceles.cobros.index', ['estado' => FeeChargeStatus::Pending->value]);
     }
 
     private function firmante(mixed $id): ?int

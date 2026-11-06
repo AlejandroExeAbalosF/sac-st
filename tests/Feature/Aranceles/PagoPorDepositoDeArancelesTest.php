@@ -6,6 +6,7 @@ namespace Tests\Feature\Aranceles;
 
 use App\Models\User;
 use App\Modules\Aranceles\Actions\AdjustFeeCharge;
+use App\Modules\Aranceles\Actions\CollectFeeInCash;
 use App\Modules\Aranceles\Actions\CorrectFeeCharge;
 use App\Modules\Aranceles\Actions\CreateFeeCharge;
 use App\Modules\Aranceles\Actions\IdentifyFeeCredits;
@@ -18,6 +19,7 @@ use App\Modules\Aranceles\Enums\FeeReasonCode;
 use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeFunding;
 use App\Modules\Aranceles\Models\FeeChargeItem;
+use App\Modules\Aranceles\Models\FeeChargeProof;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Aranceles\Models\FeeType;
 use App\Modules\Aranceles\Models\FeeTypePrice;
@@ -33,11 +35,13 @@ use App\Modules\Ledger\Actions\ReviewCashCount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\LedgerAccount;
 use App\Modules\Ledger\Exceptions\ClosedPeriodException;
+use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Ledger\Models\ReceiptFinancialEvent;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -45,10 +49,12 @@ use App\Support\Money\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\BuildsSharedBankAccount;
+use Tests\Concerns\LoadsFeeChargeProof;
 use Tests\TestCase;
 
 /**
@@ -58,6 +64,7 @@ use Tests\TestCase;
 class PagoPorDepositoDeArancelesTest extends TestCase
 {
     use BuildsSharedBankAccount;
+    use LoadsFeeChargeProof;
     use RefreshDatabase;
 
     private User $admin;
@@ -92,14 +99,49 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         return $this->admin->id;
     }
 
-    /** Homologación, $ 120 con el precio sembrado. */
+    /** Homologación, $ 120 con el precio sembrado, y con su comprobante. */
     private function pendiente(int $cantidad = 1): FeeCharge
+    {
+        return $this->conComprobante($this->sinComprobante($cantidad), $this->admin->id);
+    }
+
+    private function sinComprobante(int $cantidad = 1): FeeCharge
     {
         return app(CreateFeeCharge::class)->handle(
             'AG Max SRL', null,
             [['feeTypeId' => $this->homologacion(), 'quantity' => $cantidad]],
             'alta-'.(++$this->clave), $this->admin->id, true,
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function papel(array $cambios = []): array
+    {
+        return [
+            'amount' => '120.00',
+            'depositDate' => BusinessDate::today()->toDateString(),
+            'depositTime' => '10:30',
+            'operationNumber' => '995979830',
+            'terminal' => 'T-12',
+            'notes' => 'Depositó el apoderado',
+            'ticket' => UploadedFile::fake()->create('comprobante.pdf', 50, 'application/pdf'),
+            'idempotencyKey' => 'papel-'.(++$this->clave),
+            ...$cambios,
+        ];
+    }
+
+    /** Rechaza en la base, dentro de un punto de guardado: la prueba sigue después. */
+    private function assertBaseRechaza(callable $accion, string $mensaje): void
+    {
+        try {
+            DB::transaction($accion);
+        } catch (QueryException $e) {
+            $this->assertStringContainsString($mensaje, $e->getMessage());
+
+            return;
+        }
+
+        $this->fail('La base tenía que rechazarlo.');
     }
 
     private function homologacion(): int
@@ -437,9 +479,9 @@ class PagoPorDepositoDeArancelesTest extends TestCase
 
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.ajustar', $cobro), [
             'lines' => [['itemId' => $renglon->id, 'amount' => '100', 'previousAmount' => '120.00']], 'reasonCode' => 'rounding',
-        ])->assertRedirect(route('aranceles.pendientes.index'));
+        ])->assertRedirect(route('aranceles.cobros.index', ['estado' => 'pending']));
 
-        $this->actingAs($this->admin)->get(route('aranceles.pendientes.index'))
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['estado' => 'pending']))
             ->assertInertia(fn (Assert $page) => $page->hasFlash('toast', [
                 'type' => 'success',
                 'message' => 'Importe ajustado.',
@@ -481,7 +523,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->pendiente();
         $credito = $this->credito('500');
 
-        $this->actingAs($this->admin)->get(route('aranceles.pendientes.index'))
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['estado' => 'pending']))
             ->assertInertia(fn (Assert $page) => $page->has('motivos.amount_change.0.value')->has('motivos.collection_void.0.value'));
 
         $this->actingAs($this->admin)->get(route('aranceles.creditos.identificar', $credito))
@@ -785,14 +827,15 @@ class PagoPorDepositoDeArancelesTest extends TestCase
     {
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.store'), [
             'payerName' => 'AG Max SRL', 'items' => [['feeTypeId' => $this->homologacion(), 'quantity' => 1]], 'idempotencyKey' => 'pantalla',
-        ])->assertRedirect(route('aranceles.pendientes.index'));
+        ])->assertRedirect();
 
         $cobro = FeeCharge::query()->firstOrFail();
         $credito = $this->credito('100');
+        $this->cargarComprobante($cobro, $this->admin->id);
 
-        $this->actingAs($this->admin)->get(route('aranceles.pendientes.index'))
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['estado' => 'pending']))
             ->assertInertia(fn (Assert $page) => $page
-                ->component('aranceles/pendientes', false)
+                ->component('aranceles/cobros', false)
                 ->where('charges.data.0.missing', '120.00')
                 ->where('can.identify', true));
 
@@ -803,9 +846,9 @@ class PagoPorDepositoDeArancelesTest extends TestCase
 
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.identificar', $cobro), [
             'credits' => [$credito->id], 'idempotencyKey' => 'pantalla-1',
-        ])->assertRedirect(route('aranceles.pendientes.index'));
+        ])->assertRedirect(route('aranceles.cobros.index', ['estado' => 'pending']));
 
-        $this->actingAs($this->admin)->get(route('aranceles.pendientes.index'))
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['estado' => 'pending']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('charges.data.0.missing', '20.00')
                 ->where('charges.data.0.fundings.0.amount', '100.00'));
@@ -832,6 +875,245 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->actingAs($this->admin)->get(route('aranceles.creditos.identificar', $credito))->assertRedirect();
     }
 
+    /** Una sola pantalla: el filtro arma la cola, y el contador no depende de él. */
+    public function test_the_list_filters_by_status_and_counts_the_pending_ones(): void
+    {
+        $viejo = $this->pendiente();
+        $pagado = $this->pendiente();
+        $nuevo = $this->pendiente();
+
+        $this->actingAs($this->admin)->post(route('aranceles.pendientes.identificar', $pagado), [
+            'credits' => [$this->credito('120')->id], 'idempotencyKey' => 'filtro',
+        ])->assertRedirect();
+
+        $ids = fn (array $query = []) => $this->actingAs($this->admin)->get(route('aranceles.cobros.index', $query))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('aranceles/cobros', false)
+                ->where('pendingCount', 2)
+                ->where('can.identify', true)
+                ->where('can.adjust', true));
+
+        $ids()->assertInertia(fn (Assert $page) => $page
+            ->where('filters.estado', null)
+            ->where('charges.data.0.id', $nuevo->id)
+            ->where('charges.data.1.id', $pagado->id)
+            ->where('charges.data.2.id', $viejo->id));
+
+        // La cola va del que más espera al más nuevo.
+        $ids(['estado' => 'pending'])->assertInertia(fn (Assert $page) => $page
+            ->where('filters.estado', 'pending')
+            ->has('charges.data', 2)
+            ->where('charges.data.0.id', $viejo->id)
+            ->where('charges.data.1.id', $nuevo->id));
+
+        $ids(['estado' => 'paid'])->assertInertia(fn (Assert $page) => $page
+            ->has('charges.data', 1)
+            ->where('charges.data.0.id', $pagado->id));
+
+        $ids(['estado' => 'voided'])->assertInertia(fn (Assert $page) => $page->has('charges.data', 0));
+
+        // Lo que no es un estado no filtra ni rompe.
+        foreach (['otro', ['pending']] as $raro) {
+            $ids(['estado' => $raro])->assertInertia(fn (Assert $page) => $page
+                ->where('filters.estado', null)
+                ->has('charges.data', 3));
+        }
+    }
+
+    public function test_the_filter_combines_with_the_search(): void
+    {
+        $this->pendiente();
+        $otro = app(CreateFeeCharge::class)->handle(
+            'Otra Empresa SA', null, [['feeTypeId' => $this->homologacion(), 'quantity' => 1]],
+            'otra-empresa', $this->admin->id, true,
+        );
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['estado' => 'pending', 'q' => 'otra']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('charges.data', 1)
+                ->where('charges.data.0.id', $otro->id)
+                ->where('filters.q', 'otra')
+                ->where('filters.estado', 'pending')
+                ->where('pendingCount', 2));
+    }
+
+    // ── Comprobante ───────────────────────────────────────────────────────
+
+    public function test_registering_a_pending_charge_leads_to_the_proof_screen(): void
+    {
+        $respuesta = $this->actingAs($this->admin)->post(route('aranceles.pendientes.store'), [
+            'payerName' => 'AG Max SRL', 'items' => [['feeTypeId' => $this->homologacion(), 'quantity' => 1]], 'idempotencyKey' => 'al-comprobante',
+        ]);
+
+        $cobro = FeeCharge::query()->where('idempotency_key', 'al-comprobante')->firstOrFail();
+
+        $respuesta->assertRedirect(route('aranceles.cobros.comprobante.create', $cobro));
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.comprobante.create', $cobro))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('aranceles/comprobante-de-cobro', false)
+                ->where('cobro.payerName', 'AG Max SRL')
+                ->where('cobro.total', '120.00')
+                ->where('cobro.missing', '120.00')
+                ->where('cobro.pending', true));
+    }
+
+    /** La regla vale venga de la tarjeta o de Banco › Movimientos: los dos llegan al Action. */
+    public function test_a_pending_charge_without_proof_cannot_be_identified(): void
+    {
+        $cobro = $this->sinComprobante();
+        $credito = $this->credito('120');
+
+        $this->assertRechazaEn('credits', fn () => $this->identificar($cobro, $credito), 'comprobante');
+        $this->actingAs($this->admin)->post(route('aranceles.pendientes.identificar', $cobro), [
+            'credits' => [$credito->id], 'idempotencyKey' => 'sin-papel',
+        ])->assertSessionHasErrors('credits');
+
+        $this->assertSame(FeeChargeStatus::Pending, $cobro->refresh()->status);
+        $this->assertSame(0, FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->count());
+
+        $this->cargarComprobante($cobro, $this->admin->id);
+
+        $this->assertSame(FeeChargeStatus::Paid, $this->identificar($cobro, $credito)->status);
+    }
+
+    /** Lo que nace del crédito no pasó por ventanilla: el extracto ya es su respaldo. */
+    public function test_a_payment_born_from_a_credit_does_not_need_a_proof(): void
+    {
+        $credito = $this->credito('120');
+
+        $this->actingAs($this->admin)->post(route('aranceles.creditos.registrar'), [
+            'payerName' => 'Sin ventanilla', 'items' => [['feeTypeId' => $this->homologacion(), 'quantity' => 1]],
+            'credits' => [$credito->id], 'idempotencyKey' => 'nace-del-credito',
+        ])->assertSessionHasNoErrors();
+
+        $cobro = FeeCharge::query()->where('idempotency_key', 'nace-del-credito')->firstOrFail();
+        $this->assertSame(FeeChargeStatus::Paid, $cobro->status);
+
+        // Y se le puede cargar después, aunque ya tenga recibo.
+        $this->actingAs($this->admin)->post(route('aranceles.cobros.comprobante.store', $cobro), $this->papel())->assertSessionHasNoErrors();
+        $this->assertSame(FeeChargeStatus::Paid, $cobro->refresh()->status);
+        $this->assertSame(1, FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->count());
+    }
+
+    public function test_the_proof_keeps_what_the_paper_says(): void
+    {
+        $cobro = $this->sinComprobante();
+        // El importe del papel puede diferir: el dinero se verifica contra el extracto.
+        $papel = $this->papel(['amount' => '150.00']);
+
+        $this->actingAs($this->admin)->post(route('aranceles.cobros.comprobante.store', $cobro), $papel)
+            ->assertRedirect(route('aranceles.cobros.index', ['cobro' => $cobro->id]));
+        // El mismo envío dos veces no guarda el papel dos veces.
+        $this->actingAs($this->admin)->post(route('aranceles.cobros.comprobante.store', $cobro), $papel)->assertSessionHasNoErrors();
+
+        $comprobante = FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->sole();
+
+        $this->assertSame('150.00', $comprobante->amount);
+        $this->assertSame('995979830', $comprobante->operation_number);
+        $this->assertSame('T-12', $comprobante->terminal);
+        $this->assertSame('Depositó el apoderado', $comprobante->notes);
+        $this->assertSame('10:30:00', $comprobante->deposit_time);
+        $this->assertSame(BusinessDate::today()->toDateString(), $comprobante->deposit_date->toDateString());
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['cobro' => $cobro->id]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('charges.data.0.depositProof.attachmentId', $comprobante->attachment_id)
+                ->where('charges.data.0.depositProof.amount', '150.00')
+                ->where('charges.data.0.depositProof.operationNumber', '995979830'));
+        $this->assertFalse(FinancialEvent::query()->where('idempotency_key', 'like', '%'.$papel['idempotencyKey'].'%')->exists());
+    }
+
+    public function test_changing_the_proof_keeps_the_previous_one_and_shows_the_last(): void
+    {
+        $cobro = $this->sinComprobante();
+
+        $primero = $this->cargarComprobante($cobro, $this->admin->id, '100');
+        $segundo = $this->cargarComprobante($cobro, $this->admin->id, '120');
+
+        $this->assertSame(2, FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->count());
+        $this->assertNotSame($primero->attachment_id, $segundo->attachment_id);
+
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['cobro' => $cobro->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('charges.data.0.depositProof.attachmentId', $segundo->attachment_id));
+
+        $this->assertSame(1, AuditEvent::query()->where('action', 'arancel.comprobante-cargado')->count());
+        $this->assertSame(1, AuditEvent::query()->where('action', 'arancel.comprobante-cambiado')->count());
+    }
+
+    public function test_the_proof_is_refused_without_its_photo_or_on_a_voided_or_cash_charge(): void
+    {
+        $cobro = $this->sinComprobante();
+        $url = route('aranceles.cobros.comprobante.store', $cobro);
+
+        $this->actingAs($this->admin)->post($url, $this->papel(['ticket' => null]))->assertSessionHasErrors('ticket');
+        $this->actingAs($this->admin)->post($url, $this->papel(['ticket' => UploadedFile::fake()->create('virus.exe', 50)]))->assertSessionHasErrors('ticket');
+        $this->actingAs($this->admin)->post($url, $this->papel(['amount' => '0']))->assertSessionHasErrors('amount');
+        $this->actingAs($this->admin)->post($url, $this->papel(['depositDate' => BusinessDate::today()->addDay()->toDateString()]))->assertSessionHasErrors('depositDate');
+
+        app(VoidFeeCollection::class)->handle($cobro, new Reason(FeeReasonCode::Duplicate, null), $this->admin->id);
+
+        $this->actingAs($this->admin)->post($url, $this->papel())->assertSessionHasErrors('ticket');
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.comprobante.create', $cobro))->assertNotFound();
+
+        $efectivo = app(CollectFeeInCash::class)->handle(
+            'En efectivo', null, [['feeTypeId' => $this->homologacion(), 'quantity' => 1]],
+            'cobro-efectivo', $this->admin->id, null, null, null, true,
+        );
+
+        $this->actingAs($this->admin)->post(route('aranceles.cobros.comprobante.store', $efectivo), $this->papel())->assertSessionHasErrors('ticket');
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.comprobante.create', $efectivo))->assertNotFound();
+
+        $this->assertSame(0, FeeChargeProof::query()->count());
+    }
+
+    public function test_loading_the_proof_needs_the_permission_to_collect(): void
+    {
+        $cobro = $this->sinComprobante();
+        $contador = $this->operador('contador');
+
+        $this->assertFalse($contador->can('aranceles.cobrar'));
+        $this->actingAs($contador)->get(route('aranceles.cobros.comprobante.create', $cobro))->assertForbidden();
+        $this->actingAs($contador)->post(route('aranceles.cobros.comprobante.store', $cobro), $this->papel())->assertForbidden();
+    }
+
+    public function test_the_database_guards_the_proofs(): void
+    {
+        $cobro = $this->sinComprobante();
+        $otro = $this->sinComprobante();
+        $comprobante = $this->cargarComprobante($cobro, $this->admin->id);
+        $fila = [
+            'fee_charge_id' => $otro->id, 'attachment_id' => $comprobante->attachment_id, 'amount' => '10',
+            'deposit_date' => BusinessDate::today()->toDateString(), 'idempotency_key' => 'directo',
+        ];
+
+        $this->assertBaseRechaza(fn () => DB::table('fee_charge_proofs')->where('id', $comprobante->id)->update(['amount' => '1']), 'no se edita');
+        $this->assertBaseRechaza(fn () => DB::table('fee_charge_proofs')->where('id', $comprobante->id)->delete(), 'no se edita');
+        $this->assertBaseRechaza(fn () => DB::table('fee_charge_proofs')->insert($fila), 'no es de ese cobro');
+        $this->assertBaseRechaza(
+            fn () => DB::table('fee_charge_proofs')->insert([...$fila, 'fee_charge_id' => $cobro->id, 'amount' => '0', 'idempotency_key' => 'cero']),
+            'fee_charge_proofs_amount_positive',
+        );
+
+        $efectivo = app(CollectFeeInCash::class)->handle(
+            'En efectivo', null, [['feeTypeId' => $this->homologacion(), 'quantity' => 1]],
+            'efectivo-base', $this->admin->id, null, null, null, true,
+        );
+        $this->assertBaseRechaza(fn () => DB::table('fee_charge_proofs')->insert([...$fila, 'fee_charge_id' => $efectivo->id]), 'por banco');
+
+        app(VoidFeeCollection::class)->handle($otro, new Reason(FeeReasonCode::Duplicate, null), $this->admin->id);
+        $this->assertBaseRechaza(fn () => DB::table('fee_charge_proofs')->insert($fila), 'anulado');
+
+        $this->assertBaseRechaza(
+            fn () => DB::table('attachments')->insert([
+                'subject_type' => 'otra_cosa', 'subject_id' => 1, 'document_type' => 'x', 'title' => 'x', 'storage_disk' => 'local', 'object_key' => 'k',
+                'original_filename' => 'x.pdf', 'mime_type' => 'application/pdf', 'size_bytes' => 1, 'sha256' => str_repeat('a', 64),
+                'source' => 'scanned', 'confidentiality' => 'internal',
+            ]),
+            'attachments_subject_type_check',
+        );
+    }
+
     public function test_a_verified_payment_and_an_adjustment_through_the_screens(): void
     {
         $credito = $this->credito('100');
@@ -839,7 +1121,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->actingAs($this->admin)->post(route('aranceles.creditos.registrar'), [
             'payerName' => 'Sin ventanilla', 'items' => [['feeTypeId' => $this->homologacion(), 'quantity' => 1]],
             'credits' => [$credito->id], 'idempotencyKey' => 'sin-ventanilla',
-        ])->assertRedirect(route('aranceles.pendientes.index'));
+        ])->assertRedirect(route('aranceles.cobros.index', ['estado' => 'pending']));
 
         $cobro = FeeCharge::query()->firstOrFail();
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();

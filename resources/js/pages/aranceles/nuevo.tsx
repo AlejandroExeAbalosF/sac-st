@@ -240,7 +240,7 @@ export default function NuevoCobro({
                                 ? 'El cobro anterior queda anulado y a la vista, y nace otro con los mismos créditos. Lo que sobre queda libre; si no alcanzan, queda pendiente de lo que falta.'
                                 : 'El cobro anterior queda anulado y a la vista, y nace otro. Si el importe es el mismo, el dinero no se mueve.'
                             : porDeposito
-                              ? 'Queda pendiente, con el precio de hoy. El recibo sale cuando se identifique el depósito en el extracto.'
+                              ? 'Queda pendiente, con el precio de hoy. Al registrarlo se carga el comprobante, y el recibo sale cuando se identifique el depósito en el extracto.'
                               : 'Se cobra y se emite el recibo en el mismo acto.'
                     }
                 />

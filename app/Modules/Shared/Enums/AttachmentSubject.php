@@ -51,6 +51,9 @@ enum AttachmentSubject: string
     /** El respaldo de un cheque rechazado, el aviso a la empresa o la disposición del papel. */
     case ChequeRejection = 'cheque_rejection';
 
+    /** El comprobante del depósito o la transferencia con que se paga un arancel. */
+    case FeeCharge = 'fee_charge';
+
     public function label(): string
     {
         return match ($this) {
@@ -70,6 +73,7 @@ enum AttachmentSubject: string
             self::FineHistoricalMovement => 'Pago anterior de una multa',
             self::FinePayment => 'Pago de una multa',
             self::ChequeRejection => 'Cheque rechazado',
+            self::FeeCharge => 'Cobro de arancel',
         };
     }
 }

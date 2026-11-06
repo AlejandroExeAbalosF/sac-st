@@ -23,6 +23,7 @@ import {
     lineaVacia,
 } from '@/features/aranceles/lib/fee-form';
 import { compareAmounts, date, money, sumAmounts } from '@/lib/format';
+import { create as cargarComprobante } from '@/routes/aranceles/cobros/comprobante';
 import { registrar } from '@/routes/aranceles/creditos';
 import { identificar } from '@/routes/aranceles/pendientes';
 
@@ -45,6 +46,7 @@ export default function IdentificarCredito({
     charges,
     feeTypes,
     canChangeAmount,
+    canLoadProof,
     firmantes,
     backHref,
 }: {
@@ -52,6 +54,7 @@ export default function IdentificarCredito({
     charges: Cobro[];
     feeTypes: Tipo[];
     canChangeAmount: boolean;
+    canLoadProof: boolean;
     firmantes: Firmante[];
     backHref: string;
 }) {
@@ -124,6 +127,7 @@ export default function IdentificarCredito({
                         <CobrosPendientes
                             credito={credit}
                             cobros={charges}
+                            puedeCargarComprobante={canLoadProof}
                             firmante={firmante}
                             onFirmante={setFirmante}
                             firmantes={firmantes}
@@ -147,12 +151,14 @@ export default function IdentificarCredito({
 function CobrosPendientes({
     credito,
     cobros,
+    puedeCargarComprobante,
     firmante,
     onFirmante,
     firmantes,
 }: {
     credito: Credito;
     cobros: Cobro[];
+    puedeCargarComprobante: boolean;
     firmante: string;
     onFirmante: (valor: string) => void;
     firmantes: Firmante[];
@@ -209,17 +215,32 @@ function CobrosPendientes({
                                     Faltan {money(cobro.missing)} de{' '}
                                     {money(cobro.total)} ·{' '}
                                     {date(cobro.requestedOn)}
+                                    {cobro.depositProof
+                                        ? ` · Comprobante por ${money(cobro.depositProof.amount)} del ${date(cobro.depositProof.depositDate)}`
+                                        : ' · Falta el comprobante'}
                                 </span>
                             </span>
-                            <Button
-                                size="sm"
-                                disabled={processing}
-                                onClick={() => aplicar(cobro)}
-                            >
-                                {alcanza
-                                    ? 'Aplicar y emitir recibo'
-                                    : 'Registrar ingreso parcial'}
-                            </Button>
+                            {cobro.depositProof ? (
+                                <Button
+                                    size="sm"
+                                    disabled={processing}
+                                    onClick={() => aplicar(cobro)}
+                                >
+                                    {alcanza
+                                        ? 'Aplicar y emitir recibo'
+                                        : 'Registrar ingreso parcial'}
+                                </Button>
+                            ) : (
+                                puedeCargarComprobante && (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <Link
+                                            href={cargarComprobante(cobro.id)}
+                                        >
+                                            Cargar comprobante
+                                        </Link>
+                                    </Button>
+                                )
+                            )}
                         </li>
                     );
                 })}

@@ -54,6 +54,18 @@ final class ArancelesAuditCatalog implements AuditCatalogContributor
                 metadata: ['amount' => 'Importe'],
             ),
             new AuditActionDefinition(
+                'arancel.comprobante-cargado',
+                'Se cargó el comprobante del depósito de un arancel',
+                'Aranceles',
+                metadata: ['amount' => 'Importe', 'fecha' => 'Fecha del depósito', 'operacion' => 'Operación'],
+            ),
+            new AuditActionDefinition(
+                'arancel.comprobante-cambiado',
+                'Se cambió el comprobante del depósito de un arancel',
+                'Aranceles',
+                metadata: ['amount' => 'Importe', 'fecha' => 'Fecha del depósito', 'operacion' => 'Operación'],
+            ),
+            new AuditActionDefinition(
                 'arancel.credito-identificado',
                 'Se identificó un crédito como pago de un arancel',
                 'Aranceles',

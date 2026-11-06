@@ -52,10 +52,13 @@ final class FeeChargeController extends Controller
         $usuario = $request->user();
         $buscado = trim((string) $request->query('q', ''));
         $cobroId = $request->integer('cobro') ?: null;
+        $filtro = $request->query('estado');
+        $estado = is_string($filtro) ? FeeChargeStatus::tryFrom($filtro) : null;
 
         $cobros = $this->filas->page(FeeCharge::query()
             ->with(['items', 'balance', 'chargeReceipts.receipt'])
             ->when($cobroId !== null, fn (Builder $q) => $q->whereKey($cobroId))
+            ->when($estado !== null, fn (Builder $q) => $q->where('status', $estado))
             ->when($buscado !== '', function (Builder $q) use ($buscado): void {
                 $patron = '%'.Like::escape($buscado).'%';
 
@@ -66,18 +69,22 @@ final class FeeChargeController extends Controller
                         ->orWhere('talonario_number', 'ilike', $patron)
                         ->orWhere('counterparty_name_snapshot', 'ilike', $patron)));
             })
-            ->orderByDesc('id')
+            // Filtrados, los pendientes son una cola: primero el que más espera.
+            ->orderBy('id', $estado === FeeChargeStatus::Pending ? 'asc' : 'desc')
             ->paginate(25)
             ->withQueryString());
 
         return Inertia::render('aranceles/cobros', [
             'charges' => $cobros,
-            'filters' => ['q' => $buscado, 'cobro' => $cobroId],
+            'filters' => ['q' => $buscado, 'cobro' => $cobroId, 'estado' => $estado?->value],
+            'pendingCount' => FeeCharge::query()->where('status', FeeChargeStatus::Pending)->count(),
             'openReceipt' => $request->integer('recibo') ?: null,
             'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),
             'can' => [
                 'collect' => $usuario?->can('aranceles.cobrar') ?? false,
+                'identify' => $usuario?->can('aranceles.verificar-pagos') ?? false,
+                'adjust' => $usuario?->can('aranceles.modificar-importe') ?? false,
                 'void' => $usuario?->can('aranceles.anular') ?? false,
                 'replace' => $usuario?->can('aranceles.reemplazar-recibos') ?? false,
                 'correct' => $usuario?->can('aranceles.corregir') ?? false,
@@ -246,7 +253,7 @@ final class FeeChargeController extends Controller
         if ($recibo === null) {
             Toast::success($mensaje, 'Los créditos no alcanzan: el cobro quedó pendiente de lo que falta.');
 
-            return to_route('aranceles.pendientes.index');
+            return to_route('aranceles.cobros.index', ['estado' => FeeChargeStatus::Pending->value]);
         }
 
         Toast::success($mensaje, 'Se emitió el recibo '.$recibo->receipt->formatted_number.'.');

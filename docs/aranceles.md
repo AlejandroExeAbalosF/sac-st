@@ -58,8 +58,8 @@ Son las pantallas de caja de siempre, con la caja de Aranceles y permisos propio
   sobre el mismo evento de apertura, sin asiento nuevo: no es recaudación ni respalda un
   cobro, y es lo que permite depositarlo.
 - **Serie:** los recibos numeran con `0110`, configurable en Numeración.
-- **Arqueo:** ofrece los mismos billetes que las otras cajas, hasta $ 50, porque no circula nada
-  menor (decisión del usuario, **sin relevar con el área**). Lo que no se pueda pagar justo se
+- **Arqueo:** ofrece los mismos billetes que las otras cajas y, además, los de $ 20 y $ 10 (decisión
+  del usuario, **sin relevar con el área**). Lo que no se pueda pagar justo se
   redondea al cobrar. Un importe sin redondear no se puede contar y queda como diferencia
   explicada, hasta que el área diga cómo se rinde.
 - **Cierre y planilla:** sin columnas de cheques ni inventario. **Base:**
@@ -79,8 +79,8 @@ una sola transacción.
 - **Importe distinto del calculado:** con `aranceles.modificar-importe`, en cualquier renglón.
   Pide un motivo de la lista: Redondeo, Excepción autorizada u Otro. Los dos últimos piden detalle.
   Si fue de más o de menos no se elige: sale de comparar con lo calculado, y el informe del mes lo
-  muestra. El redondeo no tiene tope ni pide detalle, porque no circulan billetes menores de $ 50
-  (decisión del usuario, **sin relevar con el área**): la base no distingue un redondeo real de una
+  muestra. El redondeo no tiene tope ni pide detalle (decisión del usuario, **sin relevar con el
+  área**): la base no distingue un redondeo real de una
   rebaja, y el control es el informe de importes distintos de lo calculado. Si el cálculo da $ 0,00,
   hay que escribir el importe. **Base:** `fee_charge_items_change_has_reason`,
   `fee_charge_items_change_reason_code_check`, `fee_charge_items_reason_detail`.
@@ -146,20 +146,37 @@ Con el mismo importe el dinero no se mueve: el renglón de ese día pasa a ser e
 
 <a id="pago-por-deposito"></a>
 
-## Pago por depósito · `/aranceles/pendientes`
+## Pago por depósito · `/aranceles/cobros?estado=pending`
 
 Para quien paga por depósito o transferencia. Es una decisión del usuario, **sin relevar con el
 área**. No se imprime constancia: el usuario la sacó del alcance.
 
+Los pendientes no tienen pantalla propia: son `/aranceles/cobros` con el filtro de estado, que
+cuenta cuántos hay. Así filtrados, van del que más espera al más nuevo, y cada tarjeta trae sus
+acciones. También es una decisión del usuario, **sin relevar con el área**.
+
 1. **Alta** (`aranceles.cobrar`): en `/aranceles/nuevo`, «Depósito o transferencia». El cobro queda
    pendiente, con el precio de hoy. No mueve dinero ni emite recibo. No vence y conserva su precio,
    aunque el precio cambie después (**provisorio**).
-2. **Identificar** (`aranceles.verificar-pagos`): desde Pendientes se eligen uno o más créditos, o
+2. **Identificar** (`aranceles.verificar-pagos`): con el comprobante cargado, desde la tarjeta del cobro se eligen uno o más créditos, o
    desde **Banco › Movimientos**, «Identificar como arancel». Solo créditos desde la apertura de la
    caja y dentro de la vigencia de la cuenta. Se usan del más antiguo al más nuevo y de cada uno se
    toma lo necesario.
 3. **Recibo:** sale al completar el total, uno solo con todos los hechos, con fecha del día.
 
+- **Comprobante** (`aranceles.cobrar`, decisión del usuario, **sin relevar con el área**): sin él, un
+  pendiente no se identifica, ni desde su tarjeta ni desde Banco › Movimientos. Lo exige
+  `IdentifyFeeCredits`; la base no puede, porque lo que nace del crédito o de una corrección no lo
+  necesita. Al registrar el pendiente se pasa a `/aranceles/cobros/{id}/comprobante`, la misma pantalla
+  de las otras cajas: se transcribe mirando la foto, que es obligatoria, y se puede dejar para después.
+  El importe del papel puede diferir del cobro (**provisorio**): el dinero se verifica contra el
+  extracto. No mueve dinero ni emite el recibo. Ver la foto pide `adjuntos.ver`.
+- **Cambiar el comprobante** agrega otro en un cobro por banco no anulado, aunque ya tenga recibo: vale
+  el último, el anterior queda guardado y cada acto queda en la auditoría. Un cobro nacido del crédito
+  puede cargarlo después. La corrección crea otro cobro y el comprobante queda en el anulado, a la
+  vista: si el nuevo queda pendiente, hay que cargarlo de nuevo.
+  **Base:** `fee_charge_proofs` solo se agrega; `fee_charge_proofs_guard` rechaza un cobro en efectivo
+  o anulado y un archivo de otro cobro, y `fee_charge_proofs_amount_positive` exige un importe positivo.
 - **De más:** lo que sobra del crédito queda libre, sin identificar, para otro cobro o para otra
   caja. Un crédito usado en parte se sigue ofreciendo por lo libre, solo en Aranceles.
 - **De menos:** queda como ingreso parcial, vinculado y protegido, con lo que falta a la vista. Ese
@@ -220,14 +237,16 @@ que es una consulta.
 
 <a id="deposito"></a>
 
-## Depósito del efectivo · `/aranceles/depositos`
+## Traspasos: depósito del efectivo · `/aranceles/depositos`
 
 El efectivo se acumula y se deposita junto, en dos pasos. El circuito es una decisión del
 usuario, **sin relevar con el área**: falta saber cuándo sale el efectivo, quién lo registra y si
 se lleva siempre todo.
 
-1. **Traspaso** (`aranceles.depositar`): se registra cuando el efectivo sale. Propone todo lo
-   disponible y se puede bajar el importe; el resto sigue en caja. El sistema lo reparte desde la
+1. **Traspaso** (`aranceles.depositar`): se registra cuando el efectivo sale, por todo lo disponible.
+   Solo `aranceles.ajustar-traspaso` (administrador, decisión del usuario, **sin relevar con el área**)
+   puede bajar el importe; el resto sigue en caja. Sin el permiso se coteja lo que vio la persona: si
+   entró un cobro mientras tanto, se rechaza y confirma el importe nuevo. El sistema lo reparte desde la
    recepción más antigua, incluida la de la apertura, y muestra de qué recibos sale antes de
    confirmar. Asienta `cash_deposited_to_bank`: D tránsito / C efectivo. No pide foto.
 2. **Comprobante** (`aranceles.depositar`): se carga después, con foto obligatoria, sin asiento.
@@ -239,7 +258,7 @@ Con el comprobante pendiente el día se arquea y se cierra, y al otro día se si
 cargarlo no toca el día ya cerrado. Depositar no suma recaudación: solo cambia dónde está la plata.
 
 - **Fecha:** la toma el sistema al iniciar el traspaso, con su hora de registro. Solo
-  `aranceles.fechar-traspaso` (administrador) puede indicar un día pasado que siga abierto, y entonces
+  `aranceles.ajustar-traspaso` (administrador) puede indicar un día pasado que siga abierto, y entonces
   solo toma recepciones hasta esa fecha. Un día cerrado se reabre o el traspaso se registra hoy.
 - **Tope:** lo disponible por recepciones y el saldo de efectivo del libro **desde esa fecha en
   adelante, día por día** (`DepositableCash::maximum`). La pantalla, la vista previa y el traspaso

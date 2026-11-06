@@ -53,8 +53,15 @@ declare namespace App {
                     readonly receiptNumber: string | null;
                     readonly talonarioNumber: string | null;
                     readonly talonarioPhotoId: number | null;
+                    readonly depositProof: App.Modules.Aranceles.Data.FeeChargeProofData | null;
                     readonly voidReason: string | null;
                     readonly deposited: boolean;
+                };
+                export type FeeChargeProofData = {
+                    readonly attachmentId: number;
+                    readonly amount: string;
+                    readonly depositDate: string;
+                    readonly operationNumber: string | null;
                 };
                 export type FeeDepositData = {
                     id: number;
@@ -1558,7 +1565,8 @@ declare namespace App {
                     | 'fine'
                     | 'fine_historical_movement'
                     | 'fine_payment'
-                    | 'cheque_rejection';
+                    | 'cheque_rejection'
+                    | 'fee_charge';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

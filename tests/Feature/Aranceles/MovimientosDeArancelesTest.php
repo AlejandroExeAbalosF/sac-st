@@ -39,12 +39,14 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Concerns\BuildsSharedBankAccount;
+use Tests\Concerns\LoadsFeeChargeProof;
 use Tests\TestCase;
 
 /** El informe de un mes de Aranceles (reglas A100 a A105): consulta y Excel. */
 class MovimientosDeArancelesTest extends TestCase
 {
     use BuildsSharedBankAccount;
+    use LoadsFeeChargeProof;
     use RefreshDatabase;
 
     private User $admin;
@@ -99,10 +101,10 @@ class MovimientosDeArancelesTest extends TestCase
 
     private function pendiente(): FeeCharge
     {
-        return app(CreateFeeCharge::class)->handle(
+        return $this->conComprobante(app(CreateFeeCharge::class)->handle(
             'Por banco SA', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1]],
             'alta-'.(++$this->clave), $this->admin->id, true,
-        );
+        ), $this->admin->id);
     }
 
     private function identificar(FeeCharge $cobro, string $importe, ?CarbonImmutable $fecha = null): BankTransaction
@@ -406,10 +408,10 @@ class MovimientosDeArancelesTest extends TestCase
     /** También el cambio al cobrar y el ajuste posterior; y lo que suman da la sección. */
     public function test_the_totals_by_reason_add_up_to_the_section(): void
     {
-        $cobro = app(CreateFeeCharge::class)->handle(
+        $cobro = $this->conComprobante(app(CreateFeeCharge::class)->handle(
             'Con cambio', null, [['feeTypeId' => $this->tipo(), 'quantity' => 1, 'amount' => '110', 'reasonCode' => 'rounding']],
             'con-cambio', $this->admin->id, true,
-        );
+        ), $this->admin->id);
         $renglon = FeeChargeItem::query()->where('fee_charge_id', $cobro->id)->firstOrFail();
         app(AdjustFeeCharge::class)->handle(
             $cobro, [$renglon->id => ['amount' => '115', 'previous' => '110.00']], new Reason(FeeReasonCode::Other, 'Se recalculó'), null, $this->admin->id,

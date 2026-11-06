@@ -32,6 +32,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
+use Tests\Concerns\LoadsFeeChargeProof;
 use Tests\TestCase;
 
 /**
@@ -46,6 +47,7 @@ class DepositoConcurrenteDeArancelesTest extends TestCase
         cuota as cuotaDeHaberes;
         cobrar as cobrarCuota;
     }
+    use LoadsFeeChargeProof;
 
     /** @var list<Process> */
     private array $workers = [];
@@ -166,10 +168,10 @@ class DepositoConcurrenteDeArancelesTest extends TestCase
 
     private function pendiente(): FeeCharge
     {
-        return app(CreateFeeCharge::class)->handle(
+        return $this->conComprobante(app(CreateFeeCharge::class)->handle(
             'AG Max SRL', null, [['feeTypeId' => FeeType::query()->where('code', 14)->value('id'), 'quantity' => 1]],
             (string) Str::uuid(), $this->admin->id, true,
-        );
+        ), $this->admin->id);
     }
 
     /** Dos cobros y un solo crédito: el segundo espera y solo toma lo que quedó libre. */
