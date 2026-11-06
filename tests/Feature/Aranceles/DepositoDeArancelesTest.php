@@ -337,7 +337,7 @@ class DepositoDeArancelesTest extends TestCase
         $administrativo = $this->operador('administrativo');
 
         $this->actingAs($administrativo)->get(route('aranceles.depositos.index'))
-            ->assertInertia(fn (Assert $page) => $page->where('can.chooseDate', false)->where('can.cancel', true));
+            ->assertInertia(fn (Assert $page) => $page->where('can.adjustTransfer', false)->where('can.cancel', true));
 
         $this->actingAs($administrativo)->post(route('aranceles.depositos.store'), [
             'transferDate' => BusinessDate::today()->subDay()->toDateString(), 'amount' => '120', 'idempotencyKey' => 'con-fecha',
@@ -349,6 +349,44 @@ class DepositoDeArancelesTest extends TestCase
         ])->assertRedirect();
 
         $this->assertSame(BusinessDate::today()->toDateString(), CashToBankTransfer::query()->firstOrFail()->deposit_date->toDateString());
+    }
+
+    public function test_whoever_cannot_adjust_it_transfers_everything_available(): void
+    {
+        $this->abrir();
+        $this->cobrarArancel();
+        $this->cobrarArancel();
+        $administrativo = $this->operador('administrativo');
+
+        $this->actingAs($administrativo)->post(route('aranceles.depositos.store'), [
+            'amount' => '120', 'idempotencyKey' => 'una-parte',
+        ])->assertSessionHasErrors(['amount' => 'Lo disponible ahora es $ 240,00. Revisá el importe y volvé a confirmar.']);
+        $this->assertSame(0, CashToBankTransfer::query()->count());
+
+        $envio = ['amount' => '240', 'idempotencyKey' => 'todo'];
+
+        $this->actingAs($administrativo)->post(route('aranceles.depositos.store'), $envio)->assertSessionHasNoErrors();
+        // El mismo envío dos veces no se rechaza porque lo disponible ya cambió.
+        $this->actingAs($administrativo)->post(route('aranceles.depositos.store'), $envio)->assertSessionHasNoErrors();
+
+        $this->assertSame('240.00', CashToBankTransfer::query()->sole()->amount);
+    }
+
+    public function test_only_the_administrator_can_transfer_a_part(): void
+    {
+        $this->abrir();
+        $this->cobrarArancel();
+        $this->cobrarArancel();
+
+        $this->actingAs($this->admin)->get(route('aranceles.depositos.index'))
+            ->assertInertia(fn (Assert $page) => $page->where('can.adjustTransfer', true));
+        $this->actingAs($this->admin)->post(route('aranceles.depositos.store'), [
+            'amount' => '120', 'idempotencyKey' => 'una-parte',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('120.00', CashToBankTransfer::query()->sole()->amount);
+        $this->assertFalse($this->operador('contador')->can('aranceles.ajustar-traspaso'));
+        $this->assertFalse($this->operador('administrativo')->can('aranceles.ajustar-traspaso'));
     }
 
     public function test_the_preview_ignores_a_date_for_whoever_cannot_choose_it(): void

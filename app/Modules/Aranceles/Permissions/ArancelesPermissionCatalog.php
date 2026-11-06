@@ -84,9 +84,9 @@ final class ArancelesPermissionCatalog implements PermissionCatalogContributor
             ),
             // Decisión del usuario: la fecha la toma el sistema; registrar otra es una excepción.
             new PermissionDefinition(
-                'aranceles.fechar-traspaso',
-                'Registrar traspasos con otra fecha',
-                'Registrar un traspaso con una fecha pasada, en vez de la del día.',
+                'aranceles.ajustar-traspaso',
+                'Cambiar el importe o la fecha de un traspaso',
+                'Registrar un traspaso por menos de todo lo disponible, o con una fecha pasada en vez de la del día.',
                 'aranceles',
                 ['administrador'],
                 sensitive: true,

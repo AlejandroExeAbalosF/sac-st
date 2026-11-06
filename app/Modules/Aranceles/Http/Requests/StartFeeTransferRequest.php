@@ -11,9 +11,10 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * El efectivo que sale de la caja: importe y cuenta. La foto va después.
  *
- * La fecha la toma el sistema. Solo quien tiene `aranceles.fechar-traspaso` puede
- * indicar otra, y a los demás se les rechaza: ignorarla registraría otra cosa que
- * lo que mandaron.
+ * La fecha la toma el sistema, y el importe es todo lo disponible. Solo quien tiene
+ * `aranceles.ajustar-traspaso` puede indicar otra cosa. A los demás se les rechaza:
+ * ignorarlo registraría otra cosa que lo que mandaron. El importe se coteja en el
+ * controlador, que es quien conoce lo disponible.
  */
 final class StartFeeTransferRequest extends FormRequest
 {
@@ -21,7 +22,7 @@ final class StartFeeTransferRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'transferDate' => $this->user()?->can('aranceles.fechar-traspaso')
+            'transferDate' => $this->user()?->can('aranceles.ajustar-traspaso')
                 ? ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.BusinessDate::today()->toDateString()]
                 : ['prohibited'],
             'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2', 'max:99999999999999999'],

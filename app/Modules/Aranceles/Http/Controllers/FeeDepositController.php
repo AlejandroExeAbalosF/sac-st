@@ -28,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,7 +66,7 @@ final class FeeDepositController extends Controller
             'cancelados' => $this->depositos->inStatus(CashTransferStatus::Cancelled, self::HISTORIAL),
             'can' => [
                 'deposit' => $usuario?->can('aranceles.depositar') ?? false,
-                'chooseDate' => $usuario?->can('aranceles.fechar-traspaso') ?? false,
+                'adjustTransfer' => $usuario?->can('aranceles.ajustar-traspaso') ?? false,
                 'confirm' => $usuario?->can('aranceles.verificar-pagos') ?? false,
                 'cancel' => $usuario?->can('aranceles.cancelar-traspaso') ?? false,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
@@ -82,7 +83,7 @@ final class FeeDepositController extends Controller
         ]);
 
         // Como al registrarlo: sin el permiso, la fecha es la del día.
-        $fecha = isset($datos['transferDate']) && $request->user()?->can('aranceles.fechar-traspaso')
+        $fecha = isset($datos['transferDate']) && $request->user()?->can('aranceles.ajustar-traspaso')
             ? CarbonImmutable::parse((string) $datos['transferDate'])
             : BusinessDate::today();
 
@@ -98,9 +99,13 @@ final class FeeDepositController extends Controller
         ]);
     }
 
-    public function store(StartFeeTransferRequest $request, StartCashTransfer $iniciar): RedirectResponse
+    public function store(StartFeeTransferRequest $request, StartCashTransfer $iniciar, DepositableCash $efectivo): RedirectResponse
     {
         $datos = $request->validated();
+
+        if (! $request->user()?->can('aranceles.ajustar-traspaso')) {
+            $this->assertTakesEverything((string) $datos['amount'], (string) $datos['idempotencyKey'], $efectivo);
+        }
 
         $traslado = $iniciar->handle(
             cashBoxId: $this->depositos->cashBoxId(),
@@ -157,6 +162,29 @@ final class FeeDepositController extends Controller
         Toast::success('Comprobante cargado.', 'Queda en tránsito hasta que el extracto lo confirme.');
 
         return to_route('aranceles.depositos.index', ['pestana' => 'transito']);
+    }
+
+    /**
+     * Sin el permiso, el traspaso es de todo lo disponible. Se coteja lo que vio la
+     * persona y no se completa solo: si entró un cobro mientras tanto, confirma el
+     * importe nuevo. Un segundo envío del mismo formulario lo resuelve el Action.
+     *
+     * @throws ValidationException
+     */
+    private function assertTakesEverything(string $importe, string $idempotencyKey, DepositableCash $efectivo): void
+    {
+        if (CashToBankTransfer::query()->whereRelation('depositEvent', 'idempotency_key', $idempotencyKey)->exists()) {
+            return;
+        }
+
+        $hoy = BusinessDate::today();
+        $todo = $efectivo->maximum($this->depositos->cashBoxId(), Currency::Ars, $hoy, $this->depositos->available($hoy));
+
+        if (! Decimal::equals($importe, $todo)) {
+            throw ValidationException::withMessages([
+                'amount' => 'Lo disponible ahora es $ '.Decimal::format($todo).'. Revisá el importe y volvé a confirmar.',
+            ]);
+        }
     }
 
     public function candidates(Request $request, CashToBankTransfer $transfer, CashDepositCreditOptions $opciones): JsonResponse

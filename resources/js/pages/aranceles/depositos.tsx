@@ -51,7 +51,7 @@ type Parte = App.Modules.Aranceles.Data.FeeCashShareData;
 type Pestana = 'comprobante' | 'transito' | 'acreditados' | 'cancelados';
 type Permisos = {
     deposit: boolean;
-    chooseDate: boolean;
+    adjustTransfer: boolean;
     confirm: boolean;
     cancel: boolean;
     viewAttachments: boolean;
@@ -105,13 +105,13 @@ export default function Depositos({
             valor: 'transito',
             titulo: 'Sin acreditar',
             filas: enTransito,
-            vacio: 'No hay depósitos esperando al extracto.',
+            vacio: 'No hay traspasos esperando al extracto.',
         },
         {
             valor: 'acreditados',
             titulo: 'Acreditados',
             filas: acreditados,
-            vacio: 'Todavía no hay depósitos acreditados.',
+            vacio: 'Todavía no hay traspasos acreditados.',
         },
         {
             valor: 'cancelados',
@@ -125,19 +125,19 @@ export default function Depositos({
 
     return (
         <>
-            <Head title="Depósitos de aranceles" />
+            <Head title="Traspasos de aranceles" />
 
             <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-6">
                 <PageHeader
                     eyebrow="Aranceles"
-                    title="Depósitos"
+                    title="Traspasos"
                     description="El efectivo sale de la caja con el traspaso. El comprobante y la acreditación se cargan después, sin frenar el trabajo del día."
                 />
 
                 <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-5 shadow-raised">
                     <div>
                         <p className="text-xs text-field-label">
-                            Efectivo para depositar
+                            Efectivo para traspasar
                         </p>
                         <p className="font-mono text-2xl font-semibold tabular-nums">
                             {money(available)}
@@ -207,7 +207,7 @@ export default function Depositos({
             {traspasando && (
                 <NuevoTraspaso
                     disponible={available}
-                    elegirFecha={can.chooseDate}
+                    puedeAjustar={can.adjustTransfer}
                     cuentas={cuentas}
                     onCerrar={() => setTraspasando(false)}
                 />
@@ -386,28 +386,30 @@ type VistaPrevia = { available: string; exceeds: boolean; shares: Parte[] };
 
 function NuevoTraspaso({
     disponible,
-    elegirFecha,
+    puedeAjustar,
     cuentas,
     onCerrar,
 }: {
     disponible: string;
-    elegirFecha: boolean;
+    puedeAjustar: boolean;
     cuentas: PeriodoDeCuenta[];
     onCerrar: () => void;
 }) {
     const [clave] = useState(() => `traspaso-arancel:${crypto.randomUUID()}`);
     const [vista, setVista] = useState<VistaPrevia | null>(null);
 
-    // Sin el permiso la fecha no viaja: la toma el servidor.
+    // Sin el permiso la fecha no viaja, y el importe es todo lo disponible.
     const form = useForm({
-        transferDate: elegirFecha ? businessToday() : '',
+        transferDate: puedeAjustar ? businessToday() : '',
         amount: disponible,
         bankAccountId: '',
         notes: '',
         idempotencyKey: clave,
     });
 
-    const { transferDate, amount } = form.data;
+    const { transferDate } = form.data;
+    // La prop, no el formulario: si un rechazo avisa que cambió, se ve y se manda el nuevo.
+    const amount = puedeAjustar ? form.data.amount : disponible;
     const fecha = transferDate || businessToday();
 
     const vigentes = useCuentasDelDia(
@@ -443,6 +445,7 @@ function NuevoTraspaso({
 
     const enviar = (event: React.FormEvent) => {
         event.preventDefault();
+        form.transform((datos) => ({ ...datos, amount }));
         form.post(store().url, { onSuccess: () => onCerrar() });
     };
 
@@ -462,18 +465,33 @@ function NuevoTraspaso({
                 <form onSubmit={enviar} className="grid gap-4">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="grid gap-2">
-                            <Label htmlFor="traspaso-importe">Importe</Label>
-                            <AmountInput
-                                id="traspaso-importe"
-                                value={form.data.amount}
-                                onChange={(valor) =>
-                                    form.setData('amount', valor)
-                                }
-                            />
+                            {puedeAjustar ? (
+                                <>
+                                    <Label htmlFor="traspaso-importe">
+                                        Importe
+                                    </Label>
+                                    <AmountInput
+                                        id="traspaso-importe"
+                                        value={form.data.amount}
+                                        onChange={(valor) =>
+                                            form.setData('amount', valor)
+                                        }
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-xs text-field-label">
+                                        Importe
+                                    </p>
+                                    <p className="text-sm">
+                                        {money(amount)}, todo lo disponible
+                                    </p>
+                                </>
+                            )}
                             <InputError message={form.errors.amount} />
                         </div>
                         <div className="grid gap-2">
-                            {elegirFecha ? (
+                            {puedeAjustar ? (
                                 <>
                                     <Label htmlFor="traspaso-fecha">
                                         Fecha
@@ -566,11 +584,11 @@ function NuevoTraspaso({
                         <div className="grid gap-2">
                             <p className="text-xs text-field-label">
                                 Al {date(fecha)} hay {money(vista.available)}{' '}
-                                para depositar. Sale de:
+                                para traspasar. Sale de:
                             </p>
                             {vista.exceeds && (
                                 <p className="text-sm text-warning-strong">
-                                    El importe supera lo que se puede depositar
+                                    El importe supera lo que se puede traspasar
                                     a esa fecha.
                                 </p>
                             )}
