@@ -437,6 +437,36 @@ class PantallasDeDepositosTest extends TestCase
         $this->assertSame('72000.00', $ticket->refresh()->amount);
     }
 
+    /** Vincular y descartar vuelven a la cuota: el paso siguiente se da en su tarjeta. */
+    public function test_vincular_y_descartar_vuelven_a_la_cuota(): void
+    {
+        $ticket = $this->ticket();
+        $cuota = $ticket->expediente->haberes()->orderBy('id')->firstOrFail()->installments()->orderBy('installment_number')->firstOrFail();
+        $ticket->forceFill(['beneficiary_installment_id' => $cuota->id, 'haber_id' => $cuota->haber_id])->save();
+        $destino = route('haberes.haber.show', ['expediente' => $cuota->haber->expediente, 'haber' => $cuota->haber, 'cuota' => $cuota->id]);
+
+        $this->actingAs($this->operador())
+            ->post(route('depositos.link', $ticket), ['bankTransactionId' => $this->movimiento($ticket)->id])
+            ->assertRedirect($destino);
+
+        $this->actingAs($this->operador())
+            ->patch(route('depositos.unlink', $ticket), ['reasonCode' => 'wrong_credit']);
+
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('depositos.discard', $ticket->refresh()), ['reasonCode' => 'deposit_not_made'])
+            ->assertRedirect($destino);
+    }
+
+    /** Sin cuota no hay otro lugar adonde volver que la cola. */
+    public function test_sin_cuota_vincular_vuelve_a_la_cola(): void
+    {
+        $ticket = $this->ticket();
+
+        $this->actingAs($this->operador())
+            ->post(route('depositos.link', $ticket), ['bankTransactionId' => $this->movimiento($ticket)->id])
+            ->assertRedirect(route('depositos.index'));
+    }
+
     /** Un crédito anterior a la apertura ya está en el saldo inicial: no se vincula. */
     public function test_no_se_vincula_un_credito_anterior_a_la_apertura(): void
     {

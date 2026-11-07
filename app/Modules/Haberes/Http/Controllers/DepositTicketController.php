@@ -292,8 +292,7 @@ final class DepositTicketController extends Controller
             return $this->backWithError($e);
         }
 
-        return to_route('depositos.index')
-            ->with('status', 'El comprobante quedó vinculado a su movimiento bancario.');
+        return $this->volverALaCuota($ticket, 'El comprobante quedó vinculado a su movimiento bancario.');
     }
 
     public function unlink(Request $request, DepositTicket $ticket, LinkDepositTicket $vincular): RedirectResponse
@@ -327,7 +326,7 @@ final class DepositTicketController extends Controller
             return $this->backWithError($e);
         }
 
-        return to_route('depositos.index')->with('status', 'Comprobante descartado.');
+        return $this->volverALaCuota($ticket, 'Comprobante descartado.');
     }
 
     public function reopen(Request $request, DepositTicket $ticket, DiscardDepositTicket $descartar): RedirectResponse
@@ -339,6 +338,26 @@ final class DepositTicketController extends Controller
         }
 
         return back()->with('status', 'El comprobante volvió a la cola de espera.');
+    }
+
+    /**
+     * A la cuota del comprobante, posicionada en su tarjeta: el paso siguiente
+     * —registrar el ingreso, o cargar otro comprobante— se da ahí. Sin cuota
+     * no hay otro lugar adonde volver que la cola.
+     */
+    private function volverALaCuota(DepositTicket $ticket, string $mensaje): RedirectResponse
+    {
+        $cuota = $ticket->installment()->with('haber.expediente')->first();
+
+        if ($cuota === null) {
+            return to_route('depositos.index')->with('status', $mensaje);
+        }
+
+        return to_route('haberes.haber.show', [
+            'expediente' => $cuota->haber->expediente,
+            'haber' => $cuota->haber,
+            'cuota' => $cuota->id,
+        ])->with('status', $mensaje);
     }
 
     private function backWithError(RuntimeException $exception): RedirectResponse

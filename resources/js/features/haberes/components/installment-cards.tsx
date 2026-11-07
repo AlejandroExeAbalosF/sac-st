@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { compareAmounts, money, sumAmounts } from '@/lib/format';
@@ -105,6 +105,23 @@ export default function InstallmentCards({
         faltan === 1 && compareAmounts(saldo, '0.00') === 1
             ? money(saldo, { symbol: false })
             : undefined;
+
+    /*
+     * Volver de conciliar trae `?cuota=`: la pantalla baja hasta esa tarjeta
+     * en vez de quedar arriba de un plan que puede ser largo. En un efecto,
+     * porque con SSR no hay `window` en el primer render.
+     */
+    useEffect(() => {
+        const destino = new URLSearchParams(window.location.search).get(
+            'cuota',
+        );
+
+        if (destino !== null) {
+            document
+                .getElementById(`cuota-${destino}`)
+                ?.scrollIntoView({ block: 'start' });
+        }
+    }, []);
 
     return (
         <ol className="grid gap-4">

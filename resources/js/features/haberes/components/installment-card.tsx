@@ -206,8 +206,10 @@ export default function InstallmentCard({
 
     return (
         <li
+            // Destino de `?cuota=`: volver de conciliar posiciona la pantalla acá.
+            id={`cuota-${cuota.id}`}
             className={cn(
-                'overflow-hidden rounded-lg border bg-card shadow-xs transition-opacity duration-200',
+                'scroll-mt-20 overflow-hidden rounded-lg border bg-card shadow-xs transition-opacity duration-200',
                 atenuada && 'opacity-40',
                 anulada && 'border-dashed bg-muted/20',
             )}
