@@ -77,7 +77,7 @@ const ETIQUETA: Record<string, string> = {
     pending: 'Sin identificar',
     partial: 'Identificado en parte',
     reconciled: 'Identificado',
-    ignored: 'Fuera del circuito',
+    ignored: 'Excluido de la conciliación',
 };
 
 /**
@@ -244,7 +244,7 @@ export default function MovimientosIndex({
                                     Identificados
                                 </SelectItem>
                                 <SelectItem value="ignored">
-                                    Fuera del circuito
+                                    Excluidos de la conciliación
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -428,7 +428,7 @@ export default function MovimientosIndex({
                                                             variant="ghost"
                                                             size="icon"
                                                             className="size-11 sm:size-9"
-                                                            aria-label={`Dejar fuera del circuito el movimiento del ${date(m.transactionDate)}${m.description ? `: ${m.description}` : ''}`}
+                                                            aria-label={`Excluir de la conciliación el movimiento del ${date(m.transactionDate)}${m.description ? `: ${m.description}` : ''}`}
                                                             onClick={() =>
                                                                 setIgnorando(m)
                                                             }
@@ -497,7 +497,7 @@ function DialogoIgnorar({
             <DialogContent>
                 <form onSubmit={enviar}>
                     <DialogHeader>
-                        <DialogTitle>Dejar fuera del circuito</DialogTitle>
+                        <DialogTitle>Excluir de la conciliación</DialogTitle>
                         <DialogDescription>
                             El movimiento sigue existiendo y sigue sumando en el
                             saldo: lo único que cambia es que deja de aparecer

@@ -93,7 +93,7 @@ export default function ExtractoShow({
                                 onClick={() => setConfirmando(true)}
                             >
                                 <Undo2 className="size-4" />
-                                Revertir
+                                Deshacer
                             </Button>
                         ) : null
                     }
@@ -383,13 +383,14 @@ export default function ExtractoShow({
             <Dialog open={confirmando} onOpenChange={setConfirmando}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Revertir esta importación</DialogTitle>
+                        <DialogTitle>Deshacer esta importación</DialogTitle>
                         <DialogDescription>
                             Se borran las {importacion.rowsTotal} filas del
                             archivo y los {importacion.rowsNew} movimientos que
                             nacieron con él. Los que ya venían de otra
                             importación se conservan. Si alguno fue conciliado o
-                            dejado fuera del circuito, la reversión se rechaza.
+                            excluido de la conciliación, no se puede deshacer la
+                            importación.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -400,7 +401,7 @@ export default function ExtractoShow({
                             Cancelar
                         </Button>
                         <Button variant="destructive" onClick={revertir}>
-                            Revertir
+                            Deshacer importación
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -65,7 +65,7 @@ const ETIQUETA: Record<CuotaStatus, string> = {
     blocked: 'Bloqueada',
     cancelled: 'Anulada',
     paid: 'Pagada',
-    legacy_settled: 'Pagada fuera del circuito',
+    legacy_settled: 'Pagada antes de la apertura del sistema',
 };
 
 const MEDIO: Record<
@@ -150,8 +150,9 @@ export default function InstallmentCard({
     const estadoHistorico = historico.estados[cuota.id];
 
     /*
-     * Pagada fuera del circuito: sus tramos ya pasaron, afuera, y lo que
-     * queda de ellos son los papeles. La cuota no se edita mientras tanto.
+     * Pagada antes de la apertura del sistema: sus tramos ya pasaron,
+     * afuera, y lo que queda de ellos son los papeles. La cuota no se edita
+     * mientras tanto.
      */
     const saldada = cuota.status === 'legacy_settled';
 
@@ -361,7 +362,7 @@ export default function InstallmentCard({
             {saldada && estadoHistorico !== undefined ? (
                 <Seccion
                     icono={Archive}
-                    titulo="Pagada fuera del circuito"
+                    titulo="Pagada antes de la apertura del sistema"
                     ultima
                 >
                     <LegacySettlementPanel

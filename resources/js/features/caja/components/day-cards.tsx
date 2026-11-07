@@ -237,7 +237,7 @@ export function TarjetaCierre({
                             <RotateCcw className="mt-0.5 size-4 shrink-0" />
                             <div className="min-w-0">
                                 <p className="font-medium">
-                                    Este snapshot ya no está vigente.
+                                    Este cierre quedó sin efecto.
                                 </p>
                                 <p className="mt-0.5 text-xs">
                                     {cierre.reopenedBy

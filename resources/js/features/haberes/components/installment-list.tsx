@@ -47,7 +47,7 @@ const ETIQUETA: Record<CuotaStatus, string> = {
     blocked: 'Bloqueada',
     cancelled: 'Anulada',
     paid: 'Pagada',
-    legacy_settled: 'Pagada fuera del circuito',
+    legacy_settled: 'Pagada antes de la apertura del sistema',
 };
 
 /**
