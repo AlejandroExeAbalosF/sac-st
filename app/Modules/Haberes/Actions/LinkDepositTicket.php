@@ -8,9 +8,11 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
+use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\ReasonCode;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -34,6 +36,7 @@ final class LinkDepositTicket
         private readonly RecordAuditEvent $auditar,
         private readonly FindTicketCandidates $buscar,
         private readonly AllocatableAmount $disponible,
+        private readonly DepositTicketLinks $enlaces,
     ) {}
 
     public function handle(DepositTicket $ticket, BankTransaction $movimiento, int $userId): DepositTicket
@@ -132,6 +135,16 @@ final class LinkDepositTicket
                 'El movimiento es por $%s y el ticket por $%s.',
                 Decimal::format($movimiento->amount),
                 Decimal::format($ticket->amount),
+            ));
+        }
+
+        $apertura = $this->enlaces->openingDate($ticket->bank_account_id);
+
+        if ($apertura !== null && $movimiento->transaction_date?->format('Y-m-d') < $apertura) {
+            throw new RuntimeException(sprintf(
+                'Ese movimiento es anterior a la apertura de los libros (%s): ya está en el saldo inicial y no se concilia. '
+                .'Esa plata va por «Cuota del sistema anterior».',
+                CarbonImmutable::parse($apertura)->format('d/m/Y'),
             ));
         }
 

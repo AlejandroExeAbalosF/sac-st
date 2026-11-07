@@ -90,6 +90,7 @@ final class ExpedienteListItemData extends Data
      * @param  array<int, CashToBankTransfer>  $transfers  El traslado al banco por cuota.
      * @param  array<int, PaymentMedium|null>  $mediums  El medio real de cada cuota.
      * @param  array<int, InstallmentStage>  $stages  La etapa de cada cuota.
+     * @param  array<int, string>  $ticketsBeforeOpening  id de ticket => fecha de apertura
      */
     public static function fromModel(
         Expediente $expediente,
@@ -106,6 +107,7 @@ final class ExpedienteListItemData extends Data
         array $transfers = [],
         array $mediums = [],
         array $stages = [],
+        array $ticketsBeforeOpening = [],
     ): self {
         /** @var list<HaberListItemData> $haberes */
         $haberes = $expediente->haberes
@@ -119,6 +121,7 @@ final class ExpedienteListItemData extends Data
                 ticketAttachments: $ticketAttachments,
                 lastChange: $haberChanges[$haber->id] ?? null,
                 stages: $stages,
+                ticketsBeforeOpening: $ticketsBeforeOpening,
             ))
             ->values()
             ->all();

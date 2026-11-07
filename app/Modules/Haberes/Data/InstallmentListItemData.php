@@ -171,6 +171,9 @@ final class InstallmentListItemData extends Data
      *                                               ticket, por ticket.
      * @param  array<int, int>  $ticketAttachments  La foto de cada ticket,
      *                                              también por ticket.
+     * @param  array<int, string>  $ticketsBeforeOpening  La apertura, por ticket
+     *                                                    cruzado con un crédito
+     *                                                    anterior a ella.
      */
     public static function fromModel(
         BeneficiaryInstallment $cuota,
@@ -190,6 +193,7 @@ final class InstallmentListItemData extends Data
         array $ticketFundReceipts = [],
         array $ticketAttachments = [],
         ?InstallmentStage $stage = null,
+        array $ticketsBeforeOpening = [],
     ): self {
         $etiqueta = $cuota->managementLabel;
 
@@ -225,7 +229,7 @@ final class InstallmentListItemData extends Data
             ownConcept: $cuota->description,
             depositTicket: $ticket === null
                 ? null
-                : InstallmentTicketData::fromModel($ticket, $ticketFundReceipts, $ticketAttachments),
+                : InstallmentTicketData::fromModel($ticket, $ticketFundReceipts, $ticketAttachments, $ticketsBeforeOpening),
             fundedAmount: $financiado,
             remainingAmount: $falta,
             overAllocatedAmount: $sobra,

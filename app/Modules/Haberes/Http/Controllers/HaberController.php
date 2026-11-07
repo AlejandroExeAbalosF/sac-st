@@ -663,6 +663,7 @@ final class HaberController extends Controller
                 mediums: app(InstallmentFunding::class)->mediumForMany($cuotaIds),
                 ticketReceipts: app(DepositTicketLinks::class)->receipts($cuotaIds),
                 ticketAttachments: app(DepositTicketLinks::class)->attachments($cuotaIds),
+                ticketsBeforeOpening: app(DepositTicketLinks::class)->beforeOpening($cuotaIds),
                 stages: app(InstallmentStages::class)->forMany($haber->installments),
                 lastChange: app(LastChanges::class)->for(
                     'Haber',
@@ -677,6 +678,7 @@ final class HaberController extends Controller
                 'canonicalNumber' => $expediente->canonical_number,
                 'subject' => $expediente->subject,
                 'employerName' => $expediente->employer?->name,
+                'receivedDate' => $expediente->received_date?->format('Y-m-d'),
                 'declaredTotalAmount' => $expediente->declared_total_amount,
                 'status' => $expediente->status,
             ],

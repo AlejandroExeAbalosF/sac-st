@@ -110,6 +110,12 @@ en snapshots. En mostrador, el cobro y la emisión pueden ser un solo acto atóm
 la cantidad a cobrar se deriva del pendiente de la cuota. En banco, el ticket
 requiere identificar el crédito y registrar su recepción/asignación.
 
+Un crédito anterior a la apertura de los libros ya está en el saldo inicial: no se
+vincula ni se registra, y esa plata va por «Cuota del sistema anterior». La búsqueda lo
+muestra apagado y la cuota ya cruzada lo avisa. **Action** (`LinkDepositTicket`,
+`BankMovementAfterOpening`) y **base** (`bank_allocation_after_opening`, solo al
+registrarlo).
+
 El ticket no se desvincula mientras su movimiento tenga imputado neto distinto de
 cero, y el cobro desde el ticket ignora las recepciones revertidas. **Action**
 (`LinkDepositTicket::unlink`, `ReceiveAndAllocateTicket`). La base solo impide imputar

@@ -43,6 +43,7 @@ type Props = {
         canonicalNumber: string | null;
         subject: string | null;
         employerName: string | null;
+        receivedDate: string | null;
         declaredTotalAmount: string | null;
         status: App.Modules.Haberes.Enums.ExpedienteStatus;
     };
@@ -395,7 +396,7 @@ export default function MostrarHaber({
                  * lo que se vino a mirar son las cuotas.
                  */}
                 <div className="rounded-lg border bg-muted/30 px-5 py-4 text-sm">
-                    <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-3">
+                    <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div>
                             <dt className="text-xs tracking-wide text-field-label uppercase">
                                 Expediente
@@ -408,6 +409,16 @@ export default function MostrarHaber({
                                     {expediente.canonicalNumber ??
                                         expediente.displayNumber}
                                 </Link>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-xs tracking-wide text-field-label uppercase">
+                                Recibido
+                            </dt>
+                            <dd className="mt-0.5">
+                                {expediente.receivedDate === null
+                                    ? '—'
+                                    : date(expediente.receivedDate)}
                             </dd>
                         </div>
                         <div>

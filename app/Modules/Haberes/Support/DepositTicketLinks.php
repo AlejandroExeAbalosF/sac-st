@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Support;
 
+use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\CashBox;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -71,6 +75,46 @@ final class DepositTicketLinks
         }
 
         return $porTicket;
+    }
+
+    /**
+     * La apertura de los libros de Haberes en la moneda de esa cuenta.
+     *
+     * Un crédito anterior ya está dentro del saldo declarado: no se concilia.
+     * Lo impone `BankMovementAfterOpening` al registrarlo y la base
+     * (`bank_allocation_after_opening`); esto permite decirlo antes.
+     */
+    public function openingDate(int $bankAccountId): ?string
+    {
+        $caja = (int) CashBox::query()->where('code', CashBox::HABERES)->valueOrFail('id');
+        $moneda = Currency::from((string) BankAccount::query()->whereKey($bankAccountId)->valueOrFail('currency'));
+
+        return CashBookOpening::for($caja, $moneda)?->opened_on->format('Y-m-d');
+    }
+
+    /**
+     * Los tickets cruzados con un crédito anterior a esa apertura.
+     *
+     * @param  list<int>  $installmentIds
+     * @return array<int, string> id de ticket => fecha de apertura
+     */
+    public function beforeOpening(array $installmentIds): array
+    {
+        if ($installmentIds === []) {
+            return [];
+        }
+
+        return DB::table('deposit_tickets')
+            ->join('bank_transactions', 'bank_transactions.id', '=', 'deposit_tickets.bank_transaction_id')
+            ->join('bank_accounts', 'bank_accounts.id', '=', 'bank_transactions.bank_account_id')
+            ->join('cash_book_openings', 'cash_book_openings.currency', '=', 'bank_accounts.currency')
+            ->join('cash_boxes', 'cash_boxes.id', '=', 'cash_book_openings.cash_box_id')
+            ->where('cash_boxes.code', CashBox::HABERES)
+            ->whereIn('deposit_tickets.beneficiary_installment_id', $installmentIds)
+            ->whereColumn('bank_transactions.transaction_date', '<', 'cash_book_openings.opened_on')
+            ->pluck('cash_book_openings.opened_on', 'deposit_tickets.id')
+            ->map(fn ($fecha): string => substr((string) $fecha, 0, 10))
+            ->all();
     }
 
     /**

@@ -62,6 +62,11 @@ final class InstallmentTicketData extends Data
         public bool $editable,
         /** Cuántos días lleva esperando aparecer en el extracto. */
         public int $waitingDays,
+        /**
+         * La apertura de los libros, si el crédito cruzado es anterior a ella:
+         * ya está en el saldo inicial y no se puede registrar como ingreso.
+         */
+        public ?string $creditBeforeOpening,
     ) {}
 
     /**
@@ -70,11 +75,13 @@ final class InstallmentTicketData extends Data
      *
      * @param  array<int, int>  $fundReceipts  id de ticket => id de recepción
      * @param  array<int, int>  $attachments  id de ticket => id de adjunto
+     * @param  array<int, string>  $beforeOpening  id de ticket => fecha de apertura
      */
     public static function fromModel(
         DepositTicket $ticket,
         array $fundReceipts = [],
         array $attachments = [],
+        array $beforeOpening = [],
     ): self {
         return new self(
             id: $ticket->id,
@@ -100,6 +107,7 @@ final class InstallmentTicketData extends Data
             fundReceiptId: $fundReceipts[$ticket->id] ?? null,
             editable: $ticket->status === DepositTicketStatus::Waiting,
             waitingDays: (int) $ticket->deposited_at->diffInDays(BusinessDate::today(), false),
+            creditBeforeOpening: $beforeOpening[$ticket->id] ?? null,
         );
     }
 

@@ -42,6 +42,8 @@ type Props = {
     available: { data: Movimiento[]; total: number } | null;
     availableOrder: string;
     showingAvailable: boolean;
+    /** La apertura de los libros: lo anterior ya está en el saldo inicial. */
+    openingDate: string | null;
     canLink: boolean;
     canDiscard: boolean;
     canEditTicket: boolean;
@@ -67,11 +69,19 @@ export default function DepositoSearch({
     available,
     availableOrder,
     showingAvailable,
+    openingDate,
     canLink,
     canDiscard,
 }: Props) {
     const [descartando, setDescartando] = useState(false);
     const [desvinculando, setDesvinculando] = useState(false);
+
+    // Fechas `Y-m-d`: se comparan como texto. El servidor lo rechaza igual.
+    const esAnterior = (fecha: string) =>
+        openingDate !== null && fecha < openingDate;
+    const hayAnteriores =
+        candidates.some((c) => esAnterior(c.transactionDate)) ||
+        (available?.data ?? []).some((m) => esAnterior(m.transactionDate));
 
     const vincular = (transactionId: number) => {
         router.post(link(ticket.id).url, { bankTransactionId: transactionId });
@@ -116,6 +126,18 @@ export default function DepositoSearch({
                         <span>{aviso}</span>
                     </div>
                 ))}
+
+                {hayAnteriores && openingDate !== null && (
+                    <div className="flex items-start gap-2 rounded-md border bg-warning-soft/50 p-3 text-sm text-warning-strong">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <span>
+                            Los créditos anteriores a la apertura de los libros
+                            ({date(openingDate)}) ya están en el saldo inicial y
+                            no se concilian. Esa plata va por «Cuota del sistema
+                            anterior».
+                        </span>
+                    </div>
+                )}
 
                 {ticket.status === 'matched' && (
                     <div className="rounded-lg border bg-success-soft/40 p-4">
@@ -166,6 +188,9 @@ export default function DepositoSearch({
                                             canLink &&
                                             ticket.status !== 'matched'
                                         }
+                                        anterior={esAnterior(
+                                            candidato.transactionDate,
+                                        )}
                                         yaVinculado={
                                             ticket.bankTransactionId ===
                                             candidato.transactionId
@@ -186,6 +211,7 @@ export default function DepositoSearch({
                                 mostrando={showingAvailable}
                                 hayCandidatos={candidates.length > 0}
                                 puedeVincular={canLink}
+                                esAnterior={esAnterior}
                                 onVincular={vincular}
                             />
                         )}
@@ -221,11 +247,13 @@ export default function DepositoSearch({
 function TarjetaCandidato({
     candidato,
     puedeVincular,
+    anterior,
     yaVinculado,
     onVincular,
 }: {
     candidato: Candidato;
     puedeVincular: boolean;
+    anterior: boolean;
     yaVinculado: boolean;
     onVincular: () => void;
 }) {
@@ -269,6 +297,10 @@ function TarjetaCandidato({
 
                 {yaVinculado ? (
                     <StatusBadge label="Vinculado" tone="done" />
+                ) : anterior ? (
+                    <span className="text-xs text-muted-foreground">
+                        Anterior a la apertura
+                    </span>
                 ) : puedeVincular ? (
                     <Button onClick={onVincular}>Es este</Button>
                 ) : null}
@@ -322,6 +354,7 @@ function Disponibles({
     mostrando,
     hayCandidatos,
     puedeVincular,
+    esAnterior,
     onVincular,
 }: {
     ticketId: number;
@@ -330,6 +363,7 @@ function Disponibles({
     mostrando: boolean;
     hayCandidatos: boolean;
     puedeVincular: boolean;
+    esAnterior: (fecha: string) => boolean;
     onVincular: (transactionId: number) => void;
 }) {
     const pedir = (nuevoOrden: string) =>
@@ -425,15 +459,21 @@ function Disponibles({
                                 </p>
                             </div>
 
-                            {puedeVincular && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-xs"
-                                    onClick={() => onVincular(m.id)}
-                                >
-                                    Es este
-                                </Button>
+                            {esAnterior(m.transactionDate) ? (
+                                <span className="text-xs text-muted-foreground">
+                                    Anterior a la apertura
+                                </span>
+                            ) : (
+                                puedeVincular && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 text-xs"
+                                        onClick={() => onVincular(m.id)}
+                                    >
+                                        Es este
+                                    </Button>
+                                )
                             )}
                         </li>
                     ))}

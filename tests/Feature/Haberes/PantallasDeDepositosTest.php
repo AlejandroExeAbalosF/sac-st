@@ -13,6 +13,7 @@ use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
+use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
@@ -434,6 +435,66 @@ class PantallasDeDepositosTest extends TestCase
 
         // El importe no se movió.
         $this->assertSame('72000.00', $ticket->refresh()->amount);
+    }
+
+    /** Un crédito anterior a la apertura ya está en el saldo inicial: no se vincula. */
+    public function test_no_se_vincula_un_credito_anterior_a_la_apertura(): void
+    {
+        $ticket = $this->ticket();
+        $this->abrirLibrosSinSaldo();
+        $movimiento = $this->movimiento($ticket, fecha: '1999-12-31');
+
+        $this->actingAs($this->operador())
+            ->post(route('depositos.link', $ticket), ['bankTransactionId' => $movimiento->id]);
+
+        $this->assertNull($ticket->refresh()->bank_transaction_id);
+        $this->assertSame(DepositTicketStatus::Waiting, $ticket->status);
+    }
+
+    /** Desde la apertura en adelante se vincula, y la pantalla recibe la fecha. */
+    public function test_la_busqueda_recibe_la_apertura_y_vincula_lo_posterior(): void
+    {
+        $ticket = $this->ticket();
+        $this->abrirLibrosSinSaldo();
+        $movimiento = $this->movimiento($ticket, fecha: '2000-01-01');
+
+        $this->actingAs($this->operador())
+            ->get(route('depositos.search', $ticket))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('openingDate', '2000-01-01'));
+
+        $this->actingAs($this->operador())
+            ->post(route('depositos.link', $ticket), ['bankTransactionId' => $movimiento->id]);
+
+        $this->assertSame($movimiento->id, $ticket->refresh()->bank_transaction_id);
+    }
+
+    /** La tarjeta sabe que el crédito ya cruzado es anterior, para no ofrecer registrarlo. */
+    public function test_la_cuota_avisa_si_el_credito_cruzado_es_anterior_a_la_apertura(): void
+    {
+        $ticket = $this->ticket();
+        $cuota = $ticket->expediente->haberes()->orderBy('id')->firstOrFail()->installments()->orderBy('installment_number')->firstOrFail();
+        $ticket->forceFill(['beneficiary_installment_id' => $cuota->id, 'haber_id' => $cuota->haber_id])->save();
+        $movimiento = $this->movimiento($ticket, fecha: '1999-12-31');
+        // Cruzado antes de esta regla: lo que ya puede estar cargado.
+        $ticket->forceFill([
+            'bank_transaction_id' => $movimiento->id,
+            'status' => DepositTicketStatus::Matched,
+            'matched_by' => $this->operador()->id,
+            'matched_at' => now(),
+        ])->save();
+        $this->abrirLibrosSinSaldo();
+
+        $this->assertSame([$ticket->id => '2000-01-01'], app(DepositTicketLinks::class)->beforeOpening([$cuota->id]));
+
+        $haber = $cuota->haber;
+
+        $this->actingAs($this->operador())
+            ->get(route('haberes.haber.show', [$haber->expediente, $haber]))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('haber.installments.0.depositTicket.creditBeforeOpening', '2000-01-01')
+                ->where('expediente.receivedDate', $haber->expediente->received_date?->format('Y-m-d')));
     }
 
     /** El motivo de desvincular sale de la lista del acto, y su código queda en la auditoría. */

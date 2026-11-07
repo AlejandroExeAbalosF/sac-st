@@ -130,6 +130,9 @@ final class HaberListItemData extends Data
      * @param  array<int, InstallmentStage>  $stages  En qué punto del circuito
      *                                                está cada cuota, resuelto
      *                                                en lote.
+     * @param  array<int, string>  $ticketsBeforeOpening  La apertura, por ticket
+     *                                                    cruzado con un crédito
+     *                                                    anterior a ella.
      */
     public static function fromModel(
         Haber $haber,
@@ -144,6 +147,7 @@ final class HaberListItemData extends Data
         array $ticketAttachments = [],
         ?LastChangeData $lastChange = null,
         array $stages = [],
+        array $ticketsBeforeOpening = [],
     ): self {
         $cuotas = $haber->installments;
 
@@ -162,6 +166,7 @@ final class HaberListItemData extends Data
                 $ticketReceipts,
                 $ticketAttachments,
                 $stages[$cuota->id] ?? null,
+                $ticketsBeforeOpening,
             ))
             ->values()
             ->all();

@@ -729,6 +729,8 @@ function ReciboDeIngreso({
         const ticket = cuota.depositTicket;
         const cruzado = ticket !== null && ticket.bankTransactionId !== null;
         const registrada = ticket?.fundReceiptId ?? null;
+        // Ya está en el saldo inicial: registrarlo lo contaría dos veces.
+        const apertura = ticket?.creditBeforeOpening ?? null;
 
         return (
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
@@ -740,6 +742,28 @@ function ReciboDeIngreso({
                             todavía no se asignó a esta cuota: por eso figura
                             sin financiar. El recibo sale después de asignarlo.
                         </p>
+                    ) : apertura !== null ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="min-w-56 flex-1">
+                                El crédito cruzado es anterior a la apertura de
+                                los libros ({date(apertura)}): ya está en el
+                                saldo inicial y no se registra como ingreso.
+                                Desvinculá el comprobante y usá «Cuota del
+                                sistema anterior».
+                            </p>
+                            {puedeBuscarTicket && ticket !== null && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="min-h-11 shrink-0 bg-accent text-xs text-accent-foreground hover:bg-accent/80 sm:min-h-8"
+                                >
+                                    <Link href={buscarTicket(ticket.id)}>
+                                        Revisar el cruce
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
                     ) : cruzado ? (
                         <p>
                             El comprobante ya está cruzado con su crédito del
@@ -775,7 +799,7 @@ function ReciboDeIngreso({
                         </p>
                     )}
 
-                    {cruzado && puedeRegistrarPago && (
+                    {cruzado && apertura === null && puedeRegistrarPago && (
                         <div className="flex flex-wrap items-center gap-2">
                             {/*
                              * Un clic hace los dos asientos. No fusiona

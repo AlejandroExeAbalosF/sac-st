@@ -591,6 +591,7 @@ declare namespace App {
                     fundReceiptId: number | null;
                     editable: boolean;
                     waitingDays: number;
+                    creditBeforeOpening: string | null;
                 };
                 export type InstallmentTransferData = {
                     id: number;

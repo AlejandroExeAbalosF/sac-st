@@ -27,6 +27,7 @@ use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Pdf\PendingDepositSheet;
+use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\TicketCandidate;
@@ -233,6 +234,7 @@ final class DepositTicketController extends Controller
         DepositTicket $ticket,
         FindTicketCandidates $buscar,
         ListAvailableCredits $disponibles,
+        DepositTicketLinks $enlaces,
     ): Response {
         $ticket->load(['expediente.employer', 'account', 'installment', 'transaction']);
 
@@ -267,6 +269,8 @@ final class DepositTicketController extends Controller
                 : null,
             'availableOrder' => $orden,
             'showingAvailable' => $verTodos,
+            // Lo anterior se muestra apagado: `LinkDepositTicket` lo rechaza igual.
+            'openingDate' => $enlaces->openingDate($ticket->bank_account_id),
             'canLink' => $request->user()?->can('depositos.vincular') ?? false,
             'canDiscard' => $request->user()?->can('depositos.descartar') ?? false,
             'canEditTicket' => $request->user()?->can('depositos.registrar') ?? false,
