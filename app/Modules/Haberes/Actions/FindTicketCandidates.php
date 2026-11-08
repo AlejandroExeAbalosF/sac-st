@@ -42,16 +42,15 @@ final class FindTicketCandidates
          * Filtros duros. Lo que no los cumple no es «peor candidato»: no
          * es candidato.
          *
-         * El importe se compara exacto, sin tolerancia, y conviene decir
-         * por qué: en el extracto real las comisiones son movimientos
-         * separados —causal 3914—, así que el crédito entra completo. Si
-         * el importe difiere, es otro depósito.
+         * Un crédito individual puede ser menor que el comprobante cuando
+         * el banco lo acreditó en varios movimientos. Nunca se propone uno
+         * mayor: la suma final debe coincidir exactamente con el papel.
          */
         $movimientos = BankTransaction::query()
             ->where('bank_account_id', $ticket->bank_account_id)
             ->where('direction', TransactionDirection::Credit->value)
             ->whereBetween('transaction_date', [$desde->toDateString(), $hasta->toDateString()])
-            ->whereRaw('amount = ?::numeric', [$ticket->amount])
+            ->whereRaw('amount > 0 AND amount <= ?::numeric', [$ticket->amount])
             // Un depósito es un movimiento y un ticket es un depósito: lo
             // que ya tiene dueño no se ofrece de nuevo.
             ->whereNotExists(function ($query) use ($ticket): void {
@@ -59,6 +58,11 @@ final class FindTicketCandidates
                     ->from('deposit_tickets')
                     ->whereColumn('deposit_tickets.bank_transaction_id', 'bank_transactions.id')
                     ->where('deposit_tickets.id', '!=', $ticket->id);
+            })
+            ->whereNotExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from('deposit_ticket_additional_transactions')
+                    ->whereColumn('deposit_ticket_additional_transactions.bank_transaction_id', 'bank_transactions.id');
             })
             ->orderBy('transaction_date')
             ->get();
@@ -101,7 +105,7 @@ final class FindTicketCandidates
 
         $operacion = $this->operationMatches($ticket, $movimiento);
 
-        $signals = ['importe' => 'exacto'];
+        $signals = ['importe' => Decimal::equals($movimiento->amount, $ticket->amount) ? 'exacto' : 'parcial'];
 
         $signals['fecha'] = match (true) {
             $dias === 0 => 'el mismo día',

@@ -43,7 +43,11 @@ final class ReceiptOrigin
         $fila = DB::table('bank_transaction_allocations as bta')
             ->join('bank_transactions as bt', 'bt.id', '=', 'bta.bank_transaction_id')
             ->leftJoin('bank_accounts as ba', 'ba.id', '=', 'bt.bank_account_id')
-            ->leftJoin('deposit_tickets as dt', 'dt.bank_transaction_id', '=', 'bt.id')
+            ->leftJoin('deposit_ticket_additional_transactions as dta', 'dta.bank_transaction_id', '=', 'bt.id')
+            ->leftJoin('deposit_tickets as dt', function ($join): void {
+                $join->on('dt.bank_transaction_id', '=', 'bt.id')
+                    ->orOn('dt.id', '=', 'dta.deposit_ticket_id');
+            })
             ->leftJoin('expedientes as e', 'e.id', '=', 'dt.expediente_id')
             ->leftJoin('people as p', 'p.id', '=', 'e.employer_id')
             ->where('bta.financial_event_id', $receipt->financial_event_id)
@@ -89,7 +93,11 @@ final class ReceiptOrigin
 
         $filas = DB::table('fund_receipts as fr')
             ->join('bank_transaction_allocations as bta', 'bta.financial_event_id', '=', 'fr.financial_event_id')
-            ->join('deposit_tickets as dt', 'dt.bank_transaction_id', '=', 'bta.bank_transaction_id')
+            ->leftJoin('deposit_ticket_additional_transactions as dta', 'dta.bank_transaction_id', '=', 'bta.bank_transaction_id')
+            ->join('deposit_tickets as dt', function ($join): void {
+                $join->on('dt.bank_transaction_id', '=', 'bta.bank_transaction_id')
+                    ->orOn('dt.id', '=', 'dta.deposit_ticket_id');
+            })
             ->join('expedientes as e', 'e.id', '=', 'dt.expediente_id')
             ->whereIn('fr.id', $receiptIds)
             ->whereNull('bta.reversal_of_id')

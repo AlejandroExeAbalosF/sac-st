@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Actions;
 
+use App\Modules\Banking\Enums\ReconciliationStatus;
+use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Support\AllocatableAmount;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
@@ -41,21 +43,57 @@ final class LinkDepositTicket
 
     public function handle(DepositTicket $ticket, BankTransaction $movimiento, int $userId): DepositTicket
     {
-        $this->assertLinkable($ticket, $movimiento);
+        return $this->handleMany($ticket, [$movimiento], $userId);
+    }
 
-        $senales = $this->signalsFor($ticket, $movimiento);
+    /** @param list<BankTransaction> $movimientos */
+    public function handleMany(DepositTicket $ticket, array $movimientos, int $userId): DepositTicket
+    {
+        $ids = array_map(fn (BankTransaction $m): int => $m->id, $movimientos);
+        if ($ids === [] || count(array_unique($ids)) !== count($ids)) {
+            throw new RuntimeException('Elegí movimientos distintos para conciliar el comprobante.');
+        }
 
-        return DB::transaction(function () use ($ticket, $movimiento, $senales, $userId): DepositTicket {
+        return DB::transaction(function () use ($ticket, $ids, $userId): DepositTicket {
+            $ticket = DepositTicket::query()->lockForUpdate()->findOrFail($ticket->id);
+            $movimientos = BankTransaction::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+            if ($movimientos->count() !== count($ids)) {
+                throw new RuntimeException('Alguno de los movimientos ya no existe.');
+            }
+
+            $total = '0.00';
+            foreach ($movimientos as $movimiento) {
+                $this->assertLinkable($ticket, $movimiento);
+                $total = Decimal::add($total, $movimiento->amount);
+                if (Decimal::isNegative(Decimal::sub($ticket->amount, $total))) {
+                    throw new RuntimeException('La suma de los movimientos supera el importe del comprobante.');
+                }
+            }
+            if (! Decimal::equals($total, $ticket->amount)) {
+                throw new RuntimeException('La suma de los movimientos debe coincidir exactamente con el importe del comprobante.');
+            }
+
+            $primero = $movimientos->firstOrFail();
+            $senales = $this->signalsFor($ticket, $primero);
             $ticket->forceFill([
-                'bank_transaction_id' => $movimiento->id,
+                'bank_transaction_id' => $primero->id,
                 'status' => DepositTicketStatus::Matched,
                 'match_signals' => $senales,
                 'matched_by' => $userId,
                 'matched_at' => now(),
             ])->save();
 
+            foreach ($movimientos->skip(1) as $adicional) {
+                DB::table('deposit_ticket_additional_transactions')->insert([
+                    'deposit_ticket_id' => $ticket->id,
+                    'bank_transaction_id' => $adicional->id,
+                    'match_signals' => json_encode($this->signalsFor($ticket, $adicional), JSON_THROW_ON_ERROR),
+                ]);
+            }
+
             $this->auditar->handle('ticket.vinculado', $ticket, after: [
-                'bank_transaction_id' => $movimiento->id,
+                'bank_transaction_id' => $primero->id,
+                'bank_transaction_ids' => $ids,
                 'match_signals' => $senales,
             ], actorId: $userId);
 
@@ -80,18 +118,19 @@ final class LinkDepositTicket
          * agrega su reversa. Preguntar si existe una fila dejaba el ticket
          * atado para siempre a un crédito que ya no respalda nada.
          */
-        $movimiento = BankTransaction::query()->findOrFail($ticket->bank_transaction_id);
-
-        if (! Decimal::equals($this->disponible->allocated($movimiento), '0')) {
-            throw new RuntimeException(
-                'Ese movimiento ya tiene una recepción registrada: el ticket es su respaldo. '
-                .'Hay que revertir la recepción antes de desvincularlo.'
-            );
+        foreach ($ticket->transactionIds() as $id) {
+            $movimiento = BankTransaction::query()->findOrFail($id);
+            if (! Decimal::equals($this->disponible->allocated($movimiento), '0')) {
+                throw new RuntimeException(
+                    'Uno de los movimientos ya tiene una recepción registrada: hay que revertir la recepción antes de desvincular.'
+                );
+            }
         }
 
-        $anterior = $ticket->bank_transaction_id;
+        $anteriores = $ticket->transactionIds();
 
-        return DB::transaction(function () use ($ticket, $anterior, $reason, $userId, $reasonCode): DepositTicket {
+        return DB::transaction(function () use ($ticket, $anteriores, $reason, $userId, $reasonCode): DepositTicket {
+            DB::table('deposit_ticket_additional_transactions')->where('deposit_ticket_id', $ticket->id)->delete();
             $ticket->forceFill([
                 'bank_transaction_id' => null,
                 'status' => DepositTicketStatus::Waiting,
@@ -103,7 +142,7 @@ final class LinkDepositTicket
             $this->auditar->handle(
                 'ticket.desvinculado',
                 $ticket,
-                before: ['bank_transaction_id' => $anterior],
+                before: ['bank_transaction_id' => $anteriores[0], 'bank_transaction_ids' => $anteriores],
                 metadata: [
                     'motivo' => $reason,
                     'usuario' => $userId,
@@ -130,12 +169,8 @@ final class LinkDepositTicket
             throw new RuntimeException('El movimiento es de otra cuenta.');
         }
 
-        if (! Decimal::equals($movimiento->amount, $ticket->amount)) {
-            throw new RuntimeException(sprintf(
-                'El movimiento es por $%s y el ticket por $%s.',
-                Decimal::format($movimiento->amount),
-                Decimal::format($ticket->amount),
-            ));
+        if ($movimiento->direction !== TransactionDirection::Credit || $movimiento->reconciliation_status === ReconciliationStatus::Ignored) {
+            throw new RuntimeException('Solo se pueden conciliar créditos bancarios activos.');
         }
 
         $apertura = $this->enlaces->openingDate($ticket->bank_account_id);
@@ -159,6 +194,9 @@ final class LinkDepositTicket
             ->exists();
 
         if ($tomado) {
+            throw new RuntimeException('Ese movimiento ya está vinculado a otro ticket.');
+        }
+        if (DB::table('deposit_ticket_additional_transactions')->where('bank_transaction_id', $movimiento->id)->exists()) {
             throw new RuntimeException('Ese movimiento ya está vinculado a otro ticket.');
         }
     }

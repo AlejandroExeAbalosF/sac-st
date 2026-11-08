@@ -33,6 +33,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\PaymentOrderSources;
+use App\Modules\Haberes\Support\ReceiptOrigin;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
@@ -86,6 +87,57 @@ class RegistrarYAsignarTest extends TestCase
 
         $this->assertSame($esperado, $recepcion->amount);
         $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota->refresh()));
+    }
+
+    public function test_registra_dos_creditos_del_mismo_comprobante_sin_duplicar_ingresos(): void
+    {
+        $cuota = $this->cuota();
+        $cuenta = $this->cuenta();
+        $importe = $cuota->importeEsperado();
+        $mitad = Decimal::scale(bcdiv($importe, '2', 4));
+        $resto = Decimal::sub($importe, $mitad);
+        $importacion = $this->importacion($cuenta);
+        $movimientos = [];
+        foreach ([$mitad, $resto] as $parte) {
+            $movimientos[] = BankTransaction::query()->create([
+                'bank_account_id' => $cuenta->id,
+                'first_seen_import_id' => $importacion->id,
+                'transaction_date' => '2026-08-21',
+                'amount' => $parte,
+                'direction' => TransactionDirection::Credit,
+                'description' => 'Transferencia recibida',
+                'fingerprint' => hash('sha256', uniqid('', true)),
+            ]);
+        }
+        $ticket = DepositTicket::query()->create([
+            'beneficiary_installment_id' => $cuota->id,
+            'haber_id' => $cuota->haber_id,
+            'expediente_id' => $cuota->haber->expediente_id,
+            'bank_account_id' => $cuenta->id,
+            'amount' => $importe,
+            'deposited_at' => '2026-08-21',
+            'deposit_kind' => DepositKind::Transfer,
+            'status' => DepositTicketStatus::Waiting,
+        ]);
+        app(LinkDepositTicket::class)->handleMany($ticket, $movimientos, $this->operador()->id);
+
+        $clave = 'atajo-'.Str::random(8);
+        app(ReceiveAndAllocateTicket::class)->handle($cuota, $clave, $this->operador()->id);
+        app(ReceiveAndAllocateTicket::class)->handle($cuota, $clave, $this->operador()->id);
+
+        $this->assertSame($importe, app(InstallmentFunding::class)->allocated($cuota));
+        $this->assertSame(2, FundReceipt::query()->whereNull('reversal_event_id')->count());
+        $this->assertSame(2, BankTransactionAllocation::query()->whereNull('reversal_of_id')->count());
+        foreach (FundReceipt::query()->whereNull('reversal_event_id')->get() as $recepcion) {
+            $this->assertSame($ticket->expediente_id, app(ReceiptOrigin::class)->for($recepcion)['expedienteId']);
+        }
+
+        $this->emitirRecibo($cuota);
+        $this->anularElCobro($cuota);
+        $this->assertSame([], $ticket->refresh()->transactionIds());
+        foreach ($movimientos as $movimiento) {
+            $this->assertSame('0.00', app(AllocatableAmount::class)->allocated($movimiento));
+        }
     }
 
     /**

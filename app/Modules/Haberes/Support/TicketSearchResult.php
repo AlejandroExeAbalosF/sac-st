@@ -47,7 +47,7 @@ final class TicketSearchResult
         }
 
         return $this->periodImported
-            ? 'El período está importado y no aparece ningún crédito por ese importe. '
+            ? 'El período está importado y no aparece ningún crédito que pueda integrar ese importe. '
                 .'Revisá los datos del ticket, o esperá a que el banco lo acredite.'
             : 'Todavía no hay extractos importados que cubran esa fecha. '
                 .'Importá el período para poder buscarlo.';

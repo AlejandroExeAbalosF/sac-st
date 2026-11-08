@@ -75,6 +75,23 @@ export default function DepositoSearch({
 }: Props) {
     const [descartando, setDescartando] = useState(false);
     const [desvinculando, setDesvinculando] = useState(false);
+    const [seleccionados, setSeleccionados] = useState<Record<number, string>>({});
+    const centavos = (importe: string) => Math.round(Number(importe) * 100);
+    const total = Object.values(seleccionados).reduce(
+        (suma, importe) => suma + centavos(importe), 0,
+    );
+    const objetivo = centavos(ticket.amount);
+    const seleccionar = (id: number, importe: string) => {
+        if (seleccionados[id] !== undefined) {
+            setSeleccionados((actual) => {
+                const copia = { ...actual };
+                delete copia[id];
+                return copia;
+            });
+        } else if (total + centavos(importe) <= objetivo) {
+            setSeleccionados((actual) => ({ ...actual, [id]: importe }));
+        }
+    };
 
     // Fechas `Y-m-d`: se comparan como texto. El servidor lo rechaza igual.
     const esAnterior = (fecha: string) =>
@@ -83,8 +100,10 @@ export default function DepositoSearch({
         candidates.some((c) => esAnterior(c.transactionDate)) ||
         (available?.data ?? []).some((m) => esAnterior(m.transactionDate));
 
-    const vincular = (transactionId: number) => {
-        router.post(link(ticket.id).url, { bankTransactionId: transactionId });
+    const vincular = () => {
+        router.post(link(ticket.id).url, {
+            bankTransactionIds: Object.keys(seleccionados).map(Number),
+        });
     };
 
     return (
@@ -143,7 +162,10 @@ export default function DepositoSearch({
                     <div className="rounded-lg border bg-success-soft/40 p-4">
                         <p className="flex items-center gap-2 font-medium text-success-strong">
                             <CheckCircle2 className="size-5" />
-                            El comprobante quedó vinculado a su movimiento
+                            El comprobante quedó conciliado con sus movimientos
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {ticket.bankTransactionIds.length} {ticket.bankTransactionIds.length === 1 ? 'crédito bancario' : 'créditos bancarios'} · total {money(ticket.amount)}
                         </p>
                         {ticket.matchSignals && (
                             <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
@@ -166,6 +188,21 @@ export default function DepositoSearch({
                     </div>
                 )}
 
+                {ticket.status !== 'matched' && canLink && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
+                        <div>
+                            <p className="font-medium">Movimientos seleccionados: {Object.keys(seleccionados).length}</p>
+                            <p className="text-sm tabular-nums text-muted-foreground">
+                                {money((total / 100).toFixed(2))} de {money(ticket.amount)}
+                                {total < objetivo && ` · faltan ${money(((objetivo - total) / 100).toFixed(2))}`}
+                            </p>
+                        </div>
+                        <Button disabled={total !== objetivo} onClick={vincular}>
+                            Conciliar comprobante
+                        </Button>
+                    </div>
+                )}
+
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
                     <div className="space-y-3">
                         {candidates.length === 0 ? (
@@ -177,8 +214,8 @@ export default function DepositoSearch({
                             <>
                                 <p className="text-sm text-muted-foreground">
                                     {candidates.length === 1
-                                        ? 'Un movimiento coincide con el importe y la fecha.'
-                                        : `${candidates.length} movimientos coinciden con el importe. El más probable va primero.`}
+                                        ? 'Un movimiento puede formar parte del comprobante.'
+                                        : `${candidates.length} movimientos pueden formar parte del comprobante. Revisá la suma antes de conciliar.`}
                                 </p>
                                 {candidates.map((candidato) => (
                                     <TarjetaCandidato
@@ -195,9 +232,9 @@ export default function DepositoSearch({
                                             ticket.bankTransactionId ===
                                             candidato.transactionId
                                         }
-                                        onVincular={() =>
-                                            vincular(candidato.transactionId)
-                                        }
+                                        seleccionado={seleccionados[candidato.transactionId] !== undefined}
+                                        excede={total + centavos(candidato.amount) > objetivo}
+                                        onVincular={() => seleccionar(candidato.transactionId, candidato.amount)}
                                     />
                                 ))}
                             </>
@@ -212,7 +249,10 @@ export default function DepositoSearch({
                                 hayCandidatos={candidates.length > 0}
                                 puedeVincular={canLink}
                                 esAnterior={esAnterior}
-                                onVincular={vincular}
+                                seleccionados={seleccionados}
+                                total={total}
+                                objetivo={objetivo}
+                                onVincular={seleccionar}
                             />
                         )}
                     </div>
@@ -249,12 +289,16 @@ function TarjetaCandidato({
     puedeVincular,
     anterior,
     yaVinculado,
+    seleccionado,
+    excede,
     onVincular,
 }: {
     candidato: Candidato;
     puedeVincular: boolean;
     anterior: boolean;
     yaVinculado: boolean;
+    seleccionado: boolean;
+    excede: boolean;
     onVincular: () => void;
 }) {
     const fuerte = candidato.operationMatches || candidato.employerMatches;
@@ -264,6 +308,7 @@ function TarjetaCandidato({
             className={cn(
                 'rounded-lg border p-4',
                 fuerte && 'border-primary/40 bg-primary/[0.03]',
+                seleccionado && 'border-primary bg-primary/5',
                 yaVinculado && 'border-success bg-success-soft/30',
             )}
         >
@@ -302,7 +347,9 @@ function TarjetaCandidato({
                         Anterior a la apertura
                     </span>
                 ) : puedeVincular ? (
-                    <Button onClick={onVincular}>Es este</Button>
+                    <Button variant={seleccionado ? 'secondary' : 'outline'} disabled={!seleccionado && excede} onClick={onVincular}>
+                        {seleccionado ? 'Quitar' : excede ? 'Supera el importe' : 'Seleccionar'}
+                    </Button>
                 ) : null}
             </div>
 
@@ -355,6 +402,9 @@ function Disponibles({
     hayCandidatos,
     puedeVincular,
     esAnterior,
+    seleccionados,
+    total,
+    objetivo,
     onVincular,
 }: {
     ticketId: number;
@@ -364,7 +414,10 @@ function Disponibles({
     hayCandidatos: boolean;
     puedeVincular: boolean;
     esAnterior: (fecha: string) => boolean;
-    onVincular: (transactionId: number) => void;
+    seleccionados: Record<number, string>;
+    total: number;
+    objetivo: number;
+    onVincular: (transactionId: number, amount: string) => void;
 }) {
     const pedir = (nuevoOrden: string) =>
         router.get(
@@ -466,12 +519,13 @@ function Disponibles({
                             ) : (
                                 puedeVincular && (
                                     <Button
-                                        variant="outline"
+                                        variant={seleccionados[m.id] !== undefined ? 'secondary' : 'outline'}
                                         size="sm"
                                         className="h-8 text-xs"
-                                        onClick={() => onVincular(m.id)}
+                                        disabled={seleccionados[m.id] === undefined && total + Math.round(Number(m.amount) * 100) > objetivo}
+                                        onClick={() => onVincular(m.id, m.amount)}
                                     >
-                                        Es este
+                                        {seleccionados[m.id] !== undefined ? 'Quitar' : 'Seleccionar'}
                                     </Button>
                                 )
                             )}
@@ -481,9 +535,8 @@ function Disponibles({
             )}
 
             <p className="text-xs text-muted-foreground">
-                Vincular exige que el importe coincida con el del comprobante.
-                Si el que corresponde tiene otro importe, primero hay que
-                corregir el comprobante.
+                Podés seleccionar varios créditos. La suma debe coincidir con
+                el importe del comprobante y nunca superarlo.
             </p>
         </div>
     );
@@ -506,9 +559,7 @@ function SinCandidatos({
     return (
         <div className="rounded-lg border border-dashed p-8 text-center">
             <FileQuestion className="mx-auto size-8 text-muted-foreground" />
-            <p className="mt-3 font-medium">
-                No hay ningún movimiento que coincida exacto
-            </p>
+            <p className="mt-3 font-medium">No hay movimientos candidatos</p>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
                 {razon}
             </p>

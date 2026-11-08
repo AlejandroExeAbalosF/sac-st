@@ -18,6 +18,7 @@ use App\Modules\Shared\Models\CashBox;
 use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Del ticket cruzado a la cuota financiada, en un solo acto.
@@ -66,47 +67,42 @@ final class ReceiveAndAllocateTicket
         string $idempotencyKey,
         ?int $actorId = null,
     ): FundReceipt {
-        $yaAsignada = $this->recepcionYaAsignada($idempotencyKey);
-
-        if ($yaAsignada !== null) {
-            return $yaAsignada;
-        }
-
         $ticket = $this->ticketCruzado($installment);
-        $movimiento = BankTransaction::query()->findOrFail($ticket->bank_transaction_id);
 
         return DB::transaction(function () use (
-            $installment, $ticket, $movimiento, $idempotencyKey, $actorId
+            $installment, $ticket, $idempotencyKey, $actorId
         ): FundReceipt {
-            $recepcion = $this->recepcionDe($movimiento)
-                ?? $this->registrarLa($movimiento, $ticket, $idempotencyKey, $actorId);
+            $ultima = null;
+            foreach ($ticket->transactionIds() as $id) {
+                $movimiento = BankTransaction::query()->findOrFail($id);
+                $clave = $idempotencyKey.':'.$id;
+                $yaAsignada = $this->recepcionYaAsignada($clave);
+                if ($yaAsignada !== null) {
+                    $ultima = $yaAsignada;
 
-            // Si otro envío con la misma clave terminó mientras éste
-            // esperaba el lock del movimiento, devuelve ese mismo hecho.
-            $yaAsignada = $this->recepcionYaAsignada($idempotencyKey);
+                    continue;
+                }
 
-            if ($yaAsignada !== null) {
-                return $yaAsignada;
+                $recepcion = $this->recepcionDe($movimiento)
+                    ?? $this->registrarLa($movimiento, $ticket, $clave, $actorId);
+                $importe = $this->cuantoAsignar($recepcion, $installment);
+                if (Decimal::equals($importe, '0')) {
+                    throw ValidationException::withMessages([
+                        'installmentId' => 'No queda nada por asignar: o la recepción ya está repartida, '
+                            .'o la cuota ya está completa.',
+                    ]);
+                }
+                $this->asignar->handle(
+                    receipt: $recepcion,
+                    installment: $installment,
+                    amount: $importe,
+                    idempotencyKey: $clave.':asignacion',
+                    actorId: $actorId,
+                );
+                $ultima = $recepcion->refresh();
             }
 
-            $importe = $this->cuantoAsignar($recepcion, $installment);
-
-            if (Decimal::equals($importe, '0')) {
-                throw ValidationException::withMessages([
-                    'installmentId' => 'No queda nada por asignar: o la recepción ya está repartida, '
-                        .'o la cuota ya está completa.',
-                ]);
-            }
-
-            $this->asignar->handle(
-                receipt: $recepcion,
-                installment: $installment,
-                amount: $importe,
-                idempotencyKey: $idempotencyKey.':asignacion',
-                actorId: $actorId,
-            );
-
-            return $recepcion->refresh();
+            return $ultima ?? throw new LogicException('El comprobante conciliado no tiene movimientos.');
         });
     }
 

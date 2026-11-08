@@ -35,6 +35,8 @@ final class DepositTicketData extends Data
         public DepositTicketStatus $status,
         public ?string $notes,
         public ?int $bankTransactionId,
+        /** @var list<int> */
+        public array $bankTransactionIds,
         /** @var array<string, string>|null */
         public ?array $matchSignals,
         public ?string $matchedAt,
@@ -71,6 +73,7 @@ final class DepositTicketData extends Data
             status: $ticket->status,
             notes: $ticket->notes,
             bankTransactionId: $ticket->bank_transaction_id,
+            bankTransactionIds: $ticket->transactionIds(),
             matchSignals: $ticket->match_signals,
             matchedAt: $ticket->matched_at?->toIso8601String(),
             discardedReason: Reason::text($ticket->discarded_reason_code, $ticket->discarded_reason),

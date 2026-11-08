@@ -17,6 +17,7 @@ use App\Modules\Haberes\Models\Expediente;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -54,9 +55,9 @@ class CruceDeTicketsTest extends TestCase
 
         $resultado = app(FindTicketCandidates::class)->handle($ticket);
 
-        $this->assertCount(1, $resultado->candidates);
-        $this->assertSame($esperado->id, $resultado->candidates[0]->transaction->id);
-        $this->assertSame('el mismo día', $resultado->candidates[0]->signals['fecha']);
+        $this->assertCount(2, $resultado->candidates);
+        $exacto = collect($resultado->candidates)->first(fn ($c) => $c->transaction->id === $esperado->id);
+        $this->assertSame('el mismo día', $exacto->signals['fecha']);
     }
 
     /**
@@ -66,7 +67,7 @@ class CruceDeTicketsTest extends TestCase
      * 3914—, así que el crédito entra completo. Si difiere, es otro
      * depósito.
      */
-    public function test_un_importe_distinto_no_es_candidato(): void
+    public function test_un_importe_parcial_es_candidato_pero_uno_mayor_no(): void
     {
         $cuenta = $this->cuenta();
         $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
@@ -74,7 +75,7 @@ class CruceDeTicketsTest extends TestCase
         $this->movimiento($cuenta, '71999.00', '2026-04-24');
         $this->movimiento($cuenta, '72000.01', '2026-04-24');
 
-        $this->assertEmpty(app(FindTicketCandidates::class)->handle($ticket)->candidates);
+        $this->assertCount(1, app(FindTicketCandidates::class)->handle($ticket)->candidates);
     }
 
     /**
@@ -295,9 +296,67 @@ class CruceDeTicketsTest extends TestCase
         $otro = $this->movimiento($cuenta, '35000.00', '2026-04-24');
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('35.000,00');
+        $this->expectExceptionMessage('debe coincidir');
 
         app(LinkDepositTicket::class)->handle($ticket, $otro, $this->operador()->id);
+    }
+
+    public function test_dos_creditos_concilian_un_comprobante_solo_si_suman_el_importe_exacto(): void
+    {
+        $cuenta = $this->cuenta();
+        $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
+        $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
+        $segundo = $this->movimiento($cuenta, '40000.00', '2026-04-24');
+
+        app(LinkDepositTicket::class)->handleMany($ticket, [$primero, $segundo], $this->operador()->id);
+
+        $this->assertSame(DepositTicketStatus::Matched, $ticket->refresh()->status);
+        $this->assertEqualsCanonicalizing([$primero->id, $segundo->id], $ticket->transactionIds());
+        $this->assertDatabaseHas('deposit_ticket_additional_transactions', [
+            'deposit_ticket_id' => $ticket->id,
+            'bank_transaction_id' => $segundo->id,
+        ]);
+
+        app(LinkDepositTicket::class)->unlink($ticket, 'Cruce equivocado', $this->operador()->id);
+        $this->assertSame([], $ticket->refresh()->transactionIds());
+    }
+
+    public function test_no_acepta_suma_incompleta_ni_superior_al_comprobante(): void
+    {
+        $cuenta = $this->cuenta();
+        $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
+        $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
+        $menor = $this->movimiento($cuenta, '39000.00', '2026-04-24');
+        $mayor = $this->movimiento($cuenta, '41000.00', '2026-04-24');
+
+        foreach ([[$primero, $menor], [$primero, $mayor]] as $movimientos) {
+            try {
+                app(LinkDepositTicket::class)->handleMany($ticket, $movimientos, $this->operador()->id);
+                $this->fail('Se aceptó una suma distinta del comprobante.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString('importe del comprobante', $e->getMessage());
+            }
+        }
+        $this->assertSame(DepositTicketStatus::Waiting, $ticket->refresh()->status);
+    }
+
+    public function test_la_base_rechaza_un_credito_adicional_que_supera_el_comprobante(): void
+    {
+        $cuenta = $this->cuenta();
+        $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
+        $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
+        $segundo = $this->movimiento($cuenta, '40000.00', '2026-04-24');
+        $extra = $this->movimiento($cuenta, '1.00', '2026-04-24');
+        app(LinkDepositTicket::class)->handleMany($ticket, [$primero, $segundo], $this->operador()->id);
+
+        $this->expectException(QueryException::class);
+        DB::transaction(function () use ($ticket, $extra): void {
+            DB::table('deposit_ticket_additional_transactions')->insert([
+                'deposit_ticket_id' => $ticket->id,
+                'bank_transaction_id' => $extra->id,
+            ]);
+            DB::statement('SET CONSTRAINTS deposit_ticket_extra_match_total IMMEDIATE');
+        });
     }
 
     /** Desvincular devuelve el ticket a la cola y libera el movimiento. */

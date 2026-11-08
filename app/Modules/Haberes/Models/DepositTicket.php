@@ -14,6 +14,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * El comprobante del depósito que llegó con el expediente.
@@ -108,6 +109,24 @@ final class DepositTicket extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(BankTransaction::class, 'bank_transaction_id');
+    }
+
+    /** @return list<int> */
+    public function transactionIds(): array
+    {
+        if ($this->bank_transaction_id === null) {
+            return [];
+        }
+
+        return [
+            $this->bank_transaction_id,
+            ...DB::table('deposit_ticket_additional_transactions')
+                ->where('deposit_ticket_id', $this->id)
+                ->orderBy('bank_transaction_id')
+                ->pluck('bank_transaction_id')
+                ->map(fn ($id): int => (int) $id)
+                ->all(),
+        ];
     }
 
     /** @return BelongsTo<User, $this> */

@@ -221,9 +221,12 @@ final class VoidCashCollection
             ->get();
 
         foreach ($comprobantes as $comprobante) {
-            $movimiento = BankTransaction::query()->findOrFail($comprobante->bank_transaction_id);
+            $libres = collect($comprobante->transactionIds())->every(function (int $id): bool {
+                $movimiento = BankTransaction::query()->findOrFail($id);
 
-            if (Decimal::equals($this->disponible->allocated($movimiento), '0')) {
+                return Decimal::equals($this->disponible->allocated($movimiento), '0');
+            });
+            if ($libres) {
                 $this->vinculo->unlink($comprobante, $motivo->describe(), (int) $actorId, $motivo->code);
             }
         }

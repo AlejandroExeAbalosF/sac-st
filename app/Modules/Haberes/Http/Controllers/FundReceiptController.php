@@ -143,7 +143,11 @@ final class FundReceiptController extends Controller
             $recepcion
                 ->whereExists(fn (QueryBuilder $sub) => $sub
                     ->from('bank_transaction_allocations as bta')
-                    ->join('deposit_tickets as dt', 'dt.bank_transaction_id', '=', 'bta.bank_transaction_id')
+                    ->leftJoin('deposit_ticket_additional_transactions as dta', 'dta.bank_transaction_id', '=', 'bta.bank_transaction_id')
+                    ->join('deposit_tickets as dt', function ($join): void {
+                        $join->on('dt.bank_transaction_id', '=', 'bta.bank_transaction_id')
+                            ->orOn('dt.id', '=', 'dta.deposit_ticket_id');
+                    })
                     ->join('expedientes as e', 'e.id', '=', 'dt.expediente_id')
                     ->whereColumn('bta.financial_event_id', 'fund_receipts.financial_event_id')
                     ->whereNull('bta.reversal_of_id')

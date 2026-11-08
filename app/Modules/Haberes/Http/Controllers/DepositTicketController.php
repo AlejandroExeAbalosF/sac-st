@@ -280,19 +280,21 @@ final class DepositTicketController extends Controller
     public function link(Request $request, DepositTicket $ticket, LinkDepositTicket $vincular): RedirectResponse
     {
         $validado = $request->validate([
-            'bankTransactionId' => ['required', 'integer', 'exists:bank_transactions,id'],
+            'bankTransactionId' => ['required_without:bankTransactionIds', 'integer', 'exists:bank_transactions,id'],
+            'bankTransactionIds' => ['required_without:bankTransactionId', 'array', 'min:1'],
+            'bankTransactionIds.*' => ['required', 'integer', 'distinct', 'exists:bank_transactions,id'],
         ]);
 
-        /** @var BankTransaction $movimiento */
-        $movimiento = BankTransaction::query()->findOrFail($validado['bankTransactionId']);
+        $ids = $validado['bankTransactionIds'] ?? [$validado['bankTransactionId']];
+        $movimientos = BankTransaction::query()->whereKey($ids)->get()->all();
 
         try {
-            $vincular->handle($ticket, $movimiento, (int) $request->user()?->id);
+            $vincular->handleMany($ticket, $movimientos, (int) $request->user()?->id);
         } catch (RuntimeException $e) {
             return $this->backWithError($e);
         }
 
-        return $this->volverALaCuota($ticket, 'El comprobante quedó vinculado a su movimiento bancario.');
+        return $this->volverALaCuota($ticket, 'El comprobante quedó conciliado con los movimientos bancarios.');
     }
 
     public function unlink(Request $request, DepositTicket $ticket, LinkDepositTicket $vincular): RedirectResponse

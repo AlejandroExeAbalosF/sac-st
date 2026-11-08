@@ -325,6 +325,7 @@ declare namespace App {
                     status: App.Modules.Haberes.Enums.DepositTicketStatus;
                     notes: string | null;
                     bankTransactionId: number | null;
+                    bankTransactionIds: number[];
                     matchSignals: Record<string, string> | null;
                     matchedAt: string | null;
                     discardedReason: string | null;

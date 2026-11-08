@@ -15,7 +15,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
  * Todos los créditos a los que este ticket **podría** corresponder.
  *
  * Es la salida al callejón: `FindTicketCandidates` aplica filtros duros
- * —importe exacto, ventana de días— y cuando no encuentra nada la pantalla
+ * —importe no mayor al comprobante, ventana de días— y cuando no encuentra nada la pantalla
  * queda sin nada que ofrecer. Pero «no hay candidatos» casi nunca
  * significa que el depósito no exista; significa que **algo de lo que se
  * transcribió del papel no coincide**, y lo más frecuente es un dígito.
@@ -56,6 +56,11 @@ final class ListAvailableCredits
                     ->from('deposit_tickets')
                     ->whereColumn('deposit_tickets.bank_transaction_id', 'bank_transactions.id')
                     ->where('deposit_tickets.id', '!=', $ticket->id);
+            })
+            ->whereNotExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from('deposit_ticket_additional_transactions')
+                    ->whereColumn('deposit_ticket_additional_transactions.bank_transaction_id', 'bank_transactions.id');
             })
             /*
              * Y lo que ya se imputó por completo tampoco puede respaldar

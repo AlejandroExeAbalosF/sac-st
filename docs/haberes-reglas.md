@@ -110,7 +110,9 @@ Evidencia: [edición](../app/Modules/Haberes/Actions/UpdateInstallment.php),
 Se emite con la cuota completamente financiada y conserva los datos impresos
 en snapshots. En mostrador, el cobro y la emisión pueden ser un solo acto atómico;
 la cantidad a cobrar se deriva del pendiente de la cuota. En banco, el ticket
-requiere identificar el crédito y registrar su recepción/asignación.
+requiere identificar los créditos cuya suma coincide exactamente con su importe y
+registrar una recepción/asignación por cada movimiento. La selección parcial no
+queda conciliada; una suma superior se rechaza en la pantalla, el Action y la base.
 
 Un crédito anterior a la apertura de los libros ya está en el saldo inicial: no se
 vincula ni se registra, y esa plata va por «Cuota del sistema anterior». La búsqueda lo

@@ -91,8 +91,10 @@ emisión en una transacción cuando corresponde cobrar. Obtiene el importe pendi
 y el medio de la cuota, no de un importe libre enviado por el navegador.
 
 **Depósito en cuenta.** El comprobante se carga desde la cuota. La cola `/depositos`
-permite buscar y vincular el crédito del extracto. La recepción y la asignación
-registran el dinero identificado; la foto del ticket por sí sola no financia la cuota.
+permite buscar y vincular uno o varios créditos del extracto. Se seleccionan juntos:
+la suma no puede superar el importe del comprobante y solo se confirma el cruce
+cuando coincide exactamente. Cada crédito genera su propia recepción y asignación;
+la foto del ticket por sí sola no financia la cuota.
 
 **Anular el recibo de una cuota cobrada por banco deshace la conciliación.** Con un
 solo motivo libera la cuota, revierte la recepción, anula el recibo y devuelve el
