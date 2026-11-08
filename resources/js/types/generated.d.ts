@@ -258,6 +258,17 @@ declare namespace App {
         }
         namespace Haberes {
             namespace Data {
+                export type AllInstallmentRowData = {
+                    installmentId: number;
+                    expedienteId: number;
+                    haberNumber: number;
+                    expedienteNumber: string;
+                    beneficiaryName: string;
+                    installmentLabel: string;
+                    concept: string | null;
+                    amount: string;
+                    status: string;
+                };
                 export type ChequeAssignmentData = {
                     installmentId: number;
                     installmentNumber: number;

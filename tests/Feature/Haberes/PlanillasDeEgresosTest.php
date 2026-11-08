@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Haberes;
 
 use App\Models\User;
+use App\Modules\Haberes\Data\AllInstallmentRowData;
 use App\Modules\Haberes\Data\CounterPayoutRowData;
 use App\Modules\Haberes\Data\UnconfirmedTransferRowData;
 use App\Modules\Haberes\Enums\DisbursementStatus;
+use App\Modules\Haberes\Pdf\AllInstallmentsSheet;
 use App\Modules\Haberes\Pdf\CounterPayoutSheet;
 use App\Modules\Haberes\Pdf\UnconfirmedTransferSheet;
 use App\Support\Pdf\WorksheetData;
@@ -51,6 +53,38 @@ class PlanillasDeEgresosTest extends TestCase
 
         $respuesta->assertOk();
         $this->assertSame('application/pdf', $respuesta->headers->get('content-type'));
+    }
+
+    public function test_la_ruta_devuelve_un_pdf_de_todas_las_cuotas(): void
+    {
+        $respuesta = $this->actingAs($this->operador())
+            ->get(route('planillas.print', ['cola' => 'todas']));
+
+        $respuesta->assertOk();
+        $this->assertSame('application/pdf', $respuesta->headers->get('content-type'));
+        $this->assertStringContainsString('planilla-todas-las-cuotas-',
+            (string) $respuesta->headers->get('content-disposition'));
+    }
+
+    public function test_la_planilla_general_muestra_estado_sin_casilla_de_tilde(): void
+    {
+        $hoja = app(AllInstallmentsSheet::class)->build([
+            new AllInstallmentRowData(
+                installmentId: 1,
+                expedienteId: 2,
+                haberNumber: 1,
+                expedienteNumber: '34-000001/2026',
+                beneficiaryName: 'PÉREZ, Juan',
+                installmentLabel: 'Haber 1 · Cuota 1 de 2',
+                concept: 'Indemnización',
+                amount: '1000.50',
+                status: 'Pagada',
+            ),
+        ], CarbonImmutable::parse('2026-06-25 11:00'));
+
+        $this->assertSame('Pagada', $hoja->rows[0][5]);
+        $this->assertFalse(collect($hoja->columns)->contains(fn ($columna): bool => $columna->tickBox));
+        $this->assertSame([], $hoja->totals);
     }
 
     /** En línea y no como descarga, igual que los comprobantes. */

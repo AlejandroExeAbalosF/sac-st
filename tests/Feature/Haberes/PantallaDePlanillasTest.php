@@ -56,6 +56,40 @@ class PantallaDePlanillasTest extends TestCase
             );
     }
 
+    public function test_todas_incluye_las_anuladas_y_las_pagadas_fuera_del_circuito(): void
+    {
+        $anulada = $this->cuota();
+        $historica = $this->cuotas()->whereKeyNot($anulada->id)->firstOrFail();
+        $anulada->forceFill(['workflow_status' => InstallmentWorkflowStatus::Cancelled])->save();
+        $historica->forceFill(['workflow_status' => InstallmentWorkflowStatus::LegacySettled])->save();
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas']))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('cola', 'todas')
+                ->where('allCount', BeneficiaryInstallment::query()->count())
+                ->where('all.data.0.installmentId', $anulada->id)
+                ->where('all.data.0.status', 'Anulada')
+                ->where('all.data.1.installmentId', $historica->id)
+                ->where('all.data.1.status', 'Pagada fuera del circuito')
+                ->has('counter', 0)
+                ->has('transfers', 0));
+    }
+
+    public function test_las_ideas_de_filtros_solo_se_ofrecen_al_super_admin(): void
+    {
+        $this->actingAs($this->operador('administrativo'))
+            ->get(route('planillas.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canSeeFilterNotes', false));
+
+        $this->actingAs($this->operador('super-admin'))
+            ->get(route('planillas.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canSeeFilterNotes', true));
+    }
+
     /** Cobrada en efectivo y con su recibo, la cuota entra en la fila. */
     public function test_una_cuota_cobrada_en_efectivo_aparece_en_el_mostrador(): void
     {

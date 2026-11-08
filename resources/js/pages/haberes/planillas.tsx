@@ -1,9 +1,19 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Banknote, ChevronRight, Clock, Printer } from 'lucide-react';
 import PageHeader from '@/components/page-header';
+import PaginationFooter from '@/components/pagination-footer';
+import type { PaginationData } from '@/components/pagination-footer';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { show as haberShow } from '@/routes/haberes/haber';
@@ -11,13 +21,17 @@ import { index, print } from '@/routes/planillas';
 
 type CounterRow = App.Modules.Haberes.Data.CounterPayoutRowData;
 type TransferRow = App.Modules.Haberes.Data.UnconfirmedTransferRowData;
+type AllRow = App.Modules.Haberes.Data.AllInstallmentRowData;
 
-type Cola = 'mostrador' | 'transferencias';
+type Cola = 'mostrador' | 'transferencias' | 'todas';
 
 type Props = {
     cola: Cola;
     counter: CounterRow[];
     transfers: TransferRow[];
+    all: (PaginationData & { data: AllRow[] }) | null;
+    allCount: number;
+    canSeeFilterNotes: boolean;
     /** Sumados en el servidor: acá el dinero no se suma, se muestra. */
     counterTotal: string;
     transfersTotal: string;
@@ -51,6 +65,9 @@ export default function Egresos({
     cola,
     counter,
     transfers,
+    all,
+    allCount,
+    canSeeFilterNotes,
     counterTotal,
     transfersTotal,
 }: Props) {
@@ -62,6 +79,7 @@ export default function Egresos({
         );
 
     const enMostrador = cola === 'mostrador';
+    const enTransferencias = cola === 'transferencias';
 
     return (
         <>
@@ -71,7 +89,7 @@ export default function Egresos({
                 <PageHeader
                     eyebrow="Haberes"
                     title="Planillas"
-                    description="Lo que está listo para entregarse y lo que salió por el banco sin confirmar."
+                    description="Cuotas por entregar, transferencias sin confirmar y el inventario completo con su estado."
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -82,10 +100,16 @@ export default function Egresos({
                         cantidad={counter.length}
                     />
                     <Solapa
-                        activo={!enMostrador}
+                        activo={enTransferencias}
                         onClick={() => cambiar('transferencias')}
                         etiqueta="Transferencias sin confirmar"
                         cantidad={transfers.length}
+                    />
+                    <Solapa
+                        activo={cola === 'todas'}
+                        onClick={() => cambiar('todas')}
+                        etiqueta="Todas las cuotas"
+                        cantidad={allCount}
                     />
 
                     <Button
@@ -110,11 +134,159 @@ export default function Egresos({
 
                 {enMostrador ? (
                     <Mostrador filas={counter} total={counterTotal} />
-                ) : (
+                ) : enTransferencias ? (
                     <Transferencias filas={transfers} total={transfersTotal} />
-                )}
+                ) : all ? (
+                    <TodasLasCuotas pagina={all} />
+                ) : null}
             </div>
+
+            {canSeeFilterNotes && <FilterNotesPanel />}
         </>
+    );
+}
+
+function FilterNotesPanel() {
+    return (
+        <Sheet>
+            <SheetTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="fixed top-1/2 right-0 z-40 h-auto -translate-y-1/2 rounded-r-none border-r-0 bg-card px-2 py-3 text-xs shadow-raised [writing-mode:vertical-rl]"
+                >
+                    Ideas de filtros
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="overflow-y-auto">
+                <SheetHeader className="border-b pr-12">
+                    <SheetTitle>Filtros para planillas</SheetTitle>
+                    <SheetDescription>
+                        Propuestas para ampliar la búsqueda y la impresión.
+                    </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-4 px-4 text-sm leading-relaxed">
+                    <p>
+                        Agregar después filtros por{' '}
+                        <strong>expediente o beneficiario</strong> y por{' '}
+                        <strong>estado</strong>; serían los más útiles para
+                        encontrar cuotas en un listado grande.
+                    </p>
+                    <p>
+                        Luego, si hace falta, por empleador, medio y fechas.
+                        Cada filtro debería reflejarse también en el PDF.
+                    </p>
+                </div>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+function TodasLasCuotas({
+    pagina,
+}: {
+    pagina: PaginationData & { data: AllRow[] };
+}) {
+    if (pagina.total === 0) {
+        return (
+            <Vacio
+                titulo="No hay cuotas registradas."
+                detalle="La planilla general se completa a medida que se cargan los haberes."
+            />
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+                Incluye cuotas vigentes, pagadas, históricas y anuladas. La
+                planilla PDF contiene todas; la pantalla muestra 50 por página.
+            </p>
+            <div className="grid gap-3 md:hidden">
+                {pagina.data.map((fila) => (
+                    <Link
+                        key={fila.installmentId}
+                        href={haberShow([fila.expedienteId, fila.haberNumber])}
+                        className="rounded-lg border p-3 transition-colors hover:bg-muted/40"
+                    >
+                        <div className="flex items-baseline justify-between gap-3">
+                            <span className="font-medium">
+                                {fila.beneficiaryName}
+                            </span>
+                            <span className="font-mono tabular-nums">
+                                {money(fila.amount)}
+                            </span>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                            {fila.expedienteNumber} · {fila.installmentLabel}
+                        </div>
+                        <p className="mt-2 text-xs font-medium">
+                            {fila.status}
+                        </p>
+                    </Link>
+                ))}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+                <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left">
+                        <tr>
+                            <th className="p-3 font-medium text-field-label">
+                                Beneficiario
+                            </th>
+                            <th className="p-3 font-medium text-field-label">
+                                Expediente
+                            </th>
+                            <th className="p-3 font-medium text-field-label">
+                                Haber / Cuota
+                            </th>
+                            <th className="p-3 text-right font-medium text-field-label">
+                                Importe
+                            </th>
+                            <th className="p-3 font-medium text-field-label">
+                                Estado
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {pagina.data.map((fila) => (
+                            <tr key={fila.installmentId} className="border-t">
+                                <td className="p-3 font-medium">
+                                    {fila.beneficiaryName}
+                                </td>
+                                <td className="p-3">{fila.expedienteNumber}</td>
+                                <td className="p-3">
+                                    <Link
+                                        href={haberShow([
+                                            fila.expedienteId,
+                                            fila.haberNumber,
+                                        ])}
+                                        className="hover:underline"
+                                    >
+                                        {fila.installmentLabel}
+                                    </Link>
+                                    {fila.concept && (
+                                        <div className="text-xs text-muted-foreground">
+                                            {fila.concept}
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="p-3 text-right font-mono tabular-nums">
+                                    {money(fila.amount)}
+                                </td>
+                                <td className="p-3">{fila.status}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <PaginationFooter
+                pagination={pagina}
+                singular="cuota"
+                plural="cuotas"
+            />
+        </div>
     );
 }
 

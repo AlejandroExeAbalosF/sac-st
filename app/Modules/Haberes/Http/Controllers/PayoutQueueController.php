@@ -5,17 +5,25 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Haberes\Data\AllInstallmentRowData;
 use App\Modules\Haberes\Data\CounterPayoutRowData;
 use App\Modules\Haberes\Data\UnconfirmedTransferRowData;
+use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Modules\Haberes\Pdf\AllInstallmentsSheet;
 use App\Modules\Haberes\Pdf\CounterPayoutSheet;
 use App\Modules\Haberes\Pdf\UnconfirmedTransferSheet;
 use App\Modules\Haberes\Support\CounterPayoutQueue;
+use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\TransferStage;
+use App\Modules\Shared\Enums\SystemRole;
 use App\Support\Money\Decimal;
 use App\Support\Pdf\Worksheet;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -23,15 +31,15 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 /**
  * Lo que el sistema le debe a alguien, o le debe al libro.
  *
- * Dos colas, una pantalla, porque son las dos mitades del mismo dinero
- * saliendo y las decide el mismo `DisbursementEligibility`:
+ * Dos colas de trabajo y un inventario completo. Las colas son las dos
+ * mitades del dinero saliendo y las decide el mismo `DisbursementEligibility`:
  *
  * | Solapa | Qué espera | De quién es el trabajo |
  * |---|---|---|
  * | `mostrador` | nada: se paga ya | el cajero |
  * | `transferencias` | el débito, el informe o el cotejo | el contador |
  *
- * **Ninguna de las dos escribe nada.** Es una pantalla de lectura que
+ * **Ninguna vista escribe nada.** Es una pantalla de lectura que
  * lleva a la cuota, que es donde viven los actos. Por eso tampoco hay
  * Actions acá: no hay nada que accionar, hay algo que mirar y una hoja que
  * imprimir.
@@ -46,9 +54,12 @@ final class PayoutQueueController extends Controller
 
     private const TRANSFERENCIAS = 'transferencias';
 
+    private const TODAS = 'todas';
+
     public function __construct(
         private readonly CounterPayoutQueue $mostrador,
         private readonly TransferStage $etapa,
+        private readonly InstallmentStages $etapasDeCuotas,
     ) {}
 
     public function index(Request $request): Response
@@ -61,11 +72,16 @@ final class PayoutQueueController extends Controller
          */
         $mostrador = $this->mostrador->resolve();
         $transferencias = $this->transferencias();
+        $cola = $this->cola($request);
+        $todas = $cola === self::TODAS ? $this->todasPaginadas() : null;
 
         return Inertia::render('haberes/planillas', [
-            'cola' => $this->cola($request),
+            'cola' => $cola,
             'counter' => $mostrador,
             'transfers' => $transferencias,
+            'all' => $todas,
+            'allCount' => $todas?->total() ?? BeneficiaryInstallment::query()->count(),
+            'canSeeFilterNotes' => $request->user()?->hasRole(SystemRole::SuperAdmin->value) ?? false,
             /*
              * Los totales se suman acá y bajan como cadena. El navegador no
              * suma dinero: `Number` sobre importes es un `float` sobre plata
@@ -79,10 +95,10 @@ final class PayoutQueueController extends Controller
     }
 
     /**
-     * La cola de la solapa abierta, en papel.
+     * La vista abierta, en papel.
      *
      * Una ruta y no dos porque es la misma acción sobre la misma pantalla:
-     * imprimir lo que se está mirando. Cuál de las dos sale lo dice el
+     * imprimir lo que se está mirando. Cuál sale lo dice el
      * mismo parámetro que elige la solapa.
      */
     public function sheet(
@@ -90,11 +106,14 @@ final class PayoutQueueController extends Controller
         Worksheet $molde,
         CounterPayoutSheet $planillaMostrador,
         UnconfirmedTransferSheet $planillaTransferencias,
+        AllInstallmentsSheet $planillaTodas,
     ): SymfonyResponse {
         $ahora = CarbonImmutable::now();
         $quien = $request->user()?->name;
 
-        if ($this->cola($request) === self::TRANSFERENCIAS) {
+        if ($this->cola($request) === self::TODAS) {
+            $hoja = $planillaTodas->build($this->todas(), $ahora, $quien);
+        } elseif ($this->cola($request) === self::TRANSFERENCIAS) {
             $filas = $this->transferencias();
             $hoja = $planillaTransferencias->build($filas, $this->total($filas), $ahora, $quien);
         } else {
@@ -105,6 +124,41 @@ final class PayoutQueueController extends Controller
         // En línea y no como descarga, igual que los comprobantes: lo normal
         // es mirarla y mandarla a imprimir, no guardarla en Descargas.
         return $molde->render($hoja)->stream($hoja->filename());
+    }
+
+    /** @return Builder<BeneficiaryInstallment> */
+    private function consultaDeCuotas(): Builder
+    {
+        return BeneficiaryInstallment::query()->with([
+            'haber.beneficiary',
+            'haber.expediente',
+            'managementLabel',
+        ]);
+    }
+
+    /** @return LengthAwarePaginator<int, AllInstallmentRowData> */
+    private function todasPaginadas(): LengthAwarePaginator
+    {
+        $pagina = $this->consultaDeCuotas()->orderBy('id')->paginate(50)->withQueryString();
+        $etapas = $this->etapasDeCuotas->forMany($pagina->getCollection());
+
+        return $pagina->through(fn (BeneficiaryInstallment $cuota): AllInstallmentRowData => AllInstallmentRowData::fromModel($cuota, $etapas[(int) $cuota->id]));
+    }
+
+    /** @return list<AllInstallmentRowData> */
+    private function todas(): array
+    {
+        $filas = [];
+
+        $this->consultaDeCuotas()->chunkById(250, function (Collection $cuotas) use (&$filas): void {
+            $etapas = $this->etapasDeCuotas->forMany($cuotas);
+
+            foreach ($cuotas as $cuota) {
+                $filas[] = AllInstallmentRowData::fromModel($cuota, $etapas[(int) $cuota->id]);
+            }
+        });
+
+        return $filas;
     }
 
     /**
@@ -167,11 +221,13 @@ final class PayoutQueueController extends Controller
         return $desde === null ? 0 : (int) $desde->diffInDays(CarbonImmutable::now(), false);
     }
 
-    /** Cuál de las dos colas se está mirando. Ante cualquier cosa, el mostrador. */
+    /** Qué planilla se está mirando. Ante cualquier cosa, el mostrador. */
     private function cola(Request $request): string
     {
-        return $request->query('cola') === self::TRANSFERENCIAS
-            ? self::TRANSFERENCIAS
-            : self::MOSTRADOR;
+        return match ($request->query('cola')) {
+            self::TRANSFERENCIAS => self::TRANSFERENCIAS,
+            self::TODAS => self::TODAS,
+            default => self::MOSTRADOR,
+        };
     }
 }

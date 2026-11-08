@@ -207,9 +207,17 @@ el informe del organismo y el débito del extracto pueden registrarse en cualqui
 orden. Reunirlos deja el egreso listo para validar; **no lo confirma automáticamente**.
 La validación registra el asiento, marca la cuota pagada y completa la Orden.
 
-El recibo de egreso requiere un egreso confirmado. Las colas y planillas de seguimiento
-están en `/haberes/planillas`. Su número de talonario también admite una foto o PDF
-opcional de la hoja firmada, archivado con el recibo.
+El recibo de egreso requiere un egreso confirmado. En `/haberes/planillas` siguen
+las colas «Por entregar» y «Transferencias sin confirmar», y se puede consultar
+e imprimir «Todas las cuotas». Esta última incluye vigentes, pagadas, históricas
+y anuladas con su estado; pagina de a 50 en pantalla y el PDF incluye todas.
+No suma sus importes como dinero disponible ni usa una casilla de entrega, porque
+las filas representan situaciones distintas. El número de talonario del recibo
+de egreso también admite una foto o PDF opcional de la hoja firmada, archivado
+con el recibo.
+
+Una pestaña en el borde derecho abre un panel con ideas para futuros filtros.
+Solo se ofrece a quienes tienen el rol `super-admin`; no modifica las planillas.
 
 Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 
