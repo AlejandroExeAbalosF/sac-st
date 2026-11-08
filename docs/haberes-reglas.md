@@ -36,10 +36,12 @@ reconoce el ingreso o el egreso. Ledger no depende de los modelos de Haberes.
 
 - El número canónico del expediente tiene índice único; el ordinal del haber es
   único dentro del expediente y el de la cuota dentro del haber.
-- Haber y cuota exigen importes positivos. El trigger diferido
-  `beneficiary_installments_sum` verifica, al cambiar cuotas, que la suma de las no
-  anuladas no supere el importe del haber. No exige igualdad mientras el plan se carga.
-- `UpdateInstallment` exige haber y cuota activos, versión vigente y respeto del total.
+- Haber y cuota exigen importes positivos. Desde la migración
+  `2026_11_08_010000_allow_payable_installment_excess`, las cuotas pueden sumar
+  más que el importe reconocido; la diferencia es pagable. El total reconocido
+  permanece separado y se muestra el excedente en el plan. Con el plan completo,
+  la aplicación exige que la suma cubra al menos el reconocido.
+- `UpdateInstallment` exige haber y cuota activos y versión vigente.
   Si reducir una cuota deja saldo en un plan completo, aumenta la cantidad prevista
   para reflejar una cuota pendiente; rechaza ese caso al alcanzar el máximo de 60.
 

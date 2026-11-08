@@ -16,7 +16,7 @@ use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Corrige una cuota activa preservando el total reconocido y los cambios concurrentes. */
+/** Corrige una cuota activa preservando los cambios concurrentes. */
 final class UpdateInstallment
 {
     public function __construct(
@@ -72,12 +72,6 @@ final class UpdateInstallment
             $assigned = $lockedHaber->importeAsignado();
             $loaded = $lockedHaber->installments()->count();
             $expected = $lockedHaber->expected_installment_count ?? $loaded;
-
-            if (bccomp($newSum, $assigned, 2) === 1) {
-                throw ValidationException::withMessages([
-                    'amount' => 'El importe hace que las cuotas superen el total reconocido del haber.',
-                ]);
-            }
 
             if ($loaded < $expected && bccomp($newSum, $assigned, 2) === 0) {
                 throw ValidationException::withMessages([

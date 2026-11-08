@@ -387,28 +387,44 @@ class AgregarHaberTest extends TestCase
             ->assertSessionHasErrors('installments');
     }
 
-    /**
-     * El control central: mientras falten cuotas por definir la suma puede
-     * ser menor, pero nunca mayor.
-     */
-    public function test_the_installments_can_not_exceed_the_haber_amount()
+    public function test_a_single_installment_can_include_a_payable_excess(): void
     {
         $datos = $this->haber();
-        $datos['installments'][0]['amount'] = '9000000.00';
+        $datos['installments'][0]['amount'] = bcadd($datos['assignedAmount'], '25.00', 2);
 
         $this->actingAs($this->operador())
             ->post(route('haberes.haber.store', $this->expediente(self::SIN_HABERES)), $datos)
-            ->assertSessionHasErrors('installments');
+            ->assertSessionHasNoErrors();
+
+        $haber = $this->expediente(self::SIN_HABERES)->haberes()
+            ->where('beneficiary_id', $datos['beneficiaryId'])->firstOrFail();
+        $this->assertSame($datos['assignedAmount'], $haber->importeAsignado());
+        $this->assertSame($datos['installments'][0]['amount'], $haber->installments()->firstOrFail()->importeEsperado());
     }
 
-    public function test_the_haber_amount_can_not_be_reduced_below_its_installments(): void
+    public function test_the_first_of_two_installments_can_exceed_the_recognized_total(): void
+    {
+        $datos = $this->haber();
+        $datos['expectedInstallmentCount'] = 2;
+        $datos['installments'][0]['amount'] = bcadd($datos['assignedAmount'], '500.00', 2);
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.haber.store', $this->expediente(self::SIN_HABERES)), $datos)
+            ->assertSessionHasNoErrors();
+
+        $haber = $this->expediente(self::SIN_HABERES)->haberes()
+            ->where('beneficiary_id', $datos['beneficiaryId'])->firstOrFail();
+        $this->assertSame(2, $haber->expected_installment_count);
+        $this->assertSame($datos['installments'][0]['amount'], $haber->sumaDeCuotas());
+    }
+
+    public function test_reducing_the_recognized_amount_preserves_the_payable_installment(): void
     {
         $haber = $this->expediente('125957/2026')->haberes()->firstOrFail();
-
-        $this->expectException(QueryException::class);
-
         $haber->update(['assigned_amount' => '100.00']);
-        DB::statement('SET CONSTRAINTS haber_assigned_amount_sum IMMEDIATE');
+
+        $this->assertSame('100.00', $haber->refresh()->importeAsignado());
+        $this->assertTrue(bccomp($haber->sumaDeCuotas(), $haber->importeAsignado(), 2) === 1);
     }
 
     /**
@@ -428,7 +444,7 @@ class AgregarHaberTest extends TestCase
             ->assertSessionHasNoErrors();
     }
 
-    public function test_once_every_expected_installment_is_loaded_the_sum_must_match_exactly()
+    public function test_once_every_expected_installment_is_loaded_the_sum_must_cover_the_recognized_amount()
     {
         $datos = $this->haber();
         $datos['assignedAmount'] = '1200000.00';

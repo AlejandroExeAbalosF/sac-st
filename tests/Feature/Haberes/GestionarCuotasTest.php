@@ -76,6 +76,25 @@ final class GestionarCuotasTest extends TestCase
         $this->assertSame(1, $haber->installments()->count());
     }
 
+    public function test_the_last_installment_can_include_a_payable_excess(): void
+    {
+        $haber = $this->haber('77420/2024');
+        $haber->update([
+            'assigned_amount' => '120000.00',
+            'expected_installment_count' => 2,
+            'payment_terms' => 'installments',
+        ]);
+
+        $this->actingAs($this->operador())
+            ->post(
+                route('haberes.installments.store', [$haber->expediente, $haber]),
+                $this->installmentData('24025.00'),
+            )
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('120025.00', $haber->fresh()->sumaDeCuotas());
+    }
+
     public function test_it_can_not_add_more_installments_than_the_plan_expects(): void
     {
         $haber = $this->haber('77420/2024');
@@ -133,6 +152,23 @@ final class GestionarCuotasTest extends TestCase
             ])
             ->assertRedirect(route('haberes.haber.show', [$haber->expediente, $haber]))
             ->assertSessionHasNoErrors();
+    }
+
+    public function test_a_quota_can_be_increased_above_the_recognized_total(): void
+    {
+        $haber = $this->haber('77420/2024');
+        $installment = $haber->installments()->firstOrFail();
+        $importe = bcadd($haber->importeAsignado(), '25.00', 2);
+
+        $this->actingAs($this->operador())
+            ->patch(route('haberes.installments.update', [$haber->expediente, $haber, $installment]), [
+                ...$this->installmentData($importe),
+                'version' => $installment->updated_at->toISOString(),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($importe, $installment->refresh()->importeEsperado());
+        $this->assertSame('1', (string) $haber->refresh()->expected_installment_count);
     }
 
     public function test_reducing_a_complete_plan_opens_one_explicit_missing_installment(): void

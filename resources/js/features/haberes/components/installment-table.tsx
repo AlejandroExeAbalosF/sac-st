@@ -45,7 +45,7 @@ const MEDIOS = [
  * lo contrario con un campo de «cantidad» que dividía solo.
  *
  * La suma corriente se calcula con aritmética exacta de centavos y se
- * compara contra el importe del haber en el momento, no al guardar.
+ * compara contra el importe reconocido en el momento, no al guardar.
  */
 export default function InstallmentTable({
     haber,
@@ -68,6 +68,8 @@ export default function InstallmentTable({
     const faltan = haber.expectedInstallmentCount - haber.installments.length;
     const completas = faltan <= 0;
     const resto = sumAmounts([total, `-${suma.replace('-', '')}`]);
+    const excedente =
+        comparacion === 1 ? sumAmounts([suma, `-${total}`]) : '0.00';
 
     /*
      * Cargar la diferencia a mano es tipear un numero que el sistema ya
@@ -423,17 +425,15 @@ export default function InstallmentTable({
 
             {/*
              * El control que importa: mientras falten cuotas por definir la
-             * suma puede ser menor, pero nunca mayor. Cuando ya están todas
-             * las previstas, tiene que dar exacto.
+             * suma puede ser menor. Cuando ya están todas las previstas,
+             * debe cubrir el reconocido; el exceso también se paga.
              */}
             <p
                 className={cn(
                     'mt-2 flex flex-wrap items-baseline gap-x-2 text-xs',
-                    comparacion === 1
-                        ? 'text-destructive-strong'
-                        : comparacion !== null && completas && comparacion !== 0
-                          ? 'text-warning-strong'
-                          : 'text-muted-foreground',
+                    comparacion !== null && completas && comparacion === -1
+                        ? 'text-warning-strong'
+                        : 'text-muted-foreground',
                 )}
             >
                 <span>Suma de cuotas</span>
@@ -441,8 +441,8 @@ export default function InstallmentTable({
                 <span>de</span>
                 <Money value={total} className="text-sm" />
                 {comparacion === 1 && (
-                    <span className="font-medium">
-                        — supera el importe del haber
+                    <span className="font-medium text-warning-strong">
+                        — excedente pagable de <Money value={excedente} />
                     </span>
                 )}
                 {coincide && (

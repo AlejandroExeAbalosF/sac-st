@@ -19,9 +19,8 @@ use Illuminate\Support\Facades\DB;
  * derecho válido, y dejarla anotada obligaría a distinguir después entre
  * «vale cero» y «todavía no se sabe».
  *
- * El trigger de la base impide que la suma supere el derecho del haber, y
- * es diferido: las cuotas se insertan de a una y la comprobación ocurre al
- * confirmar la transacción, no fila por fila.
+ * El importe reconocido permanece en el haber; la suma de las cuotas
+ * puede incluir un excedente pagable al beneficiario.
  */
 final class AddHaber
 {

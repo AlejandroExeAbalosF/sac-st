@@ -170,10 +170,12 @@ export default function MostrarHaber({
     const anulado = haber.status === 'cancelled';
     const cargadas = haber.installments.length;
     const suma = sumAmounts(
-        haber.installments.map((cuota) => cuota.expectedAmount),
+        haber.installments
+            .filter((cuota) => cuota.status !== 'cancelled')
+            .map((cuota) => cuota.expectedAmount),
     );
     const falta = sumAmounts([haber.assignedAmount, `-${suma}`]);
-    const cierra = compareAmounts(suma, haber.assignedAmount) === 0;
+    const comparacionPlan = compareAmounts(suma, haber.assignedAmount);
 
     return (
         <>
@@ -435,14 +437,21 @@ export default function MostrarHaber({
 
                         {/*
                          * El control que importa: la suma de las cuotas
-                         * cargadas contra el derecho reconocido. Mientras
-                         * falten cuotas puede ser menor; cuando estén todas,
-                         * tiene que dar exacto.
+                         * cargadas contra el derecho reconocido. Un importe
+                         * mayor se paga y se muestra como excedente.
                          */}
                         <span className="text-xs text-muted-foreground">
-                            {cierra ? (
+                            {comparacionPlan === 0 ? (
                                 <span className="text-success-strong">
                                     Las cuotas suman el total reconocido
+                                </span>
+                            ) : comparacionPlan === 1 ? (
+                                <span className="text-warning-strong">
+                                    Cuotas por <Money value={suma} /> ·
+                                    excedente pagable de{' '}
+                                    <Money value={falta.replace('-', '')} />{' '}
+                                    sobre <Money value={haber.assignedAmount} />{' '}
+                                    reconocidos
                                 </span>
                             ) : (
                                 <>

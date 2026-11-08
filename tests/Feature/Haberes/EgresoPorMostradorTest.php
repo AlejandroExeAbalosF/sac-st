@@ -79,6 +79,26 @@ class EgresoPorMostradorTest extends TestCase
         $this->assertSame(1, $this->recibosDeEgreso()->count());
     }
 
+    public function test_el_excedente_de_la_cuota_se_cobra_y_se_paga_al_beneficiario(): void
+    {
+        $cuota = $this->cuotaCobrada(excess: '25.00');
+        $this->assertTrue(bccomp($cuota->importeEsperado(), $cuota->haber->importeAsignado(), 2) === 1);
+
+        $this->entregar($cuota)->assertSessionHasNoErrors();
+
+        $this->assertSame($cuota->importeEsperado(), Disbursement::query()->firstOrFail()->amount);
+        $this->assertSame($cuota->importeEsperado(), $this->recibosDeEgreso()->firstOrFail()->amount);
+
+        $this->actingAs($this->operador('administrativo'))
+            ->get('/caja/dia?fecha='.BusinessDate::today()->toDateString())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('book.income', 1)
+                ->where('book.income.0.cash', $cuota->importeEsperado())
+                ->has('book.expense', 1)
+                ->where('book.expense.0.cash', $cuota->importeEsperado()));
+    }
+
     /**
      * Y el recibo aparece en los movimientos del día, del lado de egresos.
      *
@@ -425,7 +445,7 @@ class EgresoPorMostradorTest extends TestCase
      * Es el punto de partida real del egreso: el empleador ya pagó y el
      * dinero está en la caja esperando que el trabajador se presente.
      */
-    private function cuotaCobrada(bool $cheque = false): BeneficiaryInstallment
+    private function cuotaCobrada(bool $cheque = false, ?string $excess = null): BeneficiaryInstallment
     {
         $cuota = Expediente::query()
             ->whereNotNull('employer_id')
@@ -438,7 +458,12 @@ class EgresoPorMostradorTest extends TestCase
             ->orderBy('installment_number')
             ->firstOrFail();
 
-        $cuota->forceFill(['expected_medium' => $cheque ? 'cheque' : 'cash'])->save();
+        $cuota->forceFill([
+            'expected_medium' => $cheque ? 'cheque' : 'cash',
+            ...($excess !== null ? [
+                'expected_amount' => bcadd($cuota->haber->importeAsignado(), $excess, 2),
+            ] : []),
+        ])->save();
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [

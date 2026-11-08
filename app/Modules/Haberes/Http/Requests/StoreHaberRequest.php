@@ -221,8 +221,8 @@ final class StoreHaberRequest extends FormRequest
     }
 
     /**
-     * La suma de las cuotas cargadas nunca supera el importe del haber, y
-     * tiene que darle exacto cuando ya están las que se preveían.
+     * Las cuotas pueden incluir un excedente pagable sobre el importe
+     * reconocido. Con el plan completo, no pueden quedar por debajo.
      */
     private function validarSumaDeCuotas(Validator $validator): void
     {
@@ -246,19 +246,10 @@ final class StoreHaberRequest extends FormRequest
 
         $comparacion = bccomp($suma, bcadd($total, '0', 2), 2);
 
-        if ($comparacion === 1) {
+        if (count($cuotas) >= $previstas && $comparacion === -1) {
             $validator->errors()->add(
                 'installments',
-                'La suma de las cuotas supera el importe del haber.',
-            );
-
-            return;
-        }
-
-        if (count($cuotas) >= $previstas && $comparacion !== 0) {
-            $validator->errors()->add(
-                'installments',
-                'Ya están cargadas todas las cuotas previstas, así que la suma tiene que dar exactamente el importe del haber.',
+                'Ya están cargadas todas las cuotas previstas, pero la suma no alcanza el importe reconocido del haber.',
             );
         }
     }

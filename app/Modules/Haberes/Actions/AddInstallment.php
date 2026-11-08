@@ -13,7 +13,7 @@ use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Agrega la próxima cuota prevista sin permitir exceder el derecho del haber. */
+/** Agrega la próxima cuota prevista; el excedente también es pagable. */
 final class AddInstallment
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
@@ -89,17 +89,11 @@ final class AddInstallment
      */
     private function validateSum(string $sum, string $assigned, bool $completesPlan): void
     {
-        if (bccomp($sum, $assigned, 2) === 1) {
-            throw ValidationException::withMessages([
-                'amount' => 'El importe hace que las cuotas superen el total reconocido del haber.',
-            ]);
-        }
-
-        if ($completesPlan && bccomp($sum, $assigned, 2) !== 0) {
+        if ($completesPlan && bccomp($sum, $assigned, 2) === -1) {
             $remaining = bcsub($assigned, $sum, 2);
 
             throw ValidationException::withMessages([
-                'amount' => "Es la última cuota prevista: debe completar exactamente el haber. Faltan {$remaining}.",
+                'amount' => "Es la última cuota prevista: debe cubrir al menos el importe reconocido del haber. Faltan {$remaining}.",
             ]);
         }
     }

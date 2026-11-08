@@ -28,9 +28,12 @@ no equivale a una cuota pagada.
 
 ## Expedientes, haberes y cuotas
 
-El expediente agrupa los derechos de los beneficiarios. Cada haber reconoce un importe
-y lo distribuye en cuotas; puede haber cuotas previstas todavía sin cargar. La suma
-de las cuotas no anuladas no puede superar el importe reconocido del haber.
+El expediente agrupa los derechos de los beneficiarios. Cada haber conserva el
+importe reconocido y lo distribuye en cuotas; puede haber cuotas previstas todavía
+sin cargar. Las cuotas pueden sumar más que el reconocido cuando se recibe un
+importe mayor: la diferencia se muestra como excedente pagable y forma parte del
+importe de la cuota, del comprobante y del pago al beneficiario. Con todas las
+cuotas previstas cargadas, la suma debe cubrir al menos el reconocido.
 
 El listado está en `/haberes/expedientes`. La ficha va por el id y el número
 completo de SiCE con guiones: `/haberes/expedientes/75/0030064-125957-2026-0`. **El

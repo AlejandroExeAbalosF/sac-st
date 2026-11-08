@@ -141,7 +141,7 @@ export default function InstallmentEditor({
                         {editando
                             ? 'Corregí únicamente los datos que hayan cambiado.'
                             : completaPlan
-                              ? 'Es la última prevista: su importe debe completar el total reconocido.'
+                              ? 'Es la última prevista: debe cubrir el total reconocido. Podés incluir un excedente pagable.'
                               : 'Podés completar ahora solo la información que ya esté confirmada.'}
                     </p>
                 </div>
@@ -274,24 +274,26 @@ export default function InstallmentEditor({
                     />
                 </div>
 
-                <div className="sm:col-span-6 lg:col-span-3">
-                    <Label htmlFor={`cuota-${numero}-due-date`}>
-                        Vencimiento
-                    </Label>
-                    <DateInput
-                        id={`cuota-${numero}-due-date`}
-                        className="mt-1 h-11 sm:h-9"
-                        value={form.data.dueDate}
-                        onChange={(event) =>
-                            form.setData('dueDate', event.target.value)
-                        }
-                        aria-invalid={Boolean(form.errors.dueDate)}
-                    />
-                    <ErrorMessage
-                        id={`cuota-${numero}-due-date-error`}
-                        message={form.errors.dueDate}
-                    />
-                </div>
+                {editando && (
+                    <div className="sm:col-span-6 lg:col-span-3">
+                        <Label htmlFor={`cuota-${numero}-due-date`}>
+                            Vencimiento
+                        </Label>
+                        <DateInput
+                            id={`cuota-${numero}-due-date`}
+                            className="mt-1 h-11 sm:h-9"
+                            value={form.data.dueDate}
+                            onChange={(event) =>
+                                form.setData('dueDate', event.target.value)
+                            }
+                            aria-invalid={Boolean(form.errors.dueDate)}
+                        />
+                        <ErrorMessage
+                            id={`cuota-${numero}-due-date-error`}
+                            message={form.errors.dueDate}
+                        />
+                    </div>
+                )}
 
                 <div className="sm:col-span-12 lg:col-span-7">
                     <Label htmlFor={`cuota-${numero}-concept`}>
