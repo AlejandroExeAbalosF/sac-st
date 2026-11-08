@@ -429,6 +429,7 @@ declare namespace App {
                     installmentCount: number;
                     paidInstallmentCount: number;
                     status: App.Modules.Haberes.Enums.HaberWorkflowStatus;
+                    paymentStatus: App.Modules.Haberes.Enums.HaberPaymentStatus;
                     blockReason: string | null;
                     concept: string | null;
                     notes: string | null;
@@ -452,6 +453,7 @@ declare namespace App {
                     loadedInstallmentCount: number;
                     paidInstallmentCount: number;
                     status: App.Modules.Haberes.Enums.HaberWorkflowStatus;
+                    paymentStatus: App.Modules.Haberes.Enums.HaberPaymentStatus;
                     blockReason: string | null;
                     receivedDate: string | null;
                     createdAt: string;
@@ -785,6 +787,11 @@ declare namespace App {
                 export type ExpectedMedium = 'cash' | 'cheque' | 'bank';
                 export type ExpedienteStatus =
                     'active' | 'suspended' | 'closed' | 'cancelled';
+                export type HaberPaymentStatus =
+                    | 'incomplete_plan'
+                    | 'unpaid'
+                    | 'partially_paid'
+                    | 'fully_paid';
                 export type HaberWorkflowStatus =
                     'active' | 'suspended' | 'blocked' | 'cancelled' | 'closed';
                 export type HaberesReasonAct =

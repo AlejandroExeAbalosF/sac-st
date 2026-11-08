@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Models;
 
 use App\Models\User;
+use App\Modules\Haberes\Enums\HaberPaymentStatus;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentTerms;
@@ -208,6 +209,23 @@ final class Haber extends Model
 
         /** @var numeric-string $total */
         return $total;
+    }
+
+    /**
+     * En qué va el pago del haber, leído de sus cuotas.
+     *
+     * Usa las cuotas ya cargadas: los listados y la pantalla del haber las
+     * traen de todos modos, así que no cuesta una consulta más.
+     */
+    public function situacionDePago(): HaberPaymentStatus
+    {
+        return HaberPaymentStatus::fromInstallments(
+            $this->importeAsignado(),
+            $this->installments->map(fn (BeneficiaryInstallment $cuota): array => [
+                'status' => $cuota->workflow_status,
+                'amount' => $cuota->importeEsperado(),
+            ]),
+        );
     }
 
     /**

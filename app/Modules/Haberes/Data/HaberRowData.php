@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Data;
 
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Haberes\Enums\HaberPaymentStatus;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
@@ -63,6 +64,8 @@ final class HaberRowData extends Data
         public int $loadedInstallmentCount,
         public int $paidInstallmentCount,
         public HaberWorkflowStatus $status,
+        /** En qué va el pago; se deriva de las cuotas, no se guarda. */
+        public HaberPaymentStatus $paymentStatus,
         /** Motivo cuando el haber no puede avanzar. */
         public ?string $blockReason,
         /** Cuándo llegó el expediente que lo trajo. */
@@ -155,6 +158,7 @@ final class HaberRowData extends Data
             loadedInstallmentCount: $haber->installments_count,
             paidInstallmentCount: $haber->paid_installments_count,
             status: $haber->workflow_status,
+            paymentStatus: $haber->situacionDePago(),
             blockReason: $haber->block_reason,
             receivedDate: $expediente->received_date?->format('Y-m-d'),
             createdAt: $haber->created_at->toIso8601String(),

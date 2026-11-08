@@ -3,13 +3,13 @@ import { ChevronRight, Lock, Maximize2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
-import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { estadoDelHaber } from '@/features/haberes/haber-status';
 import { date } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { show as expedienteShow } from '@/routes/expedientes';
@@ -18,23 +18,6 @@ import InstallmentList from './installment-list';
 import RecordDates from './record-dates';
 
 type Haber = App.Modules.Haberes.Data.HaberRowData;
-type HaberStatus = App.Modules.Haberes.Enums.HaberWorkflowStatus;
-
-const TONO: Record<HaberStatus, StatusTone> = {
-    active: 'progress',
-    suspended: 'action',
-    blocked: 'blocked',
-    cancelled: 'neutral',
-    closed: 'done',
-};
-
-const ETIQUETA: Record<HaberStatus, string> = {
-    active: 'Activo',
-    suspended: 'Suspendido',
-    blocked: 'Bloqueado',
-    cancelled: 'Anulado',
-    closed: 'Cerrado',
-};
 
 /**
  * Los haberes sin el expediente por delante.
@@ -175,10 +158,7 @@ function HaberCard({ haber }: { haber: Haber }) {
                             {haber.beneficiaryDocument || 'Sin documento'}
                         </p>
                     </div>
-                    <StatusBadge
-                        label={ETIQUETA[haber.status]}
-                        tone={TONO[haber.status]}
-                    />
+                    <StatusBadge {...estadoDelHaber(haber)} />
                 </div>
 
                 {haber.blockReason && (
@@ -395,10 +375,7 @@ function HaberRow({ haber }: { haber: Haber }) {
                 </td>
 
                 <td className="py-3 pr-5">
-                    <StatusBadge
-                        label={ETIQUETA[haber.status]}
-                        tone={TONO[haber.status]}
-                    />
+                    <StatusBadge {...estadoDelHaber(haber)} />
                 </td>
 
                 <td className="py-3 pr-5">

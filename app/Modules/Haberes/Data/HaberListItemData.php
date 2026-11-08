@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Data;
 
 use App\Models\User;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Haberes\Enums\HaberPaymentStatus;
 use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
@@ -62,6 +63,8 @@ final class HaberListItemData extends Data
         public int $installmentCount,
         public int $paidInstallmentCount,
         public HaberWorkflowStatus $status,
+        /** En qué va el pago; se deriva de las cuotas, no se guarda. */
+        public HaberPaymentStatus $paymentStatus,
         /** Motivo cuando el haber no puede avanzar. */
         public ?string $blockReason = null,
         /** Concepto base que heredan las cuotas. */
@@ -187,6 +190,7 @@ final class HaberListItemData extends Data
                 ->whereIn('workflow_status', [InstallmentWorkflowStatus::Paid, InstallmentWorkflowStatus::LegacySettled])
                 ->count(),
             status: $haber->workflow_status,
+            paymentStatus: $haber->situacionDePago(),
             blockReason: $haber->block_reason,
             concept: $haber->concept,
             notes: $haber->notes,

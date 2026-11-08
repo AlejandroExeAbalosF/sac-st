@@ -114,6 +114,42 @@ class HaberListTest extends TestCase
     }
 
     /**
+     * Cada fila trae en qué va su pago, leído de sus cuotas: es lo que el
+     * campo «Estado» muestra mientras el haber está activo.
+     */
+    public function test_each_row_carries_its_payment_status()
+    {
+        $situacion = fn (string $documento): mixed => $this->actingAs($this->operador())
+            ->get(route('expedientes.index', ['vista' => 'haberes', 'q' => $documento]))
+            ->viewData('page')['props']['haberes'][0]['paymentStatus'];
+
+        // Dos cuotas pendientes que cubren el importe.
+        $this->assertSame('unpaid', $situacion('28114902'));
+        // Dos de tres cuotas pagadas.
+        $this->assertSame('partially_paid', $situacion('25114780'));
+        // Su única cuota, pagada por el importe entero.
+        $this->assertSame('fully_paid', $situacion('22908114'));
+    }
+
+    /**
+     * Pagar la última cuota completa el haber, y deshacer el pago lo
+     * devuelve atrás: no hay un estado guardado que pueda quedar viejo.
+     */
+    public function test_the_payment_status_follows_its_installments()
+    {
+        $haber = Haber::query()
+            ->whereRelation('beneficiary', 'document', '25114780')
+            ->firstOrFail();
+        $pendiente = $haber->installments()->where('workflow_status', 'active')->firstOrFail();
+
+        $pendiente->update(['workflow_status' => 'paid']);
+        $this->assertSame('fully_paid', $haber->fresh()?->situacionDePago()->value);
+
+        $pendiente->update(['workflow_status' => 'active']);
+        $this->assertSame('partially_paid', $haber->fresh()?->situacionDePago()->value);
+    }
+
+    /**
      * Los anulados se esconden contando haberes, no expedientes: un
      * expediente vigente con su único haber anulado no aparece.
      */

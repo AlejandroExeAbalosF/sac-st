@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
-import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Collapsible,
@@ -16,6 +15,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { estadoDelHaber } from '@/features/haberes/haber-status';
 import type { EtiquetaOption } from '@/features/haberes/types';
 import { date, dateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -24,23 +24,6 @@ import HaberCancelDialog from './haber-cancel-dialog';
 import InstallmentList from './installment-list';
 
 type Haber = App.Modules.Haberes.Data.HaberListItemData;
-type HaberStatus = App.Modules.Haberes.Enums.HaberWorkflowStatus;
-
-const TONO: Record<HaberStatus, StatusTone> = {
-    active: 'progress',
-    suspended: 'action',
-    blocked: 'blocked',
-    cancelled: 'neutral',
-    closed: 'done',
-};
-
-const ETIQUETA: Record<HaberStatus, string> = {
-    active: 'Activo',
-    suspended: 'Suspendido',
-    blocked: 'Bloqueado',
-    cancelled: 'Anulado',
-    closed: 'Cerrado',
-};
 
 type Props = {
     haberes: Haber[];
@@ -208,10 +191,7 @@ function MontosDelHaber({
                         Estado
                     </span>
                     <span className="mt-0.5 block">
-                        <StatusBadge
-                            label={ETIQUETA[haber.status]}
-                            tone={TONO[haber.status]}
-                        />
+                        <StatusBadge {...estadoDelHaber(haber)} />
                     </span>
                 </span>
             )}
@@ -245,10 +225,7 @@ function HaberSummary({ haber }: { haber: Haber }) {
                 </span>
 
                 <span className="shrink-0">
-                    <StatusBadge
-                        label={ETIQUETA[haber.status]}
-                        tone={TONO[haber.status]}
-                    />
+                    <StatusBadge {...estadoDelHaber(haber)} />
                 </span>
             </span>
 

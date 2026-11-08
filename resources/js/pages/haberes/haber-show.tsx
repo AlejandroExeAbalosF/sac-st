@@ -6,13 +6,13 @@ import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
-import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import HaberCancelDialog from '@/features/haberes/components/haber-cancel-dialog';
 import InstallmentCards from '@/features/haberes/components/installment-cards';
 import type { Firmante } from '@/features/haberes/components/issue-receipt-dialog';
+import { estadoDelHaber } from '@/features/haberes/haber-status';
 import type {
     EgresoProps,
     EtiquetaOption,
@@ -30,7 +30,6 @@ import { show } from '@/routes/expedientes';
 import { history as historialDeHaber } from '@/routes/haberes/haber';
 
 type Haber = App.Modules.Haberes.Data.HaberListItemData;
-type HaberStatus = App.Modules.Haberes.Enums.HaberWorkflowStatus;
 
 type Props = {
     haber: Haber;
@@ -83,22 +82,6 @@ type Props = {
     fondosAnteriores: App.Modules.Haberes.Data.LegacyFundsOptionsData | null;
     /** La apertura de la caja de Haberes: el corte de lo histórico. */
     corteHistorico: string | null;
-};
-
-const TONO: Record<HaberStatus, StatusTone> = {
-    active: 'progress',
-    suspended: 'action',
-    blocked: 'blocked',
-    cancelled: 'neutral',
-    closed: 'done',
-};
-
-const ETIQUETA: Record<HaberStatus, string> = {
-    active: 'Activo',
-    suspended: 'Suspendido',
-    blocked: 'Bloqueado',
-    cancelled: 'Anulado',
-    closed: 'Cerrado',
 };
 
 /**
@@ -308,10 +291,7 @@ export default function MostrarHaber({
                                 ` · ${haber.paidInstallmentCount} pagadas`}
                         </DataField>
                         <DataField label="Estado">
-                            <StatusBadge
-                                label={ETIQUETA[haber.status]}
-                                tone={TONO[haber.status]}
-                            />
+                            <StatusBadge {...estadoDelHaber(haber)} />
                         </DataField>
                         {/*
                          * El haber se carga meses después que el expediente, y

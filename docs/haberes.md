@@ -54,6 +54,28 @@ La etiqueta de gestión describe la situación administrativa. Si tiene
 `blocks_payment`, retiene el egreso; no impide recibir fondos. El medio previsto de
 la cuota es informativo: una vez financiada manda el medio real de sus recepciones.
 
+<a id="estado-del-haber"></a>
+
+### Estado del haber
+
+El campo «Estado» de las pantallas de Haberes junta dos cosas. Si el haber no está
+activo, muestra su estado de gestión (`HaberWorkflowStatus`): en la práctica,
+**Anulado**. Si está activo, muestra **en qué va su pago** (`HaberPaymentStatus`), que
+no se guarda: se calcula a partir de sus cuotas cada vez que se muestra, así que deshacer un pago lo devuelve
+atrás solo. Se elige la primera condición que se cumple:
+
+| Estado | Cuándo |
+|---|---|
+| Pago completado | Las cuotas pagadas cubren el importe reconocido |
+| Pago parcial | Hay alguna cuota pagada, pero no cubre el importe |
+| Plan incompleto | Nada pagado y las cuotas cargadas no llegan al importe |
+| Sin pagos | El plan cubre el importe y no se pagó ninguna cuota |
+
+Se comparan importes, no cantidades: la cantidad prevista de cuotas puede faltar.
+Cuentan como pagadas las del circuito y las saldadas fuera de él; las anuladas no
+cuentan. Estos nombres son una propuesta del desarrollo pendiente de confirmar con
+el área.
+
 Reglas: [identidad y plan](haberes-reglas.md#identidad-y-plan) y
 [financiación](haberes-reglas.md#financiacion).
 
