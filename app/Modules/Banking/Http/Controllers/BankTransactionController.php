@@ -14,6 +14,8 @@ use App\Modules\Banking\Http\Requests\IgnoreBankTransactionRequest;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Support\BankCreditHandlers;
+use App\Modules\Banking\Support\BankMovementIdentifications;
+use App\Modules\Banking\Support\BankMovementReferences;
 use App\Modules\Banking\Support\LatestStatementBalance;
 use App\Support\Database\Like;
 use App\Support\Ui\Toast;
@@ -25,7 +27,7 @@ use RuntimeException;
 
 final class BankTransactionController extends Controller
 {
-    public function index(Request $request, BankCreditHandlers $identificadores, LatestStatementBalance $saldos): Response
+    public function index(Request $request, BankCreditHandlers $identificadores, BankMovementReferences $referencias, BankMovementIdentifications $identificaciones, LatestStatementBalance $saldos): Response
     {
         $status = $this->enumFilter($request->query('estado'), ReconciliationStatus::class);
         $direction = $this->enumFilter($request->query('sentido'), TransactionDirection::class);
@@ -59,6 +61,8 @@ final class BankTransactionController extends Controller
          * una multa.
          */
         $acciones = $identificadores->actionsFor(array_values($transactions->items()), $request->user());
+        $relaciones = $referencias->forTransactions(array_values($transactions->items()), $request->user());
+        $hechos = $identificaciones->forTransactions(array_values($transactions->items()), $request->user());
         $transactions->through(fn (BankTransaction $t): BankTransactionListItemData => BankTransactionListItemData::fromModel($t));
         $cuentas = BankAccount::query()->orderBy('label')->get();
 
@@ -75,6 +79,8 @@ final class BankTransactionController extends Controller
                 ->values()
                 ->all(),
             'creditActions' => (object) $acciones,
+            'movementReferences' => (object) $relaciones,
+            'movementIdentifications' => (object) $hechos,
             'filters' => [
                 'cuenta' => $accountId > 0 ? $accountId : null,
                 'estado' => $status?->value,

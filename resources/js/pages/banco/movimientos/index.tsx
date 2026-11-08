@@ -64,6 +64,43 @@ type Props = {
         number,
         { label: string; href: string | null; note: string | null }[]
     >;
+    movementReferences: Record<
+        number,
+        {
+            installmentId: number;
+            expediente: string;
+            beneficiary: string;
+            haber: number;
+            installment: number;
+            status:
+                | 'ticket_matched'
+                | 'funds_allocated'
+                | 'cash_deposit_credited'
+                | 'debit_linked'
+                | 'payment_confirmed';
+            amount: string | null;
+            href: string;
+        }[]
+    >;
+    movementIdentifications: Record<
+        number,
+        {
+            label: string;
+            amount: string;
+            links: { label: string; href: string }[];
+        }[]
+    >;
+};
+
+const ESTADO_RELACION: Record<
+    Props['movementReferences'][number][number]['status'],
+    string
+> = {
+    ticket_matched: 'Comprobante conciliado',
+    funds_allocated: 'Imputado a la cuota',
+    cash_deposit_credited: 'Efectivo depositado en el banco',
+    debit_linked: 'Débito vinculado',
+    payment_confirmed: 'Pago confirmado',
 };
 
 const TONO: Record<string, StatusTone> = {
@@ -98,6 +135,8 @@ export default function MovimientosIndex({
     hasAnyTransactions,
     balances,
     creditActions,
+    movementReferences,
+    movementIdentifications,
 }: Props) {
     const [buscar, setBuscar] = useState(filters.buscar ?? '');
     const [ignorando, setIgnorando] = useState<Movimiento | null>(null);
@@ -340,7 +379,9 @@ export default function MovimientosIndex({
                                     <th className="p-2 font-medium text-field-label">
                                         Estado
                                     </th>
-                                    <th className="p-2" />
+                                    <th className="p-2 font-medium text-field-label">
+                                        Detalle
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -411,7 +452,89 @@ export default function MovimientosIndex({
                                                 </p>
                                             )}
                                         </td>
-                                        <td className="p-2 text-right">
+                                        <td className="min-w-64 p-2">
+                                            {movementReferences[m.id]?.length >
+                                            0 ? (
+                                                <div className="space-y-2 text-xs">
+                                                    {movementReferences[
+                                                        m.id
+                                                    ].map((referencia) => (
+                                                        <div
+                                                            key={
+                                                                referencia.installmentId
+                                                            }
+                                                        >
+                                                            <Link
+                                                                href={
+                                                                    referencia.href
+                                                                }
+                                                                className="font-medium text-primary hover:underline"
+                                                            >
+                                                                Exp.{' '}
+                                                                {
+                                                                    referencia.expediente
+                                                                }{' '}
+                                                                · Haber{' '}
+                                                                {
+                                                                    referencia.haber
+                                                                }{' '}
+                                                                · Cuota{' '}
+                                                                {
+                                                                    referencia.installment
+                                                                }
+                                                            </Link>
+                                                            <span className="block text-muted-foreground">
+                                                                {
+                                                                    referencia.beneficiary
+                                                                }{' '}
+                                                                ·{' '}
+                                                                {
+                                                                    ESTADO_RELACION[
+                                                                        referencia
+                                                                            .status
+                                                                    ]
+                                                                }
+                                                                {referencia.amount !==
+                                                                    null &&
+                                                                    ` · ${money(referencia.amount)}`}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : movementIdentifications[m.id]
+                                                  ?.length > 0 ? (
+                                                <div className="space-y-1 text-xs text-muted-foreground">
+                                                    {movementIdentifications[
+                                                        m.id
+                                                    ].map((hecho, index) => (
+                                                        <div key={index}>
+                                                            <p>
+                                                                {hecho.label} ·{' '}
+                                                                {money(
+                                                                    hecho.amount,
+                                                                )}
+                                                            </p>
+                                                            {hecho.links.map(
+                                                                (link) => (
+                                                                    <a
+                                                                        key={
+                                                                            link.href
+                                                                        }
+                                                                        href={
+                                                                            link.href
+                                                                        }
+                                                                        className="block text-primary hover:underline"
+                                                                    >
+                                                                        {
+                                                                            link.label
+                                                                        }
+                                                                    </a>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : null}
                                             <div className="flex items-center justify-end gap-1">
                                                 {creditActions[m.id]?.map(
                                                     (accion) => (

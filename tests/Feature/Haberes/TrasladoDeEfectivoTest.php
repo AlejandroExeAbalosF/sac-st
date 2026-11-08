@@ -23,6 +23,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Support\HaberesBankMovementReferences;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
@@ -434,6 +435,18 @@ class TrasladoDeEfectivoTest extends TestCase
         $credito = $this->credito($traslado->amount, '2026-08-26');
 
         $this->confirmar($traslado, $credito);
+
+        $this->actingAs($this->operador())
+            ->get(route('banco.movimientos.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where("movementReferences.{$credito->id}.0.installmentId", $cuota->id)
+                ->where("movementReferences.{$credito->id}.0.status", 'cash_deposit_credited')
+                ->where("movementReferences.{$credito->id}.0.amount", $cuota->importeEsperado())
+                ->where("movementIdentifications.{$credito->id}.0.amount", $cuota->importeEsperado()));
+
+        $referencia = app(HaberesBankMovementReferences::class)
+            ->forTransactions([$credito], $this->operador())[$credito->id][0];
+        $this->actingAs($this->operador())->followingRedirects()->get($referencia['href'])->assertOk();
 
         $this->verHaber($cuota)
             ->assertInertia(fn (AssertableInertia $page) => $page

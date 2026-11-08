@@ -10,13 +10,17 @@ use App\Models\User;
 use App\Modules\Aranceles\Audit\ArancelesAuditCatalog;
 use App\Modules\Aranceles\Permissions\ArancelesPermissionCatalog;
 use App\Modules\Aranceles\Support\FeeBankCreditHandler;
+use App\Modules\Aranceles\Support\FeeBankReceiptLinks;
 use App\Modules\Aranceles\Support\FeeCashBoxModule;
 use App\Modules\Banking\Audit\BankingAuditCatalog;
 use App\Modules\Banking\Listeners\LinkOpeningBankAccount;
 use App\Modules\Banking\Permissions\BankingPermissionCatalog;
 use App\Modules\Banking\Support\BankCreditHandlers;
+use App\Modules\Banking\Support\BankMovementIdentifications;
+use App\Modules\Banking\Support\BankMovementReferences;
 use App\Modules\Haberes\Audit\HaberesAuditCatalog;
 use App\Modules\Haberes\Permissions\HaberesPermissionCatalog;
+use App\Modules\Haberes\Support\HaberesBankMovementReferences;
 use App\Modules\Haberes\Support\HaberesCashBoxModule;
 use App\Modules\Haberes\Support\LegacyPapersBeforeOpening;
 use App\Modules\Ledger\Audit\LedgerAuditCatalog;
@@ -27,6 +31,7 @@ use App\Modules\Ledger\Support\OpeningDateRule;
 use App\Modules\Multas\Audit\MultasAuditCatalog;
 use App\Modules\Multas\Permissions\MultasPermissionCatalog;
 use App\Modules\Multas\Support\FineBankCreditHandler;
+use App\Modules\Multas\Support\FineBankReceiptLinks;
 use App\Modules\Multas\Support\FineCashBoxModule;
 use App\Modules\Shared\Audit\AuditCatalog;
 use App\Modules\Shared\Audit\AuditCatalogContributor;
@@ -86,6 +91,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(BankCreditHandlers::class, fn ($app): BankCreditHandlers => new BankCreditHandlers($app, [
             FineBankCreditHandler::class,
             FeeBankCreditHandler::class,
+        ]));
+        $this->app->bind(BankMovementReferences::class, HaberesBankMovementReferences::class);
+        $this->app->bind(BankMovementIdentifications::class, fn ($app) => new BankMovementIdentifications([
+            $app->make(FeeBankReceiptLinks::class),
+            $app->make(FineBankReceiptLinks::class),
         ]));
     }
 

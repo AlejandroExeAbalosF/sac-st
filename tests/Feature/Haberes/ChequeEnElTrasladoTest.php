@@ -27,6 +27,7 @@ use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DisbursementEligibility;
+use App\Modules\Haberes\Support\HaberesBankMovementReferences;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
@@ -169,10 +170,11 @@ class ChequeEnElTrasladoTest extends TestCase
     {
         $cuota = $this->cuotaCobradaConDosCheques();
         $traslado = $this->depositar($cuota);
+        $credito = $this->credito($traslado->amount, '2026-08-26');
 
         $confirmado = app(ConfirmCashDepositCredit::class)->handle(
             transfer: $traslado,
-            transaction: $this->credito($traslado->amount, '2026-08-26'),
+            transaction: $credito,
             idempotencyKey: 'acreditacion-'.Str::random(8),
             actorId: $this->operador->id,
         );
@@ -189,6 +191,9 @@ class ChequeEnElTrasladoTest extends TestCase
                 ->count(),
         );
         $this->assertSame($cuota->importeEsperado(), $this->saldo(LedgerAccount::BankAccount, $traslado->cash_box_id));
+        $referencias = app(HaberesBankMovementReferences::class)->forTransactions([$credito], $this->operador);
+        $this->assertSame('cash_deposit_credited', $referencias[$credito->id][0]['status']);
+        $this->assertSame($cuota->importeEsperado(), $referencias[$credito->id][0]['amount']);
     }
 
     /**

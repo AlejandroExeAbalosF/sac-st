@@ -23,6 +23,7 @@ use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\CashToBankTransferItem;
+use App\Modules\Banking\Support\BankMovementIdentifications;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Actions\RecordCashCount;
@@ -571,6 +572,12 @@ class DepositoDeArancelesTest extends TestCase
         $acreditado = app(ConfirmCashDepositCredit::class)->handle($traslado, $credito, 'a', $this->admin->id);
 
         $this->assertSame(CashTransferStatus::BankConfirmed, $acreditado->status);
+        $service = app(BankMovementIdentifications::class);
+        $links = $service->forTransactions([$credito], $this->admin)[$credito->id][0]['links'];
+        $this->assertCount(1, $links);
+        $this->actingAs($this->admin)->get($links[0]['href'])->assertOk();
+        $this->assertSame([], $service->forTransactions([$credito])[$credito->id][0]['links']);
+
         $this->assertSame('0.00', $this->saldo(LedgerAccount::CashInTransit));
         $this->assertSame('20.00', $this->saldo(LedgerAccount::CashOnHand));
     }

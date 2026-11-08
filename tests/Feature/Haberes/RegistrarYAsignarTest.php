@@ -31,6 +31,7 @@ use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DepositTicketLinks;
+use App\Modules\Haberes\Support\HaberesBankMovementReferences;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Haberes\Support\ReceiptOrigin;
@@ -120,6 +121,12 @@ class RegistrarYAsignarTest extends TestCase
             'status' => DepositTicketStatus::Waiting,
         ]);
         app(LinkDepositTicket::class)->handleMany($ticket, $movimientos, $this->operador()->id);
+        $viewer = $this->operador();
+        $referencias = app(HaberesBankMovementReferences::class)->forTransactions($movimientos, $viewer);
+        foreach ($movimientos as $movimiento) {
+            $this->assertSame('ticket_matched', $referencias[$movimiento->id][0]['status']);
+            $this->assertSame($cuota->id, $referencias[$movimiento->id][0]['installmentId']);
+        }
 
         $clave = 'atajo-'.Str::random(8);
         app(ReceiveAndAllocateTicket::class)->handle($cuota, $clave, $this->operador()->id);
@@ -128,6 +135,11 @@ class RegistrarYAsignarTest extends TestCase
         $this->assertSame($importe, app(InstallmentFunding::class)->allocated($cuota));
         $this->assertSame(2, FundReceipt::query()->whereNull('reversal_event_id')->count());
         $this->assertSame(2, BankTransactionAllocation::query()->whereNull('reversal_of_id')->count());
+        $referencias = app(HaberesBankMovementReferences::class)->forTransactions($movimientos, $viewer);
+        foreach ($movimientos as $movimiento) {
+            $this->assertSame('funds_allocated', $referencias[$movimiento->id][0]['status']);
+            $this->assertSame($movimiento->amount, $referencias[$movimiento->id][0]['amount']);
+        }
         foreach (FundReceipt::query()->whereNull('reversal_event_id')->get() as $recepcion) {
             $this->assertSame($ticket->expediente_id, app(ReceiptOrigin::class)->for($recepcion)['expedienteId']);
         }
@@ -138,6 +150,7 @@ class RegistrarYAsignarTest extends TestCase
         foreach ($movimientos as $movimiento) {
             $this->assertSame('0.00', app(AllocatableAmount::class)->allocated($movimiento));
         }
+        $this->assertSame([], app(HaberesBankMovementReferences::class)->forTransactions($movimientos, $viewer));
     }
 
     /**

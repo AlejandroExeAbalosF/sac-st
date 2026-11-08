@@ -96,6 +96,18 @@ la suma no puede superar el importe del comprobante y solo se confirma el cruce
 cuando coincide exactamente. Cada crédito genera su propia recepción y asignación;
 la foto del ticket por sí sola no financia la cuota.
 
+En la columna «Detalle» de `/banco/movimientos`, quien puede consultar expedientes
+ve el expediente, beneficiario, haber, cuota e importe relacionados, con acceso a
+la ficha. El rótulo distingue el comprobante conciliado del dinero
+imputado y la acreditación de efectivo trasladado desde la caja; en los débitos
+distingue el vínculo de un pago ya confirmado. Si un
+crédito financia varias cuotas, se muestran todas con su importe neto vigente.
+Los movimientos identificados por Aranceles y Multas incluyen accesos a los recibos
+de los cobros y a las fichas de las multas, respectivamente, según los permisos de
+consulta. Un depósito que reúne varios cobros ofrece un acceso por cada uno.
+Los movimientos identificados por otras cajas muestran el tipo de hecho y la
+caja que lo registró, aunque no tengan una cuota de Haberes.
+
 **Anular el recibo de una cuota cobrada por banco deshace la conciliación.** Con un
 solo motivo libera la cuota, revierte la recepción, anula el recibo y devuelve el
 comprobante a la cola; el movimiento del extracto queda libre para conciliarlo otra

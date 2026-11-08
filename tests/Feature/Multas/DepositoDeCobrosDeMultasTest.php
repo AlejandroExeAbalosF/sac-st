@@ -8,6 +8,7 @@ use App\Modules\Banking\Actions\RegisterBankFundReceipt;
 use App\Modules\Banking\Enums\CashTransferStatus;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Banking\Support\BankMovementIdentifications;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\Currency;
@@ -88,6 +89,13 @@ class DepositoDeCobrosDeMultasTest extends TestCase
         $this->post(route('multas.traslados.confirm', $traslado), [
             'bankTransactionId' => $credito->id, 'idempotencyKey' => (string) Str::uuid(),
         ])->assertSessionHasNoErrors();
+
+        $service = app(BankMovementIdentifications::class);
+        $links = $service->forTransactions([$credito], $quienConcilia)[$credito->id][0]['links'];
+        $this->assertCount(1, $links);
+        $this->assertSame(route('multas.show', $multa->showParameters()), $links[0]['href']);
+        $this->followingRedirects()->get($links[0]['href'])->assertOk();
+        $this->assertSame([], $service->forTransactions([$credito])[$credito->id][0]['links']);
 
         expect($traslado->refresh()->status)->toBe(CashTransferStatus::BankConfirmed)
             ->and($this->libro())->toMatchArray(['CASH_IN_TRANSIT' => '0.00', 'BANK_ACCOUNT' => '300000.00'])
