@@ -2,20 +2,33 @@ import { Link } from '@inertiajs/react';
 import {
     ArrowRight,
     FileSpreadsheet,
+    Info,
     Lock,
     RotateCcw,
     Scale,
     UserCheck,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Money, { useMoneda } from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { conMoneda } from '@/features/caja/moneda';
-import { useRutasDeCaja } from '@/features/caja/rutas';
+import { rutasDeCaja, useRutasDeCaja } from '@/features/caja/rutas';
+import type { CodigoDeCaja } from '@/features/caja/rutas';
+import { date as formatDate } from '@/lib/format';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
+export type Rendition = {
+    url: string;
+    pending: { code: CodigoDeCaja; name: string }[];
+};
 
 /**
  * Las dos tarjetas del día: el arqueo y el cierre.
@@ -178,6 +191,7 @@ export function TarjetaCierre({
     puedeExportar,
     puedeCerrar = false,
     fecha,
+    rendition,
     accion,
 }: {
     cierre: Cierre | null;
@@ -186,6 +200,7 @@ export function TarjetaCierre({
     /** Solo se usa cuando no hay `accion`: dibuja el enlace a Cierres. */
     puedeCerrar?: boolean;
     fecha: string;
+    rendition?: Rendition | null;
     accion?: ReactNode;
 }) {
     const rutas = useRutasDeCaja();
@@ -229,6 +244,12 @@ export function TarjetaCierre({
                                 </Link>
                             </Button>
                         ))}
+                    {rendition && (
+                        <RendicionTresCajas
+                            rendition={rendition}
+                            fecha={fecha}
+                        />
+                    )}
                 </>
             ) : (
                 <>
@@ -293,6 +314,12 @@ export function TarjetaCierre({
                             </a>
                         </Button>
                     )}
+                    {rendition && (
+                        <RendicionTresCajas
+                            rendition={rendition}
+                            fecha={fecha}
+                        />
+                    )}
 
                     {/*
                      * La acción va siempre, no solo cuando el período se
@@ -310,6 +337,106 @@ export function TarjetaCierre({
                      */}
                     {accion}
                 </>
+            )}
+        </div>
+    );
+}
+
+function RendicionTresCajas({
+    rendition,
+    fecha,
+}: {
+    rendition: Rendition;
+    fecha: string;
+}) {
+    const [infoOpen, setInfoOpen] = useState(false);
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const cancelClose = () => {
+        if (closeTimer.current !== null) {
+            clearTimeout(closeTimer.current);
+        }
+    };
+    const closeSoon = () => {
+        cancelClose();
+        closeTimer.current = setTimeout(() => setInfoOpen(false), 150);
+    };
+    useEffect(
+        () => () => {
+            if (closeTimer.current !== null) {
+                clearTimeout(closeTimer.current);
+            }
+        },
+        [],
+    );
+
+    return (
+        <div className="mt-2 flex items-center gap-1">
+            {rendition.pending.length === 0 ? (
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                    <a href={rendition.url}>Rendición de las tres cajas</a>
+                </Button>
+            ) : (
+                <Button variant="outline" size="sm" className="w-full" disabled>
+                    Rendición de las tres cajas
+                </Button>
+            )}
+            {rendition.pending.length > 0 && (
+                <Popover open={infoOpen} onOpenChange={setInfoOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Ver qué cajas faltan cerrar"
+                            onPointerEnter={(event) => {
+                                if (event.pointerType === 'mouse') {
+                                    cancelClose();
+                                    setInfoOpen(true);
+                                }
+                            }}
+                            onPointerLeave={(event) => {
+                                if (event.pointerType === 'mouse') {
+                                    closeSoon();
+                                }
+                            }}
+                        >
+                            <Info className="size-4" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                        side="top"
+                        align="end"
+                        className="w-64 max-w-[calc(100vw-2rem)] p-3 text-sm"
+                        onPointerEnter={cancelClose}
+                        onPointerLeave={(event) => {
+                            if (event.pointerType === 'mouse') {
+                                closeSoon();
+                            }
+                        }}
+                    >
+                        <p>
+                            Para generar el PDF del {formatDate(fecha)} falta
+                            cerrar:
+                        </p>
+                        <ul className="mt-2 space-y-1">
+                            {rendition.pending.map((box) => (
+                                <li key={box.code}>
+                                    <Link
+                                        href={
+                                            rutasDeCaja(box.code).dia({
+                                                query: { fecha },
+                                            }).url
+                                        }
+                                        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                                    >
+                                        {box.name}
+                                        <ArrowRight className="size-4 shrink-0" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </PopoverContent>
+                </Popover>
             )}
         </div>
     );

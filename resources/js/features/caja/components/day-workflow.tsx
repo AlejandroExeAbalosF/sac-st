@@ -28,6 +28,7 @@ import {
     TarjetaArqueo,
     TarjetaCierre,
 } from '@/features/caja/components/day-cards';
+import type { Rendition } from '@/features/caja/components/day-cards';
 import {
     DialogoCierreDelDia,
     DialogoDetalle,
@@ -86,6 +87,7 @@ export default function FlujoDelDia({
     cierre,
     denominaciones,
     sheetVersion,
+    rendition,
     can,
 }: {
     fecha: string;
@@ -115,6 +117,7 @@ export default function FlujoDelDia({
     recaudacion: string;
     /** La versión con la que dibuja el generador de hoy. */
     sheetVersion: string;
+    rendition?: Rendition | null;
     cierre: Cierre | null;
     denominaciones: number[];
     can: Permisos;
@@ -350,6 +353,7 @@ export default function FlujoDelDia({
                 cerrado={cerrado}
                 puedeExportar={can.export}
                 fecha={fecha}
+                rendition={rendition}
                 accion={
                     <>
                         {/*

@@ -33,6 +33,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'caja:haberes'])->prefix('caja')->name('caja.')->group(function (): void {
     Route::middleware('can:caja.ver')->group(function (): void {
         Route::get('/', [CashController::class, 'redirect'])->name('index');
+        Route::get('rendicion-diaria', [CashController::class, 'rendition'])
+            ->middleware(['can:multas.caja.ver', 'can:aranceles.caja.ver'])->name('rendition');
         Route::get('dia', [CashController::class, 'index'])->name('dia');
         Route::get('arqueos', [CashCountController::class, 'index'])->name('arqueos.index');
         Route::get('arqueos/{cashCount}/planilla', [CashCountController::class, 'sheet'])

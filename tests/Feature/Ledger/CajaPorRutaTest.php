@@ -6,6 +6,7 @@ namespace Tests\Feature\Ledger;
 
 use App\Models\User;
 use App\Modules\Ledger\Actions\ClosePeriod;
+use App\Modules\Ledger\Actions\RegisterOpeningBalance;
 use App\Modules\Ledger\Http\Controllers\CashController;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\PeriodClosing;
@@ -13,6 +14,7 @@ use App\Modules\Shared\Models\CashBox;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\TestCase;
 
@@ -88,6 +90,40 @@ class CajaPorRutaTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         expect(PeriodClosing::query()->sole()->cash_box_id)->toBe($haberes);
+    }
+
+    public function test_la_rendicion_conjunta_requiere_los_tres_cierres_en_pesos(): void
+    {
+        $admin = $this->operador('administrador');
+        $date = CarbonImmutable::parse('2026-06-01');
+        $url = '/caja/rendicion-diaria?fecha=2026-06-01';
+        $account = $this->cuenta();
+        $boxes = [CashBox::HABERES, CashBox::MULTAS, CashBox::ARANCELES];
+        $pending = [
+            ['code' => 'haberes', 'name' => 'Haberes en consignación'],
+            ['code' => 'multas', 'name' => 'Multas'],
+            ['code' => 'aranceles', 'name' => 'Aranceles'],
+        ];
+        foreach ($boxes as $index => $code) {
+            $this->actingAs($admin)->get($url)->assertStatus(409);
+            $this->get('/caja/dia?fecha=2026-06-01')->assertInertia(
+                fn (AssertableInertia $page) => $page
+                    ->where('rendition.pending', array_slice($pending, $index))->etc(),
+            );
+            $box = $this->cajaDe($code);
+            app(RegisterOpeningBalance::class)->handle(
+                cashBoxId: $box, balances: [], date: $date, actorId: $admin->id,
+                bankAccountId: $account->id, declaredEmpty: true,
+            );
+            $this->arqueoListoParaCerrar($box, $date->toDateString(), $admin);
+            app(ClosePeriod::class)->handle(cashBoxId: $box, date: $date, actorId: $admin->id);
+        }
+        $this->get($url)->assertOk()->assertHeader('content-type', 'application/pdf');
+        foreach (['/caja/dia', '/multas/caja/dia', '/aranceles/caja/dia'] as $pageUrl) {
+            $this->get($pageUrl.'?fecha=2026-06-01')->assertInertia(
+                fn (AssertableInertia $page) => $page->where('rendition.pending', [])->etc(),
+            );
+        }
     }
 
     private function arqueoDeMultas(): CashCount

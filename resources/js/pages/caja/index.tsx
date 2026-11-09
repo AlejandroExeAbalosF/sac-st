@@ -17,6 +17,7 @@ import ChequeInventoryDialog from '@/features/caja/components/cheque-inventory-d
 import SelectorDeMoneda from '@/features/caja/components/currency-switch';
 import DayActivity from '@/features/caja/components/day-activity';
 import type { DayActivityEntry } from '@/features/caja/components/day-activity';
+import type { Rendition } from '@/features/caja/components/day-cards';
 import FlujoDelDia from '@/features/caja/components/day-workflow';
 import OpeningRequired, {
     BeforeOpening,
@@ -77,6 +78,7 @@ type Props = {
     /** Si la caja se movió después del día que se muestra. */
     movedAfter: boolean;
     closing: Cierre | null;
+    rendition: Rendition | null;
     needsOpening: boolean;
     /** La versión con la que dibuja el generador de planillas de hoy. */
     sheetVersion: string;
@@ -117,6 +119,7 @@ export default function CajaIndex({
     compositionReference,
     movedAfter,
     closing,
+    rendition,
     needsOpening,
     opening,
     sheetVersion,
@@ -443,6 +446,7 @@ export default function CajaIndex({
                                     cierre={closing}
                                     denominaciones={suggestedDenominations}
                                     sheetVersion={sheetVersion}
+                                    rendition={rendition}
                                     can={can}
                                 />
                             </aside>

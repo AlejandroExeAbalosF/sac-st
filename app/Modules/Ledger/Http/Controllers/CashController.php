@@ -13,23 +13,28 @@ use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
+use App\Modules\Ledger\Excel\CashSheetEvidence;
 use App\Modules\Ledger\Excel\CashSheetWorkbook;
 use App\Modules\Ledger\Http\Controllers\Concerns\ResolvesCashBox;
 use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Models\CashCount;
 use App\Modules\Ledger\Models\FinancialEvent;
 use App\Modules\Ledger\Models\PeriodClosing;
+use App\Modules\Ledger\Pdf\DailyCashRendition;
 use App\Modules\Ledger\Support\CashBalance;
 use App\Modules\Ledger\Support\CashDayActivity;
 use App\Modules\Ledger\Support\CashDayBook;
 use App\Modules\Ledger\Support\CashDayTakings;
 use App\Modules\Shared\Models\CashBox;
 use App\Support\BusinessDate;
+use App\Support\Database\ReadSnapshot;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as PdfResponse;
 use Throwable;
 
 /**
@@ -62,7 +67,21 @@ final class CashController extends Controller
         return to_route('caja.dia', $request->query());
     }
 
-    public function index(Request $request): Response
+    public function rendition(Request $request, DailyCashRendition $report, CashSheetEvidence $evidence, ReadSnapshot $snapshot): PdfResponse
+    {
+        $data = $request->validate(['fecha' => ['required', 'date_format:Y-m-d']]);
+        $date = CarbonImmutable::parse($data['fecha']);
+        $panels = $snapshot->run(fn () => $report->panels($date, $evidence));
+
+        $date->locale('es');
+
+        return Pdf::loadView('pdf.rendicion-tres-cajas', [
+            'date' => mb_strtoupper($date->translatedFormat('d M Y')),
+            'panels' => $panels,
+        ])->setPaper('a4', 'landscape')->download('rendicion-tres-cajas-'.$date->toDateString().'.pdf');
+    }
+
+    public function index(Request $request, DailyCashRendition $report): Response
     {
         $caja = $this->cashBox($request);
         $moneda = $this->selectedCurrency($request);
@@ -146,6 +165,12 @@ final class CashController extends Controller
              * de esta pantalla: todos los saldos son cero y el primer arqueo
              * daría una diferencia igual a todo el saldo histórico.
              */
+            'rendition' => $moneda === Currency::Ars && $request->user()?->can('caja.ver')
+                && $request->user()->can('aranceles.caja.ver') && $request->user()->can('multas.caja.ver')
+                ? [
+                    'url' => route('caja.rendition', ['fecha' => $fecha->toDateString()]),
+                    'pending' => $report->pendingBoxes($fecha),
+                ] : null,
             'needsOpening' => $apertura === null,
             /*
              * La apertura, para poder mostrar de dónde salió el saldo con

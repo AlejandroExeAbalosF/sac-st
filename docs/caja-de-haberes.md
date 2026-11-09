@@ -393,6 +393,19 @@ En el inicio, los días y los meses sin cerrar se cuentan **por moneda**: un dí
 cerrado en pesos no cierra lo que se movió en dólares. El enlace lleva al libro
 donde está lo pendiente.
 
+### Rendición diaria de las tres cajas
+
+En la tarjeta «Cierre del día» de Caja del día, debajo de «Planilla del día»
+cuando corresponde, «Rendición de las tres cajas» descarga la hoja
+consolidada cuando Haberes, Multas y Aranceles tienen cierre diario vigente con
+evidencia para esa fecha. Requiere permiso de consulta en las tres cajas.
+Mientras falte algún cierre, el botón queda deshabilitado y el ícono de información
+muestra la fecha consultada y enlaces a los días pendientes de cada caja al pasar
+el mouse, enfocarlo o tocarlo. El panel se superpone sin agrandar la página.
+La recaudación y el saldo anterior salen del arqueo congelado en cada cierre.
+En Aranceles se interpreta provisionalmente «Subtotal a depositar» como el efectivo
+disponible al cierre. El total general suma el saldo de cada caja una sola vez.
+
 ### Planilla
 
 Un `.xlsx` que reproduce el formulario del área —anverso `CAJA ddmmyy`, reverso
