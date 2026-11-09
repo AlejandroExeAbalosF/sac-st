@@ -118,7 +118,7 @@ final class DepositTicket extends Model
             return [];
         }
 
-        return [
+        return array_values([
             $this->bank_transaction_id,
             ...DB::table('deposit_ticket_additional_transactions')
                 ->where('deposit_ticket_id', $this->id)
@@ -126,7 +126,7 @@ final class DepositTicket extends Model
                 ->pluck('bank_transaction_id')
                 ->map(fn ($id): int => (int) $id)
                 ->all(),
-        ];
+        ]);
     }
 
     /** @return BelongsTo<User, $this> */

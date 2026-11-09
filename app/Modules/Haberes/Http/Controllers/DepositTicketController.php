@@ -286,7 +286,7 @@ final class DepositTicketController extends Controller
         ]);
 
         $ids = $validado['bankTransactionIds'] ?? [$validado['bankTransactionId']];
-        $movimientos = BankTransaction::query()->whereKey($ids)->get()->all();
+        $movimientos = array_values(BankTransaction::query()->whereKey($ids)->get()->all());
 
         try {
             $vincular->handleMany($ticket, $movimientos, (int) $request->user()?->id);
