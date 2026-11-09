@@ -75,10 +75,13 @@ export default function DepositoSearch({
 }: Props) {
     const [descartando, setDescartando] = useState(false);
     const [desvinculando, setDesvinculando] = useState(false);
-    const [seleccionados, setSeleccionados] = useState<Record<number, string>>({});
+    const [seleccionados, setSeleccionados] = useState<Record<number, string>>(
+        {},
+    );
     const centavos = (importe: string) => Math.round(Number(importe) * 100);
     const total = Object.values(seleccionados).reduce(
-        (suma, importe) => suma + centavos(importe), 0,
+        (suma, importe) => suma + centavos(importe),
+        0,
     );
     const objetivo = centavos(ticket.amount);
     const seleccionar = (id: number, importe: string) => {
@@ -86,6 +89,7 @@ export default function DepositoSearch({
             setSeleccionados((actual) => {
                 const copia = { ...actual };
                 delete copia[id];
+
                 return copia;
             });
         } else if (total + centavos(importe) <= objetivo) {
@@ -165,7 +169,11 @@ export default function DepositoSearch({
                             El comprobante quedó conciliado con sus movimientos
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            {ticket.bankTransactionIds.length} {ticket.bankTransactionIds.length === 1 ? 'crédito bancario' : 'créditos bancarios'} · total {money(ticket.amount)}
+                            {ticket.bankTransactionIds.length}{' '}
+                            {ticket.bankTransactionIds.length === 1
+                                ? 'crédito bancario'
+                                : 'créditos bancarios'}{' '}
+                            · total {money(ticket.amount)}
                         </p>
                         {ticket.matchSignals && (
                             <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
@@ -191,13 +199,21 @@ export default function DepositoSearch({
                 {ticket.status !== 'matched' && canLink && (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
                         <div>
-                            <p className="font-medium">Movimientos seleccionados: {Object.keys(seleccionados).length}</p>
-                            <p className="text-sm tabular-nums text-muted-foreground">
-                                {money((total / 100).toFixed(2))} de {money(ticket.amount)}
-                                {total < objetivo && ` · faltan ${money(((objetivo - total) / 100).toFixed(2))}`}
+                            <p className="font-medium">
+                                Movimientos seleccionados:{' '}
+                                {Object.keys(seleccionados).length}
+                            </p>
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                                {money((total / 100).toFixed(2))} de{' '}
+                                {money(ticket.amount)}
+                                {total < objetivo &&
+                                    ` · faltan ${money(((objetivo - total) / 100).toFixed(2))}`}
                             </p>
                         </div>
-                        <Button disabled={total !== objetivo} onClick={vincular}>
+                        <Button
+                            disabled={total !== objetivo}
+                            onClick={vincular}
+                        >
                             Conciliar comprobante
                         </Button>
                     </div>
@@ -232,9 +248,21 @@ export default function DepositoSearch({
                                             ticket.bankTransactionId ===
                                             candidato.transactionId
                                         }
-                                        seleccionado={seleccionados[candidato.transactionId] !== undefined}
-                                        excede={total + centavos(candidato.amount) > objetivo}
-                                        onVincular={() => seleccionar(candidato.transactionId, candidato.amount)}
+                                        seleccionado={
+                                            seleccionados[
+                                                candidato.transactionId
+                                            ] !== undefined
+                                        }
+                                        excede={
+                                            total + centavos(candidato.amount) >
+                                            objetivo
+                                        }
+                                        onVincular={() =>
+                                            seleccionar(
+                                                candidato.transactionId,
+                                                candidato.amount,
+                                            )
+                                        }
                                     />
                                 ))}
                             </>
@@ -347,8 +375,16 @@ function TarjetaCandidato({
                         Anterior a la apertura
                     </span>
                 ) : puedeVincular ? (
-                    <Button variant={seleccionado ? 'secondary' : 'outline'} disabled={!seleccionado && excede} onClick={onVincular}>
-                        {seleccionado ? 'Quitar' : excede ? 'Supera el importe' : 'Seleccionar'}
+                    <Button
+                        variant={seleccionado ? 'secondary' : 'outline'}
+                        disabled={!seleccionado && excede}
+                        onClick={onVincular}
+                    >
+                        {seleccionado
+                            ? 'Quitar'
+                            : excede
+                              ? 'Supera el importe'
+                              : 'Seleccionar'}
                     </Button>
                 ) : null}
             </div>
@@ -519,13 +555,28 @@ function Disponibles({
                             ) : (
                                 puedeVincular && (
                                     <Button
-                                        variant={seleccionados[m.id] !== undefined ? 'secondary' : 'outline'}
+                                        variant={
+                                            seleccionados[m.id] !== undefined
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
                                         size="sm"
                                         className="h-8 text-xs"
-                                        disabled={seleccionados[m.id] === undefined && total + Math.round(Number(m.amount) * 100) > objetivo}
-                                        onClick={() => onVincular(m.id, m.amount)}
+                                        disabled={
+                                            seleccionados[m.id] === undefined &&
+                                            total +
+                                                Math.round(
+                                                    Number(m.amount) * 100,
+                                                ) >
+                                                objetivo
+                                        }
+                                        onClick={() =>
+                                            onVincular(m.id, m.amount)
+                                        }
                                     >
-                                        {seleccionados[m.id] !== undefined ? 'Quitar' : 'Seleccionar'}
+                                        {seleccionados[m.id] !== undefined
+                                            ? 'Quitar'
+                                            : 'Seleccionar'}
                                     </Button>
                                 )
                             )}
@@ -535,8 +586,8 @@ function Disponibles({
             )}
 
             <p className="text-xs text-muted-foreground">
-                Podés seleccionar varios créditos. La suma debe coincidir con
-                el importe del comprobante y nunca superarlo.
+                Podés seleccionar varios créditos. La suma debe coincidir con el
+                importe del comprobante y nunca superarlo.
             </p>
         </div>
     );
