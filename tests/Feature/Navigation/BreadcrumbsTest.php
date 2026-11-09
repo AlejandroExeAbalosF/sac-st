@@ -41,7 +41,9 @@ const RUTAS_SIN_PANTALLA = [
     // Archivos.
     'adjuntos.download',
     'adjuntos.preview',
+    'caja.arqueos.sheet',
     'caja.cierres.sheet',
+    'caja.rendition',
     'multas.caja.cierres.sheet',
     'aranceles.caja.cierres.sheet',
     'aranceles.recibos.print',
