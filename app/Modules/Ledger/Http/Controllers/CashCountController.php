@@ -16,6 +16,7 @@ use App\Modules\Ledger\Http\Controllers\Concerns\SelectsCurrency;
 use App\Modules\Ledger\Http\Requests\RecordCashCountRequest;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Ledger\Models\CashCount;
+use App\Modules\Ledger\Pdf\CashCountPdf;
 use App\Support\BusinessDate;
 use App\Support\Ui\Toast;
 use Carbon\CarbonImmutable;
@@ -23,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Throwable;
 
 /**
@@ -115,6 +117,14 @@ final class CashCountController extends Controller
         $revisar->handle($cashCount, (int) $request->user()?->id);
 
         return back()->with('status', 'Arqueo revisado.');
+    }
+
+    public function sheet(Request $request, CashCount $cashCount, CashCountPdf $pdf): SymfonyResponse
+    {
+        abort_unless($cashCount->cash_box_id === $this->cashBox($request)->id, 404);
+        abort_unless($cashCount->status->isSettled(), 404);
+
+        return $pdf->render($cashCount)->download($pdf->filename($cashCount));
     }
 
     public function adjust(Request $request, CashCount $cashCount, AdjustCashDifference $imputar): RedirectResponse

@@ -30,6 +30,7 @@ import {
     adjust,
     index as arqueos,
     review,
+    sheet as planillaDeArqueo,
     store as arquear,
 } from '@/routes/caja/arqueos';
 import {
@@ -93,6 +94,7 @@ export type RutasDeCaja = {
         store: () => Ruta;
         review: ConArqueo;
         adjust: ConArqueo;
+        sheet?: ConArqueo;
     };
     cierres: {
         index: ConQuery;
@@ -120,7 +122,13 @@ const RUTAS: Record<CodigoDeCaja, RutasDeCaja> = {
         rotulo: 'Caja',
         dia,
         calendario,
-        arqueos: { index: arqueos, store: arquear, review, adjust },
+        arqueos: {
+            index: arqueos,
+            store: arquear,
+            review,
+            adjust,
+            sheet: planillaDeArqueo,
+        },
         cierres: { index: cierres, store: cerrar, reopen, sheet, regenerate },
         apertura: aperturaDeHaberes,
         saldoAnterior,

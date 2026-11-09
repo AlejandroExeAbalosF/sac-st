@@ -1,6 +1,7 @@
 import {
     Check,
     ChevronDown,
+    FileText,
     History,
     ListOrdered,
     Lock,
@@ -33,6 +34,7 @@ import {
     DialogoImputacion,
     DialogoRevision,
 } from '@/features/caja/components/day-workflow-dialogs';
+import { useRutasDeCaja } from '@/features/caja/rutas';
 
 type Arqueo = App.Modules.Ledger.Data.CashCountListItemData;
 type Cierre = App.Modules.Ledger.Data.PeriodClosingListItemData;
@@ -117,6 +119,7 @@ export default function FlujoDelDia({
     denominaciones: number[];
     can: Permisos;
 }) {
+    const rutas = useRutasDeCaja();
     const arqueo = arqueos.at(-1) ?? null;
 
     const [contando, setContando] = useState(false);
@@ -304,6 +307,27 @@ export default function FlujoDelDia({
                 accion={
                     <>
                         {accionArqueo}
+                        {arqueo !== null &&
+                            arqueo.status !== 'draft' &&
+                            rutas.arqueos.sheet && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2 w-full"
+                                    asChild
+                                >
+                                    <a
+                                        href={
+                                            rutas.arqueos.sheet({
+                                                cashCount: arqueo.id,
+                                            }).url
+                                        }
+                                    >
+                                        <FileText className="size-4" />
+                                        PDF del arqueo
+                                    </a>
+                                </Button>
+                            )}
                         {arqueo !== null && (
                             <Button
                                 variant="ghost"

@@ -339,6 +339,16 @@ significa necesariamente verificado por una persona independiente.
 Un borrador se reemplaza contando de nuevo; uno revisado abre el **turno
 siguiente** del mismo día.
 
+Desde que se revisa, Caja del día y el listado de Arqueos ofrecen el PDF del
+turno. Reproduce el cuadro de efectivo del formulario del área: cantidades por
+denominación y el total de esos billetes. Ese total no incluye el saldo anterior
+sin recontar ni el fajo recontado, que la planilla Excel del cierre muestra por
+separado. Conserva las casillas de «CHEQUES 3ROS» vacías y un espacio para firma;
+los cheques no se cuentan en el arqueo y su inventario sale con la
+planilla del cierre. El PDF se compone al descargarlo desde el
+arqueo firme; no crea una versión archivada ni reemplaza la planilla Excel del
+cierre.
+
 ### Imputar la diferencia (opcional)
 
 `reviewed → adjusted`. Asienta la diferencia contra `CASH_DIFFERENCE` con fecha

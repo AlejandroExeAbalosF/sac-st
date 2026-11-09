@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Check, Scissors, Search } from 'lucide-react';
+import { Check, FileText, Scissors, Search } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import Money, { EnMoneda } from '@/components/money';
@@ -241,6 +241,20 @@ function Renglon({
                     </div>
                 </td>
                 <td className="px-4 py-2 text-right whitespace-nowrap">
+                    {arqueo.status !== 'draft' && rutas.arqueos.sheet && (
+                        <Button variant="ghost" size="sm" asChild>
+                            <a
+                                href={
+                                    rutas.arqueos.sheet({
+                                        cashCount: arqueo.id,
+                                    }).url
+                                }
+                            >
+                                <FileText className="size-4" />
+                                PDF
+                            </a>
+                        </Button>
+                    )}
                     {can.review && arqueo.status === 'draft' && (
                         <Button
                             variant="outline"

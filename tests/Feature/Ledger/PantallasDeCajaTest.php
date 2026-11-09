@@ -169,6 +169,35 @@ class PantallasDeCajaTest extends TestCase
         $this->assertSame(1, PeriodClosing::query()->where('status', 'closed')->count());
     }
 
+    public function test_el_pdf_del_arqueo_se_habilita_al_revisarlo_sin_cerrar_el_dia(): void
+    {
+        $this->abrirLibros('300.00');
+        $this->recibirEfectivo('540000.00', '2026-06-02');
+        $contador = $this->operador('contador');
+
+        $this->actingAs($contador)->post('/caja/arqueos', [
+            'cashBoxId' => $this->caja(),
+            'countedOn' => '2026-06-02',
+            'currency' => 'ARS',
+            'denominations' => [20000 => 15, 10000 => 24],
+        ])->assertSessionHasNoErrors();
+
+        $arqueo = CashCount::query()->whereDate('counted_on', '2026-06-02')->firstOrFail();
+        $url = "/caja/arqueos/{$arqueo->id}/planilla";
+
+        $this->actingAs($contador)->get($url)->assertNotFound();
+        $this->actingAs($contador)->post("/caja/arqueos/{$arqueo->id}/revisar")
+            ->assertSessionHasNoErrors();
+
+        $response = $this->actingAs($this->operador('consulta'))->get($url)
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=arqueo-haberes-2026-06-02-turno-1.pdf');
+
+        $this->assertStringStartsWith('%PDF-', (string) $response->baseResponse->getContent());
+        $this->assertSame(0, PeriodClosing::query()->count());
+    }
+
     public function test_el_formulario_no_puede_elegir_el_saldo_que_queda_sin_recontar(): void
     {
         $this->abrirLibros();

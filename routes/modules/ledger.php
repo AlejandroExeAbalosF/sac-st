@@ -35,6 +35,8 @@ Route::middleware(['auth', 'verified', 'caja:haberes'])->prefix('caja')->name('c
         Route::get('/', [CashController::class, 'redirect'])->name('index');
         Route::get('dia', [CashController::class, 'index'])->name('dia');
         Route::get('arqueos', [CashCountController::class, 'index'])->name('arqueos.index');
+        Route::get('arqueos/{cashCount}/planilla', [CashCountController::class, 'sheet'])
+            ->whereNumber('cashCount')->name('arqueos.sheet');
 
         /*
          * El saldo del sistema anterior: cuánto queda sin reservar, dónde
