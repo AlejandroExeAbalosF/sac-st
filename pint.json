@@ -1,5 +1,6 @@
 {
     "preset": "laravel",
+    "exclude": ["output"],
     "rules": {
         "declare_strict_types": true,
         "global_namespace_import": {
