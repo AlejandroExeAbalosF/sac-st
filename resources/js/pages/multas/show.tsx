@@ -18,6 +18,8 @@ import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
+import type { CajaPendiente } from '@/features/caja/components/cash-box-not-ready';
 import AdjustDebtDialog from '@/features/multas/components/adjust-debt-dialog';
 import AppealDialog from '@/features/multas/components/appeal-dialog';
 import {
@@ -116,6 +118,8 @@ type Props = {
     firmantes: Firmante[];
     /** La clave del cobro: un doble clic no cobra dos veces. */
     cobroKey: string;
+    /** Lo que le falta a la caja para cobrar, depositar o verificar. */
+    cajaPendiente: CajaPendiente | null;
     can: {
         register: boolean;
         collect: boolean;
@@ -188,6 +192,7 @@ export default function MultaShow({
     recurso,
     firmantes,
     cobroKey,
+    cajaPendiente,
     can,
 }: Props) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -885,6 +890,17 @@ export default function MultaShow({
                             </div>
                         )}
                     </Encabezado>
+                    {cajaPendiente !== null &&
+                        (multa.payments.length > 0 ||
+                            isNonZero(multa.balance.debt)) && (
+                            <div className="border-b px-5 py-3">
+                                <CashBoxNotReady
+                                    caja="multas"
+                                    pendiente={cajaPendiente}
+                                    consecuencia="Hasta abrirla no se cobra en caja ni se verifican pagos por el banco."
+                                />
+                            </div>
+                        )}
                     {multa.payments.length === 0 ? (
                         <p className="px-5 py-4 text-sm text-muted-foreground">
                             Sin pagos en el sistema.

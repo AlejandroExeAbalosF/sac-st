@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Multas\Data\FinePendingPaymentData;
 use App\Modules\Multas\Enums\FineCollectionPlace;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\FineBankCredits;
+use App\Modules\Multas\Support\FineCashReadiness;
 use App\Modules\Multas\Support\FineDeposits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -36,12 +38,14 @@ final class FinePaymentQueueController extends Controller
     public function __construct(
         private readonly FineDeposits $depositos,
         private readonly FineBankCredits $creditos,
+        private readonly FineCashReadiness $preparacion,
     ) {}
 
     public function index(Request $request): Response
     {
         $usuario = $request->user();
         $concilia = $usuario?->can('multas.verificar-pagos') ?? false;
+        $deposita = $usuario?->can('multas.depositar') ?? false;
         $pedida = $request->string('pestana')->toString();
         $pestana = in_array($pedida, self::TABS, true) && ($pedida !== 'informados' || $concilia)
             ? $pedida
@@ -53,10 +57,12 @@ final class FinePaymentQueueController extends Controller
             'paraDepositar' => $this->filas($this->depositos->counterPayments(FineCollectionPlace::InCustody)),
             'enTransito' => $this->filas($this->depositos->counterPayments(FineCollectionPlace::InTransit)),
             'rechazados' => $this->filas($this->depositos->paymentsWithPendingRejections()),
+            // Por qué falta «Depositar»: la caja sin apertura.
+            'cajaPendiente' => $this->preparacion->pending($usuario, Currency::Ars, affected: $deposita),
             'can' => [
                 'verify' => $concilia,
                 // Depositar exige la caja abierta con alguna cuenta habilitada.
-                'deposit' => ($usuario?->can('multas.depositar') ?? false) && $this->creditos->book() !== null,
+                'deposit' => $deposita && $this->creditos->book() !== null,
                 'confirmDeposit' => $concilia,
                 'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,

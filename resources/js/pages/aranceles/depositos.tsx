@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
 import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
+import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
 import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { businessToday, date, dateTime, money } from '@/lib/format';
@@ -61,6 +62,8 @@ type Props = {
     tab: Pestana;
     available: string;
     isOpen: boolean;
+    /** Si quien mira puede abrir la caja: si no, el aviso no lleva a un 403. */
+    canOpenCash: boolean;
     cuentas: PeriodoDeCuenta[];
     sinComprobante: Deposito[];
     enTransito: Deposito[];
@@ -80,6 +83,7 @@ export default function Depositos({
     tab,
     available,
     isOpen,
+    canOpenCash,
     cuentas,
     sinComprobante,
     enTransito,
@@ -153,9 +157,11 @@ export default function Depositos({
                         </Button>
                     )}
                     {!isOpen && (
-                        <p className="text-sm text-warning-strong">
-                            La caja todavía no se abrió.
-                        </p>
+                        <CashBoxNotReady
+                            caja="aranceles"
+                            pendiente={{ canFix: canOpenCash }}
+                            consecuencia="Hasta abrirla no se registran traspasos."
+                        />
                     )}
                 </section>
 

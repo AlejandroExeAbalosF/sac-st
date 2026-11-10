@@ -2,6 +2,8 @@ import { Head, Link, router } from '@inertiajs/react';
 import ListViewTab from '@/components/list-view-tab';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
+import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
+import type { CajaPendiente } from '@/features/caja/components/cash-box-not-ready';
 import CollectionDeposit from '@/features/multas/components/collection-deposit';
 import { APPEAL_KIND, PAYMENT_MEDIUM } from '@/features/multas/labels';
 import { date, dateTime } from '@/lib/format';
@@ -37,6 +39,7 @@ export default function Pendientes({
     paraDepositar,
     enTransito,
     rechazados,
+    cajaPendiente,
     can,
 }: {
     tab: Pestana;
@@ -44,6 +47,8 @@ export default function Pendientes({
     paraDepositar: Pendiente[];
     enTransito: Pendiente[];
     rechazados: Pendiente[];
+    /** Por qué no se ofrece «Depositar»: la caja sin apertura. */
+    cajaPendiente: CajaPendiente | null;
     can: Permisos;
 }) {
     const pestanas: { valor: Pestana; titulo: string; filas: Pendiente[] }[] = [
@@ -102,6 +107,15 @@ export default function Pendientes({
                 </nav>
 
                 {tab === 'informados' && <Informados filas={informados} />}
+                {tab === 'depositar' &&
+                    cajaPendiente !== null &&
+                    paraDepositar.length > 0 && (
+                        <CashBoxNotReady
+                            caja="multas"
+                            pendiente={cajaPendiente}
+                            consecuencia="Hasta abrirla no se depositan cobros."
+                        />
+                    )}
                 {tab === 'depositar' && (
                     <Cobros
                         descripcion="Efectivo y cheques que siguen en la caja. Cada cobro va al banco entero y en su propio depósito."

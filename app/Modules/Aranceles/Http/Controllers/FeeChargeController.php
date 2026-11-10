@@ -234,6 +234,8 @@ final class FeeChargeController extends Controller
                 ->all(),
             'corrects' => $corrige,
             'isOpen' => $apertura !== null,
+            // Sin apertura el aviso lleva a abrirla solo a quien puede.
+            'canOpenCash' => $request->user()?->can('aranceles.caja.abrir') ?? false,
             'canChangeAmount' => $request->user()?->can('aranceles.modificar-importe') ?? false,
             'firmantes' => $this->filas->signers(),
             'motivos' => FeeReasonAct::options(),

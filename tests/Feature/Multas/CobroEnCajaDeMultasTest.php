@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\AdjustsFines;
 use Tests\Concerns\BuildsSharedBankAccount;
@@ -258,6 +259,43 @@ class CobroEnCajaDeMultasTest extends TestCase
             ->assertJsonValidationErrors('amount');
 
         expect(FinePayment::query()->count())->toBe(0);
+    }
+
+    public function test_without_the_box_opened_the_fine_explains_why_it_cannot_be_collected(): void
+    {
+        $multa = $this->multa();
+
+        // Quien cobra ve por qué no está el botón; abrir es del administrador.
+        $this->actingAs($this->operador())
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $p) => $p
+                ->where('can.collect', false)
+                ->where('cajaPendiente', ['canFix' => false]));
+
+        $this->actingAs($this->operador('administrador'))
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $p) => $p
+                ->where('cajaPendiente', ['canFix' => true]));
+
+        // A quien solo consulta la caja no le cambia nada.
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $p) => $p->where('cajaPendiente', null));
+    }
+
+    public function test_with_the_box_opened_there_is_nothing_to_explain(): void
+    {
+        $multa = $this->escenario();
+
+        $this->actingAs($this->operador())
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $p) => $p
+                ->where('can.collect', true)
+                ->where('cajaPendiente', null));
+
+        $this->actingAs($this->operador())
+            ->get(route('multas.pendientes.index', ['pestana' => 'depositar']))
+            ->assertInertia(fn (Assert $p) => $p->where('cajaPendiente', null));
     }
 
     /** Un cobro de un día anterior se presentó ese día, con el talonario de respaldo. */

@@ -59,6 +59,7 @@ final class FeeDepositController extends Controller
             'tab' => in_array($pestana, ['comprobante', 'transito', 'acreditados', 'cancelados'], true) ? $pestana : 'comprobante',
             'available' => $efectivo->maximum($caja, Currency::Ars, $hoy, $this->depositos->available($hoy)),
             'isOpen' => CashBookOpening::for($caja, Currency::Ars) !== null,
+            'canOpenCash' => $usuario?->can('aranceles.caja.abrir') ?? false,
             'cuentas' => $cuentas->depositOptions($caja, Currency::Ars),
             'sinComprobante' => $this->depositos->inStatus(CashTransferStatus::AwaitingTicket),
             'enTransito' => $this->depositos->inStatus(CashTransferStatus::Deposited),

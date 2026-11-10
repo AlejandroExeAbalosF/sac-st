@@ -575,7 +575,13 @@ Inicio lista los días y los meses de Multas sin cerrar a quien puede cerrarlos.
 
 «Cobrar en caja», en la ficha (permiso `multas.cobrar`, con la caja abierta en la
 moneda de la multa y saldo pendiente), registra un pago en **efectivo o con
-cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
+cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02).
+Sin la apertura de la caja el botón no aparece; en su lugar, la sección Pagos
+avisa que la caja todavía no se abrió. A quien puede abrirla (`multas.caja.abrir`)
+lo lleva a la apertura, y a los demás les dice que se lo pidan a un
+administrador. «Depositar», en Pendientes, avisa lo mismo.
+
+El cobro:
 
 - **Importe**: arranca vacío, para que se cargue lo que se recibe; el saldo se
   muestra debajo del campo y un clic lo copia. Un pago

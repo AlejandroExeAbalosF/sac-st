@@ -33,12 +33,12 @@ import {
     lineaVacia,
 } from '@/features/aranceles/lib/fee-form';
 import { consultaDeCobro } from '@/features/aranceles/lib/fee-query';
+import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
 import DocumentFrame, {
     HOJA_ALTO_A5,
 } from '@/features/haberes/components/document-frame';
 import { ApiError, apiGet } from '@/lib/api';
 import { businessToday, money, sumAmounts } from '@/lib/format';
-import { index as apertura } from '@/routes/aranceles/caja/apertura';
 import {
     corregir,
     index as cobros,
@@ -62,6 +62,8 @@ type Props = {
     /** El cobro que se corrige, si es una corrección. */
     corrects: Cobro | null;
     isOpen: boolean;
+    /** Si quien mira puede abrir la caja: si no, el aviso no lleva a un 403. */
+    canOpenCash: boolean;
     canChangeAmount: boolean;
     firmantes: Firmante[];
     idempotencyKey: string;
@@ -91,6 +93,7 @@ export default function NuevoCobro({
     feeTypes,
     corrects,
     isOpen,
+    canOpenCash,
     canChangeAmount,
     firmantes,
     idempotencyKey,
@@ -246,15 +249,11 @@ export default function NuevoCobro({
                 />
 
                 {!isOpen && (
-                    <p className="rounded-lg border bg-card p-4 text-sm">
-                        La caja de Aranceles todavía no se abrió.{' '}
-                        <Link
-                            href={apertura()}
-                            className="text-primary hover:underline"
-                        >
-                            Abrirla
-                        </Link>
-                    </p>
+                    <CashBoxNotReady
+                        caja="aranceles"
+                        pendiente={{ canFix: canOpenCash }}
+                        consecuencia="Hasta abrirla no se registran cobros."
+                    />
                 )}
 
                 <form

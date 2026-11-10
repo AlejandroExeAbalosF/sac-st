@@ -33,6 +33,7 @@ use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseListQuery;
 use App\Modules\Multas\Support\FineCaseNumber;
+use App\Modules\Multas\Support\FineCashReadiness;
 use App\Modules\Multas\Support\FineDeposits;
 use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
@@ -220,7 +221,7 @@ final class FineController extends Controller
      * El expediente va en la firma aunque no se use: la ruta lo trae antes que
      * la multa, y es el que acota la búsqueda de la multa por su número.
      */
-    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos, FineAppeals $recursos): Response
+    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos, FineAppeals $recursos, FineCashReadiness $preparacion): Response
     {
         $fine->load([
             'fineCase',
@@ -248,6 +249,7 @@ final class FineController extends Controller
         $usuario = $request->user();
         $cobra = $usuario?->can('multas.cobrar') ?? false;
         $verifica = $usuario?->can('multas.verificar-pagos') ?? false;
+        $deposita = $usuario?->can('multas.depositar') ?? false;
         $emiteRecibos = $cobra || $verifica;
         $cajaAbierta = $this->cajaAbierta($fine);
         $recurso = $recursos->current($fine)?->load('currentVerdict.resolver:id,name');
@@ -320,6 +322,15 @@ final class FineController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'position']) : [],
             'cobroKey' => 'multa-cobro:'.$fine->id.':'.Str::ulid(),
+            /*
+             * La caja sin apertura: sin esto cobrar, depositar y verificar
+             * faltaban sin explicación.
+             */
+            'cajaPendiente' => $preparacion->pending(
+                $usuario,
+                Currency::tryFrom($fine->currency) ?? Currency::Ars,
+                affected: $cobra || $verifica || $deposita,
+            ),
             // Las listas de motivos de cada acto: la pantalla no las repite.
             'motivos' => FineReasonAct::options(),
             'can' => [
@@ -331,7 +342,7 @@ final class FineController extends Controller
                 // Verificar contra el extracto exige la caja abierta con su cuenta.
                 'verifyBank' => $verifica && $cajaAbierta && $creditos->book() !== null,
                 // Depositar lo cobrado y confirmar su acreditación, con la cuenta del libro.
-                'deposit' => ($usuario?->can('multas.depositar') ?? false) && $creditos->book() !== null,
+                'deposit' => $deposita && $creditos->book() !== null,
                 'confirmDeposit' => $verifica,
                 // El rechazo y lo que trae el extracto, de quien concilia; el reemplazo, de la caja.
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
