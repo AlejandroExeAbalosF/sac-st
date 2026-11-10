@@ -8,22 +8,27 @@ use App\Http\Controllers\Controller;
 use App\Modules\Haberes\Data\AllInstallmentRowData;
 use App\Modules\Haberes\Data\CounterPayoutRowData;
 use App\Modules\Haberes\Data\UnconfirmedTransferRowData;
+use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Pdf\AllInstallmentsSheet;
 use App\Modules\Haberes\Pdf\CounterPayoutSheet;
 use App\Modules\Haberes\Pdf\UnconfirmedTransferSheet;
 use App\Modules\Haberes\Support\CounterPayoutQueue;
+use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Haberes\Support\TransferStage;
+use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Enums\SystemRole;
+use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
 use App\Support\Pdf\Worksheet;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -112,7 +117,13 @@ final class PayoutQueueController extends Controller
         $quien = $request->user()?->name;
 
         if ($this->cola($request) === self::TODAS) {
-            $hoja = $planillaTodas->build($this->todas(), $ahora, $quien);
+            $marcables = [];
+
+            foreach ([...$this->mostrador->resolve(), ...$this->transferencias()] as $fila) {
+                $marcables[$fila->installmentId] = true;
+            }
+
+            $hoja = $planillaTodas->build($this->todas(), $marcables, $ahora, $quien);
         } elseif ($this->cola($request) === self::TRANSFERENCIAS) {
             $filas = $this->transferencias();
             $hoja = $planillaTransferencias->build($filas, $this->total($filas), $ahora, $quien);
@@ -140,9 +151,9 @@ final class PayoutQueueController extends Controller
     private function todasPaginadas(): LengthAwarePaginator
     {
         $pagina = $this->consultaDeCuotas()->orderBy('id')->paginate(50)->withQueryString();
-        $etapas = $this->etapasDeCuotas->forMany($pagina->getCollection());
+        $filas = $this->filasDeCuotas($pagina->getCollection());
 
-        return $pagina->through(fn (BeneficiaryInstallment $cuota): AllInstallmentRowData => AllInstallmentRowData::fromModel($cuota, $etapas[(int) $cuota->id]));
+        return $pagina->through(fn (BeneficiaryInstallment $cuota): AllInstallmentRowData => $filas[(int) $cuota->id]);
     }
 
     /** @return list<AllInstallmentRowData> */
@@ -151,12 +162,56 @@ final class PayoutQueueController extends Controller
         $filas = [];
 
         $this->consultaDeCuotas()->chunkById(250, function (Collection $cuotas) use (&$filas): void {
-            $etapas = $this->etapasDeCuotas->forMany($cuotas);
-
-            foreach ($cuotas as $cuota) {
-                $filas[] = AllInstallmentRowData::fromModel($cuota, $etapas[(int) $cuota->id]);
-            }
+            array_push($filas, ...array_values($this->filasDeCuotas($cuotas)));
         });
+
+        return $filas;
+    }
+
+    /**
+     * La pantalla y el PDF leen las mismas situaciones. Las consultas por
+     * lote evitan pedir fondos, medio y recibo una vez por cada cuota.
+     *
+     * @param  Collection<int, BeneficiaryInstallment>  $cuotas
+     * @return array<int, AllInstallmentRowData>
+     */
+    private function filasDeCuotas(Collection $cuotas): array
+    {
+        if ($cuotas->isEmpty()) {
+            return [];
+        }
+
+        /** @var list<int> $ids */
+        $ids = $cuotas->pluck('id')->map(intval(...))->values()->all();
+        $financiacion = app(InstallmentFunding::class);
+        $etapas = $this->etapasDeCuotas->forMany($cuotas);
+        $financiado = $financiacion->allocatedForMany($ids);
+        $medios = $financiacion->mediumForMany($ids);
+        $egresos = Disbursement::query()
+            ->whereIn('beneficiary_installment_id', $ids)
+            ->where('status', DisbursementStatus::Confirmed)
+            ->get()
+            ->keyBy('beneficiary_installment_id');
+        $recibos = Receipt::query()
+            ->whereIn('beneficiary_installment_id', $ids)
+            ->where('receipt_type', ReceiptType::Expense)
+            ->where('status', ReceiptStatus::Issued)
+            ->pluck('beneficiary_installment_id')
+            ->flip();
+
+        $filas = [];
+
+        foreach ($cuotas as $cuota) {
+            $id = (int) $cuota->id;
+            $filas[$id] = AllInstallmentRowData::fromModel(
+                $cuota,
+                $etapas[$id],
+                $financiado[$id],
+                $medios[$id],
+                $egresos->get($id)?->method,
+                $recibos->has($id),
+            );
+        }
 
         return $filas;
     }

@@ -225,10 +225,18 @@ El recibo de egreso requiere un egreso confirmado. En `/haberes/planillas` sigue
 las colas «Por entregar» y «Transferencias sin confirmar», y se puede consultar
 e imprimir «Todas las cuotas». Esta última incluye vigentes, pagadas, históricas
 y anuladas con su estado; pagina de a 50 en pantalla y el PDF incluye todas.
-No suma sus importes como dinero disponible ni usa una casilla de entrega, porque
-las filas representan situaciones distintas. El número de talonario del recibo
-de egreso también admite una foto o PDF opcional de la hoja firmada, archivado
-con el recibo.
+El inventario distingue cuotas sin fondos imputados de las parcialmente financiadas
+(con el importe faltante), y resume qué paso falta en el ingreso, la Orden y el egreso.
+El medio de salida se muestra cuando ya puede derivarse de los fondos o del egreso;
+no se presenta el medio previsto de ingreso como un pago confirmado. En transferencia,
+el informe y el débito preceden a la validación del egreso. Una vez confirmado,
+la planilla avisa si todavía falta emitir el recibo de egreso.
+No suma sus importes como dinero disponible, porque las filas representan
+situaciones distintas. El PDF tiene una columna final sin título con casillas
+vacías solo para las cuotas que también figuran en «Por entregar» o
+«Transferencias sin confirmar»; la marca es control interno y no confirma un pago.
+El número de talonario del recibo de egreso también admite una foto o PDF
+opcional de la hoja firmada, archivado con el recibo.
 
 Una pestaña en el borde derecho abre un panel con ideas para futuros filtros.
 Solo se ofrece a quienes tienen el rol `super-admin`; no modifica las planillas.

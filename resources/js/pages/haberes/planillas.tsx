@@ -223,6 +223,11 @@ function TodasLasCuotas({
                         <p className="mt-2 text-xs font-medium">
                             {fila.status}
                         </p>
+                        {fila.paymentMethod && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Salida: {fila.paymentMethod}
+                            </p>
+                        )}
                     </Link>
                 ))}
             </div>
@@ -274,7 +279,14 @@ function TodasLasCuotas({
                                 <td className="p-3 text-right font-mono tabular-nums">
                                     {money(fila.amount)}
                                 </td>
-                                <td className="p-3">{fila.status}</td>
+                                <td className="p-3">
+                                    {fila.status}
+                                    {fila.paymentMethod && (
+                                        <div className="text-xs text-muted-foreground">
+                                            Salida: {fila.paymentMethod}
+                                        </div>
+                                    )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

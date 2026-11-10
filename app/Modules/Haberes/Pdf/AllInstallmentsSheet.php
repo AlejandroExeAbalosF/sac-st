@@ -13,8 +13,11 @@ use Carbon\CarbonImmutable;
 /** Inventario de cuotas, sin atribuir el total a caja ni a pagos pendientes. */
 final class AllInstallmentsSheet
 {
-    /** @param list<AllInstallmentRowData> $filas */
-    public function build(array $filas, CarbonImmutable $generadaEl, ?string $generadaPor = null): WorksheetData
+    /**
+     * @param  list<AllInstallmentRowData>  $filas
+     * @param  array<int, true>  $marcables  Cuotas presentes en las dos colas de trabajo
+     */
+    public function build(array $filas, array $marcables, CarbonImmutable $generadaEl, ?string $generadaPor = null): WorksheetData
     {
         return new WorksheetData(
             title: 'Todas las cuotas de Haberes',
@@ -26,6 +29,7 @@ final class AllInstallmentsSheet
                 new WorksheetColumn('Concepto'),
                 WorksheetColumn::amount('Importe'),
                 new WorksheetColumn('Estado', width: '40mm'),
+                WorksheetColumn::tick('', width: '12mm'),
             ],
             rows: array_map(fn (AllInstallmentRowData $fila): array => [
                 $fila->expedienteNumber,
@@ -33,13 +37,14 @@ final class AllInstallmentsSheet
                 $fila->installmentLabel,
                 $fila->concept ?? '—',
                 Decimal::format($fila->amount),
-                $fila->status,
+                $fila->status.($fila->paymentMethod === null ? '' : ' · Salida: '.$fila->paymentMethod),
+                isset($marcables[$fila->installmentId]) ? '' : null,
             ], $filas),
             generatedAt: $generadaEl,
             generatedBy: $generadaPor,
             subtitle: sprintf('%d cuotas registradas', count($filas)),
             filters: 'Incluye cuotas vigentes, pagadas, históricas y anuladas · Ordenadas por carga',
-            footnote: 'Hoja de consulta. Los importes listados no representan dinero disponible en caja ni un total pendiente de pago.',
+            footnote: 'Hoja de consulta. La marca es control manual y no confirma pagos ni reemplaza el recibo de egreso. Los importes no representan dinero disponible ni un total pendiente de pago.',
             emptyMessage: 'No hay cuotas registradas.',
         );
     }

@@ -268,6 +268,7 @@ declare namespace App {
                     concept: string | null;
                     amount: string;
                     status: string;
+                    paymentMethod: string | null;
                 };
                 export type ChequeAssignmentData = {
                     installmentId: number;

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Data;
 
+use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -25,16 +28,50 @@ final class AllInstallmentRowData extends Data
         /** @var numeric-string */
         public string $amount,
         public string $status,
+        public ?string $paymentMethod = null,
     ) {}
 
-    public static function fromModel(BeneficiaryInstallment $cuota, InstallmentStage $etapa): self
-    {
+    /** @param numeric-string $financiado */
+    public static function fromModel(
+        BeneficiaryInstallment $cuota,
+        InstallmentStage $etapa,
+        string $financiado,
+        ?PaymentMedium $medioDeIngreso,
+        ?DisbursementMethod $medioDeEgreso,
+        bool $tieneReciboDeEgreso,
+    ): self {
         $haber = $cuota->haber;
-        $status = $cuota->workflow_status === InstallmentWorkflowStatus::Active
-            ? $etapa->label()
-            : $cuota->workflow_status->label();
+        $pagada = $etapa === InstallmentStage::Paid
+            || $cuota->workflow_status === InstallmentWorkflowStatus::Paid;
+        $status = match (true) {
+            $pagada => $tieneReciboDeEgreso
+                ? 'Pago confirmado'
+                : 'Pago confirmado · falta recibo de egreso',
+            $cuota->workflow_status !== InstallmentWorkflowStatus::Active => $cuota->workflow_status->label(),
+            default => self::estadoActivo($cuota, $etapa, $financiado, $medioDeIngreso),
+        };
         $retenida = (bool) $cuota->managementLabel?->blocks_payment
-            && $cuota->workflow_status === InstallmentWorkflowStatus::Active;
+            && $cuota->workflow_status === InstallmentWorkflowStatus::Active
+            && ! $pagada;
+        $metodo = match (true) {
+            $pagada => $medioDeEgreso?->label(),
+            $cuota->workflow_status !== InstallmentWorkflowStatus::Active => null,
+            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => 'Transferencia',
+            $etapa === InstallmentStage::InCashBox || $etapa === InstallmentStage::AwaitingReceipt => match ($medioDeIngreso) {
+                PaymentMedium::Cash => 'Efectivo',
+                PaymentMedium::Cheque => 'Cheque de terceros',
+                default => $medioDeIngreso === PaymentMedium::Bank ? 'Transferencia' : null,
+            },
+            in_array($etapa, [
+                InstallmentStage::DepositInTransit,
+                InstallmentStage::AtBank,
+                InstallmentStage::OrderIssued,
+                InstallmentStage::TransferReported,
+                InstallmentStage::DebitObserved,
+                InstallmentStage::ReadyToValidate,
+            ], true) => 'Transferencia',
+            default => null,
+        };
 
         return new self(
             installmentId: (int) $cuota->id,
@@ -50,6 +87,32 @@ final class AllInstallmentRowData extends Data
             concept: $cuota->description ?? $haber->concept,
             amount: $cuota->importeEsperado(),
             status: $status.($retenida ? ' · pago retenido' : ''),
+            paymentMethod: $metodo,
         );
+    }
+
+    /** @param numeric-string $financiado */
+    private static function estadoActivo(
+        BeneficiaryInstallment $cuota,
+        InstallmentStage $etapa,
+        string $financiado,
+        ?PaymentMedium $medioDeIngreso,
+    ): string {
+        return match ($etapa) {
+            InstallmentStage::Unfunded => Decimal::equals($financiado, '0')
+                ? 'Sin fondos imputados'
+                : 'Fondos parciales · falta $ '.Decimal::format(Decimal::sub($cuota->importeEsperado(), $financiado)),
+            InstallmentStage::AwaitingReceipt => 'Fondos recibidos · emitir recibo de ingreso',
+            InstallmentStage::InCashBox => $medioDeIngreso === PaymentMedium::Bank
+                ? 'Fondos acreditados · falta Orden de Pago'
+                : 'Entrega pendiente',
+            InstallmentStage::DepositInTransit => 'Depósito en tránsito · falta acreditación',
+            InstallmentStage::AtBank => 'Fondos acreditados · falta Orden de Pago',
+            InstallmentStage::OrderIssued => 'Orden emitida · faltan informe y débito',
+            InstallmentStage::TransferReported => 'Transferencia informada · falta débito',
+            InstallmentStage::DebitObserved => 'Débito identificado · falta informe',
+            InstallmentStage::ReadyToValidate => 'Informe y débito registrados · falta validación',
+            default => $etapa->label(),
+        };
     }
 }

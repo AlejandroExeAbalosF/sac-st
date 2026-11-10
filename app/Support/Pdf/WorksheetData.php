@@ -24,8 +24,9 @@ final class WorksheetData
 {
     /**
      * @param  list<WorksheetColumn>  $columns
-     * @param  list<list<string>>  $rows  Una celda por columna, en el mismo
-     *                                    orden. Las de tilde van vacías.
+     * @param  list<list<string|null>>  $rows  Una celda por columna, en el mismo
+     *                                         orden. En una columna de tilde,
+     *                                         '' dibuja la casilla y null la omite.
      * @param  array<string, string>  $totals  Rótulo => importe ya formateado.
      * @param  string  $slug  Para el nombre del archivo, sin fecha ni extensión.
      */

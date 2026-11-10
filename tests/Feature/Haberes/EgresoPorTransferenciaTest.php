@@ -181,6 +181,12 @@ class EgresoPorTransferenciaTest extends TestCase
             PaymentOrderStatus::Completed,
             PaymentOrder::query()->firstOrFail()->status,
         );
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('all.data.0.status', 'Pago confirmado · falta recibo de egreso')
+                ->where('all.data.0.paymentMethod', 'Transferencia'));
     }
 
     /**

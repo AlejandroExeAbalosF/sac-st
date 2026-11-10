@@ -12,6 +12,7 @@ use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Pdf\AllInstallmentsSheet;
 use App\Modules\Haberes\Pdf\CounterPayoutSheet;
 use App\Modules\Haberes\Pdf\UnconfirmedTransferSheet;
+use App\Support\Pdf\Worksheet;
 use App\Support\Pdf\WorksheetData;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
@@ -66,7 +67,7 @@ class PlanillasDeEgresosTest extends TestCase
             (string) $respuesta->headers->get('content-disposition'));
     }
 
-    public function test_la_planilla_general_muestra_estado_sin_casilla_de_tilde(): void
+    public function test_la_planilla_general_solo_marca_las_filas_de_las_dos_colas(): void
     {
         $hoja = app(AllInstallmentsSheet::class)->build([
             new AllInstallmentRowData(
@@ -78,12 +79,42 @@ class PlanillasDeEgresosTest extends TestCase
                 installmentLabel: 'Haber 1 · Cuota 1 de 2',
                 concept: 'Indemnización',
                 amount: '1000.50',
-                status: 'Pagada',
+                status: 'Entrega pendiente',
+                paymentMethod: 'Efectivo',
             ),
-        ], CarbonImmutable::parse('2026-06-25 11:00'));
+            new AllInstallmentRowData(
+                installmentId: 2,
+                expedienteId: 2,
+                haberNumber: 1,
+                expedienteNumber: '34-000001/2026',
+                beneficiaryName: 'GÓMEZ, Ana',
+                installmentLabel: 'Haber 1 · Cuota 2 de 2',
+                concept: 'Indemnización',
+                amount: '1000.50',
+                status: 'Transferencia informada · falta débito',
+                paymentMethod: 'Transferencia',
+            ),
+            new AllInstallmentRowData(
+                installmentId: 3,
+                expedienteId: 2,
+                haberNumber: 1,
+                expedienteNumber: '34-000001/2026',
+                beneficiaryName: 'LÓPEZ, Marta',
+                installmentLabel: 'Haber 1 · Cuota 3 de 3',
+                concept: 'Indemnización',
+                amount: '1000.50',
+                status: 'Pago confirmado',
+                paymentMethod: 'Transferencia',
+            ),
+        ], [1 => true, 2 => true], CarbonImmutable::parse('2026-06-25 11:00'));
 
-        $this->assertSame('Pagada', $hoja->rows[0][5]);
-        $this->assertFalse(collect($hoja->columns)->contains(fn ($columna): bool => $columna->tickBox));
+        $this->assertSame('', $hoja->rows[0][6]);
+        $this->assertSame('', $hoja->rows[1][6]);
+        $this->assertNull($hoja->rows[2][6]);
+        $this->assertSame('', $hoja->columns[6]->label);
+        $this->assertTrue($hoja->columns[6]->tickBox);
+        $this->assertSame(2, substr_count(app(Worksheet::class)->preview($hoja)->render(), 'class="casilla"'));
+        $this->assertStringContainsString('no confirma pagos', (string) $hoja->footnote);
         $this->assertSame([], $hoja->totals);
     }
 

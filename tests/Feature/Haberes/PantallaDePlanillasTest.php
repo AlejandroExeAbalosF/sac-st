@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\HaberManagementLabel;
 use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,6 +76,37 @@ class PantallaDePlanillasTest extends TestCase
                 ->where('all.data.1.status', 'Pagada fuera del circuito')
                 ->has('counter', 0)
                 ->has('transfers', 0));
+    }
+
+    public function test_todas_distingue_una_cuota_sin_fondos_de_una_parcial(): void
+    {
+        $sinFondos = $this->cuota();
+        $parcial = $this->cuotas()->whereKeyNot($sinFondos->id)->firstOrFail();
+        $parcial->forceFill(['expected_medium' => 'cash'])->save();
+        $this->cobrar($parcial->refresh());
+        $parcial->forceFill([
+            'expected_amount' => Decimal::add($parcial->expected_amount, '100.00'),
+        ])->save();
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('all.data.0.status', 'Sin fondos imputados')
+                ->where('all.data.0.paymentMethod', null)
+                ->where('all.data.1.status', 'Fondos parciales · falta $ 100,00')
+                ->where('all.data.1.paymentMethod', null));
+    }
+
+    public function test_todas_indica_el_medio_de_salida_cuando_la_cuota_esta_lista(): void
+    {
+        $cuota = $this->cuotaCobradaEnEfectivo();
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('all.data.0.installmentId', $cuota->id)
+                ->where('all.data.0.status', 'Entrega pendiente')
+                ->where('all.data.0.paymentMethod', 'Efectivo'));
     }
 
     public function test_las_ideas_de_filtros_solo_se_ofrecen_al_super_admin(): void
@@ -186,6 +218,11 @@ class PantallaDePlanillasTest extends TestCase
         $this->actingAs($this->operador())
             ->get(route('planillas.index'))
             ->assertInertia(fn (AssertableInertia $page) => $page->has('counter', 0));
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('all.data.0.status', 'Entrega pendiente · pago retenido'));
     }
 
     /** El cheque se entrega en mano, pero no sale del cajón. */

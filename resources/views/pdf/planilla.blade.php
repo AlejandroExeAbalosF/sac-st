@@ -205,7 +205,9 @@
                     @foreach ($planilla->columns as $indice => $columna)
                         <td class="{{ $columna->align->value === 'right' ? 'der' : ($columna->align->value === 'center' ? 'centro' : '') }}">
                             @if ($columna->tickBox)
-                                <div class="casilla"></div>
+                                @if (($fila[$indice] ?? null) !== null)
+                                    <div class="casilla"></div>
+                                @endif
                             @else
                                 {{ $fila[$indice] ?? '' }}
                             @endif
