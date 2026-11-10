@@ -61,6 +61,7 @@ final class FeeReceiptPdf
             'papel' => $comprobante->snapshot,
             'documento' => self::documento($comprobante->snapshot['payerDocument'] ?? null),
             'precios' => array_map(self::precio(...), $comprobante->snapshot['lines']),
+            'bases' => array_map(self::base(...), $comprobante->snapshot['lines']),
             'casilla' => $recibo->medium_snapshot === 'cash' ? 'cash' : 'deposit',
             'importe' => Decimal::format($recibo->amount),
             'importeEnLetras' => AmountInWords::for($recibo->amount),
@@ -69,32 +70,45 @@ final class FeeReceiptPdf
     }
 
     /**
-     * Lo que el renglón cobró: cantidad por precio tiene que dar el importe del papel.
+     * El precio de la tarifa con que se calculó el renglón, aunque se haya cobrado otro importe.
      *
-     * Si alguien cambió el importe, el precio del catálogo ya no vale acá: se muestra el
-     * que resulta, y el motivo queda en el sistema. Si no da justo al centavo —$ 100 en 3—
-     * va vacío: un precio redondeado tampoco daría el importe.
+     * Al lado va el importe recibido: si alguien lo cambió —un redondeo, una excepción—,
+     * la diferencia queda a la vista en el papel. El motivo sigue solo en el sistema.
+     *
+     * Un porcentual no tiene precio unitario: muestra lo que da la tasa, con la tasa
+     * entre paréntesis, para compararlo directo con lo recibido. El monto sobre el que
+     * se aplica va en la descripción, donde hay lugar (ver `base()`).
      *
      * @param  array{quantity: int|null, unitPrice: string|null, rate: string|null, baseAmount: string|null, amount: string}  $linea
      */
     private static function precio(array $linea): string
     {
-        $importe = (string) $linea['amount'];
-
         if ($linea['unitPrice'] !== null) {
-            $cantidad = (string) ($linea['quantity'] ?? 1);
-            $unitario = bcdiv($importe, $cantidad, 2);
-
-            return Decimal::equals(bcmul($unitario, $cantidad, 2), $importe) ? '$ '.Decimal::format($unitario) : '';
+            return '$ '.Decimal::format((string) $linea['unitPrice']);
         }
 
         if ($linea['rate'] === null || $linea['baseAmount'] === null) {
             return '';
         }
 
-        return Decimal::equals(Decimal::percentOf((string) $linea['baseAmount'], (string) $linea['rate']), $importe)
-            ? rtrim(rtrim(str_replace('.', ',', (string) $linea['rate']), '0'), ',').' % s/ $ '.Decimal::format((string) $linea['baseAmount'])
-            : '$ '.Decimal::format($importe);
+        $tasa = rtrim(rtrim(str_replace('.', ',', (string) $linea['rate']), '0'), ',');
+
+        return '$ '.Decimal::format(Decimal::percentOf((string) $linea['baseAmount'], (string) $linea['rate'])).' ('.$tasa.' %)';
+    }
+
+    /**
+     * El monto sobre el que se aplicó la tasa, para el final de la descripción.
+     *
+     * Se agrega al dibujar y no se guarda en la redacción: reemplazar el recibo puede
+     * reescribir la descripción, y el monto no tiene que perderse ni quedar viejo.
+     *
+     * @param  array{rate: string|null, baseAmount: string|null}  $linea
+     */
+    private static function base(array $linea): string
+    {
+        return $linea['rate'] === null || $linea['baseAmount'] === null
+            ? ''
+            : ', s/ $ '.Decimal::format((string) $linea['baseAmount']);
     }
 
     /**

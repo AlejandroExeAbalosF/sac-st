@@ -111,9 +111,12 @@ ese total, y se comprueba también al agregar un renglón o un ajuste;
 En papel en blanco, A5 apaisado, con la misma plantilla para la pantalla y la impresora. El
 diseño es provisorio: sigue el talonario del área con el marco de los otros recibos, y falta el
 visto bueno. Lleva el Expte. tachado, el Período vacío, el CUIT o DNI solo si se cargó, el total
-a la derecha y la firma vacía, u opcionalmente el nombre y cargo del firmante elegido. El precio
-es el que resulta del importe cobrado: si se cambió, el motivo queda en el sistema y no en el papel,
-y si no da justo al centavo va vacío. Si los renglones no
+a la derecha y la firma vacía, u opcionalmente el nombre y cargo del firmante elegido. Cada
+renglón muestra el **precio** de la tarifa y el **importe recibido**. En un porcentual, el precio
+es lo que da la tasa, con la tasa entre paréntesis —«$ 86,42 (0,07 %)»—, y el monto sobre el que se
+aplica va al final de la descripción —«…, s/ $ 123.456,00»—; se agrega al dibujar, así que
+reemplazar el recibo y reescribir la descripción no lo borra. En los dos casos, si el importe se cambió, la diferencia se ve en el papel y el motivo queda
+solo en el sistema (decisión del usuario, **sin relevar con el área**). Si los renglones no
 entran, sigue en otra hoja con el mismo número. Lo que dice queda congelado al emitir. Uno
 anulado o reemplazado sale marcado así, para que no se imprima como si valiera.
 

@@ -181,14 +181,14 @@
                     <th>En concepto de:</th>
                     <th class="n" style="width: 10mm;">Cant.</th>
                     <th class="n" style="width: 26mm;">Precio</th>
-                    <th class="n" style="width: 24mm;">Importe</th>
+                    <th class="n" style="width: 28mm;">Importe recibido</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($papel['lines'] as $linea)
                     <tr>
                         <td>{{ $linea['code'] }}</td>
-                        <td>{{ $linea['name'] }}</td>
+                        <td>{{ $linea['name'] }}{{ $bases[$loop->index] }}</td>
                         <td class="n">{{ $linea['quantity'] ?? '' }}</td>
                         <td class="n">{{ $precios[$loop->index] }}</td>
                         <td class="n">$ {{ \App\Support\Money\Decimal::format((string) $linea['amount']) }}</td>

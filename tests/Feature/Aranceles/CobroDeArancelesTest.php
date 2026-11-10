@@ -1328,26 +1328,40 @@ class CobroDeArancelesTest extends TestCase
         $this->assertStringNotContainsString('CUIT:', $sinDocumento);
     }
 
-    /** En el papel, cantidad por precio da el importe, aunque se haya cambiado. */
-    public function test_the_receipt_price_follows_the_amount_charged(): void
+    /**
+     * En el papel, el precio es el de la tarifa y al lado va lo recibido: si el
+     * importe se cambió, la diferencia se ve.
+     */
+    public function test_the_receipt_shows_the_tariff_price_and_the_amount_received(): void
     {
         $this->abrir();
-        $precioDe = function (string $clave, array $renglon): string {
+        $renglonDe = function (string $clave, array $renglon): array {
             $cobro = app(CollectFeeInCash::class)->handle('Quien paga', null, [$renglon], $clave, $this->admin->id, null, null, null, true);
             $html = app(FeeReceiptPdf::class)
                 ->preview(FeeChargeReceipt::query()->where('fee_charge_id', $cobro->id)->firstOrFail())
                 ->render();
 
+            $this->assertStringContainsString('Importe recibido</th>', $html);
+
             preg_match('/<tbody>.*?<\/tr>/s', $html, $fila);
             preg_match_all('/<td class="n">\s*(.*?)\s*<\/td>/s', $fila[0], $celdas);
 
-            return $celdas[1][1];
-        };
+            preg_match('/<td>(\d+)<\/td>\s*<td>(.*?)<\/td>/s', $fila[0], $concepto);
 
-        $this->assertSame('$ 120,00', $precioDe('sin-cambio', $this->linea(14)));
-        $this->assertSame('$ 100,00', $precioDe('cambiado', $this->linea(14, ['amount' => '100', 'reasonCode' => 'rounding'])));
-        $this->assertSame('$ 75,00', $precioDe('por-dos', $this->linea(25, ['quantity' => 2, 'amount' => '150', 'reasonCode' => 'rounding'])));
-        $this->assertSame('', $precioDe('no-da-justo', $this->linea(25, ['quantity' => 3, 'amount' => '100', 'reasonCode' => 'rounding'])));
+            return ['concepto' => $concepto[2], 'precio' => $celdas[1][1], 'recibido' => $celdas[1][2]];
+        };
+        $nombre = fn (int $codigo): string => e((string) FeeType::query()->where('code', $codigo)->value('name'));
+
+        $this->assertSame(['concepto' => $nombre(14), 'precio' => '$ 120,00', 'recibido' => '$ 120,00'], $renglonDe('sin-cambio', $this->linea(14)));
+        $this->assertSame(['concepto' => $nombre(14), 'precio' => '$ 120,00', 'recibido' => '$ 100,00'], $renglonDe('cambiado', $this->linea(14, ['amount' => '100', 'reasonCode' => 'rounding'])));
+        $this->assertSame(['concepto' => $nombre(14), 'precio' => '$ 120,00', 'recibido' => '$ 240,00'], $renglonDe('por-dos', $this->linea(14, ['quantity' => 2])));
+        $this->assertSame(['concepto' => $nombre(14), 'precio' => '$ 120,00', 'recibido' => '$ 239,50'], $renglonDe('por-dos-redondeado', $this->linea(14, ['quantity' => 2, 'amount' => '239.50', 'reasonCode' => 'rounding'])));
+
+        // El porcentual: lo que da la tasa, con la tasa, y el monto en la descripción.
+        $this->assertSame(
+            ['concepto' => $nombre(15).', s/ $ 123.456,00', 'precio' => '$ 86,42 (0,07 %)', 'recibido' => '$ 86,00'],
+            $renglonDe('porcentual', $this->linea(15, ['quantity' => null, 'baseAmount' => '123456', 'amount' => '86', 'reasonCode' => 'rounding'])),
+        );
     }
 
     public function test_decimal_multiplies_and_takes_percentages_without_float(): void

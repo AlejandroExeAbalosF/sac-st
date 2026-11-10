@@ -181,7 +181,7 @@ export default function FeeLineEditor({
 
                         <FormRowField
                             htmlFor={`linea-${linea.key}-calculado`}
-                            label="Calculado"
+                            label="Importe según tarifa"
                         >
                             <output
                                 id={`linea-${linea.key}-calculado`}
