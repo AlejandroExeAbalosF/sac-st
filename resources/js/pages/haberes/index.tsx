@@ -175,7 +175,7 @@ export default function HaberesIndex({
                  * que el encabezado pueda quedar fijo. Con pocas filas no
                  * se nota —no llega a desplazarse—; con cincuenta, es lo
                  * que evita tener que subir para recordar si esa columna
-                 * era «Reconocido» o «Ingresado».
+                 * era «Ingresado» o «Estado».
                  */}
                 {pagination.total === 0 ? (
                     <p className="rounded-lg border border-dashed px-5 py-12 text-center text-sm text-muted-foreground">
@@ -232,12 +232,6 @@ export default function HaberesIndex({
                                                 className="py-2.5 pr-5 font-medium"
                                             >
                                                 Empleador
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="py-2.5 pr-5 text-right font-medium"
-                                            >
-                                                Reconocido
                                             </th>
                                             <th
                                                 scope="col"

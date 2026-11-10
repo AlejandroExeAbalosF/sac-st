@@ -54,12 +54,6 @@ export default function HaberTable({ haberes }: { haberes: Haber[] }) {
                         scope="col"
                         className="py-2.5 pr-5 text-right font-medium"
                     >
-                        Reconocido
-                    </th>
-                    <th
-                        scope="col"
-                        className="py-2.5 pr-5 text-right font-medium"
-                    >
                         Ingresado
                     </th>
                     <th scope="col" className="py-2.5 pr-5 font-medium">
@@ -356,10 +350,6 @@ function HaberRow({ haber }: { haber: Haber }) {
                 <td className="py-3 pr-5 text-sm">{haber.employerName}</td>
 
                 <td className="py-3 pr-5 text-right text-sm">
-                    <Money value={haber.assignedAmount} />
-                </td>
-
-                <td className="py-3 pr-5 text-right text-sm">
                     <Money value={haber.fundedAmount} dimWhenZero />
                 </td>
 
@@ -417,7 +407,7 @@ function HaberRow({ haber }: { haber: Haber }) {
             {abierto && (
                 <tr id={panelId}>
                     <td
-                        colSpan={9}
+                        colSpan={8}
                         className="border-b bg-accent/25 p-0 shadow-[inset_3px_0_0_0_var(--primary)]"
                     >
                         <CuotasDelHaber haber={haber} />

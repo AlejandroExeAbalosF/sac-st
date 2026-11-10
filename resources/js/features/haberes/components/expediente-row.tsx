@@ -155,10 +155,6 @@ export default function ExpedienteRow({
                 <td className="py-3 pr-5 text-sm">{expediente.employerName}</td>
 
                 <td className="py-3 pr-5 text-right text-sm">
-                    <Money value={expediente.recognizedTotalAmount} />
-                </td>
-
-                <td className="py-3 pr-5 text-right text-sm">
                     <Money value={expediente.fundedTotalAmount} dimWhenZero />
                 </td>
 
@@ -203,7 +199,7 @@ export default function ExpedienteRow({
             {abierto && (
                 <tr id={panelId}>
                     <td
-                        colSpan={8}
+                        colSpan={7}
                         className="border-b bg-accent/25 p-0 shadow-[inset_3px_0_0_0_var(--primary)]"
                     >
                         <HaberList haberes={expediente.haberes} />
