@@ -222,7 +222,7 @@ final class InicioController extends Controller
                 'key' => 'haberes',
                 'label' => 'Haberes',
                 'total' => $total,
-                'moreHref' => route('expedientes.index', ['q' => $term], absolute: false),
+                'moreHref' => route('expedientes.index', ['q' => $term, 'vista' => 'expedientes'], absolute: false),
                 'results' => $results,
             ];
         }

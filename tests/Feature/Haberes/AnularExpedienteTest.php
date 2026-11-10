@@ -39,7 +39,7 @@ class AnularExpedienteTest extends TestCase
             ->patch(route('expedientes.cancel', $expediente), [
                 'reasonCode' => 'data_entry_error', 'reason' => 'Cargado con el número equivocado, corresponde al 120327/2019.',
             ])
-            ->assertRedirect(route('expedientes.index'));
+            ->assertRedirect(route('expedientes.index', ['vista' => 'expedientes']));
 
         $this->assertSame('cancelled', $expediente->refresh()->status->value);
 
@@ -152,13 +152,13 @@ class AnularExpedienteTest extends TestCase
             ]);
 
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 5)
                 ->where('anulados', 1));
 
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['anulados' => 1]))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'anulados' => 1]))
             ->assertInertia(fn (Assert $page) => $page->has('expedientes', 6));
     }
 

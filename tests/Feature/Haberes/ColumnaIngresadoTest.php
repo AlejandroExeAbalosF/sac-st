@@ -172,7 +172,7 @@ class ColumnaIngresadoTest extends TestCase
     private function verListadoDeExpedientes(): TestResponse
     {
         return $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertOk();
     }
 

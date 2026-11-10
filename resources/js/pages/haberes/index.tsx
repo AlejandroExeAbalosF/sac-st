@@ -60,8 +60,8 @@ export default function HaberesIndex({
                 ...((cambios.anulados ?? filters.anulados)
                     ? { anulados: 1 }
                     : {}),
-                ...((cambios.vista ?? vista) === 'haberes'
-                    ? { vista: 'haberes' }
+                ...((cambios.vista ?? vista) === 'expedientes'
+                    ? { vista: 'expedientes' }
                     : {}),
             },
             { preserveState: true, replace: true },
@@ -103,16 +103,16 @@ export default function HaberesIndex({
                     className="-mt-2 flex gap-1 border-b"
                 >
                     <ListViewTab
-                        active={!porHaber}
-                        onClick={() => consultar({ vista: 'expedientes' })}
-                    >
-                        Expedientes
-                    </ListViewTab>
-                    <ListViewTab
                         active={porHaber}
                         onClick={() => consultar({ vista: 'haberes' })}
                     >
                         Haberes
+                    </ListViewTab>
+                    <ListViewTab
+                        active={!porHaber}
+                        onClick={() => consultar({ vista: 'expedientes' })}
+                    >
+                        Expedientes
                     </ListViewTab>
                 </nav>
 

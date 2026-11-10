@@ -78,7 +78,8 @@ final class ExpedienteController extends Controller
          */
         $verAnulados = $request->boolean('anulados');
 
-        if ($request->string('vista')->toString() === 'haberes') {
+        // La vista por haber es la de entrada; la de expedientes se pide.
+        if ($request->string('vista')->toString() !== 'expedientes') {
             return $this->listadoDeHaberes($search, $verAnulados);
         }
 
@@ -424,7 +425,7 @@ final class ExpedienteController extends Controller
     ): RedirectResponse {
         $anular->handle($expediente, $request->reason());
 
-        return to_route('expedientes.index')->with(
+        return to_route('expedientes.index', ['vista' => 'expedientes'])->with(
             'status',
             "Expediente {$expediente->display_number} anulado.",
         );

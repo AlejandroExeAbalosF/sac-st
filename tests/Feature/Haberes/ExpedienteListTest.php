@@ -35,7 +35,7 @@ class ExpedienteListTest extends TestCase
     public function test_it_lists_the_expedientes_with_their_haberes()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('haberes/index')->has('expedientes', 6)
@@ -56,7 +56,7 @@ class ExpedienteListTest extends TestCase
     public function test_the_amounts_travel_as_decimal_strings()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.0.recognizedTotalAmount', '1204500.00')
                 ->where('expedientes.0.haberes.0.assignedAmount', '1204500.00')
@@ -66,7 +66,7 @@ class ExpedienteListTest extends TestCase
     public function test_it_searches_by_expediente_number()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['q' => '45905']))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'q' => '45905']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 1)
                 ->where('expedientes.0.displayNumber', '45905/2018')
@@ -81,7 +81,7 @@ class ExpedienteListTest extends TestCase
     public function test_it_searches_by_beneficiary_inside_the_expediente()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['q' => 'Guaymás']))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'q' => 'Guaymás']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 1)
                 ->where('expedientes.0.displayNumber', '120326/2019')
@@ -91,14 +91,14 @@ class ExpedienteListTest extends TestCase
     public function test_the_search_ignores_accents_and_case()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['q' => 'guaymas']))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'q' => 'guaymas']))
             ->assertInertia(fn (Assert $page) => $page->has('expedientes', 1));
     }
 
     public function test_it_searches_by_document_number()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['q' => '28114902']))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'q' => '28114902']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 1)
                 ->where('expedientes.0.haberes.0.beneficiaryName', 'García, Claudio Adrián')
@@ -108,7 +108,7 @@ class ExpedienteListTest extends TestCase
     public function test_a_search_without_matches_returns_an_empty_list()
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['q' => 'no-existe-nada']))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'q' => 'no-existe-nada']))
             ->assertInertia(fn (Assert $page) => $page->has('expedientes', 0));
     }
 
@@ -130,7 +130,7 @@ class ExpedienteListTest extends TestCase
         }
 
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('expedientes', 25)
                 ->where('pagination.currentPage', 1)
@@ -158,7 +158,7 @@ class ExpedienteListTest extends TestCase
     public function test_un_expediente_recien_cargado_no_trae_modificacion(): void
     {
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.0.displayNumber', '125957/2026')
@@ -189,7 +189,7 @@ class ExpedienteListTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->actingAs($operador)
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.0.displayNumber', '125957/2026')
                 ->where('expedientes.0.lastChange.by', $operador->refresh()->name)
@@ -236,7 +236,7 @@ class ExpedienteListTest extends TestCase
 
         // Y el expediente, que sí fue anulado, lo dice.
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index', ['anulados' => 1]))
+            ->get(route('expedientes.index', ['vista' => 'expedientes', 'anulados' => 1]))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.0.displayNumber', '125957/2026')
                 ->where('expedientes.0.lastChange.at', fn (mixed $fecha): bool => is_string($fecha) && $fecha !== '')
@@ -269,7 +269,7 @@ class ExpedienteListTest extends TestCase
         $autor = $contador->refresh()->name;
 
         $this->actingAs($this->operador())
-            ->get(route('expedientes.index'))
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('expedientes.4.displayNumber', '120326/2019')
                 ->where('expedientes.4.haberes.0.lastChange.by', $autor)

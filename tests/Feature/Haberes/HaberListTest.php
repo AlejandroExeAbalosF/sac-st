@@ -273,11 +273,19 @@ class HaberListTest extends TestCase
         );
     }
 
-    /** Sin `vista`, la pantalla sigue siendo la de expedientes. */
-    public function test_the_expediente_view_is_still_the_default()
+    /** Sin `vista`, la pantalla abre por haber; la de expedientes se pide. */
+    public function test_the_haber_view_is_the_default()
     {
         $this->actingAs($this->operador())
             ->get(route('expedientes.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vista', 'haberes')
+                ->has('haberes')
+                ->missing('expedientes')
+            );
+
+        $this->actingAs($this->operador())
+            ->get(route('expedientes.index', ['vista' => 'expedientes']))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('vista', 'expedientes')
                 ->has('expedientes')
