@@ -15,6 +15,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\PaymentOrder;
+use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
@@ -62,7 +63,9 @@ final class InstallmentStages
         /** @var list<int> $ids */
         $ids = $cuotas->pluck('id')->map(intval(...))->values()->all();
 
-        $imputado = app(InstallmentFunding::class)->allocatedForMany($ids);
+        $financiacion = app(InstallmentFunding::class);
+        $imputado = $financiacion->allocatedForMany($ids);
+        $medios = $financiacion->mediumForMany($ids);
         $recibos = $this->conReciboDeIngreso($ids);
         $traslados = app(PaymentOrderSources::class)->transfersFor($ids);
         $ordenes = $this->ordenesVigentes($ids);
@@ -86,6 +89,7 @@ final class InstallmentStages
                 $traslados[$id] ?? null,
                 isset($ordenes[$id]),
                 $egresos[$id] ?? null,
+                $medios[$id] ?? null,
             );
         }
 
@@ -106,6 +110,7 @@ final class InstallmentStages
         ?CashToBankTransfer $traslado,
         bool $tieneOrden,
         ?Disbursement $egreso,
+        ?PaymentMedium $medio,
     ): InstallmentStage {
         if ($cuota->workflow_status === InstallmentWorkflowStatus::Cancelled) {
             return InstallmentStage::Cancelled;
@@ -154,9 +159,19 @@ final class InstallmentStages
             return InstallmentStage::Unfunded;
         }
 
-        return $tieneRecibo
-            ? InstallmentStage::InCashBox
-            : InstallmentStage::AwaitingReceipt;
+        if (! $tieneRecibo) {
+            return InstallmentStage::AwaitingReceipt;
+        }
+
+        /*
+         * Dónde está el dinero lo dice por dónde entró: lo que llegó por el
+         * extracto ya está acreditado, aunque nunca haya pasado por la caja.
+         * Decía «En caja» también en ese caso, y la planilla lo corregía por
+         * su cuenta: el detalle y la planilla contaban dos cosas distintas.
+         */
+        return $medio === PaymentMedium::Bank
+            ? InstallmentStage::AtBank
+            : InstallmentStage::InCashBox;
     }
 
     /**

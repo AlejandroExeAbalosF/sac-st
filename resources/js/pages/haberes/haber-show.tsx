@@ -5,14 +5,13 @@ import CollapsibleSection from '@/components/collapsible-section';
 import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
-import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { useDrawer } from '@/features/drawer/drawer-context';
 import HaberCancelDialog from '@/features/haberes/components/haber-cancel-dialog';
+import HaberStatusBadge from '@/features/haberes/components/haber-status-badge';
 import InstallmentCards from '@/features/haberes/components/installment-cards';
 import type { Firmante } from '@/features/haberes/components/issue-receipt-dialog';
-import { estadoDelHaber } from '@/features/haberes/haber-status';
 import type {
     EgresoProps,
     EtiquetaOption,
@@ -298,7 +297,7 @@ export default function MostrarHaber({
                                 ` · ${haber.paidInstallmentCount} pagadas`}
                         </DataField>
                         <DataField label="Estado">
-                            <StatusBadge {...estadoDelHaber(haber)} />
+                            <HaberStatusBadge haber={haber} />
                         </DataField>
                         {/*
                          * El haber se carga meses después que el expediente, y

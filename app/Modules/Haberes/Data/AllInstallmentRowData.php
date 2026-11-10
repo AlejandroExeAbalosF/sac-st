@@ -50,7 +50,7 @@ final class AllInstallmentRowData extends Data
                 ? 'Pago confirmado'
                 : 'Pago confirmado · falta recibo de egreso',
             $cuota->workflow_status !== InstallmentWorkflowStatus::Active => $cuota->workflow_status->label(),
-            default => self::estadoActivo($cuota, $etapa, $financiado, $medioDeIngreso),
+            default => self::estadoActivo($cuota, $etapa, $financiado),
         };
         $retenida = (bool) $cuota->managementLabel?->blocks_payment
             && $cuota->workflow_status === InstallmentWorkflowStatus::Active
@@ -58,7 +58,6 @@ final class AllInstallmentRowData extends Data
         $metodo = match (true) {
             $pagada => $medioDeEgreso,
             $cuota->workflow_status !== InstallmentWorkflowStatus::Active => null,
-            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => DisbursementMethod::BankTransfer,
             $etapa === InstallmentStage::InCashBox || $etapa === InstallmentStage::AwaitingReceipt => match ($medioDeIngreso) {
                 PaymentMedium::Cash => DisbursementMethod::Cash,
                 PaymentMedium::Cheque => DisbursementMethod::Cheque,
@@ -82,7 +81,6 @@ final class AllInstallmentRowData extends Data
             $cuota->workflow_status === InstallmentWorkflowStatus::Suspended => InstallmentStage::Suspended->value,
             $pagada && ! $tieneReciboDeEgreso => 'paid_missing_receipt',
             $etapa === InstallmentStage::Unfunded && ! Decimal::equals($financiado, '0') => 'partially_funded',
-            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => InstallmentStage::AtBank->value,
             default => $etapa->value,
         };
 
@@ -111,16 +109,13 @@ final class AllInstallmentRowData extends Data
         BeneficiaryInstallment $cuota,
         InstallmentStage $etapa,
         string $financiado,
-        ?PaymentMedium $medioDeIngreso,
     ): string {
         return match ($etapa) {
             InstallmentStage::Unfunded => Decimal::equals($financiado, '0')
                 ? 'Sin fondos imputados'
                 : 'Fondos parciales · falta $ '.Decimal::format(Decimal::sub($cuota->importeEsperado(), $financiado)),
             InstallmentStage::AwaitingReceipt => 'Fondos recibidos · emitir recibo de ingreso',
-            InstallmentStage::InCashBox => $medioDeIngreso === PaymentMedium::Bank
-                ? 'Fondos acreditados · falta Orden de Pago'
-                : 'Entrega pendiente',
+            InstallmentStage::InCashBox => 'Entrega pendiente',
             InstallmentStage::DepositInTransit => 'Depósito en tránsito · falta acreditación',
             InstallmentStage::AtBank => 'Fondos acreditados · falta Orden de Pago',
             InstallmentStage::OrderIssued => 'Orden emitida · faltan informe y débito',

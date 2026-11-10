@@ -2,14 +2,13 @@ import { Link } from '@inertiajs/react';
 import { ChevronRight, Lock, Maximize2 } from 'lucide-react';
 import { useId } from 'react';
 import Money from '@/components/money';
-import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { estadoDelHaber } from '@/features/haberes/haber-status';
+import HaberStatusBadge from '@/features/haberes/components/haber-status-badge';
 import { useRememberedOpen } from '@/hooks/use-remembered-open';
 import { date } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -159,7 +158,7 @@ function HaberCard({ haber }: { haber: Haber }) {
                             {haber.beneficiaryDocument || 'Sin documento'}
                         </p>
                     </div>
-                    <StatusBadge {...estadoDelHaber(haber)} />
+                    <HaberStatusBadge haber={haber} />
                 </div>
 
                 {haber.blockReason && (
@@ -376,7 +375,7 @@ function HaberRow({ haber }: { haber: Haber }) {
                 </td>
 
                 <td className="py-3 pr-5">
-                    <StatusBadge {...estadoDelHaber(haber)} />
+                    <HaberStatusBadge haber={haber} />
                 </td>
 
                 <td className="py-3 pr-5">

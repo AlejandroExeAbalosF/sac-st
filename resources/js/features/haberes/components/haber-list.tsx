@@ -3,7 +3,6 @@ import { Ban, ChevronDown, Lock, Maximize2, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Money from '@/components/money';
-import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Collapsible,
@@ -15,7 +14,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { estadoDelHaber } from '@/features/haberes/haber-status';
+import HaberStatusBadge from '@/features/haberes/components/haber-status-badge';
 import type { EtiquetaOption } from '@/features/haberes/types';
 import { date, dateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -191,7 +190,7 @@ function MontosDelHaber({
                         Estado
                     </span>
                     <span className="mt-0.5 block">
-                        <StatusBadge {...estadoDelHaber(haber)} />
+                        <HaberStatusBadge haber={haber} />
                     </span>
                 </span>
             )}
@@ -225,7 +224,7 @@ function HaberSummary({ haber }: { haber: Haber }) {
                 </span>
 
                 <span className="shrink-0">
-                    <StatusBadge {...estadoDelHaber(haber)} />
+                    <HaberStatusBadge haber={haber} />
                 </span>
             </span>
 

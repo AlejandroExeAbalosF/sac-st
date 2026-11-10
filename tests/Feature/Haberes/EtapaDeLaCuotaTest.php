@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Haberes;
 
 use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
+use App\Modules\Banking\Actions\RegisterBankFundReceipt;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashToBankTransfer;
+use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Enums\InstallmentStage;
@@ -17,6 +19,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Support\InstallmentStages;
 use App\Modules\Shared\Enums\ReceiptStatus;
+use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
@@ -108,6 +111,36 @@ class EtapaDeLaCuotaTest extends TestCase
         $cuota = $this->cuotaAcreditada();
 
         $this->assertSame(InstallmentStage::AtBank, $this->etapaDe($cuota));
+    }
+
+    /**
+     * Cobrada por banco, con su recibo: el dinero está acreditado, no en el
+     * cajón. Decía «En caja» y solo la planilla lo corregía.
+     */
+    public function test_cobrada_por_banco_queda_en_el_banco(): void
+    {
+        $cuota = $this->cuota();
+        $cuota->forceFill(['expected_medium' => 'bank'])->save();
+
+        $recepcion = app(RegisterBankFundReceipt::class)->handle(
+            transaction: $this->credito($cuota->importeEsperado()),
+            amount: $cuota->importeEsperado(),
+            idempotencyKey: 'recepcion-'.Str::random(8),
+            cashBoxId: (int) CashBox::query()->where('code', 'haberes')->value('id'),
+        );
+        app(AllocateFundsToInstallment::class)->handle(
+            receipt: $recepcion,
+            installment: $cuota->refresh(),
+            amount: $cuota->importeEsperado(),
+            idempotencyKey: 'asignacion-'.Str::random(8),
+        );
+        app(CollectAndIssueReceipt::class)->handle(
+            installment: $cuota->refresh(),
+            idempotencyKey: 'recibo-'.Str::random(8),
+            actorId: $this->operador()->id,
+        );
+
+        $this->assertSame(InstallmentStage::AtBank, $this->etapaDe($cuota->refresh()));
     }
 
     /** Anulada manda sobre todo lo demás. */

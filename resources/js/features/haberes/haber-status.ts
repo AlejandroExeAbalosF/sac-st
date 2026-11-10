@@ -44,3 +44,26 @@ export function estadoDelHaber(haber: {
         ? PAGO[haber.paymentStatus]
         : GESTION[haber.status];
 }
+
+/**
+ * El avance en importes que acompaña a «Sin pagos» y «Pago parcial».
+ *
+ * Los dos rótulos son ciertos pero no dicen cuánto: «Pagado $ 80.000 de
+ * $ 200.000» sí. Cuenta lo que se debía de las cuotas pagadas, sin
+ * excedentes, contra lo reconocido. En los demás casos no agrega nada.
+ */
+export function avanceDelHaber(haber: {
+    status: Gestion;
+    paymentStatus: Pago;
+    paidAmount: string;
+    assignedAmount: string;
+}): { pagado: string; reconocido: string } | null {
+    const sigueEnCurso =
+        haber.status === 'active' &&
+        (haber.paymentStatus === 'unpaid' ||
+            haber.paymentStatus === 'partially_paid');
+
+    return sigueEnCurso
+        ? { pagado: haber.paidAmount, reconocido: haber.assignedAmount }
+        : null;
+}

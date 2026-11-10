@@ -1,6 +1,10 @@
 # Guía de interfaz de SAC-ST
 
-Esta guía reúne las convenciones que comparten las pantallas del sistema.
+Esta guía reúne las convenciones que comparten las pantallas del sistema. Los
+rótulos de estado de cada pantalla, con lo que indican, están en
+[Estados visibles en la interfaz](estados-de-interfaz.md): un estado nuevo o un
+rótulo que cambia se anota ahí en la misma tanda. Los estados que piden algo se
+escriben como «lo que pasó · lo que falta» («Débito identificado · falta informe»).
 
 ## Campos de formulario en una misma fila
 

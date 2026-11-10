@@ -66,6 +66,13 @@ final class HaberRowData extends Data
         public HaberWorkflowStatus $status,
         /** En qué va el pago; se deriva de las cuotas, no se guarda. */
         public HaberPaymentStatus $paymentStatus,
+        /**
+         * Lo pagado de lo reconocido, sin excedentes: el avance que acompaña
+         * a «Sin pagos» y «Pago parcial».
+         *
+         * @var numeric-string
+         */
+        public string $paidAmount,
         /** Motivo cuando el haber no puede avanzar. */
         public ?string $blockReason,
         /** Cuándo llegó el expediente que lo trajo. */
@@ -159,6 +166,7 @@ final class HaberRowData extends Data
             paidInstallmentCount: $haber->paid_installments_count,
             status: $haber->workflow_status,
             paymentStatus: $haber->situacionDePago(),
+            paidAmount: $haber->importePagado(),
             blockReason: $haber->block_reason,
             receivedDate: $expediente->received_date?->format('Y-m-d'),
             createdAt: $haber->created_at->toIso8601String(),

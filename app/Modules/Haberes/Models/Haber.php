@@ -12,6 +12,7 @@ use App\Modules\Haberes\Enums\PaymentTerms;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
 use App\Support\Database\Like;
+use App\Support\Money\Decimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -221,11 +222,32 @@ final class Haber extends Model
     {
         return HaberPaymentStatus::fromInstallments(
             $this->importeAsignado(),
+            // Lo que se debe de cada cuota: el excedente se paga, pero no es parte de lo reconocido.
             $this->installments->map(fn (BeneficiaryInstallment $cuota): array => [
                 'status' => $cuota->workflow_status,
-                'amount' => $cuota->importeEsperado(),
+                'amount' => $cuota->importeAAbonar(),
             ]),
         );
+    }
+
+    /**
+     * Lo pagado de lo reconocido: lo que se debía de las cuotas pagadas,
+     * en el circuito o antes de la apertura. Sin el excedente, para poder
+     * leerlo contra el importe reconocido («Pagado $ 80.000 de $ 200.000»).
+     *
+     * @return numeric-string
+     */
+    public function importePagado(): string
+    {
+        $pagado = '0.00';
+
+        foreach ($this->installments as $cuota) {
+            if (in_array($cuota->workflow_status, [InstallmentWorkflowStatus::Paid, InstallmentWorkflowStatus::LegacySettled], true)) {
+                $pagado = Decimal::add($pagado, $cuota->importeAAbonar());
+            }
+        }
+
+        return $pagado;
     }
 
     /**

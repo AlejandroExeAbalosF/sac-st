@@ -445,6 +445,7 @@ declare namespace App {
                     paidInstallmentCount: number;
                     status: App.Modules.Haberes.Enums.HaberWorkflowStatus;
                     paymentStatus: App.Modules.Haberes.Enums.HaberPaymentStatus;
+                    paidAmount: string;
                     blockReason: string | null;
                     concept: string | null;
                     notes: string | null;
@@ -469,6 +470,7 @@ declare namespace App {
                     paidInstallmentCount: number;
                     status: App.Modules.Haberes.Enums.HaberWorkflowStatus;
                     paymentStatus: App.Modules.Haberes.Enums.HaberPaymentStatus;
+                    paidAmount: string;
                     blockReason: string | null;
                     receivedDate: string | null;
                     createdAt: string;
