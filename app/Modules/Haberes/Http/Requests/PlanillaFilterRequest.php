@@ -40,6 +40,30 @@ final class PlanillaFilterRequest extends FormRequest
     }
 
     /** @return array<string, string> */
+    public function attributes(): array
+    {
+        return [
+            'expediente' => 'expediente',
+            'beneficiario' => 'beneficiario',
+            'empleador' => 'empleador',
+            'stages' => 'situaciones',
+            'stages.*' => 'situación',
+            'medio' => 'medio de pago',
+            'medioPrevisto' => 'medio previsto',
+            'retenido' => 'retenido',
+            'vencimientoDesde' => 'vencimiento desde',
+            'vencimientoHasta' => 'vencimiento hasta',
+            'pagoDesde' => 'pago desde',
+            'pagoHasta' => 'pago hasta',
+            'importeMin' => 'importe mínimo',
+            'importeMax' => 'importe máximo',
+            'page' => 'página',
+            'formato' => 'formato',
+            'descargar' => 'descarga',
+        ];
+    }
+
+    /** @return array<string, string> */
     public function messages(): array
     {
         return [
