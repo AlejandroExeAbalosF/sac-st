@@ -126,12 +126,16 @@
         <div class="campo rotulo" style="left: 104mm; top: 90mm;">Expte. Judicial N.º</div>
         <div class="campo linea" style="left: 132mm; top: 94mm; width: 62mm;"></div>
 
-        <div class="campo rotulo" style="left: 11mm; top: 102mm;">SON:</div>
+        @if ($aAbonar !== null)
+            {{-- Con excedente, los dos importes por separado: lo que se debía y lo recibido. --}}
+            <div class="campo rotulo" style="left: 11mm; top: 101mm;">Importe a abonar:</div>
+            <div class="campo rotulo" style="left: 11mm; top: 112mm;">Importe recibido:</div>
+        @else
+            <div class="campo rotulo" style="left: 11mm; top: 102mm;">SON:</div>
+        @endif
 
         <div class="campo rotulo" style="left: 11mm; top: 120mm;">Salta:</div>
         <div class="campo linea" style="left: 21mm; top: 124mm; width: 70mm;"></div>
-
-        <div class="campo" style="left: 5mm; top: 128mm; font-size: 6pt; color: #555;">F.022</div>
 
         <div class="campo pie-firma" style="left: 122mm; top: 135mm; width: 72mm;">
             <div style="border-top: 0.3mm dotted #111; padding-top: 0.6mm;">Firma y Aclaración</div>
@@ -175,23 +179,34 @@
         <div class="campo escrito" style="left: 133mm; top: 90mm;">{{ $snapshot['judicialReference'] }}</div>
     @endif
 
-    <div class="campo" style="left: 20mm; top: 99mm;">
-        <span class="importe-caja">$ {{ $importe }}</span>
-    </div>
+    @if ($aAbonar !== null)
+        <div class="campo escrito" style="left: 40mm; top: 100.5mm; font-size: 10pt;">$ {{ $aAbonar }}</div>
+        <div class="campo" style="left: 40mm; top: 109mm;">
+            <span class="importe-caja">$ {{ $importe }}</span>
+        </div>
+    @else
+        <div class="campo" style="left: 20mm; top: 99mm;">
+            <span class="importe-caja">$ {{ $importe }}</span>
+        </div>
+    @endif
     <div class="campo escrito" style="left: 104mm; top: 101mm;">Total multa $ {{ $totalMulta }}</div>
 
-    {{-- El cancelatorio dice cómo se llegó a cero, y separa el excedente (M05, M09). --}}
-    @if ($esCancelatorio || ($snapshot['excess'] ?? '0.00') !== '0.00')
+    {{--
+        El cancelatorio dice cómo se llegó a cero: los pagos anteriores (M09).
+        El excedente se nombra solo sobre el talonario: en papel en blanco ya
+        lo muestran «Importe a abonar» e «Importe recibido» (M05).
+    --}}
+    @php($excedenteAparte = $sobreTalonario && ($snapshot['excess'] ?? '0.00') !== '0.00')
+    @if ($esCancelatorio || $excedenteAparte)
         <div class="campo detalle" style="left: 104mm; top: 107mm; width: 90mm;">
             @if ($esCancelatorio)
                 <strong>Pago cancelatorio.</strong>
                 @foreach ($snapshot['previousPayments'] ?? [] as $anterior)
                     {{ \App\Modules\Multas\Support\PartialDate::fromStored($anterior['date'], \App\Modules\Multas\Enums\DatePrecision::tryFrom($anterior['precision'] ?? '') ?? \App\Modules\Multas\Enums\DatePrecision::Unknown)->toDisplay() }}
-                    $ {{ \App\Support\Money\Decimal::format((string) $anterior['amount']) }}{{ $anterior['receipt'] ? ' (rec. '.$anterior['receipt'].')' : '' }};
+                    $ {{ \App\Support\Money\Decimal::format((string) $anterior['amount']) }}{{ $anterior['receipt'] ? ' (rec. '.$anterior['receipt'].')' : '' }}{{ $loop->last ? '.' : ';' }}
                 @endforeach
-                Saldo $ 0,00.
             @endif
-            @if (($snapshot['excess'] ?? '0.00') !== '0.00')
+            @if ($excedenteAparte)
                 Excedente pendiente $ {{ \App\Support\Money\Decimal::format((string) $snapshot['excess']) }}.
             @endif
         </div>

@@ -590,10 +590,16 @@ cheque** y en el mismo acto lo aplica a la multa y emite el recibo (M02):
 - **Recibo**: de la serie de Multas (`0210/…`, configurable en Numeración),
   «recibí de» la carátula de la multa, con su concepto —pago parcial o
   cancelatorio de la multa por su resolución—, el expediente administrativo y el
-  total de la multa. Se ve e imprime desde la fila del pago, sobre papel en blanco
+  total de la multa. Las letras y el recuadro dicen siempre lo recibido. Con
+  excedente, en papel en blanco, el «SON:» pasa a **Importe a abonar** —el saldo
+  antes de este pago, sin recuadro— y debajo va **Importe recibido** con su
+  recuadro. Sobre la hoja del talonario, que trae el «SON:» impreso, sigue la
+  disposición de siempre (decisión del usuario, **sin relevar con el área**). Se ve e imprime desde la fila del pago, sobre papel en blanco
   o sobre la hoja del talonario. El del pago que deja la deuda en cero es el
   **cancelatorio**: lista los pagos anteriores, con la fecha que se conoce de cada
-  uno, y separa el excedente. La casilla «Depósito Cta.» lleva el número de la
+  uno, sin repetir el saldo en cero. El excedente se nombra aparte —«Excedente
+  pendiente»— solo sobre el talonario: en papel en blanco ya lo muestran los dos
+  importes. La casilla «Depósito Cta.» lleva el número de la
   cuenta del crédito en un pago por banco; en un cobro en caja, la cuenta solo si la
   caja tiene una única vigente, y vacía si tiene varias —el depósito guarda la
   suya—. Lo que dice queda congelado: un ajuste posterior de la multa, un cambio en

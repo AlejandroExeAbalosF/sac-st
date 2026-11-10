@@ -70,7 +70,30 @@ final class FineReceiptPdf
             'importe' => Decimal::format($recibo->amount),
             'importeEnLetras' => AmountInWords::for($recibo->amount),
             'totalMulta' => Decimal::format((string) ($comprobante->snapshot['obligation'] ?? '0')),
+            'aAbonar' => $conFondo ? self::aAbonar($comprobante->snapshot) : null,
             'selloUrl' => is_file(public_path('sello-organismo.png')) ? public_path('sello-organismo.png') : null,
         ];
+    }
+
+    /**
+     * Lo que se debía antes de este pago, solo cuando entró de más.
+     *
+     * Con excedente el papel separa los dos importes: lo que había que abonar,
+     * en lugar del «SON:», y debajo lo recibido en su recuadro, que es lo que
+     * dicen las letras. En un pago parcial o justo no hace falta: el recuadro
+     * y el total de la multa ya lo cuentan. Sale de la copia congelada.
+     *
+     * Solo en papel en blanco: la hoja del talonario trae el «SON:» impreso y
+     * debajo no tiene rótulo, así que ahí se sigue la disposición de siempre.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    private static function aAbonar(array $snapshot): ?string
+    {
+        if (Decimal::equals((string) ($snapshot['excess'] ?? '0'), '0') || ! isset($snapshot['obligation'], $snapshot['paidBefore'])) {
+            return null;
+        }
+
+        return Decimal::format(Decimal::sub((string) $snapshot['obligation'], (string) $snapshot['paidBefore']));
     }
 }

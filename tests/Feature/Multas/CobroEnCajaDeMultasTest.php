@@ -12,6 +12,7 @@ use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Models\FinePaymentReceipt;
+use App\Modules\Multas\Pdf\FineReceiptPdf;
 use App\Modules\Multas\Support\FinePaymentTimeliness;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\AdjustsFines;
 use Tests\Concerns\BuildsSharedBankAccount;
 use Tests\Concerns\CollectsInstallments;
@@ -403,6 +405,55 @@ class CobroEnCajaDeMultasTest extends TestCase
         expect($comprobante->snapshot['bankAccountNumber'])->toBe('310000999888777');
         $this->actingAs($this->operador())->get(route('multas.recibos.view', $comprobante->receipt_id))
             ->assertOk()->assertSee('310000999888777')->assertDontSee('310000999888778');
+    }
+
+    /**
+     * Con excedente, el papel en blanco separa lo que se debía —sin recuadro,
+     * en lugar del «SON:»— de lo recibido, en su recuadro. Un pago parcial o
+     * justo, y cualquiera sobre el talonario, siguen como siempre.
+     */
+    #[DataProvider('importesDelPago')]
+    public function test_the_receipt_splits_the_amount_due_only_with_an_excess(string $importe, string $recuadro, ?string $aAbonar): void
+    {
+        $multa = $this->escenario();
+        $comprobante = $this->cobrar($multa, FinePaymentMedium::Cash, $importe)->paymentReceipt()->firstOrFail();
+
+        $html = (string) $this->actingAs($this->operador())->get(route('multas.recibos.view', $comprobante->receipt_id))->getContent();
+
+        expect($html)->toContain('<span class="importe-caja">$ '.$recuadro.'</span>');
+
+        if ($aAbonar === null) {
+            expect($html)->toContain('SON:')->not->toContain('Importe a abonar')->not->toContain('Importe recibido');
+        } else {
+            expect($html)->not->toContain('SON:')
+                ->toContain('Importe a abonar:')->toContain('font-size: 10pt;">$ '.$aAbonar.'</div>')
+                ->toContain('Importe recibido:');
+        }
+
+        $talonario = app(FineReceiptPdf::class)->preview($comprobante, conFondo: false)->render();
+        expect($talonario)->toContain('<span class="importe-caja">$ '.$recuadro.'</span>')
+            ->not->toContain('top: 100.5mm');
+
+        // El cancelatorio no repite el saldo, y el excedente se nombra solo sobre el talonario.
+        expect($html)->not->toContain('Saldo $ 0,00')->not->toContain('Excedente pendiente')->not->toContain('F.022')
+            ->and($talonario)->not->toContain('Saldo $ 0,00');
+
+        if ($aAbonar === null) {
+            expect($talonario)->not->toContain('Excedente pendiente');
+        } else {
+            expect($html)->toContain('Pago cancelatorio.')
+                ->and($talonario)->toContain('Pago cancelatorio.')->toContain('Excedente pendiente $ 100.000,00.');
+        }
+    }
+
+    /** @return array<string, array{string, string, string|null}> */
+    public static function importesDelPago(): array
+    {
+        return [
+            'parcial' => ['300000.00', '300.000,00', null],
+            'justo' => ['1400000.00', '1.400.000,00', null],
+            'con excedente' => ['1500000.00', '1.500.000,00', '1.400.000,00'],
+        ];
     }
 
     // ── El excedente sigue a la obligación ──────────────────────────────
