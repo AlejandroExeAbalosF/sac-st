@@ -108,6 +108,17 @@ final class SpreadsheetReader
         $rows = [];
 
         try {
+            /*
+             * Excel («CSV UTF-8») y el Bloc de notas anteponen la marca BOM
+             * al guardar. Delante de la primera comilla, esa marca hace que
+             * la primera celda deje de leerse como entrecomillada y la
+             * cabecera ya no se reconoce: un extracto abierto y guardado
+             * otra vez se rechazaba sin ningún movimiento.
+             */
+            if (fread($handle, 3) !== "\xEF\xBB\xBF") {
+                rewind($handle);
+            }
+
             // Escape vacío: RFC 4180 puro. La barra invertida no escapa
             // nada en un CSV bancario, y tratarla como si lo hiciera
             // rompe cualquier concepto que la contenga.

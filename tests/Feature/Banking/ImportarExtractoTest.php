@@ -219,6 +219,33 @@ class ImportarExtractoTest extends TestCase
         $this->assertSame(0, $import->rows()->count());
     }
 
+    /**
+     * Abrir el CSV y guardarlo con Excel o el Bloc de notas le antepone la
+     * marca BOM de UTF-8. Con ella delante, la cabecera no se reconocía y
+     * el archivo se rechazaba por no tener movimientos.
+     */
+    public function test_el_csv_guardado_con_bom_se_interpreta_entero(): void
+    {
+        $cuenta = $this->cuenta();
+
+        $conBom = tempnam(sys_get_temp_dir(), 'ext').'.csv';
+        file_put_contents($conBom, "\xEF\xBB\xBF".file_get_contents($this->fixture('macro-online.csv')));
+
+        $this->actingAs($this->operador())
+            ->post(route('banco.extractos.store'), [
+                'bankAccountId' => $cuenta->id,
+                'file' => new UploadedFile($conBom, 'con-bom.csv', null, null, true),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $import = BankStatementImport::query()->firstOrFail();
+
+        $this->assertSame(ImportStatus::Completed, $import->status);
+        $this->assertSame(14, $import->rows_valid);
+        $this->assertSame(0, $import->rows_rejected);
+        $this->assertSame(14, BankTransaction::query()->count());
+    }
+
     public function test_el_extracto_de_otra_cuenta_se_rechaza(): void
     {
         $otra = BankAccount::query()->create([
