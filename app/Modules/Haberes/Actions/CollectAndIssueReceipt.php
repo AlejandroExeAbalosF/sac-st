@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Models\Expediente;
+use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Ledger\Models\FinancialEvent;
@@ -13,6 +15,8 @@ use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Reason;
+use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -43,10 +47,12 @@ final class CollectAndIssueReceipt
         private readonly IssueIncomeReceipt $emitir,
         private readonly InstallmentFunding $financiacion,
         private readonly StoreAttachment $adjuntos,
+        private readonly RecordInstallmentExcess $importeMayor,
     ) {}
 
     /**
      * @param  array{number: string, bank: string|null, issueDate: string|null}|null  $cheque
+     * @param  array{total: numeric-string, reason: Reason, version: CarbonInterface}|null  $excess  Si entró más de lo que se debe.
      *
      * @throws ValidationException
      */
@@ -62,6 +68,9 @@ final class CollectAndIssueReceipt
         ?array $cheque = null,
         ?string $notes = null,
         ?UploadedFile $talonarioPhoto = null,
+        // Lo que quien cobra vio en pantalla: si cambió, no se cobra otra cosa.
+        ?string $confirmedAmount = null,
+        ?array $excess = null,
     ): Receipt {
         $claveDelCobro = $idempotencyKey.':cobro';
 
@@ -71,7 +80,7 @@ final class CollectAndIssueReceipt
             return $this->collect(
                 $installment, $claveDelCobro, $actorId, $talonarioNumber,
                 $signedById, $printsTalonarioNumber, $receivedDate, $cheque,
-                $notes, $talonarioPhoto, $adjunto,
+                $notes, $talonarioPhoto, $adjunto, $confirmedAmount, $excess,
             );
         } catch (Throwable $e) {
             $this->deleteRolledBackFile($adjunto);
@@ -82,6 +91,7 @@ final class CollectAndIssueReceipt
 
     /**
      * @param  array{number: string, bank: string|null, issueDate: string|null}|null  $cheque
+     * @param  array{total: numeric-string, reason: Reason, version: CarbonInterface}|null  $excess
      */
     private function collect(
         BeneficiaryInstallment $installment,
@@ -95,11 +105,13 @@ final class CollectAndIssueReceipt
         ?string $notes,
         ?UploadedFile $talonarioPhoto,
         ?Attachment &$adjunto,
+        ?string $confirmedAmount,
+        ?array $excess,
     ): Receipt {
         return DB::transaction(function () use (
             $installment, $claveDelCobro, $actorId, $talonarioNumber,
             $signedById, $printsTalonarioNumber, $receivedDate, $cheque, $notes,
-            $talonarioPhoto, &$adjunto
+            $talonarioPhoto, &$adjunto, $confirmedAmount, $excess
         ): Receipt {
             /*
              * Un segundo envío del mismo formulario.
@@ -117,7 +129,35 @@ final class CollectAndIssueReceipt
                 }
             }
 
+            /*
+             * Los bloqueos, de afuera hacia adentro y antes de todo:
+             * expediente -> haber -> cuota, el mismo orden de la asignación y
+             * de las correcciones. Tomar la cuota primero y el haber después
+             * invertía el orden y podía trabarse con una corrección
+             * simultánea. Lo que sigue lee y cobra sobre esta misma cuota.
+             */
+            $installment = $this->bloquear($installment);
+
+            /*
+             * El importe mayor, en el mismo acto que el cobro: si el cobro
+             * falla —el día cerrado, el talonario repetido— no queda una
+             * cuota esperando un total que no entró. Son las mismas reglas
+             * que registrarlo desde la tarjeta.
+             */
+            if ($excess !== null) {
+                if (! $this->cobraAlEmitir($installment)) {
+                    throw ValidationException::withMessages([
+                        'excessTotal' => 'El importe mayor se registra al cobrar por mostrador. En esta cuota no hay nada que cobrar acá.',
+                    ]);
+                }
+
+                $this->importeMayor->handle($installment, $excess['total'], $excess['reason'], $excess['version'], $actorId);
+                $installment->refresh();
+            }
+
             if ($this->cobraAlEmitir($installment)) {
+                $this->assertSameAmount($installment, $confirmedAmount);
+
                 $this->cobrar->handle(
                     installment: $installment,
                     amount: $this->financiacion->remaining($installment),
@@ -153,6 +193,46 @@ final class CollectAndIssueReceipt
                 storedTalonarioPhoto: $adjunto,
             );
         });
+    }
+
+    /**
+     * Lo que se cobra es lo que quien cobra confirmó.
+     *
+     * El importe sale de la cuota y no del navegador, pero entre abrir el
+     * cobro y confirmarlo otra persona pudo registrar un importe mayor: sin
+     * esto se cobraría y se imprimiría un total que nadie vio. Se lee sobre la
+     * cuota ya bloqueada (`bloquear`), la misma fila que bloquea registrar el
+     * excedente.
+     *
+     * @throws ValidationException
+     */
+    private function assertSameAmount(BeneficiaryInstallment $installment, ?string $confirmedAmount): void
+    {
+        if ($confirmedAmount === null) {
+            return;
+        }
+
+        $aCobrar = $this->financiacion->remaining($installment);
+
+        if (! Decimal::equals($aCobrar, $confirmedAmount)) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'El importe a cobrar cambió: ahora es $ '.Decimal::format($aCobrar).'. Revisalo antes de cobrar.',
+            ]);
+        }
+    }
+
+    /** La cuota, con su expediente y su haber bloqueados en ese orden. */
+    private function bloquear(BeneficiaryInstallment $installment): BeneficiaryInstallment
+    {
+        $haber = Haber::query()->whereKey($installment->haber_id)->firstOrFail();
+
+        Expediente::query()->lockForUpdate()->findOrFail($haber->expediente_id);
+        Haber::query()->lockForUpdate()->findOrFail($haber->id);
+
+        return BeneficiaryInstallment::query()
+            ->where('haber_id', $haber->id)
+            ->lockForUpdate()
+            ->findOrFail($installment->id);
     }
 
     private function deleteRolledBackFile(?Attachment $adjunto): void

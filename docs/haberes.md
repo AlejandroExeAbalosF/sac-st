@@ -30,10 +30,27 @@ no equivale a una cuota pagada.
 
 El expediente agrupa los derechos de los beneficiarios. Cada haber conserva el
 importe reconocido y lo distribuye en cuotas; puede haber cuotas previstas todavía
-sin cargar. Las cuotas pueden sumar más que el reconocido cuando se recibe un
-importe mayor: la diferencia se muestra como excedente pagable y forma parte del
-importe de la cuota, del comprobante y del pago al beneficiario. Con todas las
-cuotas previstas cargadas, la suma debe cubrir al menos el reconocido.
+sin cargar. Las cuotas se cargan por lo que se debe: la suma no supera el reconocido,
+no lo agota mientras queden cuotas previstas sin cargar y lo cubre justo con el plan
+completo.
+
+<a id="importe-mayor"></a>
+
+**Importe mayor.** Cuando por una cuota entra más de lo que se debe, se registra el
+total y un motivo de la lista. Por mostrador va dentro de «Cobrar y emitir recibo»,
+en «Entró más de lo que se debe»: el total recibido se cobra en el mismo acto y la
+vista previa muestra el recibo como va a salir; si el cobro falla, el importe mayor
+tampoco queda. Por banco, «Registrar importe mayor», en la tarjeta de la cuota, pide
+el «Importe del comprobante» si hay uno a la espera —que lo fija— y va antes del
+cruce. Los dos caminos piden el permiso de corregir cuotas. La diferencia queda como **excedente recibido** de esa cuota: la cuota pasa a
+esperar el total, que se cobra, figura en el comprobante y se paga al beneficiario.
+No mueve dinero ni toca la caja: el dinero entra después, por el cobro o el cruce de
+siempre. Se registra antes de cualquier dinero imputado, recibo, comprobante cruzado
+o respaldo del sistema anterior, y con la cuota fuera de circulación. Escribir lo que
+se debe en una cuota con excedente lo quita, con su motivo. Corregir la cuota cambia
+lo que se debe y conserva el total registrado: el excedente se recalcula, y una base
+mayor que el total se rechaza. El cobro por mostrador rechaza si el importe cambió
+entre abrirlo y confirmarlo. (Decisión del usuario, **sin relevar con el área**.)
 
 El listado está en `/haberes/expedientes`. La ficha va por el id y el número
 completo de SiCE con guiones: `/haberes/expedientes/75/0030064-125957-2026-0`. **El
@@ -124,7 +141,11 @@ Con la recepción revertida, el comprobante puede volver a cobrar la cuota o
 desvincularse para que el crédito se cruce con otro.
 
 El recibo de ingreso requiere financiación completa y conserva los datos impresos
-en columnas de snapshot. Corregir luego la cuota no reescribe el recibo. El cobro
+en columnas de snapshot. Corregir luego la cuota no reescribe el recibo. Con
+excedente, congela además lo que se debía (`amount_due_snapshot`) y, en papel en
+blanco, imprime «Importe a abonar» sin recuadro y debajo «Importe recibido» con el
+recuadro, que es lo que dicen las letras. Sobre la hoja del talonario sale como
+siempre. El cobro
 de un cheque por mostrador no espera su posterior acreditación bancaria para emitirlo.
 Cuando se informa un número de talonario, se puede adjuntar opcionalmente la foto o
 el PDF de esa hoja; queda en el almacenamiento privado, asociado al recibo emitido.

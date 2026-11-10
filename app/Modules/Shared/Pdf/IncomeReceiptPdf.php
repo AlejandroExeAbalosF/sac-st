@@ -88,6 +88,15 @@ final class IncomeReceiptPdf implements ReceiptDocument
             'sobreTalonario' => ! $conFondo,
             'importe' => Decimal::format($receipt->amount),
             'importeEnLetras' => AmountInWords::for($receipt->amount),
+            /*
+             * Lo que se debía, cuando entró más. El recuadro y las letras
+             * siguen diciendo lo recibido; esto va arriba, sin recuadro.
+             * Solo en papel en blanco: la hoja del talonario no tiene dónde,
+             * y ahí sale como siempre. Es la copia congelada al emitir.
+             */
+            'aAbonar' => $conFondo && $receipt->amount_due_snapshot !== null
+                ? Decimal::format($receipt->amount_due_snapshot)
+                : null,
             'extra' => $extra ?? new ReceiptPrintData,
             /*
              * El sello y el logotipo del organismo. Todavía no están

@@ -12,6 +12,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\HaberManagementLabel;
+use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
@@ -448,6 +449,7 @@ class PantallaDePlanillasTest extends TestCase
     {
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 'receivedDate' => BusinessDate::today()->toDateString(),
                 'idempotencyKey' => 'cobro-'.Str::random(10),
                 ...$extra,

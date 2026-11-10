@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { salidaDe } from '@/features/haberes/installment-channel';
 import { ETAPA } from '@/features/haberes/installment-stage';
 import type { EtiquetaOption } from '@/features/haberes/types';
-import { compareAmounts, date, money, sumAmounts } from '@/lib/format';
+import {
+    compareAmounts,
+    date,
+    isNonZero,
+    money,
+    sumAmounts,
+} from '@/lib/format';
 import { cn } from '@/lib/utils';
 import InstallmentEditor from './installment-editor';
 
@@ -104,7 +110,7 @@ export default function InstallmentList({
     const sumaCargada = sumAmounts(
         cuotas
             .filter((cuota) => cuota.status !== 'cancelled')
-            .map((cuota) => cuota.expectedAmount),
+            .map((cuota) => cuota.amountDue),
     );
     const saldo = sumAmounts([
         totalReconocido,
@@ -150,6 +156,13 @@ export default function InstallmentList({
                     </span>
 
                     <Money value={cuota.expectedAmount} />
+
+                    {isNonZero(cuota.excessAmount) && (
+                        <span className="text-muted-foreground">
+                            incluye excedente recibido{' '}
+                            <Money value={cuota.excessAmount} />
+                        </span>
+                    )}
 
                     {cuota.concept && (
                         <span className="text-muted-foreground">

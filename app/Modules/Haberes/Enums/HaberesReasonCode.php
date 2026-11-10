@@ -33,6 +33,8 @@ enum HaberesReasonCode: string implements ReasonCode
     case WrongReceipt = 'wrong_receipt';
     case WrongExpediente = 'wrong_expediente';
     case WrongCredit = 'wrong_credit';
+    case EmployerOverpaid = 'employer_overpaid';
+    case EmployerSettlementError = 'employer_settlement_error';
     /**
      * Lo pone el sistema: el papel cae porque se anuló el pago fuera del
      * circuito que respaldaba. El motivo de fondo es el del pago.
@@ -58,6 +60,8 @@ enum HaberesReasonCode: string implements ReasonCode
             self::WrongReceipt => 'Comprobante equivocado o ilegible',
             self::WrongExpediente => 'Era de otro expediente',
             self::WrongCredit => 'Era otro movimiento del extracto',
+            self::EmployerOverpaid => 'El empleador depositó de más',
+            self::EmployerSettlementError => 'Error de liquidación del empleador',
             self::SettlementVoided => 'Se anuló el pago que respaldaba',
             self::Other => 'Otro',
         };

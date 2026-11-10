@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $expediente_number_snapshot
  * @property string|null $installment_label_snapshot
  * @property numeric-string $amount
+ * @property numeric-string|null $amount_due_snapshot Lo que se debía, congelado al emitir, cuando entró más.
  * @property CarbonInterface $issue_date
  * @property ReceiptStatus $status
  * @property ReceiptIssueMode $issue_mode
@@ -76,6 +77,7 @@ final class Receipt extends Model
         'expediente_number_snapshot',
         'installment_label_snapshot',
         'amount',
+        'amount_due_snapshot',
         'issue_date',
         'status',
         'issue_mode',
@@ -147,6 +149,7 @@ final class Receipt extends Model
             'issue_mode' => ReceiptIssueMode::class,
             'prints_talonario_number' => 'boolean',
             'amount' => 'decimal:2',
+            'amount_due_snapshot' => 'decimal:2',
             'issue_date' => 'date',
             'recorded_at' => 'datetime',
             'voided_at' => 'datetime',

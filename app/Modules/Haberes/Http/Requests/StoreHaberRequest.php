@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Http\Requests;
 use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
+use App\Modules\Haberes\Support\InstallmentPlanRules;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\PersonBankAccount;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -221,8 +222,10 @@ final class StoreHaberRequest extends FormRequest
     }
 
     /**
-     * Las cuotas pueden incluir un excedente pagable sobre el importe
-     * reconocido. Con el plan completo, no pueden quedar por debajo.
+     * Lo que se debe de las cuotas contra lo reconocido (`InstallmentPlanRules`).
+     *
+     * Al dar de alta se carga solo lo que se debe: un excedente se registra
+     * después en su cuota, cuando entra el dinero.
      */
     private function validarSumaDeCuotas(Validator $validator): void
     {
@@ -234,7 +237,7 @@ final class StoreHaberRequest extends FormRequest
 
         $previstas = (int) $this->input('expectedInstallmentCount', 0);
         $cuotas = $this->cuotas();
-        $suma = '0';
+        $suma = '0.00';
 
         foreach ($cuotas as $cuota) {
             $importe = (string) ($cuota['amount'] ?? '0');
@@ -244,13 +247,10 @@ final class StoreHaberRequest extends FormRequest
             }
         }
 
-        $comparacion = bccomp($suma, bcadd($total, '0', 2), 2);
+        $problema = InstallmentPlanRules::problema($suma, bcadd($total, '0', 2), count($cuotas) >= $previstas);
 
-        if (count($cuotas) >= $previstas && $comparacion === -1) {
-            $validator->errors()->add(
-                'installments',
-                'Ya están cargadas todas las cuotas previstas, pero la suma no alcanza el importe reconocido del haber.',
-            );
+        if ($problema !== null) {
+            $validator->errors()->add('installments', $problema);
         }
     }
 

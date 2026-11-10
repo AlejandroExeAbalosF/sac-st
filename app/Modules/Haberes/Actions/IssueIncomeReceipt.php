@@ -258,6 +258,8 @@ final class IssueIncomeReceipt
      *
      * Lo único que le falta es el número definitivo, que se toma al emitir
      * bajo lock y por lo tanto todavía no existe.
+     *
+     * @param  numeric-string|null  $totalRecibido  El papel, como va a salir si se confirma el importe mayor.
      */
     public function preview(
         BeneficiaryInstallment $installment,
@@ -265,6 +267,8 @@ final class IssueIncomeReceipt
         ?int $signedById = null,
         ?int $personId = null,
         bool $printsTalonarioNumber = false,
+        // El total que se escribe como importe mayor, antes de registrarlo.
+        ?string $totalRecibido = null,
     ): Receipt {
         $installment->loadMissing(['haber.beneficiary', 'haber.expediente.employer']);
 
@@ -297,8 +301,19 @@ final class IssueIncomeReceipt
             $printsTalonarioNumber,
         ));
 
+        /*
+         * Lo que va a decir el recibo emitido: el total de la cuota una vez
+         * cobrada, no solo lo que falta. Con lo que se debe al lado, imprimir
+         * el pendiente mostraría un par que el recibo real no va a tener.
+         */
         if ($porCobrar) {
-            $recibo->amount = $this->financiacion->remaining($installment);
+            $recibo->amount = $installment->importeEsperado();
+
+            if ($totalRecibido !== null && bccomp($totalRecibido, $installment->importeAAbonar(), 2) >= 0) {
+                $mayor = bccomp($totalRecibido, $installment->importeAAbonar(), 2) === 1;
+                $recibo->amount = Decimal::scale($totalRecibido);
+                $recibo->amount_due_snapshot = $mayor ? $installment->importeAAbonar() : null;
+            }
         }
 
         $serie = DocumentSeries::activeForCode(ReceiptType::Income->seriesCode());
@@ -370,6 +385,12 @@ final class IssueIncomeReceipt
             'expediente_number_snapshot' => $expediente->display_number,
             'installment_label_snapshot' => 'Cuota '.$installment->installment_number,
             'amount' => $this->financiacion->allocated($installment),
+            /*
+             * Lo que se debía, solo cuando entró de más: el papel lo muestra
+             * junto a lo recibido, y una corrección posterior de la cuota no
+             * puede cambiar lo que el empleador se llevó.
+             */
+            'amount_due_snapshot' => $installment->tieneExcedente() ? $installment->importeAAbonar() : null,
             'issue_date' => $issueDate ?? BusinessDate::today(),
             'status' => ReceiptStatus::Issued,
             /*

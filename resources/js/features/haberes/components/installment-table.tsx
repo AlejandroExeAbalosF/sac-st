@@ -68,8 +68,7 @@ export default function InstallmentTable({
     const faltan = haber.expectedInstallmentCount - haber.installments.length;
     const completas = faltan <= 0;
     const resto = sumAmounts([total, `-${suma.replace('-', '')}`]);
-    const excedente =
-        comparacion === 1 ? sumAmounts([suma, `-${total}`]) : '0.00';
+    const sobra = comparacion === 1 ? sumAmounts([suma, `-${total}`]) : '0.00';
 
     /*
      * Cargar la diferencia a mano es tipear un numero que el sistema ya
@@ -425,13 +424,17 @@ export default function InstallmentTable({
 
             {/*
              * El control que importa: mientras falten cuotas por definir la
-             * suma puede ser menor. Cuando ya están todas las previstas,
-             * debe cubrir el reconocido; el exceso también se paga.
+             * suma tiene que quedar por debajo —cada una necesita su
+             * importe—. Con todas las previstas, cubre el reconocido justo.
+             * Se carga lo que se debe: lo que entre de más se registra en la
+             * cuota cuando llega el dinero. El servidor valida lo mismo.
              */}
             <p
                 className={cn(
                     'mt-2 flex flex-wrap items-baseline gap-x-2 text-xs',
-                    comparacion !== null && completas && comparacion === -1
+                    comparacion === 1 ||
+                        (comparacion === 0 && !completas) ||
+                        (comparacion === -1 && completas)
                         ? 'text-warning-strong'
                         : 'text-muted-foreground',
                 )}
@@ -442,10 +445,15 @@ export default function InstallmentTable({
                 <Money value={total} className="text-sm" />
                 {comparacion === 1 && (
                     <span className="font-medium text-warning-strong">
-                        — excedente pagable de <Money value={excedente} />
+                        — supera el reconocido en <Money value={sobra} />
                     </span>
                 )}
-                {coincide && (
+                {comparacion === 0 && !completas && (
+                    <span className="font-medium text-warning-strong">
+                        — no deja saldo para las cuotas que faltan
+                    </span>
+                )}
+                {coincide && completas && (
                     <span className="font-medium text-success-strong">
                         — coincide
                     </span>

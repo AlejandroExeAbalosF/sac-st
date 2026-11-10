@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { EtiquetaOption } from '@/features/haberes/types';
-import { money, parseAmount } from '@/lib/format';
+import { isNonZero, money, parseAmount } from '@/lib/format';
 import installments from '@/routes/haberes/installments';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
@@ -74,7 +74,7 @@ export default function InstallmentEditor({
 
     const form = useForm<FormData>({
         amount: cuota
-            ? money(cuota.expectedAmount, { symbol: false })
+            ? money(cuota.amountDue, { symbol: false })
             : importeSugerido,
         managementLabelId: cuota?.managementLabelId ?? null,
         concept: cuota?.ownConcept ?? '',
@@ -141,7 +141,7 @@ export default function InstallmentEditor({
                         {editando
                             ? 'Corregí únicamente los datos que hayan cambiado.'
                             : completaPlan
-                              ? 'Es la última prevista: debe cubrir el total reconocido. Podés incluir un excedente pagable.'
+                              ? 'Es la última prevista: debe cubrir el total reconocido.'
                               : 'Podés completar ahora solo la información que ya esté confirmada.'}
                     </p>
                 </div>
@@ -161,7 +161,9 @@ export default function InstallmentEditor({
 
             <div className="mt-4 grid gap-x-5 gap-y-4 sm:grid-cols-12">
                 <div className="sm:col-span-6 lg:col-span-3">
-                    <Label htmlFor={`cuota-${numero}-amount`}>Importe</Label>
+                    <Label htmlFor={`cuota-${numero}-amount`}>
+                        Importe a abonar
+                    </Label>
                     <div className="mt-1">
                         <AmountInput
                             id={`cuota-${numero}-amount`}
@@ -184,6 +186,17 @@ export default function InstallmentEditor({
                         id={`cuota-${numero}-amount-error`}
                         message={form.errors.amount}
                     />
+                    {/*
+                     * El excedente no se edita acá: tiene su propio acto. Al
+                     * corregir lo que se debe se conserva el total, y el
+                     * excedente se recalcula.
+                     */}
+                    {cuota && isNonZero(cuota.excessAmount) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Total registrado {money(cuota.expectedAmount)} ·
+                            excedente recibido {money(cuota.excessAmount)}
+                        </p>
+                    )}
                 </div>
 
                 <div className="sm:col-span-6 lg:col-span-3">

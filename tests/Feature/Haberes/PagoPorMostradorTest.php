@@ -250,7 +250,7 @@ class PagoPorMostradorTest extends TestCase
         $cuota = $this->cuotaEnEfectivo();
 
         $this->actingAs($this->operador('consulta'))
-            ->post(route('haberes.installments.receipt', $cuota), $this->datos())
+            ->post(route('haberes.installments.receipt', $cuota), [...$this->datos(), 'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota)])
             ->assertForbidden();
 
         $this->assertSame(0, FundReceipt::query()->count());
@@ -298,6 +298,7 @@ class PagoPorMostradorTest extends TestCase
     ): TestResponse {
         return $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 ...$this->datos(),
                 ...$extra,
             ]);

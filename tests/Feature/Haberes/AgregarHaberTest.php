@@ -387,44 +387,41 @@ class AgregarHaberTest extends TestCase
             ->assertSessionHasErrors('installments');
     }
 
-    public function test_a_single_installment_can_include_a_payable_excess(): void
+    /** Al dar de alta se carga lo que se debe: lo que entra de más se registra en la cuota. */
+    public function test_a_single_installment_can_not_exceed_the_recognized_total(): void
     {
         $datos = $this->haber();
         $datos['installments'][0]['amount'] = bcadd($datos['assignedAmount'], '25.00', 2);
 
         $this->actingAs($this->operador())
             ->post(route('haberes.haber.store', $this->expediente(self::SIN_HABERES)), $datos)
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('installments');
 
-        $haber = $this->expediente(self::SIN_HABERES)->haberes()
-            ->where('beneficiary_id', $datos['beneficiaryId'])->firstOrFail();
-        $this->assertSame($datos['assignedAmount'], $haber->importeAsignado());
-        $this->assertSame($datos['installments'][0]['amount'], $haber->installments()->firstOrFail()->importeEsperado());
+        $this->assertFalse($this->expediente(self::SIN_HABERES)->haberes()
+            ->where('beneficiary_id', $datos['beneficiaryId'])->exists());
     }
 
-    public function test_the_first_of_two_installments_can_exceed_the_recognized_total(): void
+    /** Con una cuota prevista sin cargar, la primera no puede agotar lo reconocido. */
+    public function test_the_first_of_two_installments_can_not_use_up_the_recognized_total(): void
     {
         $datos = $this->haber();
         $datos['expectedInstallmentCount'] = 2;
-        $datos['installments'][0]['amount'] = bcadd($datos['assignedAmount'], '500.00', 2);
+        $datos['installments'][0]['amount'] = $datos['assignedAmount'];
 
         $this->actingAs($this->operador())
             ->post(route('haberes.haber.store', $this->expediente(self::SIN_HABERES)), $datos)
-            ->assertSessionHasNoErrors();
-
-        $haber = $this->expediente(self::SIN_HABERES)->haberes()
-            ->where('beneficiary_id', $datos['beneficiaryId'])->firstOrFail();
-        $this->assertSame(2, $haber->expected_installment_count);
-        $this->assertSame($datos['installments'][0]['amount'], $haber->sumaDeCuotas());
+            ->assertSessionHasErrors(['installments' => 'Todavía hay cuotas previstas sin cargar: debe quedar saldo para ellas.']);
     }
 
-    public function test_reducing_the_recognized_amount_preserves_the_payable_installment(): void
+    /** La base no deja bajar lo reconocido por debajo de lo que se debe de las cuotas. */
+    public function test_the_recognized_amount_can_not_drop_below_what_the_installments_owe(): void
     {
         $haber = $this->expediente('125957/2026')->haberes()->firstOrFail();
-        $haber->update(['assigned_amount' => '100.00']);
 
-        $this->assertSame('100.00', $haber->refresh()->importeAsignado());
-        $this->assertTrue(bccomp($haber->sumaDeCuotas(), $haber->importeAsignado(), 2) === 1);
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        $this->expectException(QueryException::class);
+
+        $haber->update(['assigned_amount' => '100.00']);
     }
 
     /**

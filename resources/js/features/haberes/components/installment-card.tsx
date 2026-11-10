@@ -2,6 +2,7 @@ import {
     Archive,
     ArrowDownRight,
     ArrowUpRight,
+    BadgePlus,
     CircleDashed,
     FolderOpen,
     History,
@@ -36,6 +37,7 @@ import type {
 import { date, isNonZero } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { history as historialDeCuota } from '@/routes/haberes/installments';
+import InstallmentExcessDialog from './installment-excess-dialog';
 import InstallmentExpense from './installment-expense';
 import InstallmentIncome from './installment-income';
 import InstallmentTimeline from './installment-timeline';
@@ -140,6 +142,7 @@ export default function InstallmentCard({
 }) {
     const { openDrawer } = useDrawer();
     const [destrabar, setDestrabar] = useState(false);
+    const [importeMayor, setImporteMayor] = useState(false);
     const [pagoAnterior, setPagoAnterior] = useState(false);
     const [apartando, setApartando] = useState(false);
     const [guia, setGuia] = useState(false);
@@ -190,6 +193,21 @@ export default function InstallmentCard({
      * de desaparecer: esconderlo dejaría al operador sin saber qué hacer.
      */
     const trabada = estadoOrden?.editLocked ?? false;
+
+    /*
+     * Registrar un importe mayor va antes de cualquier dinero: con plata
+     * imputada, recibo, comprobante cruzado o papel del sistema anterior ya
+     * no se puede saber qué parte entró de más. El servidor decide lo mismo;
+     * esto solo evita ofrecer un botón que va a rebotar.
+     */
+    const admiteImporteMayor =
+        editable &&
+        cuota.status === 'active' &&
+        estadoOrden?.order == null &&
+        !isNonZero(cuota.fundedAmount) &&
+        cuota.incomeReceipt === null &&
+        cuota.depositTicket?.status !== 'matched' &&
+        (estadoHistorico?.documents.length ?? 0) === 0;
 
     /*
      * El medio real, solo cuando difiere del previsto.
@@ -325,7 +343,19 @@ export default function InstallmentCard({
                             </span>
                         )}
                     </span>
-                    <Money value={cuota.expectedAmount} />
+                    <span className="text-right">
+                        <Money value={cuota.expectedAmount} />
+                        {isNonZero(cuota.excessAmount) && (
+                            <span
+                                className="block text-xs text-muted-foreground"
+                                title={cuota.excessReason ?? undefined}
+                            >
+                                a abonar <Money value={cuota.amountDue} /> ·
+                                excedente recibido{' '}
+                                <Money value={cuota.excessAmount} />
+                            </span>
+                        )}
+                    </span>
                 </div>
 
                 {cuota.managementLabel && (
@@ -391,6 +421,7 @@ export default function InstallmentCard({
                             firmantes={firmantes}
                             reciboDePapel={reciboDePapel}
                             puedeAnularPapel={historico.permisos.anularPapel}
+                            puedeRegistrarImporteMayor={admiteImporteMayor}
                         />
                     </Seccion>
 
@@ -489,6 +520,24 @@ export default function InstallmentCard({
                     </ConAyuda>
                 )}
 
+                {/*
+                 * Por mostrador el importe mayor se registra en el propio
+                 * cobro, viendo el recibo; acá queda para la vía bancaria,
+                 * donde se registra antes de cruzar el comprobante.
+                 */}
+                {admiteImporteMayor && cuota.expectedMedium === 'bank' && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setImporteMayor(true)}
+                    >
+                        <BadgePlus className="size-3.5" aria-hidden="true" />
+                        Registrar importe mayor
+                    </Button>
+                )}
+
                 {editable && !anulada && !saldada && (
                     <Button
                         type="button"
@@ -562,6 +611,14 @@ export default function InstallmentCard({
                         setPagoAnterior(false);
                         setGuia(true);
                     }}
+                />
+            )}
+
+            {importeMayor && (
+                <InstallmentExcessDialog
+                    cuota={cuota}
+                    abierto
+                    onCerrar={() => setImporteMayor(false)}
                 />
             )}
 

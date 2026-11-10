@@ -172,6 +172,12 @@
         <div class="campo rotulo" style="left: 104mm; top: 81mm;">Expte. N.º</div>
         <div class="campo linea" style="left: 124mm; top: 86mm; width: 70mm;"></div>
 
+        @if ($aAbonar !== null)
+            {{-- Entró más de lo que se debía: los dos importes, por separado. --}}
+            <div class="campo rotulo" style="left: 11mm; top: 89mm;">Importe a abonar:</div>
+            <div class="campo rotulo" style="left: 11mm; top: 96mm;">Importe recibido:</div>
+        @endif
+
         <div class="campo rotulo" style="left: 108mm; top: 93mm;">Cuota</div>
         <div class="campo rotulo" style="left: 130mm; top: 93mm;">de</div>
 
@@ -259,9 +265,16 @@
     </div>
 
     {{-- El importe, en su recuadro, y las casillas de cuota al lado. --}}
-    <div class="campo" style="left: 22mm; top: 92mm;">
-        <span class="importe-caja">$ {{ $importe }}</span>
-    </div>
+    @if ($aAbonar !== null)
+        <div class="campo escrito" style="left: 40mm; top: 88.5mm; font-size: 10pt;">$ {{ $aAbonar }}</div>
+        <div class="campo" style="left: 40mm; top: 94mm;">
+            <span class="importe-caja">$ {{ $importe }}</span>
+        </div>
+    @else
+        <div class="campo" style="left: 22mm; top: 92mm;">
+            <span class="importe-caja">$ {{ $importe }}</span>
+        </div>
+    @endif
 
     <div class="campo" style="left: 120mm; top: 92mm;">
         <span class="casilla">{{ $extra->cuotaNumero !== null ? str_pad((string) $extra->cuotaNumero, 2, '0', STR_PAD_LEFT) : '' }}</span>

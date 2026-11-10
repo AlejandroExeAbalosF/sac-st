@@ -676,6 +676,14 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
             ->whereNumber('installment')
             ->name('haberes.installments.unlock-edit');
 
+        /*
+         * Registrar que por la cuota entra más de lo que se debe. Cambia lo
+         * que la cuota espera, como corregirla, y va con el mismo permiso.
+         */
+        Route::post('haberes/cuotas/{installment}/importe-mayor', [InstallmentController::class, 'recordExcess'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.record-excess');
+
         Route::get('haberes/expedientes/{expediente}/editar', [ExpedienteController::class, 'edit'])
             ->name('expedientes.edit');
         Route::patch('haberes/expedientes/{expediente}', [ExpedienteController::class, 'update'])

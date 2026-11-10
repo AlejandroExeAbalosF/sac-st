@@ -55,12 +55,14 @@ use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Pdf\IncomeReceiptPdf;
 use App\Modules\Shared\Pdf\ReceiptPdfFactory;
 use App\Modules\Shared\Support\LastChanges;
+use App\Modules\Shared\Support\Reason;
 use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use App\Support\Validation\ScannedDocument;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -232,15 +234,31 @@ final class HaberController extends Controller
             'chequeBank' => ['nullable', 'string', 'max:120'],
             'chequeIssueDate' => ['nullable', 'date'],
             'idempotencyKey' => ['required', 'string', 'max:120'],
+            /*
+             * Lo que quien cobra vio: no decide cuánto se cobra —eso sale de
+             * la cuota—, solo permite rechazar si cambió mientras tanto.
+             */
+            'confirmedAmount' => ['nullable', 'numeric'],
+            /*
+             * Si entró más de lo que se debe: el total, con su motivo y la
+             * versión de la cuota que se vio. Se registra en el mismo acto
+             * que el cobro (`RecordInstallmentExcess`).
+             */
+            'excessTotal' => ['nullable', 'numeric', 'gt:0', 'max:9999999999999.99'],
+            'version' => ['nullable', 'date', 'required_with:excessTotal'],
+            ...Reason::rules(HaberesReasonAct::InstallmentExcess, required: false, max: 300),
         ], [
             'receivedDate.before_or_equal' => 'La fecha del pago no puede ser futura.',
             'receivedDate.after_or_equal' => 'La fecha del pago no puede ser anterior al alta de la cuota ('
                 .$installment->created_at->copy()->timezone((string) config('app.display_timezone'))->format('d/m/Y').'), que es cuando llego el expediente.',
             'talonarioNumber.required_with' => 'Indicá el número del talonario al que pertenece la foto.',
+            'excessTotal.gt' => 'El total tiene que ser mayor que cero.',
+            'version.required_with' => 'Recargá la página antes de registrar el importe mayor.',
             ...ScannedDocument::messages('talonarioPhoto', 'La foto del talonario'),
         ]);
 
         $cobra = $cobrarYEmitir->cobraAlEmitir($installment);
+        $excedente = $this->importeMayorDelCobro($request, $validado);
         $conCheque = $cobra && $installment->expected_medium === ExpectedMedium::Cheque;
 
         if ($conCheque && ($validado['chequeNumber'] ?? '') === '') {
@@ -257,6 +275,12 @@ final class HaberController extends Controller
          */
         if ($cobra) {
             abort_unless($request->user()?->can('recepciones.registrar') ?? false, 403);
+
+            if (($validado['confirmedAmount'] ?? null) === null) {
+                throw ValidationException::withMessages([
+                    'installmentId' => 'Recargá la página: falta el importe a cobrar que se mostró.',
+                ]);
+            }
         }
 
         $recibo = $cobrarYEmitir->handle(
@@ -276,9 +300,41 @@ final class HaberController extends Controller
             ] : null,
             notes: $validado['notes'] ?? null,
             talonarioPhoto: $request->file('talonarioPhoto'),
+            confirmedAmount: $cobra ? Decimal::scale((string) $validado['confirmedAmount']) : null,
+            excess: $excedente,
         );
 
         return back()->with('status', "Recibo de ingreso {$recibo->formatted_number} emitido.");
+    }
+
+    /**
+     * El importe mayor que viene con el cobro, si lo hay.
+     *
+     * Cambia lo que la cuota espera, como corregirla, y pide el mismo
+     * permiso que el botón de la tarjeta.
+     *
+     * @param  array<string, mixed>  $validado
+     * @return array{total: numeric-string, reason: Reason, version: CarbonInterface}|null
+     */
+    private function importeMayorDelCobro(Request $request, array $validado): ?array
+    {
+        if (($validado['excessTotal'] ?? null) === null) {
+            return null;
+        }
+
+        abort_unless($request->user()?->can('expedientes.editar') ?? false, 403);
+
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::InstallmentExcess);
+
+        if ($motivo === null) {
+            throw ValidationException::withMessages(['reasonCode' => 'Elegí por qué entra más.']);
+        }
+
+        return [
+            'total' => Decimal::scale((string) $validado['excessTotal']),
+            'reason' => $motivo,
+            'version' => CarbonImmutable::parse((string) $validado['version']),
+        ];
     }
 
     /**
@@ -298,11 +354,15 @@ final class HaberController extends Controller
         IncomeReceiptPdf $pdf,
         ReceiptFormData $formulario,
     ): SymfonyResponse {
+        $total = Decimal::parse($request->string('excessTotal')->toString() ?: null);
+
         $borrador = $emitir->preview(
             installment: $installment,
             talonarioNumber: $request->string('talonarioNumber')->toString() ?: null,
             signedById: $request->integer('signedById') ?: null,
             printsTalonarioNumber: $request->boolean('printsTalonarioNumber'),
+            // Lo que se está escribiendo en «Entró más de lo que se debe».
+            totalRecibido: $total === null || Decimal::isNegative($total) ? null : $total,
         );
 
         return response($pdf->preview(

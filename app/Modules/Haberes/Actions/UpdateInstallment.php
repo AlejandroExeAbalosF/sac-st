@@ -11,8 +11,10 @@ use App\Modules\Haberes\Enums\PaymentTerms;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Support\InstallmentEditLock;
+use App\Modules\Haberes\Support\InstallmentPlanRules;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
+use App\Support\Money\Decimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -64,19 +66,46 @@ final class UpdateInstallment
                 ]);
             }
 
+            /*
+             * El importe que se edita es el que se debe. Si la cuota tiene un
+             * excedente registrado, el total declarado se conserva —es lo que
+             * entró, o lo que dice el comprobante— y el excedente se
+             * recalcula contra la base nueva. Una base mayor que ese total ya
+             * no es un excedente: se registra el importe mayor de nuevo.
+             */
+            $aAbonar = $data->amount;
+            $total = $aAbonar;
+            $excedente = '0.00';
+
+            if ($lockedInstallment->tieneExcedente()) {
+                $total = $lockedInstallment->importeEsperado();
+
+                if (bccomp($aAbonar, $total, 2) === 1) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Lo que se debe no puede superar el total registrado de la cuota ($ '.Decimal::format($total).'). Si entró más, registrá el importe mayor de nuevo.',
+                    ]);
+                }
+
+                $excedente = Decimal::sub($total, $aAbonar);
+            }
+
             $sumWithoutCurrent = (string) $lockedHaber->installments()
                 ->where('workflow_status', '!=', InstallmentWorkflowStatus::Cancelled->value)
                 ->whereKeyNot($lockedInstallment->id)
-                ->sum('expected_amount');
-            $newSum = bcadd($sumWithoutCurrent, $data->amount, 2);
+                ->sum(DB::raw('expected_amount - excess_amount'));
+            $newSum = bcadd($sumWithoutCurrent, $aAbonar, 2);
             $assigned = $lockedHaber->importeAsignado();
             $loaded = $lockedHaber->installments()->count();
             $expected = $lockedHaber->expected_installment_count ?? $loaded;
 
-            if ($loaded < $expected && bccomp($newSum, $assigned, 2) === 0) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Todavía hay cuotas previstas sin cargar: debe quedar saldo para ellas.',
-                ]);
+            /*
+             * Con el plan completo, quedar por debajo de lo reconocido no es
+             * un error: abre una cuota pendiente (más abajo).
+             */
+            $problema = InstallmentPlanRules::problema($newSum, $assigned, completaElPlan: false);
+
+            if ($problema !== null && ($loaded < $expected || bccomp($newSum, $assigned, 2) === 1)) {
+                throw ValidationException::withMessages(['amount' => $problema]);
             }
 
             if ($loaded >= $expected && $loaded >= 60 && bccomp($newSum, $assigned, 2) === -1) {
@@ -101,8 +130,13 @@ final class UpdateInstallment
             $motivoDeLaVentana = Reason::text($lockedInstallment->edit_unlock_reason_code, $lockedInstallment->edit_unlock_reason);
             $codigoDeLaVentana = $lockedInstallment->edit_unlock_reason_code?->value;
 
+            $sinExcedente = bccomp($excedente, '0', 2) === 0;
+
             $lockedInstallment->fill([
-                'expected_amount' => $data->amount,
+                'expected_amount' => $total,
+                'excess_amount' => $excedente,
+                'excess_reason_code' => $sinExcedente ? null : $lockedInstallment->excess_reason_code,
+                'excess_reason' => $sinExcedente ? null : $lockedInstallment->excess_reason,
                 'management_label_id' => $data->managementLabelId,
                 'due_date' => $data->dueDate,
                 'description' => $data->concept,
@@ -196,6 +230,7 @@ final class UpdateInstallment
     {
         return [
             'expected_amount' => $cuota->expected_amount,
+            'excess_amount' => $cuota->excess_amount,
             'management_label_id' => $cuota->management_label_id,
             'due_date' => $cuota->due_date?->toDateString(),
             'description' => $cuota->description,

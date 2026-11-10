@@ -12,6 +12,7 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Actions\AllocateFundsToInstallment;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
+use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Actions\RegisterCashFundReceipt;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\CashBox;
@@ -95,7 +96,7 @@ class PantallaDelReciboTest extends TestCase
         $cuota = $this->cuotaFinanciada();
 
         $this->actingAs($this->operador())
-            ->post(route('haberes.installments.receipt', $cuota), ['idempotencyKey' => 'recibo-'.Str::random(8)])
+            ->post(route('haberes.installments.receipt', $cuota), ['confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota), 'idempotencyKey' => 'recibo-'.Str::random(8)])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
@@ -116,6 +117,7 @@ class PantallaDelReciboTest extends TestCase
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 'talonarioNumber' => '00071514',
                 'idempotencyKey' => 'recibo-talonario',
             ])
@@ -149,7 +151,7 @@ class PantallaDelReciboTest extends TestCase
         $this->financiarPorBanco($cuota->refresh(), '1000.00');
 
         $this->actingAs($this->operador())
-            ->post(route('haberes.installments.receipt', $cuota), ['idempotencyKey' => 'recibo-'.Str::random(8)])
+            ->post(route('haberes.installments.receipt', $cuota), ['confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota), 'idempotencyKey' => 'recibo-'.Str::random(8)])
             ->assertSessionHasErrors('installmentId');
 
         $this->assertSame(0, Receipt::query()->count());
@@ -160,7 +162,7 @@ class PantallaDelReciboTest extends TestCase
         $cuota = $this->cuotaFinanciada();
 
         $this->actingAs($this->operador('consulta'))
-            ->post(route('haberes.installments.receipt', $cuota), ['idempotencyKey' => 'recibo-'.Str::random(8)])
+            ->post(route('haberes.installments.receipt', $cuota), ['confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota), 'idempotencyKey' => 'recibo-'.Str::random(8)])
             ->assertForbidden();
 
         $this->assertSame(0, Receipt::query()->count());
@@ -178,7 +180,7 @@ class PantallaDelReciboTest extends TestCase
         $cuota = $this->cuotaFinanciada();
 
         $this->actingAs($this->operador('administrativo'))
-            ->post(route('haberes.installments.receipt', $cuota), ['idempotencyKey' => 'recibo-'.Str::random(8)])
+            ->post(route('haberes.installments.receipt', $cuota), ['confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota), 'idempotencyKey' => 'recibo-'.Str::random(8)])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, Receipt::query()->count());
@@ -271,6 +273,7 @@ class PantallaDelReciboTest extends TestCase
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 'talonarioNumber' => '00071514',
                 'printsTalonarioNumber' => true,
                 'idempotencyKey' => 'recibo-encabezado',
@@ -305,6 +308,7 @@ class PantallaDelReciboTest extends TestCase
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 'printsTalonarioNumber' => true,
                 'idempotencyKey' => 'recibo-sin-talonario',
             ])

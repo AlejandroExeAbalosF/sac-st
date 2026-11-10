@@ -19,8 +19,9 @@ use Illuminate\Support\Facades\DB;
  * derecho válido, y dejarla anotada obligaría a distinguir después entre
  * «vale cero» y «todavía no se sabe».
  *
- * El importe reconocido permanece en el haber; la suma de las cuotas
- * puede incluir un excedente pagable al beneficiario.
+ * Las cuotas se cargan por lo que se debe de ellas, sin pasar de lo
+ * reconocido. Lo que entre de más se registra después en su cuota
+ * (`RecordInstallmentExcess`).
  */
 final class AddHaber
 {

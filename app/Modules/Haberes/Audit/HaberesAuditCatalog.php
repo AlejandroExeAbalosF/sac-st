@@ -62,6 +62,9 @@ final class HaberesAuditCatalog implements AuditCatalogContributor
             // Corregir el importe de una cuota cambia cuánto se le debe a
             // alguien.
             new AuditActionDefinition('cuota.corregida', 'Se corrigió la cuota', 'Haberes', AuditSeverity::Critical),
+            // Cambian cuánto se cobra y se le paga al beneficiario.
+            new AuditActionDefinition('cuota.excedente-registrado', 'Se registró un importe mayor en la cuota', 'Haberes', AuditSeverity::Critical),
+            new AuditActionDefinition('cuota.excedente-quitado', 'Se quitó el excedente de la cuota', 'Haberes', AuditSeverity::Critical),
             new AuditActionDefinition(
                 'cuota.medio-alineado',
                 'Se alineó el medio con el comprobante bancario cargado',

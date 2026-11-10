@@ -76,7 +76,8 @@ final class GestionarCuotasTest extends TestCase
         $this->assertSame(1, $haber->installments()->count());
     }
 
-    public function test_the_last_installment_can_include_a_payable_excess(): void
+    /** Lo que entra de más se registra en la cuota, no al cargarla. */
+    public function test_the_last_installment_can_not_exceed_the_recognized_total(): void
     {
         $haber = $this->haber('77420/2024');
         $haber->update([
@@ -90,9 +91,9 @@ final class GestionarCuotasTest extends TestCase
                 route('haberes.installments.store', [$haber->expediente, $haber]),
                 $this->installmentData('24025.00'),
             )
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors(['amount' => 'Lo que se debe de las cuotas superaría el importe reconocido del haber. Si entró de más, registralo en la cuota con «Registrar importe mayor».']);
 
-        $this->assertSame('120025.00', $haber->fresh()->sumaDeCuotas());
+        $this->assertSame(1, $haber->installments()->count());
     }
 
     public function test_it_can_not_add_more_installments_than_the_plan_expects(): void
@@ -154,7 +155,8 @@ final class GestionarCuotasTest extends TestCase
             ->assertSessionHasNoErrors();
     }
 
-    public function test_a_quota_can_be_increased_above_the_recognized_total(): void
+    /** Corregir la cuota no sirve para cargar un excedente: tiene su propio acto. */
+    public function test_a_quota_can_not_be_increased_above_the_recognized_total(): void
     {
         $haber = $this->haber('77420/2024');
         $installment = $haber->installments()->firstOrFail();
@@ -165,9 +167,9 @@ final class GestionarCuotasTest extends TestCase
                 ...$this->installmentData($importe),
                 'version' => $installment->updated_at->toISOString(),
             ])
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('amount');
 
-        $this->assertSame($importe, $installment->refresh()->importeEsperado());
+        $this->assertSame($haber->importeAsignado(), $installment->refresh()->importeEsperado());
         $this->assertSame('1', (string) $haber->refresh()->expected_installment_count);
     }
 

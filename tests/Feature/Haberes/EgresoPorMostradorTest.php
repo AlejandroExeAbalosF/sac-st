@@ -11,6 +11,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\HaberManagementLabel;
+use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Actions\TakeNextDocumentNumber;
@@ -460,13 +461,17 @@ class EgresoPorMostradorTest extends TestCase
 
         $cuota->forceFill([
             'expected_medium' => $cheque ? 'cheque' : 'cash',
+            // El excedente, registrado en la cuota: lo que se debía no cambia.
             ...($excess !== null ? [
                 'expected_amount' => bcadd($cuota->haber->importeAsignado(), $excess, 2),
+                'excess_amount' => bcsub(bcadd($cuota->haber->importeAsignado(), $excess, 2), $cuota->importeEsperado(), 2),
+                'excess_reason_code' => 'employer_overpaid',
             ] : []),
         ])->save();
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.receipt', $cuota), [
+                'confirmedAmount' => app(InstallmentFunding::class)->remaining($cuota),
                 'receivedDate' => BusinessDate::today()->toDateString(),
                 'idempotencyKey' => 'cobro-'.Str::random(10),
                 ...($cheque ? ['chequeNumber' => '12345678', 'chequeBank' => 'Banco Nación'] : []),

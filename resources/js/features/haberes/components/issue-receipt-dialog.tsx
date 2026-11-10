@@ -1,9 +1,11 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { FileText, Printer } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronRight, FileText, Printer } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
+import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -27,6 +29,7 @@ import { businessToday, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { receipt as emitirRecibo } from '@/routes/haberes/installments';
 import { preview as previaDelRecibo } from '@/routes/haberes/installments/receipt';
+import { importeMayorDelCobro } from '../importe-mayor';
 import DocumentFrame, { HOJA_ALTO_A5 } from './document-frame';
 import TalonarioHint from './talonario-hint';
 
@@ -48,11 +51,14 @@ export type Firmante = { id: number; name: string; position: string | null };
 export default function IssueReceiptDialog({
     cuota,
     firmantes,
+    puedeRegistrarImporteMayor = false,
     abierto,
     onCerrar,
 }: {
     cuota: Cuota;
     firmantes: Firmante[];
+    /** Si el cobro puede registrar, en el mismo acto, que entró más de lo que se debe. */
+    puedeRegistrarImporteMayor?: boolean;
     abierto: boolean;
     onCerrar: () => void;
 }) {
@@ -103,7 +109,40 @@ export default function IssueReceiptDialog({
         chequeBank: '',
         chequeIssueDate: '',
         talonarioPhoto: null as File | null,
+        excessTotal: '',
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
     });
+
+    /*
+     * «Entró más de lo que se debe»: el total que llegó, la diferencia con lo
+     * que se debe y su motivo. Se registra en el mismo acto que el cobro, así
+     * que plegado no cambia nada. La vista previa espera a que se deje de
+     * tipear para no pedir un recibo por cada tecla.
+     */
+    const [conImporteMayor, setConImporteMayor] = useState(false);
+    const {
+        total: totalMayor,
+        excedente,
+        aCobrar,
+        incompleto: importeMayorIncompleto,
+    } = importeMayorDelCobro(
+        conImporteMayor,
+        form.data.excessTotal,
+        cuota.amountDue,
+        cuota.remainingAmount,
+    );
+    const hayExcedente = totalMayor !== null;
+    const [totalDePrevia, setTotalDePrevia] = useState('');
+
+    useEffect(() => {
+        const espera = setTimeout(
+            () => setTotalDePrevia(totalMayor ?? ''),
+            400,
+        );
+
+        return () => clearTimeout(espera);
+    }, [hayExcedente, totalMayor]);
 
     /*
      * La clave viaja con el formulario desde que se abre: es lo que hace
@@ -142,10 +181,21 @@ export default function IssueReceiptDialog({
             params.set('printsTalonarioNumber', '1');
         }
 
+        if (totalDePrevia !== '') {
+            params.set('excessTotal', totalDePrevia);
+        }
+
         const query = params.toString();
 
         return previaDelRecibo(cuota.id).url + (query ? `?${query}` : '');
-    }, [cuota.id, talonario, firmante, sobreTalonario, conTalonarioArriba]);
+    }, [
+        cuota.id,
+        talonario,
+        firmante,
+        sobreTalonario,
+        conTalonarioArriba,
+        totalDePrevia,
+    ]);
 
     /*
      * La hoja mide lo que mide —A5 apaisado— y el dialogo mide otra cosa.
@@ -155,12 +205,26 @@ export default function IssueReceiptDialog({
 
     const emitir = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (hayQueCobrar && importeMayorIncompleto) {
+            return;
+        }
+
         form.transform((datos) => ({
             ...datos,
             talonarioNumber: talonario.trim(),
             printsTalonarioNumber: conTalonarioArriba,
             signedById: firmante,
             idempotencyKey: clave,
+            /*
+             * Lo que se está por cobrar, tal como se ve: si otra persona
+             * registró un importe mayor mientras tanto, el servidor rechaza
+             * en vez de cobrar un total que nadie confirmó.
+             */
+            confirmedAmount: hayQueCobrar ? aCobrar : null,
+            ...(hayQueCobrar && hayExcedente
+                ? { excessTotal: totalMayor, version: cuota.updatedAt }
+                : { excessTotal: null, reasonCode: '', reason: '' }),
         }));
 
         form.post(emitirRecibo(cuota.id).url, {
@@ -240,7 +304,7 @@ export default function IssueReceiptDialog({
                                                 Importe
                                             </dt>
                                             <dd className="font-mono font-semibold tabular-nums">
-                                                {money(cuota.remainingAmount)}
+                                                {money(aCobrar)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-3">
@@ -338,9 +402,51 @@ export default function IssueReceiptDialog({
                                         </div>
                                     )}
 
+                                    {puedeRegistrarImporteMayor && (
+                                        <ImporteMayor
+                                            cuota={cuota}
+                                            abierto={conImporteMayor}
+                                            onAbrir={setConImporteMayor}
+                                            total={form.data.excessTotal}
+                                            onTotal={(valor) =>
+                                                form.setData(
+                                                    'excessTotal',
+                                                    valor,
+                                                )
+                                            }
+                                            excedente={
+                                                hayExcedente ? excedente : null
+                                            }
+                                            incompleto={importeMayorIncompleto}
+                                            motivo={form.data.reasonCode}
+                                            detalle={form.data.reason}
+                                            onMotivo={(codigo) =>
+                                                form.setData(
+                                                    'reasonCode',
+                                                    codigo,
+                                                )
+                                            }
+                                            onDetalle={(texto) =>
+                                                form.setData('reason', texto)
+                                            }
+                                            errores={{
+                                                total:
+                                                    form.errors.excessTotal ??
+                                                    (
+                                                        form.errors as Record<
+                                                            string,
+                                                            string | undefined
+                                                        >
+                                                    ).amount,
+                                                motivo: form.errors.reasonCode,
+                                                detalle: form.errors.reason,
+                                            }}
+                                        />
+                                    )}
+
                                     <p className="text-xs text-muted-foreground">
-                                        Si lo que llegó no coincide, se corrige
-                                        la cuota y después se emite.
+                                        Si lo que llegó es menos, se corrige la
+                                        cuota y después se emite.
                                     </p>
                                 </div>
                             )}
@@ -530,7 +636,13 @@ export default function IssueReceiptDialog({
                             >
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={form.processing}>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    form.processing ||
+                                    (hayQueCobrar && importeMayorIncompleto)
+                                }
+                            >
                                 <FileText className="size-4" />
                                 {hayQueCobrar
                                     ? 'Cobrar y emitir'
@@ -566,5 +678,118 @@ function Opcion({
         >
             {etiqueta}
         </button>
+    );
+}
+
+/**
+ * «Entró más de lo que se debe», dentro del cobro.
+ *
+ * Plegado no cambia nada. Desplegado, el total que se escribe es lo que se
+ * cobra y lo que dice el recibo, y la diferencia con lo que se debe queda
+ * como excedente recibido de la cuota, con su motivo.
+ */
+function ImporteMayor({
+    cuota,
+    abierto,
+    onAbrir,
+    total,
+    onTotal,
+    excedente,
+    incompleto,
+    motivo,
+    detalle,
+    onMotivo,
+    onDetalle,
+    errores,
+}: {
+    cuota: Cuota;
+    abierto: boolean;
+    onAbrir: (abierto: boolean) => void;
+    total: string;
+    onTotal: (valor: string) => void;
+    excedente: string | null;
+    /** Abierta sin un total mayor que lo que se debe: no se puede cobrar así. */
+    incompleto: boolean;
+    motivo: App.Modules.Haberes.Enums.HaberesReasonCode | '';
+    detalle: string;
+    onMotivo: (codigo: App.Modules.Haberes.Enums.HaberesReasonCode) => void;
+    onDetalle: (texto: string) => void;
+    errores: { total?: string; motivo?: string; detalle?: string };
+}) {
+    return (
+        <div className="rounded-md border bg-card">
+            <button
+                type="button"
+                onClick={() => onAbrir(!abierto)}
+                aria-expanded={abierto}
+                className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+                <ChevronRight
+                    className={cn(
+                        'size-3.5 transition-transform motion-reduce:transition-none',
+                        abierto && 'rotate-90',
+                    )}
+                    aria-hidden="true"
+                />
+                Entró más de lo que se debe
+            </button>
+
+            {abierto && (
+                <div className="space-y-3 border-t px-3 py-3">
+                    <div className="space-y-1.5">
+                        <Label htmlFor={`total-mayor-${cuota.id}`}>
+                            Total recibido
+                        </Label>
+                        <AmountInput
+                            id={`total-mayor-${cuota.id}`}
+                            value={total}
+                            onChange={onTotal}
+                            words="below"
+                        />
+                        <InputError
+                            message={
+                                errores.total ??
+                                (incompleto
+                                    ? 'Escribí un total mayor que lo que se debe, o plegá esta sección para cobrar lo que se debe.'
+                                    : undefined)
+                            }
+                        />
+                    </div>
+
+                    <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <dt className="text-xs text-field-label">
+                                Importe a abonar
+                            </dt>
+                            <dd className="tabular-nums">
+                                {money(cuota.amountDue)}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-xs text-field-label">
+                                Excedente recibido
+                            </dt>
+                            <dd className="tabular-nums">
+                                {excedente === null ? '—' : money(excedente)}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    {excedente !== null && (
+                        <ReasonFields
+                            act="installment_excess"
+                            code={motivo}
+                            detail={detalle}
+                            onCodeChange={onMotivo}
+                            onDetailChange={onDetalle}
+                            codeError={errores.motivo}
+                            detailError={errores.detalle}
+                            idPrefix={`motivo-cobro-mayor-${cuota.id}`}
+                            maxLength={300}
+                        />
+                    )}
+                </div>
+            )}
+        </div>
     );
 }

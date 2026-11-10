@@ -8,6 +8,7 @@ use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Ledger\Enums\Currency;
+use App\Support\Money\Decimal;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,7 +23,10 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $haber_id
  * @property int $installment_number
- * @property string $expected_amount
+ * @property string $expected_amount Lo que la cuota recibe y se paga, excedente incluido.
+ * @property string $excess_amount Lo que entró de más; cero salvo que se haya registrado.
+ * @property HaberesReasonCode|null $excess_reason_code
+ * @property string|null $excess_reason
  * @property InstallmentWorkflowStatus $workflow_status
  * @property Carbon|null $due_date
  * @property ExpectedMedium $expected_medium Obligatorio desde 09/2026: una cuota sin medio no dice por dónde se paga.
@@ -41,6 +45,9 @@ final class BeneficiaryInstallment extends Model
         'haber_id',
         'installment_number',
         'expected_amount',
+        'excess_amount',
+        'excess_reason_code',
+        'excess_reason',
         'management_label_id',
         'due_date',
         'description',
@@ -65,6 +72,37 @@ final class BeneficiaryInstallment extends Model
         $importe = $this->expected_amount;
 
         return $importe;
+    }
+
+    /**
+     * Lo que entró de más en la cuota: cero salvo que se haya registrado.
+     *
+     * @return numeric-string
+     */
+    public function excedente(): string
+    {
+        /** @var numeric-string $importe */
+        $importe = $this->excess_amount ?? '0.00';
+
+        return $importe;
+    }
+
+    /**
+     * Lo que se debía de la cuota: el previsto sin el excedente.
+     *
+     * Es lo que cuenta contra el importe reconocido del haber; el excedente
+     * se cobra y se paga, pero va aparte.
+     *
+     * @return numeric-string
+     */
+    public function importeAAbonar(): string
+    {
+        return Decimal::sub($this->importeEsperado(), $this->excedente());
+    }
+
+    public function tieneExcedente(): bool
+    {
+        return bccomp($this->excedente(), '0', 2) === 1;
     }
 
     /**
@@ -142,6 +180,8 @@ final class BeneficiaryInstallment extends Model
             'workflow_status' => InstallmentWorkflowStatus::class,
             'expected_medium' => ExpectedMedium::class,
             'expected_amount' => 'decimal:2',
+            'excess_amount' => 'decimal:2',
+            'excess_reason_code' => HaberesReasonCode::class,
             'due_date' => 'date',
             'edit_unlocked_at' => 'datetime',
             'created_at' => 'datetime',

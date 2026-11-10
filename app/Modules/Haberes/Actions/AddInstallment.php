@@ -9,11 +9,17 @@ use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
+use App\Modules\Haberes\Support\InstallmentPlanRules;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Agrega la próxima cuota prevista; el excedente también es pagable. */
+/**
+ * Agrega la próxima cuota prevista, por lo que se debe de ella.
+ *
+ * Lo que entre de más se registra después en la cuota, con
+ * `RecordInstallmentExcess`: acá solo cuenta lo reconocido.
+ */
 final class AddInstallment
 {
     public function __construct(private readonly RecordAuditEvent $auditar) {}
@@ -41,12 +47,16 @@ final class AddInstallment
 
             foreach ($installments as $installment) {
                 if ($installment->workflow_status !== InstallmentWorkflowStatus::Cancelled) {
-                    $sum = bcadd($sum, $installment->importeEsperado(), 2);
+                    $sum = bcadd($sum, $installment->importeAAbonar(), 2);
                 }
             }
 
             $newSum = bcadd($sum, $data->amount, 2);
-            $this->validateSum($newSum, $lockedHaber->importeAsignado(), $installments->count() + 1 >= $expected);
+            $problema = InstallmentPlanRules::problema($newSum, $lockedHaber->importeAsignado(), $installments->count() + 1 >= $expected);
+
+            if ($problema !== null) {
+                throw ValidationException::withMessages(['amount' => $problema]);
+            }
 
             $usedNumbers = $installments->pluck('installment_number')->all();
             $number = 1;
@@ -81,20 +91,5 @@ final class AddInstallment
 
             return $installment;
         });
-    }
-
-    /**
-     * @param  numeric-string  $sum
-     * @param  numeric-string  $assigned
-     */
-    private function validateSum(string $sum, string $assigned, bool $completesPlan): void
-    {
-        if ($completesPlan && bccomp($sum, $assigned, 2) === -1) {
-            $remaining = bcsub($assigned, $sum, 2);
-
-            throw ValidationException::withMessages([
-                'amount' => "Es la última cuota prevista: debe cubrir al menos el importe reconocido del haber. Faltan {$remaining}.",
-            ]);
-        }
     }
 }

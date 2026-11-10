@@ -13,8 +13,10 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
+use Illuminate\Database\Eloquent\Collection;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -31,8 +33,36 @@ final class InstallmentListItemData extends Data
     public function __construct(
         public int $id,
         public int $number,
-        /** @var numeric-string */
+        /**
+         * Lo que la cuota recibe y se paga, excedente incluido.
+         *
+         * @var numeric-string
+         */
         public string $expectedAmount,
+        /**
+         * Lo que se debe: el previsto sin el excedente. Es lo que cuenta
+         * contra el importe reconocido del haber.
+         *
+         * @var numeric-string
+         */
+        public string $amountDue,
+        /**
+         * Lo que entró de más, registrado en la cuota. Distinto de
+         * `overAllocatedAmount`, que es dinero imputado por encima de lo previsto.
+         *
+         * @var numeric-string
+         */
+        public string $excessAmount,
+        /** Por qué entró de más, con el detalle si lo hay. */
+        public ?string $excessReason,
+        /**
+         * Lo que suman los comprobantes a la espera, si hay alguno: con un
+         * depósito fraccionado son varios, y el importe mayor tiene que
+         * coincidir con todos juntos (`RecordInstallmentExcess`).
+         *
+         * @var numeric-string|null
+         */
+        public ?string $waitingTicketsAmount,
         public InstallmentWorkflowStatus $status,
         public ?string $concept,
         /** T.CONOC., P.P. HOMOL., PAGAR. */
@@ -217,6 +247,10 @@ final class InstallmentListItemData extends Data
             id: $cuota->id,
             number: $cuota->installment_number,
             expectedAmount: $cuota->importeEsperado(),
+            amountDue: $cuota->importeAAbonar(),
+            excessAmount: $cuota->excedente(),
+            excessReason: $cuota->tieneExcedente() ? Reason::text($cuota->excess_reason_code, $cuota->excess_reason) : null,
+            waitingTicketsAmount: self::waitingTicketsAmount($tickets),
             status: $cuota->workflow_status,
             concept: $cuota->description ?? $haberConcept,
             managementLabel: $etiqueta?->code,
@@ -246,6 +280,24 @@ final class InstallmentListItemData extends Data
             createdAt: BusinessDate::fromInstant($cuota->created_at)->toDateString(),
             updatedAt: $cuota->updated_at->toISOString(),
             stage: $stage,
+        );
+    }
+
+    /**
+     * @param  Collection<int, DepositTicket>|null  $tickets
+     * @return numeric-string|null
+     */
+    private static function waitingTicketsAmount(?Collection $tickets): ?string
+    {
+        $esperando = $tickets?->filter(fn (DepositTicket $t): bool => $t->status === DepositTicketStatus::Waiting);
+
+        if ($esperando === null || $esperando->isEmpty()) {
+            return null;
+        }
+
+        return $esperando->reduce(
+            fn (string $suma, DepositTicket $t): string => Decimal::add($suma, (string) $t->amount),
+            '0.00',
         );
     }
 }

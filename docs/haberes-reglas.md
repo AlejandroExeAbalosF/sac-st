@@ -36,17 +36,32 @@ reconoce el ingreso o el egreso. Ledger no depende de los modelos de Haberes.
 
 - El número canónico del expediente tiene índice único; el ordinal del haber es
   único dentro del expediente y el de la cuota dentro del haber.
-- Haber y cuota exigen importes positivos. Desde la migración
-  `2026_11_08_010000_allow_payable_installment_excess`, las cuotas pueden sumar
-  más que el importe reconocido; la diferencia es pagable. El total reconocido
-  permanece separado y se muestra el excedente en el plan. Con el plan completo,
-  la aplicación exige que la suma cubra al menos el reconocido.
-- `UpdateInstallment` exige haber y cuota activos y versión vigente.
+- Haber y cuota exigen importes positivos. `expected_amount` es lo que la cuota
+  recibe y se paga; `excess_amount`, lo que entró de más, registrado en la cuota.
+  Lo que se debe es la diferencia. **Base** (`2026_11_10_010000_add_excess_to_installments`):
+  `beneficiary_installments_excess_check` (excedente no negativo y menor que el
+  importe), `beneficiary_installments_excess_reason_check` (con excedente, motivo de la
+  lista del acto `installment_excess`; sin él, nulo) y los triggers diferidos
+  `beneficiary_installments_sum` y `haber_assigned_amount_sum`, que vuelven a poner
+  tope en lo reconocido sobre lo que se debe. **Action** (`InstallmentPlanRules`, en
+  `StoreHaberRequest`, `AddInstallment` y `UpdateInstallment`): además, lo que se debe
+  no agota lo reconocido con cuotas previstas sin cargar y lo cubre con el plan
+  completo.
+- `RecordInstallmentExcess` registra o quita el excedente: haber y cuota activos,
+  versión vigente, sin Orden en circulación, sin dinero imputado, sin recibo de
+  ingreso, sin respaldo del sistema anterior y sin comprobante cruzado; con uno a la
+  espera, el total es el suyo. Audita `cuota.excedente-registrado` o
+  `cuota.excedente-quitado`. Estas guardas son del Action; la base protege el
+  excedente y su motivo, no el momento.
+- `UpdateInstallment` exige haber y cuota activos y versión vigente. Edita lo que se
+  debe: con excedente conserva el total y lo recalcula, y rechaza una base mayor.
   Si reducir una cuota deja saldo en un plan completo, aumenta la cantidad prevista
   para reflejar una cuota pendiente; rechaza ese caso al alcanzar el máximo de 60.
 
 Evidencia: [esquema de expedientes](../database/migrations/2026_08_11_000000_create_expedientes_tables.php),
+[excedente por cuota](../database/migrations/2026_11_10_010000_add_excess_to_installments.php),
 [UpdateInstallment](../app/Modules/Haberes/Actions/UpdateInstallment.php),
+[importe mayor](../tests/Feature/Haberes/ImporteMayorDeLaCuotaTest.php),
 [gestión de cuotas](../tests/Feature/Haberes/GestionarCuotasTest.php) y
 [numeración del haber](../tests/Feature/Haberes/NumeroDelHaberTest.php).
 
@@ -109,7 +124,12 @@ Evidencia: [edición](../app/Modules/Haberes/Actions/UpdateInstallment.php),
 
 Se emite con la cuota completamente financiada y conserva los datos impresos
 en snapshots. En mostrador, el cobro y la emisión pueden ser un solo acto atómico;
-la cantidad a cobrar se deriva del pendiente de la cuota. En banco, el ticket
+la cantidad a cobrar se deriva del pendiente de la cuota, y el diálogo envía la que
+mostró: si cambió, se rechaza (**Action**, `CollectAndIssueReceipt`). Con excedente,
+el recibo congela lo que se debía en `amount_due_snapshot`; **base**:
+`receipts_amount_due_snapshot_check` (positivo y menor que el importe) y la columna
+entre las que `receipts_append_only()` no deja editar. La vista previa imprime el
+total que tendrá el recibo, no solo el pendiente. En banco, el ticket
 requiere identificar los créditos cuya suma coincide exactamente con su importe y
 registrar una recepción/asignación por cada movimiento. La selección parcial no
 queda conciliada; una suma superior se rechaza en la pantalla, el Action y la base.

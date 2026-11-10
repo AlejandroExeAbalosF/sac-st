@@ -76,6 +76,7 @@ export default function InstallmentIncome({
     firmantes,
     reciboDePapel,
     puedeAnularPapel,
+    puedeRegistrarImporteMayor,
 }: {
     cuota: Cuota;
     cuentas: PeriodoDeCuenta[];
@@ -96,6 +97,8 @@ export default function InstallmentIncome({
     reciboDePapel: Papel | null;
     /** Si puede anular un recibo de papel mal cargado que ya no respalda plata. */
     puedeAnularPapel: boolean;
+    /** Si el cobro puede registrar, en el mismo acto, que entró más de lo que se debe. */
+    puedeRegistrarImporteMayor: boolean;
 }) {
     const anulada = cuota.status === 'cancelled';
     const sinFinanciar = Number(cuota.fundedAmount) <= 0;
@@ -171,6 +174,7 @@ export default function InstallmentIncome({
                 <ReciboDeIngreso
                     cuota={cuota}
                     firmantes={firmantes}
+                    puedeRegistrarImporteMayor={puedeRegistrarImporteMayor}
                     puedeAnular={puedeAnular}
                     puedeBuscarTicket={puedeBuscarTicket && !anulada}
                     puedeRegistrarPago={puedeRegistrarPago}
@@ -544,6 +548,7 @@ function Financiacion({
 function ReciboDeIngreso({
     cuota,
     firmantes,
+    puedeRegistrarImporteMayor,
     puedeEmitir,
     puedeAnular,
     puedeBuscarTicket,
@@ -551,6 +556,7 @@ function ReciboDeIngreso({
 }: {
     cuota: Cuota;
     firmantes: Firmante[];
+    puedeRegistrarImporteMayor: boolean;
     puedeEmitir: boolean;
     puedeAnular: boolean;
     /** Para ofrecer la conciliación mientras el comprobante siga sin cruzar. */
@@ -883,6 +889,7 @@ function ReciboDeIngreso({
             <IssueReceiptDialog
                 cuota={cuota}
                 firmantes={firmantes}
+                puedeRegistrarImporteMayor={puedeRegistrarImporteMayor}
                 abierto={abierto}
                 onCerrar={() => setAbierto(false)}
             />

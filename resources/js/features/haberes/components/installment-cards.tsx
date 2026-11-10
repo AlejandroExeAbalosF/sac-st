@@ -95,7 +95,7 @@ export default function InstallmentCards({
     const sumaCargada = sumAmounts(
         cuotas
             .filter((cuota) => cuota.status !== 'cancelled')
-            .map((cuota) => cuota.expectedAmount),
+            .map((cuota) => cuota.amountDue),
     );
     const saldo = sumAmounts([
         totalReconocido,

@@ -525,6 +525,10 @@ declare namespace App {
                     id: number;
                     number: number;
                     expectedAmount: string;
+                    amountDue: string;
+                    excessAmount: string;
+                    excessReason: string | null;
+                    waitingTicketsAmount: string | null;
                     status: App.Modules.Haberes.Enums.InstallmentWorkflowStatus;
                     concept: string | null;
                     managementLabel: string | null;
@@ -820,7 +824,9 @@ declare namespace App {
                     | 'collection_void'
                     | 'funds_release'
                     | 'fund_receipt_reversal'
-                    | 'deposit_ticket_unlink';
+                    | 'deposit_ticket_unlink'
+                    | 'installment_excess'
+                    | 'installment_excess_removal';
                 export type HaberesReasonCode =
                     | 'data_entry_error'
                     | 'duplicate'
@@ -837,6 +843,8 @@ declare namespace App {
                     | 'wrong_receipt'
                     | 'wrong_expediente'
                     | 'wrong_credit'
+                    | 'employer_overpaid'
+                    | 'employer_settlement_error'
                     | 'settlement_voided'
                     | 'other';
                 export type InstallmentStage =

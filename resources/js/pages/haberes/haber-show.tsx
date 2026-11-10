@@ -169,11 +169,16 @@ export default function MostrarHaber({
 
     const anulado = haber.status === 'cancelled';
     const cargadas = haber.installments.length;
-    const suma = sumAmounts(
-        haber.installments
-            .filter((cuota) => cuota.status !== 'cancelled')
-            .map((cuota) => cuota.expectedAmount),
+    /*
+     * Lo que se debe de las cuotas contra lo reconocido; el excedente que
+     * entró en alguna va aparte. Haber de $ 200 con una cuota de $ 100 más
+     * $ 10 recibidos de más: faltan programar $ 100 y hay $ 10 de excedente.
+     */
+    const vigentes = haber.installments.filter(
+        (cuota) => cuota.status !== 'cancelled',
     );
+    const suma = sumAmounts(vigentes.map((cuota) => cuota.amountDue));
+    const excedente = sumAmounts(vigentes.map((cuota) => cuota.excessAmount));
     const falta = sumAmounts([haber.assignedAmount, `-${suma}`]);
     const comparacionPlan = compareAmounts(suma, haber.assignedAmount);
 
@@ -436,22 +441,14 @@ export default function MostrarHaber({
                         </h2>
 
                         {/*
-                         * El control que importa: la suma de las cuotas
-                         * cargadas contra el derecho reconocido. Un importe
-                         * mayor se paga y se muestra como excedente.
+                         * El control que importa: lo que se debe de las
+                         * cuotas contra el derecho reconocido. El excedente
+                         * se cobra y se paga, pero se cuenta aparte.
                          */}
                         <span className="text-xs text-muted-foreground">
                             {comparacionPlan === 0 ? (
                                 <span className="text-success-strong">
                                     Las cuotas suman el total reconocido
-                                </span>
-                            ) : comparacionPlan === 1 ? (
-                                <span className="text-warning-strong">
-                                    Cuotas por <Money value={suma} /> ·
-                                    excedente pagable de{' '}
-                                    <Money value={falta.replace('-', '')} />{' '}
-                                    sobre <Money value={haber.assignedAmount} />{' '}
-                                    reconocidos
                                 </span>
                             ) : (
                                 <>
@@ -459,12 +456,18 @@ export default function MostrarHaber({
                                     <Money value={haber.assignedAmount} />
                                     {isNonZero(falta) && (
                                         <>
-                                            {' · faltan '}
+                                            {' · faltan programar '}
                                             <Money
                                                 value={falta.replace('-', '')}
                                             />
                                         </>
                                     )}
+                                </>
+                            )}
+                            {isNonZero(excedente) && (
+                                <>
+                                    {' · excedente recibido '}
+                                    <Money value={excedente} />
                                 </>
                             )}
                         </span>

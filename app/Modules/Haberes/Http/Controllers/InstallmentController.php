@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Haberes\Actions\AddInstallment;
 use App\Modules\Haberes\Actions\ReceiveAndAllocateTicket;
+use App\Modules\Haberes\Actions\RecordInstallmentExcess;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\UnlockInstallmentEdit;
 use App\Modules\Haberes\Actions\UpdateInstallment;
@@ -20,6 +21,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use LogicException;
@@ -180,6 +182,47 @@ final class InstallmentController extends Controller
             'status',
             'Edición habilitada. Al guardar los cambios, la cuota vuelve a quedar bloqueada.',
         );
+    }
+
+    /**
+     * Registra el total que entra por la cuota cuando supera lo que se debe.
+     *
+     * El operador escribe el total; la diferencia queda como excedente de la
+     * cuota, con su motivo. Con el total igual a lo que se debe, lo quita.
+     */
+    public function recordExcess(
+        Request $request,
+        BeneficiaryInstallment $installment,
+        RecordInstallmentExcess $registrar,
+    ): RedirectResponse {
+        $quita = $request->boolean('remove');
+        $acto = $quita ? HaberesReasonAct::InstallmentExcessRemoval : HaberesReasonAct::InstallmentExcess;
+
+        $validado = $request->validate(
+            [
+                'amount' => ['required', 'numeric', 'gt:0', 'max:9999999999999.99'],
+                'version' => ['required', 'date'],
+                ...Reason::rules($acto, max: 300),
+            ],
+            [
+                'amount.required' => 'Escribí el total.',
+                'amount.gt' => 'El total tiene que ser mayor que cero.',
+                'reasonCode.required' => $quita ? 'Elegí por qué se quita.' : 'Elegí por qué entra más.',
+            ] + Reason::messages(),
+            ['amount' => 'total'],
+        );
+
+        $cuota = $registrar->handle(
+            $installment,
+            Decimal::scale((string) $validado['amount']),
+            Reason::fromValidated($validado, $acto) ?? throw new LogicException('El motivo ya se validó.'),
+            CarbonImmutable::parse((string) $validado['version']),
+            $request->user()?->id,
+        );
+
+        return back()->with('status', $cuota->tieneExcedente()
+            ? "Cuota {$cuota->installment_number}: se registró un excedente de $ ".Decimal::format($cuota->excedente()).'.'
+            : "Cuota {$cuota->installment_number}: se quitó el excedente.");
     }
 
     public function update(
