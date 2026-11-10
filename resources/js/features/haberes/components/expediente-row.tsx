@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { ChevronRight, Eye, Users } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
@@ -10,6 +10,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useRememberedOpen } from '@/hooks/use-remembered-open';
 import { date } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { show } from '@/routes/expedientes';
@@ -47,7 +48,10 @@ export default function ExpedienteRow({
 }: {
     expediente: Expediente;
 }) {
-    const [abierto, setAbierto] = useState(false);
+    const [abierto, alternar] = useRememberedOpen(
+        'haberes.expedientes',
+        expediente.id,
+    );
     const panelId = useId();
     const cantidad = expediente.haberes.length;
     const primero = expediente.haberes[0];
@@ -82,7 +86,7 @@ export default function ExpedienteRow({
                 >
                     <button
                         type="button"
-                        onClick={() => setAbierto((v) => !v)}
+                        onClick={alternar}
                         aria-expanded={abierto}
                         aria-controls={panelId}
                         className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -212,7 +216,10 @@ export default function ExpedienteRow({
 
 /** La misma lectura del expediente, reordenada para una pantalla angosta. */
 export function ExpedienteCard({ expediente }: { expediente: Expediente }) {
-    const [abierto, setAbierto] = useState(false);
+    const [abierto, alternar] = useRememberedOpen(
+        'haberes.expedientes',
+        expediente.id,
+    );
     const panelId = useId();
     const cantidad = expediente.haberes.length;
     const primero = expediente.haberes[0];
@@ -221,7 +228,7 @@ export function ExpedienteCard({ expediente }: { expediente: Expediente }) {
         <article className="overflow-hidden rounded-lg border bg-card shadow-xs">
             <button
                 type="button"
-                onClick={() => setAbierto((valor) => !valor)}
+                onClick={alternar}
                 aria-expanded={abierto}
                 aria-controls={panelId}
                 className="group flex min-h-11 w-full items-start justify-between gap-3 px-4 py-3.5 text-left transition-colors outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"

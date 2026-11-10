@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { ChevronRight, Lock, Maximize2 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { estadoDelHaber } from '@/features/haberes/haber-status';
+import { useRememberedOpen } from '@/hooks/use-remembered-open';
 import { date } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { show as expedienteShow } from '@/routes/expedientes';
@@ -143,7 +144,7 @@ export function HaberCardList({ haberes }: { haberes: Haber[] }) {
 
 /** La misma lectura del haber, reordenada para una pantalla angosta. */
 function HaberCard({ haber }: { haber: Haber }) {
-    const [abierto, setAbierto] = useState(false);
+    const [abierto, alternar] = useRememberedOpen('haberes.haberes', haber.id);
     const panelId = useId();
 
     return (
@@ -218,7 +219,7 @@ function HaberCard({ haber }: { haber: Haber }) {
                 <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
                     <button
                         type="button"
-                        onClick={() => setAbierto((valor) => !valor)}
+                        onClick={alternar}
                         aria-expanded={abierto}
                         aria-controls={panelId}
                         className="-ml-2 flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2 text-left transition-colors outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring"
@@ -268,7 +269,7 @@ function HaberCard({ haber }: { haber: Haber }) {
 }
 
 function HaberRow({ haber }: { haber: Haber }) {
-    const [abierto, setAbierto] = useState(false);
+    const [abierto, alternar] = useRememberedOpen('haberes.haberes', haber.id);
     const panelId = useId();
     const anulado = haber.status === 'cancelled';
 
@@ -296,7 +297,7 @@ function HaberRow({ haber }: { haber: Haber }) {
                 >
                     <button
                         type="button"
-                        onClick={() => setAbierto((valor) => !valor)}
+                        onClick={alternar}
                         aria-expanded={abierto}
                         aria-controls={panelId}
                         className="-ml-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
