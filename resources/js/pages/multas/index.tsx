@@ -1,6 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { FileSpreadsheet, Plus, Search } from 'lucide-react';
+import { Eye, FileSpreadsheet, Maximize2, Plus, Search } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
+import type { ComponentProps } from 'react';
 import ListViewTab from '@/components/list-view-tab';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -16,6 +18,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { DEBT_STATUS, partialDate } from '@/features/multas/labels';
 import { isNonZero } from '@/lib/format';
 import { create, exportar, index } from '@/routes/multas';
@@ -310,8 +317,14 @@ function TablaDeExpedientes({ expedientes }: { expedientes: Expediente[] }) {
                     <th scope="col" className={`${TH} text-right`}>
                         Saldo
                     </th>
-                    <th scope="col" className="py-2.5 pr-4 font-medium">
+                    <th scope="col" className={TH}>
                         Estado
+                    </th>
+                    <th
+                        scope="col"
+                        className="py-2.5 pr-4 text-right font-medium"
+                    >
+                        Acciones
                     </th>
                 </tr>
             </thead>
@@ -371,7 +384,7 @@ function TablaDeExpedientes({ expedientes }: { expedientes: Expediente[] }) {
                                 </p>
                             ))}
                         </td>
-                        <td className="py-2.5 pr-4">
+                        <td className="py-2.5 pr-5">
                             <div className="flex flex-wrap gap-1">
                                 <StatusBadge
                                     label={
@@ -392,6 +405,14 @@ function TablaDeExpedientes({ expedientes }: { expedientes: Expediente[] }) {
                                     />
                                 )}
                             </div>
+                        </td>
+                        <td className="py-1.5 pr-4">
+                            <AccionVer
+                                href={showCase(expediente.routeKey)}
+                                etiqueta={`Ver el expediente ${expediente.label}`}
+                                tooltip="Ver el expediente"
+                                icono={Eye}
+                            />
                         </td>
                     </tr>
                 ))}
@@ -433,8 +454,14 @@ function TablaDeMultas({ multas }: { multas: Multa[] }) {
                     >
                         Saldo
                     </th>
-                    <th scope="col" className="py-2.5 pr-4 font-medium">
+                    <th scope="col" className="py-2.5 pr-5 font-medium">
                         Estado
+                    </th>
+                    <th
+                        scope="col"
+                        className="py-2.5 pr-4 text-right font-medium"
+                    >
+                        Acciones
                     </th>
                 </tr>
             </thead>
@@ -480,7 +507,7 @@ function TablaDeMultas({ multas }: { multas: Multa[] }) {
                         <td className="py-2.5 pr-5 text-right text-sm">
                             <Money value={multa.balance.debt} dimWhenZero />
                         </td>
-                        <td className="py-2.5 pr-4">
+                        <td className="py-2.5 pr-5">
                             <div className="flex flex-wrap gap-1">
                                 <StatusBadge
                                     label={
@@ -498,9 +525,50 @@ function TablaDeMultas({ multas }: { multas: Multa[] }) {
                                 )}
                             </div>
                         </td>
+                        <td className="py-1.5 pr-4">
+                            <AccionVer
+                                href={multa.href}
+                                etiqueta={`Ver la multa ${multa.caption}`}
+                                tooltip="Ver la multa"
+                                icono={Maximize2}
+                            />
+                        </td>
                     </tr>
                 ))}
             </tbody>
         </table>
+    );
+}
+
+/** El botón de detalle de la fila, el mismo que usan los listados de Haberes. */
+function AccionVer({
+    href,
+    etiqueta,
+    tooltip,
+    icono: Icono,
+}: {
+    href: ComponentProps<typeof Link>['href'];
+    etiqueta: string;
+    tooltip: string;
+    icono: LucideIcon;
+}) {
+    return (
+        <div className="flex justify-end">
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        aria-label={etiqueta}
+                    >
+                        <Link href={href}>
+                            <Icono className="size-4" aria-hidden="true" />
+                        </Link>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+        </div>
     );
 }
