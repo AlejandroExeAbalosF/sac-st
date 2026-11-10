@@ -303,6 +303,12 @@ function FilaDeCobro({
                         {money(cobro.total)}
                     </span>
                     {anulado && <StatusBadge label="Anulado" voided />}
+                    {/*
+                     * El estado va siempre, también cuando está pagado: el
+                     * medio y el depósito dicen dónde está el dinero, no si
+                     * el cobro terminó.
+                     */}
+                    {pagado && <StatusBadge label="Pagado" tone="done" />}
                     {pendiente && (
                         <StatusBadge
                             label={`Pendiente: faltan ${money(cobro.missing)}`}

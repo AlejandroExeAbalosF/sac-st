@@ -266,26 +266,45 @@ export default function MultaShow({
                     />
                     <div>
                         <p className="text-xs tracking-wide text-field-label uppercase">
-                            Estado
+                            Estado de la deuda
                         </p>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                             <StatusBadge
                                 label={estado.label}
                                 tone={estado.tone}
                             />
-                            {isNonZero(multa.balance.excess) && (
-                                <StatusBadge
-                                    label="Con excedente"
-                                    tone="action"
-                                />
-                            )}
-                            {isNonZero(multa.balance.pendingRegularization) && (
-                                <StatusBadge
-                                    label="Pago a regularizar"
-                                    tone="blocked"
-                                />
-                            )}
                         </div>
+                        {/*
+                         * Lo que sigue pidiendo una acción va aparte de la
+                         * deuda: una multa «Cancelada» puede tener todavía un
+                         * cheque rechazado sin reemplazo o un excedente por
+                         * resolver, y en la misma fila de insignias se leía
+                         * como una contradicción.
+                         */}
+                        {(isNonZero(multa.balance.excess) ||
+                            isNonZero(multa.balance.pendingRegularization)) && (
+                            <>
+                                <p className="mt-3 text-xs tracking-wide text-field-label uppercase">
+                                    Atención
+                                </p>
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {isNonZero(
+                                        multa.balance.pendingRegularization,
+                                    ) && (
+                                        <StatusBadge
+                                            label="Pago a regularizar · cheque rechazado"
+                                            tone="blocked"
+                                        />
+                                    )}
+                                    {isNonZero(multa.balance.excess) && (
+                                        <StatusBadge
+                                            label="Con excedente"
+                                            tone="action"
+                                        />
+                                    )}
+                                </div>
+                            </>
+                        )}
                         {isNonZero(multa.balance.excess) && (
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Excedente pendiente{' '}

@@ -22,7 +22,7 @@ final readonly class PlanillaFilters
         'ready_to_validate' => 'Falta validación',
         'paid_missing_receipt' => 'Pago confirmado, falta recibo de egreso',
         'paid' => 'Pago confirmado',
-        'paid_before_opening' => 'Pagada fuera del circuito',
+        'paid_before_opening' => 'Pagada antes de la apertura',
         'blocked' => 'Bloqueada',
         'suspended' => 'Suspendida',
         'cancelled' => 'Anulada',

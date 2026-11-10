@@ -29,7 +29,7 @@ const TONO: Record<string, StatusTone> = {
 
 const ETIQUETA: Record<string, string> = {
     waiting: 'Esperando en el banco',
-    matched: 'Encontrado',
+    matched: 'Conciliado con el banco',
     discarded: 'Descartado',
 };
 

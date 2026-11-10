@@ -55,10 +55,10 @@ enum DisbursementStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'Preparado',
-            self::ReportReceived => 'Transferencia informada',
-            self::BankDebitObserved => 'Débito observado',
-            self::ReadyForValidation => 'Listo para validar',
+            self::Pending => 'Preparado · faltan informe y débito',
+            self::ReportReceived => 'Transferencia informada · falta débito',
+            self::BankDebitObserved => 'Débito identificado · falta informe',
+            self::ReadyForValidation => 'Informe y débito registrados · falta validación',
             self::Confirmed => 'Confirmado',
             self::Reversed => 'Revertido',
             self::Failed => 'Fallido',

@@ -75,7 +75,7 @@ class PantallaDePlanillasTest extends TestCase
                 ->where('all.data.0.installmentId', $anulada->id)
                 ->where('all.data.0.status', 'Anulada')
                 ->where('all.data.1.installmentId', $historica->id)
-                ->where('all.data.1.status', 'Pagada fuera del circuito')
+                ->where('all.data.1.status', 'Pagada antes de la apertura')
                 ->has('counter', 0)
                 ->has('transfers', 0));
     }
@@ -213,7 +213,7 @@ class PantallaDePlanillasTest extends TestCase
 
         try {
             $sheet = IOFactory::load($path)->getActiveSheet();
-            $this->assertStringContainsString('Pagada fuera del circuito', $sheet->getCell('A1')->getFormattedValue());
+            $this->assertStringContainsString('Pagada antes de la apertura', $sheet->getCell('A1')->getFormattedValue());
             $this->assertSame(3, $sheet->getHighestRow());
             $this->assertSame($pagadaFuera->haber->expediente->display_number, $sheet->getCell('A3')->getFormattedValue());
         } finally {

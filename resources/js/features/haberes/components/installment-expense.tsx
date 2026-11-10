@@ -38,10 +38,10 @@ const TONO: Record<EgresoStatus, StatusTone> = {
 };
 
 const ETIQUETA: Record<EgresoStatus, string> = {
-    pending: 'Preparado',
-    report_received: 'Transferencia informada',
-    bank_debit_observed: 'Débito observado',
-    ready_for_validation: 'Listo para validar',
+    pending: 'Preparado · faltan informe y débito',
+    report_received: 'Transferencia informada · falta débito',
+    bank_debit_observed: 'Débito identificado · falta informe',
+    ready_for_validation: 'Informe y débito registrados · falta validación',
     confirmed: 'Pagado',
     reversed: 'Revertido',
     failed: 'Fallido',

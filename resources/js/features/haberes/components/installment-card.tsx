@@ -67,7 +67,7 @@ const ETIQUETA: Record<CuotaStatus, string> = {
     blocked: 'Bloqueada',
     cancelled: 'Anulada',
     paid: 'Pagada',
-    legacy_settled: 'Pagada antes de la apertura del sistema',
+    legacy_settled: 'Pagada antes de la apertura',
 };
 
 const MEDIO: Record<
@@ -394,7 +394,7 @@ export default function InstallmentCard({
             {saldada && estadoHistorico !== undefined ? (
                 <Seccion
                     icono={Archive}
-                    titulo="Pagada antes de la apertura del sistema"
+                    titulo="Pagada antes de la apertura"
                     ultima
                 >
                     <LegacySettlementPanel

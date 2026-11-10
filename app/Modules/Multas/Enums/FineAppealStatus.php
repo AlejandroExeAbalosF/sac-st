@@ -27,7 +27,7 @@ enum FineAppealStatus: string
             self::Open => 'En trámite',
             self::Upheld => 'Prosperó',
             self::Rejected => 'No prosperó',
-            self::Dropped => 'Cayó',
+            self::Dropped => 'Sin efecto · pago descartado o anulado',
         };
     }
 

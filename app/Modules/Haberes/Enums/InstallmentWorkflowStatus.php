@@ -34,7 +34,7 @@ enum InstallmentWorkflowStatus: string
             self::Blocked => 'Bloqueada',
             self::Cancelled => 'Anulada',
             self::Paid => 'Pagada',
-            self::LegacySettled => 'Pagada fuera del circuito',
+            self::LegacySettled => 'Pagada antes de la apertura',
         };
     }
 }

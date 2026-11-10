@@ -106,7 +106,7 @@ export const APPEAL_STATUS: Record<
     open: 'En trámite',
     upheld: 'Prosperó',
     rejected: 'No prosperó',
-    dropped: 'Cayó',
+    dropped: 'Sin efecto · pago descartado o anulado',
 };
 
 /** Si se presentó antes o después del cierre del mes de la multa (M08). */

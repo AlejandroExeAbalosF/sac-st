@@ -29,7 +29,7 @@ enum DepositTicketStatus: string
     {
         return match ($this) {
             self::Waiting => 'Esperando en el banco',
-            self::Matched => 'Encontrado',
+            self::Matched => 'Conciliado con el banco',
             self::Discarded => 'Descartado',
         };
     }

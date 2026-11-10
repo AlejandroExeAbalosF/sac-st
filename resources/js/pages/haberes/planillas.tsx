@@ -149,9 +149,9 @@ const TONO: Record<string, StatusTone> = {
 };
 
 const ETIQUETA: Record<string, string> = {
-    report_received: 'Transferencia informada',
-    bank_debit_observed: 'Débito observado',
-    ready_for_validation: 'Listo para validar',
+    report_received: 'Transferencia informada · falta débito',
+    bank_debit_observed: 'Débito identificado · falta informe',
+    ready_for_validation: 'Informe y débito registrados · falta validación',
 };
 
 /**

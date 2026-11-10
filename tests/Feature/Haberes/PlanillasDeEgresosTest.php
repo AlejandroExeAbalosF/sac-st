@@ -238,7 +238,7 @@ class PlanillasDeEgresosTest extends TestCase
         $this->assertSame('OP 0001-00000123', $hoja->rows[0][4]);
         $this->assertSame('20/06/2026', $hoja->rows[0][5]);
         $this->assertSame('—', $hoja->rows[0][6]);
-        $this->assertSame('Transferencia informada', $hoja->rows[0][7]);
+        $this->assertSame('Transferencia informada · falta débito', $hoja->rows[0][7]);
     }
 
     /** Tildar la hoja no postea ningún asiento, y el papel lo dice. */
