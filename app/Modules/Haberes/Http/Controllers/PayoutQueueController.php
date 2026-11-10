@@ -5,30 +5,22 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Haberes\Data\AllInstallmentRowData;
 use App\Modules\Haberes\Data\CounterPayoutRowData;
 use App\Modules\Haberes\Data\UnconfirmedTransferRowData;
-use App\Modules\Haberes\Enums\DisbursementStatus;
-use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Http\Requests\PlanillaFilterRequest;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Pdf\AllInstallmentsSheet;
 use App\Modules\Haberes\Pdf\CounterPayoutSheet;
 use App\Modules\Haberes\Pdf\UnconfirmedTransferSheet;
 use App\Modules\Haberes\Support\CounterPayoutQueue;
-use App\Modules\Haberes\Support\InstallmentFunding;
-use App\Modules\Haberes\Support\InstallmentStages;
+use App\Modules\Haberes\Support\PlanillaFilters;
+use App\Modules\Haberes\Support\PlanillaInstallments;
 use App\Modules\Haberes\Support\TransferStage;
-use App\Modules\Shared\Enums\ReceiptStatus;
-use App\Modules\Shared\Enums\ReceiptType;
-use App\Modules\Shared\Enums\SystemRole;
-use App\Modules\Shared\Models\Receipt;
+use App\Support\Excel\SpreadsheetWriter;
 use App\Support\Money\Decimal;
 use App\Support\Pdf\Worksheet;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Generator;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -47,7 +39,7 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  * **Ninguna vista escribe nada.** Es una pantalla de lectura que
  * lleva a la cuota, que es donde viven los actos. Por eso tampoco hay
  * Actions acá: no hay nada que accionar, hay algo que mirar y una hoja que
- * imprimir.
+ * imprimir o descargar.
  *
  * Los depósitos esperando acreditación son la tercera cola del circuito,
  * pero son plata **entrando** y ya tienen su pantalla en `/depositos`. Su
@@ -64,10 +56,10 @@ final class PayoutQueueController extends Controller
     public function __construct(
         private readonly CounterPayoutQueue $mostrador,
         private readonly TransferStage $etapa,
-        private readonly InstallmentStages $etapasDeCuotas,
+        private readonly PlanillaInstallments $planillas,
     ) {}
 
-    public function index(Request $request): Response
+    public function index(PlanillaFilterRequest $request): Response
     {
         /*
          * Las dos listas van siempre, no solo la de la solapa abierta: el
@@ -75,18 +67,23 @@ final class PayoutQueueController extends Controller
          * que resolverla igual. Las dos tienen tope, así que el peor caso
          * está acotado.
          */
-        $mostrador = $this->mostrador->resolve();
-        $transferencias = $this->transferencias();
+        $filtros = $request->filters();
+        [$mostrador, $transferencias] = $this->colasFiltradas($filtros);
         $cola = $this->cola($request);
-        $todas = $cola === self::TODAS ? $this->todasPaginadas() : null;
+        $todas = $cola === self::TODAS ? $this->planillas->page($filtros, $request->integer('page', 1)) : null;
 
         return Inertia::render('haberes/planillas', [
             'cola' => $cola,
             'counter' => $mostrador,
             'transfers' => $transferencias,
             'all' => $todas,
-            'allCount' => $todas?->total() ?? BeneficiaryInstallment::query()->count(),
-            'canSeeFilterNotes' => $request->user()?->hasRole(SystemRole::SuperAdmin->value) ?? false,
+            'allCount' => $todas?->total() ?? $this->planillas->count($filtros),
+            'filters' => $filtros->toArray(),
+            'stageOptions' => array_map(
+                fn (string $value, string $label): array => ['value' => $value, 'label' => $label],
+                array_keys(PlanillaFilters::STAGES),
+                array_values(PlanillaFilters::STAGES),
+            ),
             /*
              * Los totales se suman acá y bajan como cadena. El navegador no
              * suma dinero: `Number` sobre importes es un `float` sobre plata
@@ -100,14 +97,14 @@ final class PayoutQueueController extends Controller
     }
 
     /**
-     * La vista abierta, en papel.
+     * La vista abierta, en papel o Excel.
      *
      * Una ruta y no dos porque es la misma acción sobre la misma pantalla:
-     * imprimir lo que se está mirando. Cuál sale lo dice el
+     * exportar la selección actual. Cuál sale lo dice el
      * mismo parámetro que elige la solapa.
      */
     public function sheet(
-        Request $request,
+        PlanillaFilterRequest $request,
         Worksheet $molde,
         CounterPayoutSheet $planillaMostrador,
         UnconfirmedTransferSheet $planillaTransferencias,
@@ -115,105 +112,83 @@ final class PayoutQueueController extends Controller
     ): SymfonyResponse {
         $ahora = CarbonImmutable::now();
         $quien = $request->user()?->name;
+        $filtros = $request->filters();
+        [$mostrador, $transferencias] = $this->colasFiltradas($filtros);
+        $cola = $this->cola($request);
+        $aplicados = $filtros->forQueue($cola);
+        $marcables = [];
 
-        if ($this->cola($request) === self::TODAS) {
-            $marcables = [];
-
-            foreach ([...$this->mostrador->resolve(), ...$this->transferencias()] as $fila) {
-                $marcables[$fila->installmentId] = true;
-            }
-
-            $hoja = $planillaTodas->build($this->todas(), $marcables, $ahora, $quien);
-        } elseif ($this->cola($request) === self::TRANSFERENCIAS) {
-            $filas = $this->transferencias();
-            $hoja = $planillaTransferencias->build($filas, $this->total($filas), $ahora, $quien);
-        } else {
-            $filas = $this->mostrador->resolve();
-            $hoja = $planillaMostrador->build($filas, $this->total($filas), $ahora, $quien);
+        foreach ([...$mostrador, ...$transferencias] as $fila) {
+            $marcables[$fila->installmentId] = true;
         }
 
-        // En línea y no como descarga, igual que los comprobantes: lo normal
-        // es mirarla y mandarla a imprimir, no guardarla en Descargas.
-        return $molde->render($hoja)->stream($hoja->filename());
-    }
+        if ($cola === self::TODAS && $request->query('formato') === 'xlsx') {
+            $columns = $planillaTodas->build([], [], $ahora)->columns;
+            $rows = (function () use ($aplicados, $marcables, $planillaTodas): Generator {
+                foreach ($this->planillas->rows($aplicados) as $fila) {
+                    yield $planillaTodas->row($fila, isset($marcables[$fila->installmentId]));
+                }
+            })();
 
-    /** @return Builder<BeneficiaryInstallment> */
-    private function consultaDeCuotas(): Builder
-    {
-        return BeneficiaryInstallment::query()->with([
-            'haber.beneficiary',
-            'haber.expediente',
-            'managementLabel',
-        ]);
-    }
-
-    /** @return LengthAwarePaginator<int, AllInstallmentRowData> */
-    private function todasPaginadas(): LengthAwarePaginator
-    {
-        $pagina = $this->consultaDeCuotas()->orderBy('id')->paginate(50)->withQueryString();
-        $filas = $this->filasDeCuotas($pagina->getCollection());
-
-        return $pagina->through(fn (BeneficiaryInstallment $cuota): AllInstallmentRowData => $filas[(int) $cuota->id]);
-    }
-
-    /** @return list<AllInstallmentRowData> */
-    private function todas(): array
-    {
-        $filas = [];
-
-        $this->consultaDeCuotas()->chunkById(250, function (Collection $cuotas) use (&$filas): void {
-            array_push($filas, ...array_values($this->filasDeCuotas($cuotas)));
-        });
-
-        return $filas;
-    }
-
-    /**
-     * La pantalla y el PDF leen las mismas situaciones. Las consultas por
-     * lote evitan pedir fondos, medio y recibo una vez por cada cuota.
-     *
-     * @param  Collection<int, BeneficiaryInstallment>  $cuotas
-     * @return array<int, AllInstallmentRowData>
-     */
-    private function filasDeCuotas(Collection $cuotas): array
-    {
-        if ($cuotas->isEmpty()) {
-            return [];
-        }
-
-        /** @var list<int> $ids */
-        $ids = $cuotas->pluck('id')->map(intval(...))->values()->all();
-        $financiacion = app(InstallmentFunding::class);
-        $etapas = $this->etapasDeCuotas->forMany($cuotas);
-        $financiado = $financiacion->allocatedForMany($ids);
-        $medios = $financiacion->mediumForMany($ids);
-        $egresos = Disbursement::query()
-            ->whereIn('beneficiary_installment_id', $ids)
-            ->where('status', DisbursementStatus::Confirmed)
-            ->get()
-            ->keyBy('beneficiary_installment_id');
-        $recibos = Receipt::query()
-            ->whereIn('beneficiary_installment_id', $ids)
-            ->where('receipt_type', ReceiptType::Expense)
-            ->where('status', ReceiptStatus::Issued)
-            ->pluck('beneficiary_installment_id')
-            ->flip();
-
-        $filas = [];
-
-        foreach ($cuotas as $cuota) {
-            $id = (int) $cuota->id;
-            $filas[$id] = AllInstallmentRowData::fromModel(
-                $cuota,
-                $etapas[$id],
-                $financiado[$id],
-                $medios[$id],
-                $egresos->get($id)?->method,
-                $recibos->has($id),
+            return SpreadsheetWriter::download(
+                'planilla-todas-las-cuotas-'.$ahora->format('Y-m-d').'.xlsx',
+                array_map(fn ($column): string => $column->label, $columns),
+                $rows,
+                $aplicados->summary(),
             );
         }
 
-        return $filas;
+        if ($cola === self::TODAS) {
+            $hoja = $planillaTodas->build(
+                iterator_to_array($this->planillas->rows($aplicados), false),
+                $marcables,
+                $ahora,
+                $quien,
+                $aplicados->summary(),
+            );
+        } elseif ($cola === self::TRANSFERENCIAS) {
+            $hoja = $planillaTransferencias->build($transferencias, $this->total($transferencias), $ahora, $quien, $aplicados->summary());
+        } else {
+            $hoja = $planillaMostrador->build($mostrador, $this->total($mostrador), $ahora, $quien, $aplicados->summary());
+        }
+
+        if ($request->query('formato') === 'xlsx') {
+            return SpreadsheetWriter::download(
+                $hoja->slug.'-'.$ahora->format('Y-m-d').'.xlsx',
+                array_map(fn ($column): string => $column->label, $hoja->columns),
+                $hoja->rows,
+                $aplicados->summary(),
+            );
+        }
+
+        // La acción «Planilla» mantiene la vista en línea; «PDF» la descarga.
+        $pdf = $molde->render($hoja);
+
+        return $request->boolean('descargar')
+            ? $pdf->download($hoja->filename())
+            : $pdf->stream($hoja->filename());
+    }
+
+    /**
+     * @return array{list<CounterPayoutRowData>, list<UnconfirmedTransferRowData>}
+     */
+    private function colasFiltradas(PlanillaFilters $filtros): array
+    {
+        $mostrador = $this->mostrador->resolve();
+        $transferencias = $this->transferencias();
+        $aceptadasMostrador = $this->planillas->matchingIds(
+            $filtros->forQueue(self::MOSTRADOR),
+            array_map(fn (CounterPayoutRowData $fila): int => $fila->installmentId, $mostrador),
+        );
+        $aceptadasTransferencias = $this->planillas->matchingIds(
+            $filtros->forQueue(self::TRANSFERENCIAS),
+            array_map(fn (UnconfirmedTransferRowData $fila): int => $fila->installmentId, $transferencias),
+        );
+
+        return [
+            array_values(array_filter($mostrador, fn (CounterPayoutRowData $fila): bool => isset($aceptadasMostrador[$fila->installmentId]))),
+            array_values(array_filter($transferencias, fn (UnconfirmedTransferRowData $fila): bool => isset($aceptadasTransferencias[$fila->installmentId]))),
+        ];
     }
 
     /**
@@ -277,7 +252,7 @@ final class PayoutQueueController extends Controller
     }
 
     /** Qué planilla se está mirando. Ante cualquier cosa, el mostrador. */
-    private function cola(Request $request): string
+    private function cola(PlanillaFilterRequest $request): string
     {
         return match ($request->query('cola')) {
             self::TRANSFERENCIAS => self::TRANSFERENCIAS,

@@ -129,6 +129,15 @@ class PlanillasDeEgresosTest extends TestCase
         );
     }
 
+    public function test_el_pdf_se_puede_descargar(): void
+    {
+        $respuesta = $this->actingAs($this->operador())
+            ->get(route('planillas.print', ['cola' => 'todas', 'descargar' => 1]));
+
+        $respuesta->assertOk();
+        $this->assertStringStartsWith('attachment', (string) $respuesta->headers->get('content-disposition'));
+    }
+
     public function test_sin_permiso_no_hay_planilla(): void
     {
         $this->actingAs(User::factory()->create())

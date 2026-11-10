@@ -269,6 +269,8 @@ declare namespace App {
                     amount: string;
                     status: string;
                     paymentMethod: string | null;
+                    stageCode: string;
+                    paymentMethodCode: string | null;
                 };
                 export type ChequeAssignmentData = {
                     installmentId: number;

@@ -36,6 +36,7 @@ final class CounterPayoutSheet
         string $total,
         CarbonImmutable $generadaEl,
         ?string $generadaPor = null,
+        ?string $appliedFilters = null,
     ): WorksheetData {
         $cajas = $this->cajas($filas);
         // La caja se repite en todas las filas mientras haya una sola, que
@@ -77,7 +78,7 @@ final class CounterPayoutSheet
             subtitle: $unaSolaCaja === null
                 ? 'Cuotas financiadas, con su recibo de ingreso emitido y sin trabas'
                 : 'Cuotas financiadas, con su recibo de ingreso emitido y sin trabas · '.$unaSolaCaja,
-            filters: 'Solo mostrador y solo efectivo · Ordenadas por apellido del beneficiario',
+            filters: 'Solo mostrador y solo efectivo · Ordenadas por apellido del beneficiario'.($appliedFilters === null ? '' : ' · '.$appliedFilters),
             totals: [
                 /*
                  * El número por el que se imprime la hoja, así que va aunque

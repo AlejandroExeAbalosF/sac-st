@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 /**
@@ -109,17 +110,114 @@ class PantallaDePlanillasTest extends TestCase
                 ->where('all.data.0.paymentMethod', 'Efectivo'));
     }
 
-    public function test_las_ideas_de_filtros_solo_se_ofrecen_al_super_admin(): void
+    public function test_los_filtros_estan_disponibles_para_quien_puede_ver_planillas(): void
     {
         $this->actingAs($this->operador('administrativo'))
             ->get(route('planillas.index'))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('canSeeFilterNotes', false));
+                ->where('filters.expediente', '')
+                ->has('stageOptions', 16));
+    }
 
-        $this->actingAs($this->operador('super-admin'))
-            ->get(route('planillas.index'))
+    public function test_filtro_de_situacion_se_aplica_antes_de_contar_y_paginar(): void
+    {
+        $sinFondos = $this->cuota();
+        $pagadaFuera = $this->cuotas()->whereKeyNot($sinFondos->id)->firstOrFail();
+        $pagadaFuera->forceFill(['workflow_status' => InstallmentWorkflowStatus::LegacySettled])->save();
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['cola' => 'todas', 'stages' => ['paid_before_opening']]))
+            ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('canSeeFilterNotes', true));
+                ->where('allCount', 1)
+                ->where('all.total', 1)
+                ->where('all.data.0.installmentId', $pagadaFuera->id)
+                ->where('filters.stages.0', 'paid_before_opening'));
+    }
+
+    public function test_filtro_de_expediente_restringe_tambien_el_mostrador(): void
+    {
+        $cuota = $this->cuotaCobradaEnEfectivo();
+        $numero = $cuota->haber->expediente->display_number;
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['expediente' => $numero]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('counter', 1)
+                ->where('counter.0.installmentId', $cuota->id));
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', ['expediente' => 'inexistente']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('counter', 0)
+                ->where('allCount', 0));
+    }
+
+    public function test_el_mostrador_ignora_los_filtros_que_no_aparecen_en_su_panel(): void
+    {
+        $cuota = $this->cuotaCobradaEnEfectivo();
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', [
+                'cola' => 'mostrador',
+                'stages' => ['paid'],
+                'medio' => 'bank_transfer',
+                'retenido' => 1,
+                'pagoDesde' => '2099-01-01',
+            ]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('counter', 1)
+                ->where('counter.0.installmentId', $cuota->id)
+                ->where('allCount', 0));
+    }
+
+    public function test_transferencias_ignora_filtros_ocultos_pero_acepta_su_avance(): void
+    {
+        [$informada, $debitada] = $this->variasCuotas(2);
+        $this->egreso($informada, DisbursementStatus::ReportReceived);
+        $this->egreso($debitada, DisbursementStatus::BankDebitObserved);
+
+        $this->actingAs($this->operador())
+            ->get(route('planillas.index', [
+                'cola' => 'transferencias',
+                'stages' => ['paid', 'transfer_reported'],
+                'medio' => 'cheque',
+                'pagoDesde' => '2099-01-01',
+            ]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('transfers', 1)
+                ->where('transfers.0.installmentId', $informada->id));
+    }
+
+    public function test_excel_descarga_solo_las_cuotas_filtradas_e_indica_el_criterio(): void
+    {
+        $sinFondos = $this->cuota();
+        $pagadaFuera = $this->cuotas()->whereKeyNot($sinFondos->id)->firstOrFail();
+        $pagadaFuera->forceFill(['workflow_status' => InstallmentWorkflowStatus::LegacySettled])->save();
+
+        $response = $this->actingAs($this->operador())->get(route('planillas.print', [
+            'cola' => 'todas',
+            'formato' => 'xlsx',
+            'stages' => ['paid_before_opening'],
+        ]));
+
+        $response->assertOk();
+        $this->assertStringContainsString('attachment', (string) $response->headers->get('content-disposition'));
+        $path = tempnam(sys_get_temp_dir(), 'planilla').'.xlsx';
+        ob_start();
+        $response->baseResponse->sendContent();
+        $content = ob_get_clean();
+        $this->assertIsString($content);
+        file_put_contents($path, $content);
+
+        try {
+            $sheet = IOFactory::load($path)->getActiveSheet();
+            $this->assertStringContainsString('Pagada fuera del circuito', $sheet->getCell('A1')->getFormattedValue());
+            $this->assertSame(3, $sheet->getHighestRow());
+            $this->assertSame($pagadaFuera->haber->expediente->display_number, $sheet->getCell('A3')->getFormattedValue());
+        } finally {
+            @unlink($path);
+        }
     }
 
     /** Cobrada en efectivo y con su recibo, la cuota entra en la fila. */

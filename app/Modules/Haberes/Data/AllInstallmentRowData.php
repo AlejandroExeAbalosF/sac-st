@@ -29,6 +29,8 @@ final class AllInstallmentRowData extends Data
         public string $amount,
         public string $status,
         public ?string $paymentMethod = null,
+        public string $stageCode = '',
+        public ?string $paymentMethodCode = null,
     ) {}
 
     /** @param numeric-string $financiado */
@@ -54,13 +56,14 @@ final class AllInstallmentRowData extends Data
             && $cuota->workflow_status === InstallmentWorkflowStatus::Active
             && ! $pagada;
         $metodo = match (true) {
-            $pagada => $medioDeEgreso?->label(),
+            $pagada => $medioDeEgreso,
             $cuota->workflow_status !== InstallmentWorkflowStatus::Active => null,
-            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => 'Transferencia',
+            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => DisbursementMethod::BankTransfer,
             $etapa === InstallmentStage::InCashBox || $etapa === InstallmentStage::AwaitingReceipt => match ($medioDeIngreso) {
-                PaymentMedium::Cash => 'Efectivo',
-                PaymentMedium::Cheque => 'Cheque de terceros',
-                default => $medioDeIngreso === PaymentMedium::Bank ? 'Transferencia' : null,
+                PaymentMedium::Cash => DisbursementMethod::Cash,
+                PaymentMedium::Cheque => DisbursementMethod::Cheque,
+                PaymentMedium::Bank => DisbursementMethod::BankTransfer,
+                default => null,
             },
             in_array($etapa, [
                 InstallmentStage::DepositInTransit,
@@ -69,8 +72,18 @@ final class AllInstallmentRowData extends Data
                 InstallmentStage::TransferReported,
                 InstallmentStage::DebitObserved,
                 InstallmentStage::ReadyToValidate,
-            ], true) => 'Transferencia',
+            ], true) => DisbursementMethod::BankTransfer,
             default => null,
+        };
+        $stageCode = match (true) {
+            $cuota->workflow_status === InstallmentWorkflowStatus::LegacySettled => InstallmentStage::PaidBeforeOpening->value,
+            $cuota->workflow_status === InstallmentWorkflowStatus::Cancelled => InstallmentStage::Cancelled->value,
+            $cuota->workflow_status === InstallmentWorkflowStatus::Blocked => InstallmentStage::Blocked->value,
+            $cuota->workflow_status === InstallmentWorkflowStatus::Suspended => InstallmentStage::Suspended->value,
+            $pagada && ! $tieneReciboDeEgreso => 'paid_missing_receipt',
+            $etapa === InstallmentStage::Unfunded && ! Decimal::equals($financiado, '0') => 'partially_funded',
+            $etapa === InstallmentStage::InCashBox && $medioDeIngreso === PaymentMedium::Bank => InstallmentStage::AtBank->value,
+            default => $etapa->value,
         };
 
         return new self(
@@ -87,7 +100,9 @@ final class AllInstallmentRowData extends Data
             concept: $cuota->description ?? $haber->concept,
             amount: $cuota->importeEsperado(),
             status: $status.($retenida ? ' · pago retenido' : ''),
-            paymentMethod: $metodo,
+            paymentMethod: $metodo?->label(),
+            stageCode: $stageCode,
+            paymentMethodCode: $metodo?->value,
         );
     }
 

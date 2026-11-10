@@ -1,11 +1,22 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, ChevronRight, Clock, Printer } from 'lucide-react';
+import {
+    Banknote,
+    ChevronRight,
+    Clock,
+    Download,
+    ListFilter,
+    Printer,
+} from 'lucide-react';
+import { useId, useState } from 'react';
+import FormRowField from '@/components/form-row-field';
 import PageHeader from '@/components/page-header';
 import PaginationFooter from '@/components/pagination-footer';
 import type { PaginationData } from '@/components/pagination-footer';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
     Sheet,
     SheetContent,
@@ -24,6 +35,99 @@ type TransferRow = App.Modules.Haberes.Data.UnconfirmedTransferRowData;
 type AllRow = App.Modules.Haberes.Data.AllInstallmentRowData;
 
 type Cola = 'mostrador' | 'transferencias' | 'todas';
+type Filters = {
+    expediente: string;
+    beneficiario: string;
+    empleador: string;
+    stages: string[];
+    medio: string;
+    medioPrevisto: string;
+    retenido: boolean;
+    vencimientoDesde: string;
+    vencimientoHasta: string;
+    pagoDesde: string;
+    pagoHasta: string;
+    importeMin: string;
+    importeMax: string;
+};
+type StageOption = { value: string; label: string };
+
+const EMPTY_FILTERS: Filters = {
+    expediente: '',
+    beneficiario: '',
+    empleador: '',
+    stages: [],
+    medio: '',
+    medioPrevisto: '',
+    retenido: false,
+    vencimientoDesde: '',
+    vencimientoHasta: '',
+    pagoDesde: '',
+    pagoHasta: '',
+    importeMin: '',
+    importeMax: '',
+};
+
+const TRANSFER_STAGES = new Set([
+    'transfer_reported',
+    'debit_observed',
+    'ready_to_validate',
+]);
+
+function activeFilterCount(filters: Filters, cola: Cola) {
+    const common = [
+        filters.expediente,
+        filters.beneficiario,
+        filters.empleador,
+        filters.medioPrevisto,
+        filters.vencimientoDesde,
+        filters.vencimientoHasta,
+        filters.importeMin,
+        filters.importeMax,
+    ].filter(Boolean).length;
+
+    if (cola === 'mostrador') {
+        return common;
+    }
+
+    if (cola === 'transferencias') {
+        return (
+            common +
+            Number(filters.stages.some((stage) => TRANSFER_STAGES.has(stage)))
+        );
+    }
+
+    return (
+        common +
+        [filters.medio, filters.pagoDesde, filters.pagoHasta].filter(Boolean)
+            .length +
+        Number(filters.stages.length > 0) +
+        Number(filters.retenido)
+    );
+}
+
+function planillaUrl(
+    base: string,
+    cola: Cola,
+    filters: Filters,
+    extra: Record<string, string> = {},
+) {
+    const query = new URLSearchParams({ cola, ...extra });
+
+    for (const [key, value] of Object.entries(filters)) {
+        if (key === 'stages') {
+            for (const stage of value as string[]) {
+                query.append('stages[]', stage);
+            }
+        } else if (value === true) {
+            query.set(key, '1');
+        } else if (typeof value === 'string' && value.trim() !== '') {
+            query.set(key, value.trim());
+        }
+    }
+
+    return `${base}?${query.toString()}`;
+}
 
 type Props = {
     cola: Cola;
@@ -31,7 +135,8 @@ type Props = {
     transfers: TransferRow[];
     all: (PaginationData & { data: AllRow[] }) | null;
     allCount: number;
-    canSeeFilterNotes: boolean;
+    filters: Filters;
+    stageOptions: StageOption[];
     /** Sumados en el servidor: acá el dinero no se suma, se muestra. */
     counterTotal: string;
     transfersTotal: string;
@@ -67,16 +172,18 @@ export default function Egresos({
     transfers,
     all,
     allCount,
-    canSeeFilterNotes,
+    filters,
+    stageOptions,
     counterTotal,
     transfersTotal,
 }: Props) {
     const cambiar = (siguiente: Cola) =>
         router.get(
-            index().url,
-            { cola: siguiente },
+            planillaUrl(index().url, siguiente, filters),
+            {},
             { preserveState: true, replace: true },
         );
+    const activeFilters = activeFilterCount(filters, cola);
 
     const enMostrador = cola === 'mostrador';
     const enTransferencias = cola === 'transferencias';
@@ -122,7 +229,7 @@ export default function Egresos({
                             nueva: la lista sigue acá cuando el papel ya salió
                             por la impresora. */}
                         <a
-                            href={print({ query: { cola } }).url}
+                            href={planillaUrl(print().url, cola, filters)}
                             target="_blank"
                             rel="noreferrer"
                         >
@@ -130,68 +237,323 @@ export default function Egresos({
                             Planilla
                         </a>
                     </Button>
+                    <Button asChild variant="outline" size="sm">
+                        <a
+                            href={planillaUrl(print().url, cola, filters, {
+                                descargar: '1',
+                            })}
+                        >
+                            <Download aria-hidden="true" /> PDF
+                        </a>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                        <a
+                            href={planillaUrl(print().url, cola, filters, {
+                                formato: 'xlsx',
+                            })}
+                        >
+                            <Download aria-hidden="true" /> Excel
+                        </a>
+                    </Button>
                 </div>
+
+                <PlanillaFilterPanel
+                    cola={cola}
+                    filters={filters}
+                    stageOptions={stageOptions}
+                    activeFilters={activeFilters}
+                />
 
                 {enMostrador ? (
                     <Mostrador filas={counter} total={counterTotal} />
                 ) : enTransferencias ? (
                     <Transferencias filas={transfers} total={transfersTotal} />
                 ) : all ? (
-                    <TodasLasCuotas pagina={all} />
+                    <TodasLasCuotas pagina={all} filtered={activeFilters > 0} />
                 ) : null}
             </div>
-
-            {canSeeFilterNotes && <FilterNotesPanel />}
         </>
     );
 }
 
-function FilterNotesPanel() {
+function PlanillaFilterPanel({
+    cola,
+    filters,
+    stageOptions,
+    activeFilters,
+}: {
+    cola: Cola;
+    filters: Filters;
+    stageOptions: StageOption[];
+    activeFilters: number;
+}) {
+    const [draft, setDraft] = useState<Filters>(filters);
+    const [open, setOpen] = useState(false);
+    const change = (key: keyof Filters, value: string | boolean | string[]) =>
+        setDraft((current) => ({ ...current, [key]: value }));
+    const apply = (next: Filters) => {
+        setOpen(false);
+        router.get(planillaUrl(index().url, cola, next), {}, { replace: true });
+    };
+
     return (
-        <Sheet>
+        <Sheet
+            open={open}
+            onOpenChange={(value) => {
+                setOpen(value);
+
+                if (value) {
+                    setDraft(filters);
+                }
+            }}
+        >
             <SheetTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="fixed top-1/2 right-0 z-40 h-auto -translate-y-1/2 rounded-r-none border-r-0 bg-card px-2 py-3 text-xs shadow-raised [writing-mode:vertical-rl]"
-                >
-                    Ideas de filtros
+                <Button type="button" variant="outline" size="sm">
+                    <ListFilter aria-hidden="true" /> Filtros
+                    {activeFilters > 0 ? ` (${activeFilters})` : ''}
                 </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="overflow-y-auto">
+            <SheetContent side="right" className="overflow-y-auto sm:max-w-lg">
                 <SheetHeader className="border-b pr-12">
                     <SheetTitle>Filtros para planillas</SheetTitle>
                     <SheetDescription>
-                        Propuestas para ampliar la búsqueda y la impresión.
+                        Se muestran los criterios útiles para esta pestaña. Los
+                        filtros comunes también afectan las otras planillas.
                     </SheetDescription>
                 </SheetHeader>
-                <div className="space-y-4 px-4 text-sm leading-relaxed">
-                    <p>
-                        Agregar después filtros por{' '}
-                        <strong>expediente o beneficiario</strong> y por{' '}
-                        <strong>estado</strong>; serían los más útiles para
-                        encontrar cuotas en un listado grande.
-                    </p>
-                    <p>
-                        Luego, si hace falta, por empleador, medio y fechas.
-                        Cada filtro debería reflejarse también en el PDF.
-                    </p>
-                </div>
+                <form
+                    className="standard-form space-y-5 px-4 pb-6"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        apply(draft);
+                    }}
+                >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <FilterInput
+                            label="Expediente"
+                            value={draft.expediente}
+                            onChange={(value) => change('expediente', value)}
+                        />
+                        <FilterInput
+                            label="Beneficiario o documento"
+                            value={draft.beneficiario}
+                            onChange={(value) => change('beneficiario', value)}
+                        />
+                        <FilterInput
+                            label="Empleador"
+                            value={draft.empleador}
+                            onChange={(value) => change('empleador', value)}
+                        />
+                        {cola === 'todas' && (
+                            <FormRowField
+                                htmlFor="planilla-medio"
+                                label="Medio de pago"
+                            >
+                                <select
+                                    id="planilla-medio"
+                                    className="h-9 rounded-md border border-input bg-background px-3 font-normal"
+                                    value={draft.medio}
+                                    onChange={(event) =>
+                                        change('medio', event.target.value)
+                                    }
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="cash">Efectivo</option>
+                                    <option value="cheque">Cheque</option>
+                                    <option value="bank_transfer">
+                                        Transferencia
+                                    </option>
+                                </select>
+                            </FormRowField>
+                        )}
+                        <FormRowField
+                            htmlFor="planilla-medio-previsto"
+                            label="Medio de ingreso previsto"
+                        >
+                            <select
+                                id="planilla-medio-previsto"
+                                className="h-9 rounded-md border border-input bg-background px-3 font-normal"
+                                value={draft.medioPrevisto}
+                                onChange={(event) =>
+                                    change('medioPrevisto', event.target.value)
+                                }
+                            >
+                                <option value="">Todos</option>
+                                <option value="cash">Efectivo</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="bank">Banco</option>
+                            </select>
+                        </FormRowField>
+                    </div>
+                    {cola !== 'mostrador' && (
+                        <fieldset className="space-y-2">
+                            <legend className="text-sm font-medium">
+                                {cola === 'todas'
+                                    ? 'Situación de la cuota'
+                                    : 'Avance de la transferencia'}
+                            </legend>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                {stageOptions
+                                    .filter(
+                                        (option) =>
+                                            cola === 'todas' ||
+                                            TRANSFER_STAGES.has(option.value),
+                                    )
+                                    .map((option) => (
+                                        <label
+                                            key={option.value}
+                                            className="flex items-center gap-2 text-sm"
+                                        >
+                                            <Checkbox
+                                                checked={draft.stages.includes(
+                                                    option.value,
+                                                )}
+                                                onCheckedChange={(checked) =>
+                                                    change(
+                                                        'stages',
+                                                        checked
+                                                            ? [
+                                                                  ...draft.stages,
+                                                                  option.value,
+                                                              ]
+                                                            : draft.stages.filter(
+                                                                  (stage) =>
+                                                                      stage !==
+                                                                      option.value,
+                                                              ),
+                                                    )
+                                                }
+                                            />
+                                            {option.label}
+                                        </label>
+                                    ))}
+                            </div>
+                        </fieldset>
+                    )}
+                    {cola === 'todas' && (
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Checkbox
+                                checked={draft.retenido}
+                                onCheckedChange={(checked) =>
+                                    change('retenido', checked === true)
+                                }
+                            />
+                            Solo cuotas con pago retenido
+                        </label>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <FilterInput
+                            label="Vencimiento desde"
+                            type="date"
+                            value={draft.vencimientoDesde}
+                            onChange={(value) =>
+                                change('vencimientoDesde', value)
+                            }
+                        />
+                        <FilterInput
+                            label="Vencimiento hasta"
+                            type="date"
+                            value={draft.vencimientoHasta}
+                            onChange={(value) =>
+                                change('vencimientoHasta', value)
+                            }
+                        />
+                        {cola === 'todas' && (
+                            <FilterInput
+                                label="Pago desde"
+                                type="date"
+                                value={draft.pagoDesde}
+                                onChange={(value) => change('pagoDesde', value)}
+                            />
+                        )}
+                        {cola === 'todas' && (
+                            <FilterInput
+                                label="Pago hasta"
+                                type="date"
+                                value={draft.pagoHasta}
+                                onChange={(value) => change('pagoHasta', value)}
+                            />
+                        )}
+                        <FilterInput
+                            label="Importe mínimo"
+                            type="amount"
+                            value={draft.importeMin}
+                            onChange={(value) => change('importeMin', value)}
+                        />
+                        <FilterInput
+                            label="Importe máximo"
+                            type="amount"
+                            value={draft.importeMax}
+                            onChange={(value) => change('importeMax', value)}
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 border-t pt-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setDraft(EMPTY_FILTERS);
+                                apply(EMPTY_FILTERS);
+                            }}
+                        >
+                            Limpiar todos
+                        </Button>
+                        <Button type="submit">Aplicar filtros</Button>
+                    </div>
+                </form>
             </SheetContent>
         </Sheet>
     );
 }
 
+function FilterInput({
+    label,
+    value,
+    onChange,
+    type = 'text',
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    type?: string;
+}) {
+    const id = useId();
+
+    return (
+        <FormRowField htmlFor={id} label={label}>
+            <Input
+                id={id}
+                type={type === 'amount' ? 'text' : type}
+                inputMode={type === 'amount' ? 'decimal' : undefined}
+                placeholder={type === 'amount' ? '0,00' : undefined}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="font-normal"
+            />
+        </FormRowField>
+    );
+}
+
 function TodasLasCuotas({
     pagina,
+    filtered,
 }: {
     pagina: PaginationData & { data: AllRow[] };
+    filtered: boolean;
 }) {
     if (pagina.total === 0) {
         return (
             <Vacio
-                titulo="No hay cuotas registradas."
-                detalle="La planilla general se completa a medida que se cargan los haberes."
+                titulo={
+                    filtered
+                        ? 'No hay cuotas con estos filtros.'
+                        : 'No hay cuotas registradas.'
+                }
+                detalle={
+                    filtered
+                        ? 'Probá con otros criterios o limpiá los filtros.'
+                        : 'La planilla general se completa a medida que se cargan los haberes.'
+                }
             />
         );
     }

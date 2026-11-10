@@ -34,6 +34,7 @@ final class UnconfirmedTransferSheet
         string $total,
         CarbonImmutable $generadaEl,
         ?string $generadaPor = null,
+        ?string $appliedFilters = null,
     ): WorksheetData {
         return new WorksheetData(
             title: 'Transferencias sin confirmar',
@@ -67,7 +68,7 @@ final class UnconfirmedTransferSheet
             generatedBy: $generadaPor,
             subtitle: 'El dinero salió y el egreso todavía no está confirmado en el sistema',
             filters: 'Informadas, con débito observado o listas para validar · '
-                .'Ordenadas de la más antigua a la más reciente',
+                .'Ordenadas de la más antigua a la más reciente'.($appliedFilters === null ? '' : ' · '.$appliedFilters),
             totals: [
                 sprintf('Total sin confirmar (%d egresos)', count($filas)) => Decimal::format($total),
             ],

@@ -30,11 +30,14 @@ final class SpreadsheetWriter
      * @param  list<string>  $headers
      * @param  iterable<list<string|int|null>>  $rows
      */
-    public static function download(string $filename, array $headers, iterable $rows): StreamedResponse
+    public static function download(string $filename, array $headers, iterable $rows, ?string $description = null): StreamedResponse
     {
-        return new StreamedResponse(function () use ($headers, $rows): void {
+        return new StreamedResponse(function () use ($headers, $rows, $description): void {
             $writer = new Writer;
             $writer->openToFile('php://output');
+            if ($description !== null && $description !== '') {
+                $writer->addRow(self::row([$description]));
+            }
             $writer->addRow(self::row($headers, new Style(fontBold: true)));
 
             foreach ($rows as $row) {

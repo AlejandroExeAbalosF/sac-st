@@ -224,7 +224,7 @@ La validación registra el asiento, marca la cuota pagada y completa la Orden.
 El recibo de egreso requiere un egreso confirmado. En `/haberes/planillas` siguen
 las colas «Por entregar» y «Transferencias sin confirmar», y se puede consultar
 e imprimir «Todas las cuotas». Esta última incluye vigentes, pagadas, históricas
-y anuladas con su estado; pagina de a 50 en pantalla y el PDF incluye todas.
+y anuladas con su estado; pagina de a 50 en pantalla y las descargas incluyen todas las filas filtradas.
 El inventario distingue cuotas sin fondos imputados de las parcialmente financiadas
 (con el importe faltante), y resume qué paso falta en el ingreso, la Orden y el egreso.
 El medio de salida se muestra cuando ya puede derivarse de los fondos o del egreso;
@@ -238,8 +238,16 @@ vacías solo para las cuotas que también figuran en «Por entregar» o
 El número de talonario del recibo de egreso también admite una foto o PDF
 opcional de la hoja firmada, archivado con el recibo.
 
-Una pestaña en el borde derecho abre un panel con ideas para futuros filtros.
-Solo se ofrece a quienes tienen el rol `super-admin`; no modifica las planillas.
+El panel «Filtros» muestra expediente, beneficiario o documento, empleador,
+medio de ingreso previsto, vencimiento e importe en las tres pestañas.
+«Transferencias sin confirmar» agrega el avance de la transferencia; «Todas las
+cuotas» agrega las demás situaciones, medio de pago, pago retenido y fecha de pago.
+Cada pestaña aplica solo sus criterios disponibles a filas, cantidades y descargas;
+los filtros ocultos se conservan al cambiar de pestaña para poder volver a usarlos.
+«Planilla» abre el PDF para imprimir; «PDF» y «Excel» descargan todas las filas
+filtradas, sin el límite de 50 de la pantalla. Cada archivo indica los criterios
+aplicados. El Excel general se escribe por lotes para no cargar todas las cuotas
+en memoria.
 
 Estados, restricciones y pruebas: [egreso](haberes-reglas.md#egreso).
 
