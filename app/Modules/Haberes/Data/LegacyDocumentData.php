@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Data;
 
 use App\Modules\Haberes\Enums\LegacyDocumentKind;
 use App\Modules\Haberes\Models\LegacyDocument;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -26,12 +27,12 @@ final class LegacyDocumentData extends Data
          */
         public string $amount,
         /** La foto, si se cargó. Es opcional. */
-        public ?int $attachmentId,
+        public ?AttachmentData $attachment,
         /** Si lo trajo el registro del pago, y cae con él al anularlo. */
         public bool $belongsToSettlement,
     ) {}
 
-    public static function fromModel(LegacyDocument $documento, ?int $attachmentId): self
+    public static function fromModel(LegacyDocument $documento, ?AttachmentData $attachment): self
     {
         return new self(
             id: $documento->id,
@@ -39,7 +40,7 @@ final class LegacyDocumentData extends Data
             number: $documento->number,
             issuedOn: $documento->issued_on->format('Y-m-d'),
             amount: $documento->amount,
-            attachmentId: $attachmentId,
+            attachment: $attachment,
             belongsToSettlement: $documento->legacy_settlement_id !== null,
         );
     }

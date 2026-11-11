@@ -76,6 +76,18 @@ class CuotaHistoricaTest extends TestCase
         $this->assertSame(PaymentMedium::Cash, $registro->payment_medium);
         $this->assertSame(3, LegacyDocument::query()->where('legacy_settlement_id', $registro->id)->count());
         $this->assertSame(2, Attachment::query()->where('subject_type', AttachmentSubject::LegacyDocument->value)->count());
+
+        // Las dos fotos llegan a la ficha con lo que la miniatura necesita.
+        $this->actingAs($this->operador('administrativo'))
+            ->get(route('haberes.haber.show', [$cuota->haber->expediente, $cuota->haber]))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where(
+                "historicos.{$cuota->id}.documents",
+                fn ($papeles): bool => collect($papeles)
+                    ->pluck('attachment')
+                    ->filter()
+                    ->filter(fn (array $foto): bool => $foto['kind'] === 'image' && $foto['canOpen'] === true)
+                    ->count() === 2,
+            ));
         $this->assertSame(
             InstallmentStage::PaidBeforeOpening,
             app(InstallmentStages::class)->forMany(collect([$cuota]))[$cuota->id],

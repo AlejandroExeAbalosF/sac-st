@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Data;
 
+use App\Models\User;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Support\DisbursementReadiness;
@@ -74,7 +75,7 @@ final class InstallmentDisbursementData extends Data
         public bool $needsReceipt,
     ) {}
 
-    public static function fromReadiness(DisbursementReadiness $estado): self
+    public static function fromReadiness(DisbursementReadiness $estado, ?User $viewer): self
     {
         return new self(
             channel: $estado->channel,
@@ -85,7 +86,7 @@ final class InstallmentDisbursementData extends Data
             amount: $estado->amount,
             disbursement: $estado->disbursement === null
                 ? null
-                : DisbursementSummaryData::fromModel($estado->disbursement),
+                : DisbursementSummaryData::fromModel($estado->disbursement, $viewer),
             receipt: $estado->expenseReceipt === null
                 ? null
                 : InstallmentReceiptData::fromModel($estado->expenseReceipt),

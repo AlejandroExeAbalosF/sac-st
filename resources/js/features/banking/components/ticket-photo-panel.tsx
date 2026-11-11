@@ -1,5 +1,8 @@
 import { FileUp, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { AttachmentThumbnail } from '@/components/attachments/attachment-preview';
+import { localItem } from '@/components/attachments/types';
+import { useAttachmentViewer } from '@/components/attachments/use-attachment-viewer';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -74,6 +77,7 @@ export default function TicketPhotoPanel({
     error?: string;
 }) {
     const [encima, setEncima] = useState(false);
+    const { open, viewer } = useAttachmentViewer();
     const esPdf = foto?.type === 'application/pdf';
 
     return (
@@ -151,25 +155,33 @@ export default function TicketPhotoPanel({
                             </Button>
                         </div>
 
-                        {esPdf ? (
-                            /*
-                             * Un iframe y no un `<object>`, que la CSP prohíbe
-                             * (`object-src 'none'`). No va por `DocumentFrame`:
-                             * ese coteja una dirección del servidor, y este
-                             * archivo todavía está solo en el navegador.
-                             */
-                            <iframe
-                                src={vistaPrevia}
-                                title="Comprobante en PDF"
-                                className="h-[32rem] w-full rounded"
-                            />
-                        ) : (
-                            <img
-                                src={vistaPrevia}
-                                alt="Comprobante del depósito"
-                                className="w-full rounded"
-                            />
-                        )}
+                        {/*
+                         * Un clic abre el visor, con zoom y todas las hojas.
+                         * El PDF muestra acá su primera hoja dibujada con
+                         * pdf.js, no un `<iframe>`: así la CSP no necesita
+                         * admitir marcos `blob:`.
+                         */}
+                        <button
+                            type="button"
+                            onClick={() => open([localItem(foto)])}
+                            aria-label="Ver el comprobante en grande"
+                            className="block w-full cursor-zoom-in overflow-hidden rounded focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            {esPdf ? (
+                                <div className="aspect-[1/1.414] w-full bg-white">
+                                    <AttachmentThumbnail
+                                        item={localItem(foto)}
+                                    />
+                                </div>
+                            ) : (
+                                <img
+                                    src={vistaPrevia}
+                                    alt="Comprobante del depósito"
+                                    className="w-full rounded"
+                                />
+                            )}
+                        </button>
+                        {viewer}
 
                         <Button
                             type="button"

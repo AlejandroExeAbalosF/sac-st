@@ -98,12 +98,11 @@ return [
             'frame-ancestors' => ["'none'"],
             'object-src' => ["'none'"],
             /*
-             * `blob:` es el PDF que el operador acaba de elegir, antes de
-             * subirlo, en `TicketPhotoPanel`. Es un archivo de su propio
-             * navegador: no carga nada de otro origen, y hereda esta misma
-             * política. `object-src` sigue cerrado.
+             * Solo los documentos del propio sistema (`same_origin_frame_routes`).
+             * Un PDF recién elegido ya no se mira en un marco `blob:`: lo
+             * dibuja pdf.js, desde `public/vendor/pdfjs`, en el mismo origen.
              */
-            'frame-src' => ["'self'", 'blob:'],
+            'frame-src' => ["'self'"],
             'img-src' => ["'self'", 'data:', 'blob:'],
             'font-src' => ["'self'", 'data:'],
             /*

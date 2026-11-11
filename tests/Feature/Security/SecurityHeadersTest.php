@@ -40,13 +40,19 @@ class SecurityHeadersTest extends TestCase
         $this->assertStringContainsString("object-src 'none'", $csp);
     }
 
-    /** El PDF recién elegido se mira en un iframe propio: nada de otro origen. */
-    public function test_frames_only_admit_the_system_and_a_local_file()
+    /**
+     * Solo se enmarcan documentos del propio sistema.
+     *
+     * El PDF recién elegido ya no se mira en un marco `blob:`: lo dibuja
+     * pdf.js en la página. Un marco `blob:` abierto de más es un lugar donde
+     * mostrar contenido que el servidor nunca vio.
+     */
+    public function test_frames_only_admit_the_system()
     {
         $csp = $this->get(route('login'))->headers->get('Content-Security-Policy');
 
         $this->assertIsString($csp);
-        $this->assertStringContainsString("frame-src 'self' blob:;", $csp.';');
+        $this->assertStringContainsString("frame-src 'self';", $csp.';');
     }
 
     /**

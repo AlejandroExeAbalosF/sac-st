@@ -348,7 +348,7 @@ declare namespace App {
                     notes: string | null;
                     reportedAt: string | null;
                     transferReference: string | null;
-                    reportAttachmentId: number | null;
+                    reportAttachment: App.Modules.Shared.Data.AttachmentData | null;
                     beneficiaryCbu: string | null;
                     debitTransactionId: number | null;
                     debitDate: string | null;
@@ -649,7 +649,7 @@ declare namespace App {
                     number: string;
                     issuedOn: string;
                     amount: string;
-                    attachmentId: number | null;
+                    attachment: App.Modules.Shared.Data.AttachmentData | null;
                     belongsToSettlement: boolean;
                 };
                 export type LegacyFundsOptionsData = {

@@ -30,6 +30,7 @@ use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Shared\Enums\AttachmentKind;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
@@ -141,8 +142,11 @@ class EgresoPorTransferenciaTest extends TestCase
 
         Storage::disk($adjunto->storage_disk)->assertExists($adjunto->object_key);
 
-        $estado = InstallmentDisbursementData::fromReadiness(app(DisbursementEligibility::class)->for($cuota->refresh()));
-        $this->assertSame($adjunto->id, $estado->disbursement?->reportAttachmentId);
+        $estado = InstallmentDisbursementData::fromReadiness(app(DisbursementEligibility::class)->for($cuota->refresh()), $this->operador());
+        $this->assertSame($adjunto->id, $estado->disbursement?->reportAttachment?->id);
+        // El informe es un PDF y quien lo mira lo puede abrir: la cuota lo muestra en miniatura.
+        $this->assertSame(AttachmentKind::Pdf, $estado->disbursement?->reportAttachment?->kind);
+        $this->assertTrue($estado->disbursement?->reportAttachment?->canOpen);
     }
 
     /** Solo foto o PDF, como el resto de los papeles escaneados. */

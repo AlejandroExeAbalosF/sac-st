@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Data;
 
+use App\Models\User;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
@@ -37,7 +39,7 @@ final class DisbursementSummaryData extends Data
         'validatedBy:id,name',
         'bankTransaction:id,transaction_date,amount,operation_id,description,counterparty_name',
         'feeBankTransaction:id,amount',
-        'reportDocument',
+        'reportDocument.uploader:id,name',
     ];
 
     public function __construct(
@@ -57,7 +59,7 @@ final class DisbursementSummaryData extends Data
         /** Con qué número identificó la transferencia. */
         public ?string $transferReference,
         /** La foto o el PDF del informe, si se adjuntó. */
-        public ?int $reportAttachmentId,
+        public ?AttachmentData $reportAttachment,
         /** El CBU al que se pidió transferir, congelado. */
         public ?string $beneficiaryCbu,
         /** El débito del extracto que prueba que el dinero salió. */
@@ -83,7 +85,7 @@ final class DisbursementSummaryData extends Data
         public ?string $validatedAt,
     ) {}
 
-    public static function fromModel(Disbursement $disbursement): self
+    public static function fromModel(Disbursement $disbursement, ?User $viewer): self
     {
         $debito = $disbursement->bankTransaction;
         $comision = $disbursement->feeBankTransaction;
@@ -98,7 +100,9 @@ final class DisbursementSummaryData extends Data
             notes: $disbursement->notes,
             reportedAt: $disbursement->report_received_at === null ? null : BusinessDate::fromInstant($disbursement->report_received_at)->toDateString(),
             transferReference: $disbursement->transfer_reference,
-            reportAttachmentId: $disbursement->reportDocument?->id,
+            reportAttachment: $disbursement->reportDocument === null
+                ? null
+                : AttachmentData::fromModel($disbursement->reportDocument, $viewer),
             beneficiaryCbu: $disbursement->beneficiary_cbu_snapshot,
             debitTransactionId: $debito?->id,
             debitDate: $debito?->transaction_date?->format('Y-m-d'),

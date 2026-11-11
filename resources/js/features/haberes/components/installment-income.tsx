@@ -13,6 +13,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
 import ReasonFields from '@/components/reason-fields';
@@ -30,7 +31,6 @@ import CreditMatchDialog from '@/features/banking/components/credit-match-dialog
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { preview } from '@/routes/adjuntos';
 import { search as buscarTicket } from '@/routes/depositos';
 import { receiveAndAllocate as registrarIngreso } from '@/routes/haberes/installments';
 import { voidPaper as anularPapel } from '@/routes/haberes/installments/legacy-funds';
@@ -234,15 +234,8 @@ function ReciboDePapel({
                 <span className="font-mono text-xs tabular-nums">
                     {money(papel.amount)}
                 </span>
-                {papel.attachmentId !== null && (
-                    <a
-                        href={preview(papel.attachmentId).url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-primary hover:underline"
-                    >
-                        Ver foto
-                    </a>
+                {papel.attachment !== null && (
+                    <AttachmentMini attachment={papel.attachment} />
                 )}
                 {puedeLiberar && (
                     <Button
@@ -928,12 +921,18 @@ function Comprobante({
         return (
             <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="flex items-center gap-1.5 text-xs">
-                        <Icono className="size-3.5 shrink-0 text-success-strong" />
-                        {encontrado
-                            ? 'Comprobante cargado y encontrado en el extracto.'
-                            : 'Comprobante cargado, esperando aparecer en el extracto.'}
-                    </p>
+                    <div className="flex items-center gap-3">
+                        {/* El papel a la vista: un clic lo abre en el visor. */}
+                        {ticket.attachment !== null && (
+                            <AttachmentMini attachment={ticket.attachment} />
+                        )}
+                        <p className="flex items-center gap-1.5 text-xs">
+                            <Icono className="size-3.5 shrink-0 text-success-strong" />
+                            {encontrado
+                                ? 'Comprobante cargado y encontrado en el extracto.'
+                                : 'Comprobante cargado, esperando aparecer en el extracto.'}
+                        </p>
+                    </div>
                     <Button
                         variant="ghost"
                         size="sm"

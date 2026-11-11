@@ -822,7 +822,7 @@ final class HaberController extends Controller
              */
             'canValidateDisbursement' => request()->user()?->can('egresos.validar') ?? false,
             // Lo del sistema anterior: los papeles de cada cuota, si se pagó antes de la apertura.
-            'historicos' => app(LegacyInstallments::class)->forMany($cuotaIds),
+            'historicos' => app(LegacyInstallments::class)->forMany($cuotaIds, request()->user()),
             // El de la moneda del haber: cada caja corta en su propia apertura.
             'corteHistorico' => app(LegacyCutoff::class)->date(Currency::from($haber->currency))?->toDateString(),
             'canRecordLegacy' => $puedeRegistrarHistorico,
@@ -915,6 +915,7 @@ final class HaberController extends Controller
 
             $estados[$cuota->id] = InstallmentDisbursementData::fromReadiness(
                 $habilitacion->for($cuota, $medios[$cuota->id] ?? null),
+                request()->user(),
             );
         }
 

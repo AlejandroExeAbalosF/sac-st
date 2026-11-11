@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
-import { Ban, ImageIcon } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import Money from '@/components/money';
 import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { date } from '@/lib/format';
-import { preview } from '@/routes/adjuntos';
 import { voidMethod as anularPagoAnterior } from '@/routes/haberes/installments/legacy-settlement';
 
 type Estado = App.Modules.Haberes.Data.InstallmentLegacyData;
@@ -126,16 +126,8 @@ function FilaDePapel({ papel }: { papel: Papel }) {
             </span>
             <span className="flex items-center gap-3">
                 <Money value={papel.amount} />
-                {papel.attachmentId !== null && (
-                    <a
-                        href={preview(papel.attachmentId).url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                        <ImageIcon className="size-3.5" aria-hidden="true" />
-                        Ver foto
-                    </a>
+                {papel.attachment !== null && (
+                    <AttachmentMini attachment={papel.attachment} />
                 )}
             </span>
         </li>

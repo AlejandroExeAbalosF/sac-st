@@ -3,19 +3,18 @@ import {
     CircleCheck,
     CircleDashed,
     Eye,
-    FileText,
     HandCoins,
     Landmark,
     Megaphone,
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { date, money } from '@/lib/format';
-import { preview as verAdjunto } from '@/routes/adjuntos';
 import PayBeneficiaryDialog from './pay-beneficiary-dialog';
 import ReceiptViewerDialog from './receipt-viewer-dialog';
 import TransferDebitDialog from './transfer-debit-dialog';
@@ -376,20 +375,13 @@ function PasosDeTransferencia({ egreso }: { egreso: Egreso | null }) {
                               ? ''
                               : ` · Ref. ${egreso.transferReference}`)
                 }
-                accion={
-                    egreso?.reportAttachmentId != null && (
-                        <a
-                            href={verAdjunto(egreso.reportAttachmentId).url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="ml-1.5 inline-flex items-center gap-1 text-primary hover:underline"
-                        >
-                            <FileText className="size-3.5" aria-hidden="true" />
-                            Ver informe
-                        </a>
-                    )
-                }
             />
+            {egreso?.reportAttachment != null && (
+                <div className="flex items-center gap-2 pl-5.5 text-xs text-muted-foreground">
+                    <AttachmentMini attachment={egreso.reportAttachment} />
+                    Informe del organismo
+                </div>
+            )}
             <Paso
                 hecho={egreso?.debitTransactionId != null}
                 titulo="El débito en el extracto"

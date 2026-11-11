@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Support;
 
+use App\Models\User;
 use App\Modules\Haberes\Data\InstallmentLegacyData;
 use App\Modules\Haberes\Data\LegacyDocumentData;
 use App\Modules\Haberes\Data\LegacySettlementData;
 use App\Modules\Haberes\Models\LegacyDocument;
 use App\Modules\Haberes\Models\LegacySettlement;
 use App\Modules\Shared\Enums\AttachmentSubject;
-use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Support\Attachments;
 
 /**
  * Lo del sistema anterior de cada cuota, en unas pocas consultas.
@@ -20,13 +21,17 @@ use App\Modules\Shared\Models\Attachment;
  */
 final class LegacyInstallments
 {
-    public function __construct(private readonly InstallmentMovements $movimientos) {}
+    public function __construct(
+        private readonly InstallmentMovements $movimientos,
+        private readonly Attachments $adjuntos,
+    ) {}
 
     /**
      * @param  list<int>  $installmentIds
+     * @param  User|null  $viewer  quien mira: decide qué fotos puede abrir
      * @return array<int, InstallmentLegacyData>
      */
-    public function forMany(array $installmentIds): array
+    public function forMany(array $installmentIds, ?User $viewer): array
     {
         if ($installmentIds === []) {
             return [];
@@ -45,7 +50,12 @@ final class LegacyInstallments
             ->orderBy('id')
             ->get();
 
-        $fotos = $this->photos(array_values($documentos->pluck('id')->map(intval(...))->all()));
+        // La más reciente de cada papel: si se volvió a fotografiar, la última.
+        $fotos = $this->adjuntos->latestFor(
+            AttachmentSubject::LegacyDocument,
+            array_values($documentos->pluck('id')->map(intval(...))->all()),
+            $viewer,
+        );
         $obstaculos = $this->movimientos->obstaclesFor($installmentIds);
 
         $porCuota = [];
@@ -67,32 +77,5 @@ final class LegacyInstallments
         }
 
         return $porCuota;
-    }
-
-    /**
-     * La foto más reciente de cada papel.
-     *
-     * @param  list<int>  $documentIds
-     * @return array<int, int>
-     */
-    private function photos(array $documentIds): array
-    {
-        if ($documentIds === []) {
-            return [];
-        }
-
-        $adjuntos = Attachment::query()
-            ->where('subject_type', AttachmentSubject::LegacyDocument->value)
-            ->whereIn('subject_id', $documentIds)
-            ->orderBy('id')
-            ->get(['id', 'subject_id']);
-
-        $porPapel = [];
-
-        foreach ($adjuntos as $adjunto) {
-            $porPapel[$adjunto->subject_id] = $adjunto->id;
-        }
-
-        return $porPapel;
     }
 }
