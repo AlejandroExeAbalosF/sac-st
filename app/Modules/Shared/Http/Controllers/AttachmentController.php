@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Shared\Actions\PurgeAttachment;
 use App\Modules\Shared\Actions\RenameAttachment;
 use App\Modules\Shared\Actions\VoidAttachment;
 use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Http\Requests\AttachmentHistoryRequest;
+use App\Modules\Shared\Http\Requests\PurgeAttachmentRequest;
 use App\Modules\Shared\Http\Requests\RenameAttachmentRequest;
 use App\Modules\Shared\Http\Requests\VoidAttachmentRequest;
 use App\Modules\Shared\Models\Attachment;
@@ -61,6 +63,21 @@ final class AttachmentController extends Controller
             is_string($type) ? $type : null,
             $request->user(),
         );
+    }
+
+    /**
+     * Elimina del todo un adjunto ya anulado. El archivo se borra del disco
+     * después del commit, y si falla se reintenta.
+     */
+    public function purge(PurgeAttachmentRequest $request, Attachment $attachment, PurgeAttachment $eliminar): RedirectResponse
+    {
+        Gate::authorize('purge', $attachment);
+
+        $eliminar->handle($attachment, $request->reason(), $request->user());
+
+        Toast::success('Se eliminó el archivo.', 'En la auditoría queda qué era y por qué se eliminó.');
+
+        return back();
     }
 
     /** Anula un respaldo opcional: queda guardado, fuera de la vista. */

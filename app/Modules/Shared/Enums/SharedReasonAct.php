@@ -18,12 +18,20 @@ enum SharedReasonAct: string implements ReasonAct
     case VoidAttachment = 'void_attachment';
 
     /**
+     * Eliminar del todo un adjunto ya anulado. El motivo no tiene columna:
+     * la fila desaparece, y queda en la auditoría.
+     */
+    case PurgeAttachment = 'purge_attachment';
+
+    /**
      * @return list<SharedReasonCode>
      */
     public function codes(): array
     {
         return match ($this) {
             self::VoidAttachment => SharedReasonCode::cases(),
+            // Lo que justifica que ni siquiera quede guardado.
+            self::PurgeAttachment => [SharedReasonCode::SensitiveData, SharedReasonCode::WrongFile, SharedReasonCode::Other],
         };
     }
 

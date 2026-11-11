@@ -147,6 +147,17 @@ final class Attachment extends Model
             && in_array([$this->subject_type->value, $this->document_type], self::VOIDABLE, true);
     }
 
+    /**
+     * Si se puede eliminar del todo: solo un anulado de la lista. Primero
+     * se anula, con su motivo; eliminar es el segundo paso.
+     */
+    public function canBePurged(): bool
+    {
+        return $this->isVoided()
+            && $this->source !== AttachmentSource::Generated
+            && in_array([$this->subject_type->value, $this->document_type], self::VOIDABLE, true);
+    }
+
     /** Un adjunto anulado no se renombra: queda como estaba al anularlo. */
     public function canBeRenamed(): bool
     {

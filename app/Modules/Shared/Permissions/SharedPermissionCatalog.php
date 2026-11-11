@@ -86,6 +86,17 @@ final class SharedPermissionCatalog implements PermissionCatalogContributor
                 'adjuntos',
                 ['administrador', 'contador', 'administrativo'],
             ),
+            // Eliminar no tiene vuelta: el archivo deja de existir. Solo el
+            // administrador, y no se delega.
+            new PermissionDefinition(
+                'adjuntos.eliminar',
+                'Eliminar adjuntos anulados',
+                'Borrar del todo un adjunto ya anulado, como la nota médica de otra persona subida por error. El archivo deja de existir; en la auditoría queda qué era y por qué se eliminó.',
+                'adjuntos',
+                ['administrador'],
+                sensitive: true,
+                delegable: false,
+            ),
             // Lo reservado no circula: una nota médica, un dato sensible del
             // trabajador. Quien consulta expedientes todo el día no lo abre.
             new PermissionDefinition(

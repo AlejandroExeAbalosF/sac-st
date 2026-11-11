@@ -67,6 +67,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->middleware('can:adjuntos.anular')
         ->name('adjuntos.void');
 
+    // Eliminar del todo un anulado. Solo el administrador: `adjuntos.eliminar` no se delega.
+    Route::delete('adjuntos/{attachment}', [AttachmentController::class, 'purge'])
+        ->whereNumber('attachment')
+        ->middleware('can:adjuntos.eliminar')
+        ->name('adjuntos.purge');
+
     /*
      * Configuración del sistema.
      *

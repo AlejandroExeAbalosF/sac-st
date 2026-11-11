@@ -42,6 +42,8 @@ final class AttachmentData extends Data
         public bool $canRename,
         /** Si quien mira puede anularlo, y el archivo lo admite. */
         public bool $canVoid,
+        /** Si quien mira puede eliminarlo del todo: solo uno ya anulado. */
+        public bool $canPurge,
         /** Quién lo anuló, cuándo y por qué; nulo si está vigente. */
         public ?AttachmentVoidData $voided,
         public ?string $createdByName,
@@ -68,6 +70,7 @@ final class AttachmentData extends Data
             canOpen: $viewer !== null && Gate::forUser($viewer)->allows('view', $adjunto),
             canRename: $viewer !== null && $adjunto->canBeRenamed() && Gate::forUser($viewer)->allows('rename', $adjunto),
             canVoid: $viewer !== null && $adjunto->canBeVoided() && Gate::forUser($viewer)->allows('void', $adjunto),
+            canPurge: $viewer !== null && $adjunto->canBePurged() && Gate::forUser($viewer)->allows('purge', $adjunto),
             voided: $adjunto->voided_at === null || $adjunto->void_reason_code === null ? null : new AttachmentVoidData(
                 at: $adjunto->voided_at->toIso8601String(),
                 byName: $adjunto->voider?->name,

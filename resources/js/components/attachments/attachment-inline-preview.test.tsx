@@ -13,6 +13,7 @@ const adjunto = (cambios: Partial<Attachment> = {}): Attachment => ({
     canOpen: true,
     canRename: false,
     canVoid: false,
+    canPurge: false,
     voided: null,
     createdByName: 'Operador',
     createdAt: '2026-11-10T13:00:00Z',

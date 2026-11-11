@@ -90,14 +90,28 @@ services:
       retries: 3
       start_period: 20s
 
-  # Hoy ningún proceso encola trabajos, pero QUEUE_CONNECTION=database: el
-  # día que alguno lo haga sin un worker corriendo, los trabajos se
-  # acumularían en la tabla sin que nadie se entere.
+  # Los trabajos en cola, con QUEUE_CONNECTION=database. Hoy, el borrado del
+  # archivo de un adjunto eliminado (`DeleteAttachmentFile`). Sin un worker
+  # corriendo se acumularían en la tabla sin que nadie se entere; el
+  # barrido del servicio `scheduler` los retoma igual.
   queue:
     <<: *app
     environment:
       SACST_OPTIMIZE: "true"
     command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600", "--sleep=3", "--no-ansi"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Las tareas programadas de `routes/console.php`. Hoy, el barrido que
+  # retoma los borrados de archivos de adjuntos eliminados que quedaron
+  # pendientes: sin este servicio, un archivo que no se pudo borrar quedaría
+  # en el disco sin que nadie lo vuelva a intentar.
+  scheduler:
+    <<: *app
+    environment:
+      SACST_OPTIMIZE: "true"
+    command: ["php", "artisan", "schedule:work", "--no-ansi"]
     depends_on:
       migrate:
         condition: service_completed_successfully

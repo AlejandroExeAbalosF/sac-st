@@ -46,4 +46,10 @@ final class AttachmentPolicy
     {
         return $user->can('adjuntos.anular') && $this->view($user, $attachment);
     }
+
+    /** Eliminar del todo: hay que poder abrirlo y tener el permiso. El estado, aparte. */
+    public function purge(User $user, Attachment $attachment): bool
+    {
+        return $user->can('adjuntos.eliminar') && $this->view($user, $attachment);
+    }
 }

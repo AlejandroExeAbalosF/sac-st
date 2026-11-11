@@ -117,6 +117,8 @@ class PermissionCatalogTest extends TestCase
         sort($noDelegables);
 
         $this->assertSame([
+            // Eliminar un adjunto no tiene vuelta: solo el administrador.
+            'adjuntos.eliminar',
             'multas.corregir-pagos',
             'roles.gestionar',
             'usuarios.crear',

@@ -1,5 +1,6 @@
 import {
     Ban,
+    Trash2,
     Download,
     Lock,
     MoreVertical,
@@ -20,6 +21,7 @@ import {
     extensionOf,
     FileKindBadge,
 } from './attachment-preview';
+import { AttachmentPurgeDialog } from './attachment-purge-dialog';
 import {
     AttachmentTitleEditor,
     renameAttachment,
@@ -60,6 +62,7 @@ export function AttachmentCard({
     const [menuAbierto, setMenuAbierto] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [anulando, setAnulando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
     const anulado = attachment.voided;
     /*
      * Al cerrarse, el menú devuelve el foco a su botón. Si se eligió
@@ -220,6 +223,15 @@ export function AttachmentCard({
                                         Anular
                                     </DropdownMenuItem>
                                 )}
+                                {attachment.canPurge && (
+                                    <DropdownMenuItem
+                                        onSelect={() => setEliminando(true)}
+                                        className="text-destructive-strong focus:text-destructive-strong"
+                                    >
+                                        <Trash2 className="size-4" />
+                                        Eliminar definitivamente
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
@@ -234,6 +246,12 @@ export function AttachmentCard({
                 <AttachmentVoidDialog
                     attachment={attachment}
                     onClose={() => setAnulando(false)}
+                />
+            )}
+            {eliminando && (
+                <AttachmentPurgeDialog
+                    attachment={attachment}
+                    onClose={() => setEliminando(false)}
                 />
             )}
         </div>

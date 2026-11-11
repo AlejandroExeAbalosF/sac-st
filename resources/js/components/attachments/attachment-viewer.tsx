@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
     Ban,
+    Trash2,
     ChevronLeft,
     ChevronRight,
     Download,
@@ -27,6 +28,7 @@ import {
     extensionOf,
     FileKindBadge,
 } from './attachment-preview';
+import { AttachmentPurgeDialog } from './attachment-purge-dialog';
 import {
     AttachmentTitleEditor,
     renameAttachment,
@@ -176,6 +178,7 @@ export default function AttachmentViewer({
     const [editando, setEditando] = useState(false);
     const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
     const [anulando, setAnulando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
     // Que el menú no le devuelva el foco a su botón al elegir corregir.
     const aEditar = useRef(false);
 
@@ -261,6 +264,7 @@ export default function AttachmentViewer({
     const remoto = item?.source === 'remote' ? item.attachment : null;
     const renombrable = remoto?.canRename === true;
     const anulable = remoto?.canVoid === true;
+    const eliminable = remoto?.canPurge === true;
 
     const guardarTitulo = (valor: string | null) => {
         if (valor === null || item?.source !== 'remote') {
@@ -343,56 +347,68 @@ export default function AttachmentViewer({
                         </div>
 
                         <div className="flex items-center gap-0.5">
-                            {(renombrable || anulable) && !editando && (
-                                <>
-                                    <DropdownMenu modal={false}>
-                                        <DropdownMenuTrigger asChild>
-                                            <button
-                                                type="button"
-                                                aria-label="Acciones del archivo"
-                                                title="Acciones del archivo"
-                                                className="flex size-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
-                                            >
-                                                <MoreVertical className="size-5" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            align="end"
-                                            className="w-52"
-                                            onCloseAutoFocus={(e) => {
-                                                if (aEditar.current) {
-                                                    e.preventDefault();
-                                                    aEditar.current = false;
-                                                }
-                                            }}
-                                        >
-                                            {renombrable && (
-                                                <DropdownMenuItem
-                                                    onSelect={() => {
-                                                        aEditar.current = true;
-                                                        setEditando(true);
-                                                    }}
+                            {(renombrable || anulable || eliminable) &&
+                                !editando && (
+                                    <>
+                                        <DropdownMenu modal={false}>
+                                            <DropdownMenuTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    aria-label="Acciones del archivo"
+                                                    title="Acciones del archivo"
+                                                    className="flex size-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
                                                 >
-                                                    <Pencil className="size-4" />
-                                                    Corregir descripción
-                                                </DropdownMenuItem>
-                                            )}
-                                            {anulable && (
-                                                <DropdownMenuItem
-                                                    onSelect={() =>
-                                                        setAnulando(true)
+                                                    <MoreVertical className="size-5" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                align="end"
+                                                className="w-52"
+                                                onCloseAutoFocus={(e) => {
+                                                    if (aEditar.current) {
+                                                        e.preventDefault();
+                                                        aEditar.current = false;
                                                     }
-                                                    className="text-destructive-strong focus:text-destructive-strong"
-                                                >
-                                                    <Ban className="size-4" />
-                                                    Anular
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <span className="mx-1 h-6 w-px bg-white/15" />
-                                </>
-                            )}
+                                                }}
+                                            >
+                                                {renombrable && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() => {
+                                                            aEditar.current = true;
+                                                            setEditando(true);
+                                                        }}
+                                                    >
+                                                        <Pencil className="size-4" />
+                                                        Corregir descripción
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {anulable && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            setAnulando(true)
+                                                        }
+                                                        className="text-destructive-strong focus:text-destructive-strong"
+                                                    >
+                                                        <Ban className="size-4" />
+                                                        Anular
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {eliminable && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            setEliminando(true)
+                                                        }
+                                                        className="text-destructive-strong focus:text-destructive-strong"
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                        Eliminar definitivamente
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <span className="mx-1 h-6 w-px bg-white/15" />
+                                    </>
+                                )}
                             <ViewerButton
                                 label="Alejar (−)"
                                 onClick={() => setZoom((z) => nextZoom(z, -1))}
@@ -513,6 +529,13 @@ export default function AttachmentViewer({
                             attachment={remoto}
                             onClose={() => setAnulando(false)}
                             onVoided={onClose}
+                        />
+                    )}
+                    {eliminando && remoto !== null && (
+                        <AttachmentPurgeDialog
+                            attachment={remoto}
+                            onClose={() => setEliminando(false)}
+                            onPurged={onClose}
                         />
                     )}
                 </DialogPrimitive.Content>

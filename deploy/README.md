@@ -24,6 +24,7 @@ pasaje a HTTPS es un cambio de configuración (sección 8).
       ▼
   web (nginx) ──▶ app (php-fpm) ──▶ PostgreSQL 18 del HOST (10.200.1.1)
                   queue (worker)          │
+                  scheduler (tareas)      │
                   migrate (una vez)       └─ roles sacst_owner / sacst_app
                        │
                        └─ storage/ = SACST_STORAGE_PATH del servidor
@@ -347,12 +348,19 @@ sudo sed -n 's/^APP_KEY=base64://p' /etc/sacst/app.env | base64 -d | wc -c   # 3
 
 ```bash
 sudo deploy/bin/sacst up -d
-sudo deploy/bin/sacst ps          # app, web y queue arriba; migrate en «exited (0)»
+sudo deploy/bin/sacst ps          # app, web, queue y scheduler arriba; migrate en «exited (0)»
 ```
 
 El orden es automático: `migrate` corre las migraciones y siembra el catálogo
 (permisos, series, cajas y etiquetas), termina, y recién entonces arrancan
-`app` y `queue`. `web` espera a que `app` esté sano.
+`app`, `queue` y `scheduler`. `web` espera a que `app` esté sano.
+
+`scheduler` corre las tareas programadas de `routes/console.php`
+(`schedule:work`). Hoy es una: el barrido que retoma el borrado del archivo de
+un adjunto eliminado que quedó pendiente —si el disco falló o el proceso se
+cortó después del commit—. Sin él, ese archivo quedaría en el disco sin que
+nadie lo vuelva a intentar. Desde la versión que lo trae, actualizar incluye
+levantarlo: `up -d` lo crea solo.
 
 ### 3.5 Primer administrador
 
@@ -407,7 +415,7 @@ responde 400 a cualquier otro, así que `APP_URL` va con la IP y el puerto:
 
 ```bash
 sudo sed -i 's|^APP_URL=.*|APP_URL=http://<IP_DEL_SERVIDOR>:8080|' /etc/sacst/app.env
-sudo deploy/bin/sacst up -d --force-recreate app queue
+sudo deploy/bin/sacst up -d --force-recreate app queue scheduler
 ```
 
 La IP del proxy tampoco hace falta todavía: `SACST_DC_PROXY_IP` puede quedar en

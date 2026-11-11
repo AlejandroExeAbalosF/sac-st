@@ -36,6 +36,25 @@ final class SharedAuditCatalog implements AuditCatalogContributor
                 AuditSeverity::Critical,
                 metadata: ['motivo' => 'Motivo', 'sujeto' => 'Lo que documentaba'],
             ),
+            // Sin vuelta: el archivo deja de existir. Lo que era queda acá.
+            new AuditActionDefinition(
+                'adjunto.eliminado',
+                'Se eliminó el adjunto anulado',
+                'Adjuntos',
+                AuditSeverity::Critical,
+                metadata: [
+                    'motivo' => 'Motivo',
+                    'titulo' => 'Descripción',
+                    'archivo' => 'Archivo',
+                    'sujeto' => 'Lo que documentaba',
+                    'tipo' => 'Tipo de documento',
+                    'mime' => 'Formato',
+                    'peso' => 'Peso en bytes',
+                    'sha256' => 'Huella',
+                    'subido_por' => 'Lo subió',
+                    'anulacion' => 'Motivo de la anulación',
+                ],
+            ),
             new AuditActionDefinition('persona.corregida', 'Se corrigió la ficha de la persona', 'Personas'),
             new AuditActionDefinition(
                 'persona.datos-completados',

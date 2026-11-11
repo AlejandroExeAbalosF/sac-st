@@ -1484,6 +1484,7 @@ declare namespace App {
                     canOpen: boolean;
                     canRename: boolean;
                     canVoid: boolean;
+                    canPurge: boolean;
                     voided: App.Modules.Shared.Data.AttachmentVoidData | null;
                     createdByName: string | null;
                     createdAt: string;
@@ -1662,7 +1663,8 @@ declare namespace App {
                     'issued' | 'voided' | 'spoiled' | 'replaced';
                 export type ReceiptType = 'income' | 'expense';
                 export type SeriesOrigin = 'system' | 'talonario_loaded';
-                export type SharedReasonAct = 'void_attachment';
+                export type SharedReasonAct =
+                    'void_attachment' | 'purge_attachment';
                 export type SharedReasonCode =
                     | 'wrong_file'
                     | 'wrong_subject'

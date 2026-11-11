@@ -123,6 +123,18 @@ prop compartida `attachmentReasons`, no en `motivos`). Queda en la auditoría co
 `adjunto.anulado`, crítico. Al anular, el visor se cierra: la pantalla de atrás se
 recarga, y su copia de los archivos ya no dice la verdad.
 
+**Eliminar definitivamente es el segundo paso, y solo de un anulado.** Lo hace el
+administrador (`adjuntos.eliminar`, sensible y no delegable), desde el menú ⋮ de la
+tarjeta o del visor de un anulado, con un motivo de
+`SharedReasonAct::PurgeAttachment`. `PurgeAttachment` audita lo que era
+(`adjunto.eliminado`, crítico: descripción, archivo, huella, sujeto, quién lo subió y
+los dos motivos), anota el borrado del archivo en `attachment_file_deletions` y
+elimina la fila por `purge_attachment()`, todo en una transacción. La base solo
+borra un anulado de la lista, y solo si el borrado del archivo ya está anotado. El
+archivo se borra después del commit (`DeleteAttachmentFile`, en cola) y la tarea
+se da por cumplida solo si el archivo **ya no existe**; si falla, el barrido
+`attachments:sweep-deletions` (cada hora, servicio `scheduler`) la retoma.
+
 Donde se muestra un archivo solo —el ticket de una cuota, la foto de un papel, el
 informe del egreso, la foto del talonario— va `AttachmentHistoryButton`, con el
 `AttachmentHistoryData` del DTO: con el único anulado no queda miniatura, y el
