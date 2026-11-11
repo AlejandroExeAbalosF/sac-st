@@ -78,6 +78,7 @@ declare namespace App {
                     notes: string | null;
                     creditedOn: string | null;
                     ticketAttachment: App.Modules.Shared.Data.AttachmentData | null;
+                    ticketHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     shares: App.Modules.Aranceles.Data.FeeCashShareData[];
                 };
                 export type FeeTypeData = {

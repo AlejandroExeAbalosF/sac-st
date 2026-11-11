@@ -144,13 +144,13 @@ final class DepositTicketLinks
      * @param  list<int>  $installmentIds
      * @return array<int, AttachmentHistoryData> id de ticket => su historial
      */
-    public function attachmentHistory(array $installmentIds): array
+    public function attachmentHistory(array $installmentIds, ?User $viewer): array
     {
         if ($installmentIds === []) {
             return [];
         }
 
-        return app(Attachments::class)->historyFor(AttachmentSubject::DepositTicket, $this->ticketsOf($installmentIds));
+        return app(Attachments::class)->historyFor(AttachmentSubject::DepositTicket, $this->ticketsOf($installmentIds), $viewer);
     }
 
     /**

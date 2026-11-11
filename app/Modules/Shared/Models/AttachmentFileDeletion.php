@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $requested_by
  * @property CarbonInterface $requested_at
  * @property CarbonInterface|null $deleted_at
+ * @property CarbonInterface|null $kept_at
  * @property int $attempts
  * @property string|null $last_error
  */
@@ -38,7 +39,7 @@ final class AttachmentFileDeletion extends Model
      */
     public function scopePending(Builder $query): Builder
     {
-        return $query->whereNull('deleted_at');
+        return $query->whereNull('deleted_at')->whereNull('kept_at');
     }
 
     /** @return array<string, string> */
@@ -47,6 +48,7 @@ final class AttachmentFileDeletion extends Model
         return [
             'requested_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'kept_at' => 'datetime',
             'attempts' => 'integer',
         ];
     }

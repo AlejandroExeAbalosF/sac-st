@@ -90,8 +90,15 @@ final class FeeDeposits
             $viewer,
             'cash_transfer_ticket',
         );
+        // Cuántos tickets se cargaron: el historial deja ver las cargas anteriores.
+        $historiales = app(Attachments::class)->historyFor(
+            AttachmentSubject::CashTransfer,
+            $traslados->modelKeys(),
+            $viewer,
+            'cash_transfer_ticket',
+        );
 
-        return array_values($traslados->map(function (CashToBankTransfer $t) use ($cobros, $comprobantes): FeeDepositData {
+        return array_values($traslados->map(function (CashToBankTransfer $t) use ($cobros, $comprobantes, $historiales): FeeDepositData {
 
             return new FeeDepositData(
                 id: $t->id,
@@ -107,6 +114,7 @@ final class FeeDeposits
                 notes: $t->notes,
                 creditedOn: $t->creditEvent?->event_date->toDateString(),
                 ticketAttachment: $comprobantes[$t->id] ?? null,
+                ticketHistory: $historiales[$t->id] ?? null,
                 shares: array_values($t->items
                     ->sortBy('id')
                     ->map(fn ($item): FeeCashShareData => $this->parte($item->fundReceipt, $item->amount, $cobros))

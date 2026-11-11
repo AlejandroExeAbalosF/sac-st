@@ -51,34 +51,56 @@ class EliminacionDeAdjuntosTest extends TestCase
     public function test_un_vigente_no_se_elimina_ni_con_la_funcion(): void
     {
         $adjunto = $this->adjunto();
-        $this->anotarBorrado($adjunto);
 
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('Solo se elimina un adjunto anulado');
 
-        DB::select('SELECT purge_attachment(?)', [$adjunto->id]);
+        DB::select('SELECT purge_attachment(?, ?)', [$adjunto->id, $this->operador('administrador')->id]);
     }
 
-    /** Sin la tarea de borrado anotada, el archivo quedaría huérfano. */
-    public function test_la_base_exige_anotar_el_borrado_del_archivo(): void
+    /**
+     * La tarea de borrado la anota la base a partir de la fila que elimina:
+     * nadie manda a borrar el archivo de un adjunto que sigue existiendo.
+     */
+    public function test_no_se_anota_el_borrado_de_un_archivo_en_uso(): void
     {
         $adjunto = $this->anulado();
 
         $this->expectException(QueryException::class);
-        $this->expectExceptionMessage('anotar el borrado de su archivo');
+        $this->expectExceptionMessage('lo usa un adjunto');
 
-        DB::select('SELECT purge_attachment(?)', [$adjunto->id]);
+        AttachmentFileDeletion::query()->create([
+            'attachment_id' => $adjunto->id,
+            'disk' => 'local',
+            'object_key' => $adjunto->object_key,
+            'requested_by' => $this->operador('administrador')->id,
+        ]);
+    }
+
+    /** Si otro adjunto comparte el archivo, se elimina la fila y el archivo se queda. */
+    public function test_un_archivo_compartido_no_se_manda_a_borrar(): void
+    {
+        $adjunto = $this->anulado();
+        $otro = Attachment::query()->create([
+            ...collect($adjunto->getAttributes())->only(['subject_type', 'subject_id', 'document_type', 'title', 'storage_disk', 'object_key', 'original_filename', 'mime_type', 'size_bytes', 'sha256', 'source'])->all(),
+        ]);
+
+        app(PurgeAttachment::class)->handle($adjunto, $this->motivo(), $this->operador('administrador'));
+
+        $this->assertNull(Attachment::query()->find($adjunto->id));
+        $this->assertNotNull($otro->fresh());
+        $this->assertSame(0, AttachmentFileDeletion::query()->count());
+        Storage::disk('local')->assertExists($adjunto->object_key);
     }
 
     public function test_una_tarea_de_borrado_solo_anota_sus_intentos(): void
     {
-        $adjunto = $this->anulado();
-        $tarea = $this->anotarBorrado($adjunto);
+        $tarea = $this->tareaHuerfana();
 
         DB::table('attachment_file_deletions')->where('id', $tarea->id)->update(['attempts' => 1, 'last_error' => 'sin disco']);
         DB::table('attachment_file_deletions')->where('id', $tarea->id)->update(['attempts' => 2, 'deleted_at' => now()]);
 
-        foreach ([['object_key' => 'otro'], ['attempts' => 1], ['deleted_at' => null]] as $cambio) {
+        foreach ([['object_key' => 'otro'], ['attempts' => 1], ['deleted_at' => null], ['kept_at' => now()]] as $cambio) {
             try {
                 DB::transaction(fn () => DB::table('attachment_file_deletions')->where('id', $tarea->id)->update($cambio));
                 $this->fail('La tarea dejó cambiar '.json_encode($cambio));
@@ -107,7 +129,9 @@ class EliminacionDeAdjuntosTest extends TestCase
 
         $this->assertNull(Attachment::query()->find($adjunto->id));
 
+        // La anotó la base, a partir de la fila que eliminó.
         $tarea = AttachmentFileDeletion::query()->sole();
+        $this->assertSame($adjunto->id, $tarea->attachment_id);
         $this->assertSame($adjunto->object_key, $tarea->object_key);
         $this->assertSame($admin->id, $tarea->requested_by);
         Queue::assertPushed(DeleteAttachmentFile::class, fn (DeleteAttachmentFile $job): bool => $job->deletionId === $tarea->id);
@@ -183,8 +207,7 @@ class EliminacionDeAdjuntosTest extends TestCase
     /** Que `delete()` no falle no alcanza: el archivo tiene que no estar. */
     public function test_un_archivo_que_sigue_en_el_disco_deja_la_tarea_pendiente(): void
     {
-        $adjunto = $this->anulado();
-        $tarea = $this->anotarBorrado($adjunto);
+        $tarea = $this->tareaHuerfana();
 
         $disco = Mockery::mock(Filesystem::class);
         $disco->shouldReceive('delete')->andReturn(false);
@@ -199,16 +222,66 @@ class EliminacionDeAdjuntosTest extends TestCase
         $this->assertNotNull($pendiente?->last_error);
     }
 
+    /**
+     * Un archivo que, al procesar la tarea, vuelve a estar en uso se
+     * conserva: el borrado nunca confía solo en que la tarea sea correcta.
+     */
+    public function test_un_archivo_en_uso_al_procesarse_se_conserva(): void
+    {
+        $tarea = $this->tareaHuerfana();
+        Attachment::query()->create([
+            'subject_type' => AttachmentSubject::DepositTicket,
+            'subject_id' => 2,
+            'document_type' => 'deposit_ticket',
+            'title' => 'Otro',
+            'storage_disk' => 'local',
+            'object_key' => $tarea->object_key,
+            'original_filename' => 'otro.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 9,
+            'sha256' => hash('sha256', 'otro'),
+            'source' => 'scanned',
+        ]);
+
+        $this->assertTrue(app(AttachmentFileRemover::class)->process($tarea));
+
+        Storage::disk('local')->assertExists($tarea->object_key);
+        $cerrada = $tarea->fresh();
+        $this->assertNotNull($cerrada?->kept_at);
+        $this->assertNull($cerrada?->deleted_at);
+    }
+
     /** El barrido retoma lo que quedó pendiente si el proceso se cortó. */
     public function test_el_barrido_retoma_los_borrados_pendientes(): void
     {
-        $adjunto = $this->anulado();
-        $tarea = $this->anotarBorrado($adjunto);
+        $tarea = $this->tareaHuerfana();
 
         $this->artisan('attachments:sweep-deletions')->assertSuccessful();
 
-        Storage::disk('local')->assertMissing($adjunto->object_key);
+        Storage::disk('local')->assertMissing($tarea->object_key);
         $this->assertNotNull($tarea->fresh()?->deleted_at);
+    }
+
+    /**
+     * Más de un lote: el conjunto de pendientes se achica mientras se
+     * recorre, y paginar por desplazamiento salteaba tareas.
+     */
+    public function test_el_barrido_no_saltea_tareas_de_un_lote_al_otro(): void
+    {
+        $solicitante = $this->operador('administrador')->id;
+        $filas = [];
+
+        for ($i = 0; $i < 1001; $i++) {
+            $filas[] = ['attachment_id' => 100000 + $i, 'disk' => 'local', 'object_key' => 'ya-no-esta/'.$i, 'requested_by' => $solicitante];
+        }
+
+        foreach (array_chunk($filas, 500) as $lote) {
+            DB::table('attachment_file_deletions')->insert($lote);
+        }
+
+        $this->artisan('attachments:sweep-deletions')->assertSuccessful();
+
+        $this->assertSame(0, AttachmentFileDeletion::query()->pending()->count());
     }
 
     /* ── Andamiaje ───────────────────────────────────────────────────── */
@@ -218,12 +291,16 @@ class EliminacionDeAdjuntosTest extends TestCase
         return new Reason(SharedReasonCode::SensitiveData);
     }
 
-    private function anotarBorrado(Attachment $adjunto): AttachmentFileDeletion
+    /** Una tarea pendiente cuyo archivo ya no usa ningún adjunto, con el archivo en el disco. */
+    private function tareaHuerfana(): AttachmentFileDeletion
     {
+        $clave = 'deposit_ticket/huerfano-'.Str::random(8).'.pdf';
+        Storage::disk('local')->put($clave, 'contenido');
+
         return AttachmentFileDeletion::query()->create([
-            'attachment_id' => $adjunto->id,
+            'attachment_id' => 999999,
             'disk' => 'local',
-            'object_key' => $adjunto->object_key,
+            'object_key' => $clave,
             'requested_by' => $this->operador('administrador')->id,
         ]);
     }

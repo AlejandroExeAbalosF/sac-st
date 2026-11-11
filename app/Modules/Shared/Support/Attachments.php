@@ -122,12 +122,15 @@ final class Attachments
      * una cuota, la foto de un papel—: si se anula el único, la miniatura
      * desaparece, y sin este dato no quedaría desde dónde llegar a él.
      *
+     * A quien no puede ver adjuntos no se le da nada: el historial se abre
+     * con `adjuntos.ver`, y ofrecerle el botón terminaba en un 403.
+     *
      * @param  array<int>  $subjectIds
      * @return array<int, AttachmentHistoryData> por id del sujeto; solo los que tienen alguno
      */
-    public function historyFor(AttachmentSubject $subject, array $subjectIds, ?string $documentType = null): array
+    public function historyFor(AttachmentSubject $subject, array $subjectIds, ?User $viewer, ?string $documentType = null): array
     {
-        if ($subjectIds === []) {
+        if ($subjectIds === [] || $viewer === null || ! $viewer->can('adjuntos.ver')) {
             return [];
         }
 

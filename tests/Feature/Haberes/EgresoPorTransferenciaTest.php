@@ -196,7 +196,7 @@ class EgresoPorTransferenciaTest extends TestCase
 
         $this->assertSame($primero->id, $estado()?->reportAttachment?->id);
 
-        $historial = app(Attachments::class)->historyFor(AttachmentSubject::Disbursement, [$egreso->id], Disbursement::REPORT_DOCUMENT_TYPE)[$egreso->id];
+        $historial = app(Attachments::class)->historyFor(AttachmentSubject::Disbursement, [$egreso->id], $this->operador(), Disbursement::REPORT_DOCUMENT_TYPE)[$egreso->id];
         $this->assertSame([2, 1], [$historial->total, $historial->voided]);
     }
 

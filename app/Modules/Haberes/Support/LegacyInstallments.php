@@ -59,6 +59,7 @@ final class LegacyInstallments
         $historiales = $this->adjuntos->historyFor(
             AttachmentSubject::LegacyDocument,
             array_values($documentos->pluck('id')->map(intval(...))->all()),
+            $viewer,
         );
         $obstaculos = $this->movimientos->obstaclesFor($installmentIds);
 

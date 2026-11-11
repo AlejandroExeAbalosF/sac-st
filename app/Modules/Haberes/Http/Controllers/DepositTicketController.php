@@ -82,6 +82,7 @@ final class DepositTicketController extends Controller
         $historiales = $adjuntos->historyFor(
             AttachmentSubject::DepositTicket,
             array_map(fn (DepositTicket $t): int => $t->id, $tickets->items()),
+            $request->user(),
         );
 
         $tickets->through(fn (DepositTicket $t): DepositTicketData => DepositTicketData::fromModel($t, $fotos[$t->id] ?? null, $historiales[$t->id] ?? null));
@@ -272,7 +273,7 @@ final class DepositTicketController extends Controller
             'ticket' => DepositTicketData::fromModel(
                 $ticket,
                 $adjuntos->latestOf(AttachmentSubject::DepositTicket, $ticket->id, $request->user()),
-                $adjuntos->historyFor(AttachmentSubject::DepositTicket, [$ticket->id])[$ticket->id] ?? null,
+                $adjuntos->historyFor(AttachmentSubject::DepositTicket, [$ticket->id], $request->user())[$ticket->id] ?? null,
             ),
             'candidates' => array_map(
                 fn (TicketCandidate $c): TicketCandidateData => TicketCandidateData::fromCandidate($c),

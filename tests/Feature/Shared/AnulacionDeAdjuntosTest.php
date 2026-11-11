@@ -238,7 +238,7 @@ class AnulacionDeAdjuntosTest extends TestCase
 
         $this->assertSame($anterior->id, $adjuntos->latestOf(AttachmentSubject::DepositTicket, 7, null)?->id);
 
-        $historial = $adjuntos->historyFor(AttachmentSubject::DepositTicket, [7])[7];
+        $historial = $adjuntos->historyFor(AttachmentSubject::DepositTicket, [7], $this->operador())[7];
         $this->assertSame(2, $historial->total);
         $this->assertSame(1, $historial->voided);
     }
@@ -256,6 +256,20 @@ class AnulacionDeAdjuntosTest extends TestCase
             ->assertJsonPath('0.voided.reason', 'Se subió el archivo equivocado')
             ->assertJsonPath('0.canOpen', true)
             ->assertJsonPath('0.canVoid', false);
+    }
+
+    /**
+     * Sin `adjuntos.ver` la pantalla no recibe el conteo: ofrecer el botón
+     * terminaba en un 403 al abrirlo.
+     */
+    public function test_a_quien_no_ve_adjuntos_no_se_le_entrega_el_historial(): void
+    {
+        $this->adjunto(sujeto: 5);
+        $adjuntos = app(Attachments::class);
+
+        $this->assertSame([], $adjuntos->historyFor(AttachmentSubject::DepositTicket, [5], User::factory()->create()));
+        $this->assertSame([], $adjuntos->historyFor(AttachmentSubject::DepositTicket, [5], null));
+        $this->assertSame(1, $adjuntos->historyFor(AttachmentSubject::DepositTicket, [5], $this->operador('consulta'))[5]->total);
     }
 
     public function test_sin_permiso_de_ver_adjuntos_no_hay_historial(): void

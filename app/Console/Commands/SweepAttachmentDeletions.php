@@ -27,7 +27,12 @@ final class SweepAttachmentDeletions extends Command
         $borrados = 0;
         $pendientes = 0;
 
-        AttachmentFileDeletion::query()->pending()->orderBy('id')->each(function (AttachmentFileDeletion $tarea) use ($remover, &$borrados, &$pendientes): void {
+        /*
+         * Por id y no por desplazamiento: el conjunto de pendientes se achica
+         * a medida que se cumplen, y paginar con OFFSET saltaba tareas del
+         * lote siguiente; terminaba con éxito dejando algunas sin intentar.
+         */
+        AttachmentFileDeletion::query()->pending()->eachById(function (AttachmentFileDeletion $tarea) use ($remover, &$borrados, &$pendientes): void {
             $remover->process($tarea) ? $borrados++ : $pendientes++;
         });
 

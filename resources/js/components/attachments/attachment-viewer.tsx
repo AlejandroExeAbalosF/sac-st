@@ -35,7 +35,7 @@ import {
 } from './attachment-title-editor';
 import { AttachmentVoidDialog } from './attachment-void-dialog';
 import { ImageStage } from './image-stage';
-import type { ViewerItem } from './types';
+import type { Attachment, ViewerItem } from './types';
 import { downloadUrl, previewUrl } from './types';
 import { useObjectUrl } from './use-object-url';
 
@@ -177,8 +177,14 @@ export default function AttachmentViewer({
     const [titulos, setTitulos] = useState<Record<string, string>>({});
     const [editando, setEditando] = useState(false);
     const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
-    const [anulando, setAnulando] = useState(false);
-    const [eliminando, setEliminando] = useState(false);
+    /*
+     * El archivo sobre el que se abrió cada diálogo, fijado al abrirlo. El
+     * visor puede cambiar de archivo mientras el diálogo está abierto; si el
+     * diálogo leyera el actual, anularía o eliminaría otro.
+     */
+    const [anulando, setAnulando] = useState<Attachment | null>(null);
+    const [eliminando, setEliminando] = useState<Attachment | null>(null);
+    const dialogoAbierto = anulando !== null || eliminando !== null;
     // Que el menú no le devuelva el foco a su botón al elegir corregir.
     const aEditar = useRef(false);
 
@@ -231,8 +237,26 @@ export default function AttachmentViewer({
         }
     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-        if (e.target instanceof HTMLInputElement) {
+    const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+        /*
+         * Los atajos son del visor y de nada más. React hace subir los
+         * eventos de un diálogo en portal por el árbol de componentes: sin
+         * esto, una flecha o una «R» escritas en el motivo cambiaban de
+         * archivo o rotaban la foto.
+         */
+        const destino = e.target;
+        const escribe =
+            destino instanceof HTMLInputElement ||
+            destino instanceof HTMLTextAreaElement ||
+            destino instanceof HTMLSelectElement ||
+            (destino instanceof HTMLElement && destino.isContentEditable);
+
+        if (
+            dialogoAbierto ||
+            escribe ||
+            !(destino instanceof Node) ||
+            !e.currentTarget.contains(destino)
+        ) {
             return;
         }
 
@@ -385,7 +409,7 @@ export default function AttachmentViewer({
                                                 {anulable && (
                                                     <DropdownMenuItem
                                                         onSelect={() =>
-                                                            setAnulando(true)
+                                                            setAnulando(remoto)
                                                         }
                                                         className="text-destructive-strong focus:text-destructive-strong"
                                                     >
@@ -396,7 +420,9 @@ export default function AttachmentViewer({
                                                 {eliminable && (
                                                     <DropdownMenuItem
                                                         onSelect={() =>
-                                                            setEliminando(true)
+                                                            setEliminando(
+                                                                remoto,
+                                                            )
                                                         }
                                                         className="text-destructive-strong focus:text-destructive-strong"
                                                     >
@@ -524,17 +550,17 @@ export default function AttachmentViewer({
                      * sin ese archivo, y la copia que tiene el visor ya no
                      * dice la verdad.
                      */}
-                    {anulando && remoto !== null && (
+                    {anulando !== null && (
                         <AttachmentVoidDialog
-                            attachment={remoto}
-                            onClose={() => setAnulando(false)}
+                            attachment={anulando}
+                            onClose={() => setAnulando(null)}
                             onVoided={onClose}
                         />
                     )}
-                    {eliminando && remoto !== null && (
+                    {eliminando !== null && (
                         <AttachmentPurgeDialog
-                            attachment={remoto}
-                            onClose={() => setEliminando(false)}
+                            attachment={eliminando}
+                            onClose={() => setEliminando(null)}
                             onPurged={onClose}
                         />
                     )}

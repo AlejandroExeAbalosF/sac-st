@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentLink } from '@/components/attachments/attachment-link';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
@@ -278,6 +279,10 @@ function FilaDeDeposito({
                         <Paperclip className="size-3" aria-hidden="true" />
                         Ver comprobante
                     </AttachmentLink>
+                    <AttachmentHistoryButton
+                        history={deposito.ticketHistory}
+                        hasCurrent={deposito.ticketAttachment !== null}
+                    />
                     {deposito.notes && <span>{deposito.notes}</span>}
                 </p>
             )}

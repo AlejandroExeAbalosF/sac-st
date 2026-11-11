@@ -726,7 +726,7 @@ final class HaberController extends Controller
                 mediums: app(InstallmentFunding::class)->mediumForMany($cuotaIds),
                 ticketReceipts: app(DepositTicketLinks::class)->receipts($cuotaIds),
                 ticketAttachments: app(DepositTicketLinks::class)->attachments($cuotaIds, request()->user()),
-                ticketAttachmentHistory: app(DepositTicketLinks::class)->attachmentHistory($cuotaIds),
+                ticketAttachmentHistory: app(DepositTicketLinks::class)->attachmentHistory($cuotaIds, request()->user()),
                 ticketsBeforeOpening: app(DepositTicketLinks::class)->beforeOpening($cuotaIds),
                 stages: app(InstallmentStages::class)->forMany($haber->installments),
                 lastChange: app(LastChanges::class)->for(
@@ -928,6 +928,7 @@ final class HaberController extends Controller
                 fn ($estado): ?int => $estado->disbursement?->id,
                 $habilitaciones,
             ))),
+            request()->user(),
             Disbursement::REPORT_DOCUMENT_TYPE,
         );
 

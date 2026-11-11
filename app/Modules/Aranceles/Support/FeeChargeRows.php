@@ -80,7 +80,7 @@ final class FeeChargeRows
             'talonario_photo',
         );
         // Cuántas fotos tiene cada recibo: con la única anulada, el camino a ella.
-        $historiales = $this->adjuntos->historyFor(AttachmentSubject::Receipt, array_values($cobros->flatMap(fn (FeeCharge $c) => $c->chargeReceipts->pluck('receipt_id'))->unique()->all()), 'talonario_photo');
+        $historiales = $this->adjuntos->historyFor(AttachmentSubject::Receipt, array_values($cobros->flatMap(fn (FeeCharge $c) => $c->chargeReceipts->pluck('receipt_id'))->unique()->all()), $viewer, 'talonario_photo');
         // En orden, el último pisa a los anteriores.
         $comprobantes = FeeChargeProof::query()->whereIn('fee_charge_id', $ids)->orderBy('id')->get()->keyBy('fee_charge_id');
         $fotosDeComprobantes = $this->adjuntos->forIds(array_values($comprobantes->pluck('attachment_id')->all()), $viewer);

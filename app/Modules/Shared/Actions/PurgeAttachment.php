@@ -7,7 +7,6 @@ namespace App\Modules\Shared\Actions;
 use App\Models\User;
 use App\Modules\Shared\Jobs\DeleteAttachmentFile;
 use App\Modules\Shared\Models\Attachment;
-use App\Modules\Shared\Models\AttachmentFileDeletion;
 use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -18,10 +17,12 @@ use Illuminate\Validation\ValidationException;
  * archivo.
  *
  * En una transacción: relee la fila bloqueada, valida estado y permiso,
- * audita lo que era —el archivo deja de existir—, anota el borrado del
- * archivo y elimina la fila por `purge_attachment()`. El archivo se borra
- * después del commit (`DeleteAttachmentFile`); si falla, la tarea queda
- * pendiente y la retoma el barrido programado.
+ * audita lo que era —el archivo deja de existir— y elimina la fila por
+ * `purge_attachment()`, que anota ella misma el borrado del archivo a
+ * partir de la fila eliminada. El archivo se borra después del commit
+ * (`DeleteAttachmentFile`); si falla, la tarea queda pendiente y la retoma
+ * el barrido programado. Si otro adjunto comparte el archivo, no hay tarea:
+ * el archivo se queda.
  */
 final class PurgeAttachment
 {
@@ -29,7 +30,7 @@ final class PurgeAttachment
 
     public function handle(Attachment $attachment, Reason $reason, User $actor): void
     {
-        $tarea = DB::transaction(function () use ($attachment, $reason, $actor): AttachmentFileDeletion {
+        $tarea = DB::transaction(function () use ($attachment, $reason, $actor): ?int {
             $adjunto = Attachment::query()->with('uploader:id,name')->lockForUpdate()->findOrFail($attachment->id);
 
             if (! $adjunto->canBePurged()) {
@@ -58,18 +59,13 @@ final class PurgeAttachment
                 actorId: $actor->id,
             );
 
-            $tarea = AttachmentFileDeletion::query()->create([
-                'attachment_id' => $adjunto->id,
-                'disk' => $adjunto->storage_disk,
-                'object_key' => $adjunto->object_key,
-                'requested_by' => $actor->id,
-            ]);
+            $tarea = DB::selectOne('SELECT purge_attachment(?, ?) AS tarea', [$adjunto->id, $actor->id])->tarea;
 
-            DB::select('SELECT purge_attachment(?)', [$adjunto->id]);
-
-            return $tarea;
+            return $tarea === null ? null : (int) $tarea;
         });
 
-        DeleteAttachmentFile::dispatch($tarea->id)->afterCommit();
+        if ($tarea !== null) {
+            DeleteAttachmentFile::dispatch($tarea)->afterCommit();
+        }
     }
 }
