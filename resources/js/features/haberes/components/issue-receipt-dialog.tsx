@@ -1,11 +1,9 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { ChevronRight, FileText, Printer } from 'lucide-react';
+import { FileText, Printer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
-import ReasonFields from '@/components/reason-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -29,8 +27,9 @@ import { businessToday, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { receipt as emitirRecibo } from '@/routes/haberes/installments';
 import { preview as previaDelRecibo } from '@/routes/haberes/installments/receipt';
-import { importeMayorDelCobro } from '../importe-mayor';
+import { importeMayor } from '../importe-mayor';
 import DocumentFrame, { HOJA_ALTO_A5 } from './document-frame';
+import ExcessAmountSection from './excess-amount-section';
 import TalonarioHint from './talonario-hint';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
@@ -124,9 +123,9 @@ export default function IssueReceiptDialog({
     const {
         total: totalMayor,
         excedente,
-        aCobrar,
+        importe: aCobrar,
         incompleto: importeMayorIncompleto,
-    } = importeMayorDelCobro(
+    } = importeMayor(
         conImporteMayor,
         form.data.excessTotal,
         cuota.amountDue,
@@ -403,7 +402,9 @@ export default function IssueReceiptDialog({
                                     )}
 
                                     {puedeRegistrarImporteMayor && (
-                                        <ImporteMayor
+                                        <ExcessAmountSection
+                                            titulo="Entró más de lo que se debe"
+                                            etiquetaTotal="Total recibido"
                                             cuota={cuota}
                                             abierto={conImporteMayor}
                                             onAbrir={setConImporteMayor}
@@ -678,118 +679,5 @@ function Opcion({
         >
             {etiqueta}
         </button>
-    );
-}
-
-/**
- * «Entró más de lo que se debe», dentro del cobro.
- *
- * Plegado no cambia nada. Desplegado, el total que se escribe es lo que se
- * cobra y lo que dice el recibo, y la diferencia con lo que se debe queda
- * como excedente recibido de la cuota, con su motivo.
- */
-function ImporteMayor({
-    cuota,
-    abierto,
-    onAbrir,
-    total,
-    onTotal,
-    excedente,
-    incompleto,
-    motivo,
-    detalle,
-    onMotivo,
-    onDetalle,
-    errores,
-}: {
-    cuota: Cuota;
-    abierto: boolean;
-    onAbrir: (abierto: boolean) => void;
-    total: string;
-    onTotal: (valor: string) => void;
-    excedente: string | null;
-    /** Abierta sin un total mayor que lo que se debe: no se puede cobrar así. */
-    incompleto: boolean;
-    motivo: App.Modules.Haberes.Enums.HaberesReasonCode | '';
-    detalle: string;
-    onMotivo: (codigo: App.Modules.Haberes.Enums.HaberesReasonCode) => void;
-    onDetalle: (texto: string) => void;
-    errores: { total?: string; motivo?: string; detalle?: string };
-}) {
-    return (
-        <div className="rounded-md border bg-card">
-            <button
-                type="button"
-                onClick={() => onAbrir(!abierto)}
-                aria-expanded={abierto}
-                className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-                <ChevronRight
-                    className={cn(
-                        'size-3.5 transition-transform motion-reduce:transition-none',
-                        abierto && 'rotate-90',
-                    )}
-                    aria-hidden="true"
-                />
-                Entró más de lo que se debe
-            </button>
-
-            {abierto && (
-                <div className="space-y-3 border-t px-3 py-3">
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`total-mayor-${cuota.id}`}>
-                            Total recibido
-                        </Label>
-                        <AmountInput
-                            id={`total-mayor-${cuota.id}`}
-                            value={total}
-                            onChange={onTotal}
-                            words="below"
-                        />
-                        <InputError
-                            message={
-                                errores.total ??
-                                (incompleto
-                                    ? 'Escribí un total mayor que lo que se debe, o plegá esta sección para cobrar lo que se debe.'
-                                    : undefined)
-                            }
-                        />
-                    </div>
-
-                    <dl className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                            <dt className="text-xs text-field-label">
-                                Importe a abonar
-                            </dt>
-                            <dd className="tabular-nums">
-                                {money(cuota.amountDue)}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt className="text-xs text-field-label">
-                                Excedente recibido
-                            </dt>
-                            <dd className="tabular-nums">
-                                {excedente === null ? '—' : money(excedente)}
-                            </dd>
-                        </div>
-                    </dl>
-
-                    {excedente !== null && (
-                        <ReasonFields
-                            act="installment_excess"
-                            code={motivo}
-                            detail={detalle}
-                            onCodeChange={onMotivo}
-                            onDetailChange={onDetalle}
-                            codeError={errores.motivo}
-                            detailError={errores.detalle}
-                            idPrefix={`motivo-cobro-mayor-${cuota.id}`}
-                            maxLength={300}
-                        />
-                    )}
-                </div>
-            )}
-        </div>
     );
 }

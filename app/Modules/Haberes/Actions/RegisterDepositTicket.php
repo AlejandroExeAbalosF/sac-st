@@ -9,10 +9,14 @@ use App\Modules\Haberes\Enums\ExpectedMedium;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
+use App\Modules\Haberes\Models\Expediente;
+use App\Modules\Haberes\Models\Haber;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Actions\StoreAttachment;
 use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Support\Reason;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -34,19 +38,46 @@ final class RegisterDepositTicket
 {
     public function __construct(
         private readonly RecordAuditEvent $auditar,
+        private readonly RecordInstallmentExcess $recordExcess,
         private readonly StoreAttachment $attachments,
     ) {}
 
     /**
      * @param  array<string, mixed>  $datos
+     * @param  array{total: numeric-string, reason: Reason, version: CarbonInterface}|null  $excess
      */
-    public function handle(array $datos, ?UploadedFile $foto, ?int $userId): DepositTicket
+    public function handle(array $datos, ?UploadedFile $foto, ?int $userId, ?array $excess = null): DepositTicket
     {
         $adjunto = null;
 
         try {
-            return DB::transaction(function () use ($datos, $foto, $userId, &$adjunto): DepositTicket {
-                $this->assertCuotaEsperaDeposito($datos['installmentId'] ?? null);
+            return DB::transaction(function () use ($datos, $foto, $userId, $excess, &$adjunto): DepositTicket {
+                $cuota = null;
+                if (isset($datos['installmentId'])) {
+                    $consulta = BeneficiaryInstallment::query();
+                    if ($excess === null) {
+                        // El registro de excedente toma estos candados en el mismo orden.
+                        Expediente::query()->sharedLock()->findOrFail((int) $datos['expedienteId']);
+                        if (isset($datos['haberId'])) {
+                            Haber::query()->sharedLock()->findOrFail((int) $datos['haberId']);
+                        }
+                        $consulta->lockForUpdate();
+                    }
+                    $cuota = $consulta->findOrFail((int) $datos['installmentId']);
+                }
+
+                if ($cuota?->workflow_status === InstallmentWorkflowStatus::LegacySettled) {
+                    throw ValidationException::withMessages([
+                        'installmentId' => 'La cuota ya se pagó fuera del circuito: no espera ningún depósito.',
+                    ]);
+                }
+
+                if ($excess !== null) {
+                    if ($cuota === null) {
+                        throw ValidationException::withMessages(['installmentId' => 'El importe mayor requiere una cuota.']);
+                    }
+                    $this->recordExcess->handle($cuota, $excess['total'], $excess['reason'], $excess['version'], $userId, newTicket: true);
+                }
 
                 $ticket = DepositTicket::query()->create([
                     'expediente_id' => $datos['expedienteId'],
@@ -55,7 +86,7 @@ final class RegisterDepositTicket
                     'bank_account_id' => $datos['bankAccountId'],
                     'deposited_at' => $datos['depositedAt'],
                     'deposited_time' => $datos['depositedTime'] ?? null,
-                    'amount' => $datos['amount'],
+                    'amount' => $excess['total'] ?? $datos['amount'] ?? $cuota?->importeEsperado(),
                     'operation_number' => $datos['operationNumber'] ?? null,
                     'terminal' => $datos['terminal'] ?? null,
                     'deposit_kind' => $datos['depositKind'],
@@ -147,25 +178,5 @@ final class RegisterDepositTicket
             ],
             actorId: $userId,
         );
-    }
-
-    /**
-     * Una cuota pagada fuera del circuito no espera ningún depósito.
-     *
-     * @throws ValidationException
-     */
-    private function assertCuotaEsperaDeposito(mixed $installmentId): void
-    {
-        if (! is_numeric($installmentId)) {
-            return;
-        }
-
-        $estado = BeneficiaryInstallment::query()->whereKey((int) $installmentId)->value('workflow_status');
-
-        if ($estado === InstallmentWorkflowStatus::LegacySettled) {
-            throw ValidationException::withMessages([
-                'installmentId' => 'La cuota ya se pagó fuera del circuito: no espera ningún depósito.',
-            ]);
-        }
     }
 }

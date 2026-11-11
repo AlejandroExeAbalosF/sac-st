@@ -53,6 +53,13 @@ reconoce el ingreso o el egreso. Ledger no depende de los modelos de Haberes.
   espera, el total es el suyo. Audita `cuota.excedente-registrado` o
   `cuota.excedente-quitado`. Estas guardas son del Action; la base protege el
   excedente y su motivo, no el momento.
+  Las guardas viven en `InstallmentExcessEligibility`, que la pantalla también
+  consulta para no ofrecer lo que va a rebotar.
+- `RegisterDepositTicket` puede registrar el excedente junto con el primer
+  comprobante de la cuota, en la misma transacción: además de las guardas
+  anteriores, exige que la cuota no tenga excedente ni otro comprobante a la
+  espera. El ticket nace por el total; si falla la carga, se revierten el
+  excedente y su auditoría.
 - `UpdateInstallment` exige haber y cuota activos y versión vigente. Edita lo que se
   debe: con excedente conserva el total y lo recalcula, y rechaza una base mayor.
   Si reducir una cuota deja saldo en un plan completo, aumenta la cantidad prevista

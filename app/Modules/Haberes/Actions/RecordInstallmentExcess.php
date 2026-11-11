@@ -5,17 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Haberes\Enums\DepositTicketStatus;
-use App\Modules\Haberes\Enums\HaberWorkflowStatus;
-use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
-use App\Modules\Haberes\Support\IncomeEvidence;
-use App\Modules\Haberes\Support\InstallmentEditLock;
-use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Haberes\Support\InstallmentExcessEligibility;
 use App\Modules\Shared\Actions\RecordAuditEvent;
-use App\Modules\Shared\Enums\ReceiptType;
-use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
@@ -41,8 +35,7 @@ final class RecordInstallmentExcess
 {
     public function __construct(
         private readonly RecordAuditEvent $auditar,
-        private readonly InstallmentEditLock $traba,
-        private readonly InstallmentFunding $financiacion,
+        private readonly InstallmentExcessEligibility $eligibility,
     ) {}
 
     /**
@@ -56,8 +49,9 @@ final class RecordInstallmentExcess
         Reason $motivo,
         ?CarbonInterface $version,
         ?int $actorId = null,
+        bool $newTicket = false,
     ): BeneficiaryInstallment {
-        return DB::transaction(function () use ($installment, $total, $motivo, $version, $actorId): BeneficiaryInstallment {
+        return DB::transaction(function () use ($installment, $total, $motivo, $version, $actorId, $newTicket): BeneficiaryInstallment {
             // De afuera hacia adentro, como la asignación: expediente -> haber -> cuota.
             $expedienteId = Haber::query()->whereKey($installment->haber_id)->valueOrFail('expediente_id');
             Expediente::query()->lockForUpdate()->findOrFail($expedienteId);
@@ -67,7 +61,15 @@ final class RecordInstallmentExcess
                 ->lockForUpdate()
                 ->findOrFail($installment->id);
 
-            $this->assertRegistrable($haber, $cuota, $version);
+            if ($version === null || ! $cuota->updated_at->equalTo($version)) {
+                throw ValidationException::withMessages(['amount' => 'Otra persona modificó esta cuota. Recargá la página para ver la versión actual.']);
+            }
+
+            $cuota->setRelation('haber', $haber);
+            $problema = $this->eligibility->rejection($cuota, $newTicket);
+            if ($problema !== null) {
+                throw ValidationException::withMessages(['amount' => $problema]);
+            }
 
             $aAbonar = $cuota->importeAAbonar();
             $comparacion = bccomp($total, $aAbonar, 2);
@@ -115,26 +117,6 @@ final class RecordInstallmentExcess
         });
     }
 
-    /** @throws ValidationException */
-    private function assertRegistrable(Haber $haber, BeneficiaryInstallment $cuota, ?CarbonInterface $version): void
-    {
-        $problema = match (true) {
-            $haber->workflow_status !== HaberWorkflowStatus::Active => 'El haber no está activo.',
-            $cuota->workflow_status !== InstallmentWorkflowStatus::Active => 'Solo se registra un importe mayor en una cuota activa.',
-            $version === null || ! $cuota->updated_at->equalTo($version) => 'Otra persona modificó esta cuota. Recargá la página para ver la versión actual.',
-            $this->traba->lockingOrder($cuota) !== null => 'La cuota ya está en circulación con su Orden de Pago: no se le puede registrar un importe mayor.',
-            bccomp($this->financiacion->allocated($cuota), '0', 2) === 1 => 'La cuota ya tiene dinero imputado: el importe mayor se registra antes de cobrarla.',
-            $this->tieneRecibo($cuota) => 'La cuota ya tiene recibo de ingreso.',
-            IncomeEvidence::of($cuota) !== null => 'La cuota está respaldada por el sistema anterior: sus importes tienen que coincidir con ese registro.',
-            $cuota->depositTickets()->where('status', DepositTicketStatus::Matched)->exists() => 'La cuota tiene un comprobante ya cruzado con el banco: desvinculalo antes de registrar el importe mayor.',
-            default => null,
-        };
-
-        if ($problema !== null) {
-            throw ValidationException::withMessages(['amount' => $problema]);
-        }
-    }
-
     /**
      * Con comprobantes a la espera, el total es lo que dicen: el papel no se
      * reescribe desde acá, y el cruce exige igualdad exacta.
@@ -162,14 +144,5 @@ final class RecordInstallmentExcess
                 'amount' => 'El comprobante cargado es por $ '.Decimal::format($suma).': el total tiene que coincidir con él.',
             ]);
         }
-    }
-
-    private function tieneRecibo(BeneficiaryInstallment $cuota): bool
-    {
-        return Receipt::query()
-            ->issued()
-            ->where('receipt_type', ReceiptType::Income)
-            ->where('beneficiary_installment_id', $cuota->id)
-            ->exists();
     }
 }

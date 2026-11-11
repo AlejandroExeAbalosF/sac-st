@@ -73,9 +73,10 @@ trait ValidatesDepositTicket
     /**
      * Lo que el operador copia mirando el papel.
      *
-     * Es todo lo que pide el alta: a qué cuota apunta el comprobante, por
-     * cuánto y de qué tipo los arma el servidor desde la cuota de la
-     * dirección, así que no hay campo que pueda contradecirlos.
+     * A qué cuota apunta el comprobante y de qué tipo es los arma el
+     * servidor desde la cuota de la dirección, así que no hay campo que
+     * pueda contradecirlos. El importe tampoco se transcribe acá: sale de la
+     * cuota, o del importe mayor cuando el papel trae más.
      *
      * @return array<string, mixed>
      */

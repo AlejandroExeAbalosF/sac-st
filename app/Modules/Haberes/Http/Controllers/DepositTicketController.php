@@ -28,7 +28,9 @@ use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Pdf\PendingDepositSheet;
 use App\Modules\Haberes\Support\DepositTicketLinks;
+use App\Modules\Haberes\Support\ExcessFromRequest;
 use App\Modules\Haberes\Support\HaberesCashBox;
+use App\Modules\Haberes\Support\InstallmentExcessEligibility;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\TicketCandidate;
 use App\Modules\Shared\Enums\AttachmentSubject;
@@ -139,7 +141,7 @@ final class DepositTicketController extends Controller
      * Preguntarlos sería ofrecer contradecir a la dirección por la que se
      * entró.
      */
-    public function create(BeneficiaryInstallment $installment): Response
+    public function create(Request $request, BeneficiaryInstallment $installment, InstallmentExcessEligibility $eligibility): Response
     {
         // Una cuota pagada fuera del circuito no espera ningún depósito.
         abort_if($installment->workflow_status === InstallmentWorkflowStatus::LegacySettled, 404);
@@ -157,10 +159,15 @@ final class DepositTicketController extends Controller
         $medio = $this->financiacion->effectiveMedium($installment);
 
         return Inertia::render('haberes/depositos/create', [
+            'motivos' => HaberesReasonAct::options(),
             'cuota' => [
                 'id' => $installment->id,
                 'number' => $installment->installment_number,
                 'amount' => $installment->importeEsperado(),
+                'amountDue' => $installment->importeAAbonar(),
+                'excessAmount' => $installment->excedente(),
+                'version' => $installment->updated_at->toISOString(),
+                'canRecordExcess' => $request->user()?->can('expedientes.editar') && $eligibility->rejection($installment, newTicket: true) === null,
                 'concept' => $installment->description ?? $haber->concept,
                 'medium' => $medio->value,
                 'mediumLabel' => $medio->label(),
@@ -187,6 +194,12 @@ final class DepositTicketController extends Controller
      * los arma el servidor desde la cuota. Es lo que hace imposible el
      * ticket que dice una cosa y cuelga de otra —y de paso deja al
      * formulario con un solo trabajo, que es transcribir el papel—.
+     *
+     * La única excepción es el importe mayor: si el papel trae más de lo
+     * que se debe, llega el total con su motivo y `RegisterDepositTicket`
+     * lo registra en la cuota antes de crear el comprobante, en la misma
+     * transacción. El ticket nace por ese total porque es lo que la cuota
+     * pasa a esperar, no porque el formulario lo haya elegido.
      */
     public function store(
         SaveDepositTicketRequest $request,
@@ -201,13 +214,13 @@ final class DepositTicketController extends Controller
             'expedienteId' => $installment->haber->expediente_id,
             'haberId' => $installment->haber_id,
             'installmentId' => $installment->id,
-            'amount' => $installment->importeEsperado(),
             'depositKind' => DepositKind::forMedium(
                 $this->financiacion->effectiveMedium($installment),
             )->value,
         ];
 
-        $ticket = $registrar->handle($datos, $request->file('photo'), $request->user()?->id);
+        $excess = ExcessFromRequest::fromValidated($request, $datos);
+        $ticket = $registrar->handle($datos, $request->file('photo'), $request->user()?->id, $excess);
 
         Toast::success('Comprobante registrado.', 'Buscá el movimiento en el extracto.');
 

@@ -24,6 +24,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CollectsInstallments;
 use Tests\TestCase;
 
@@ -279,6 +281,106 @@ final class ImporteMayorDeLaCuotaTest extends TestCase
         $this->assertStringContainsString('$ 110.000,00', $html);
         // Mirar no registra nada.
         $this->assertSame('0.00', $cuota->refresh()->excedente());
+    }
+
+    public function test_el_comprobante_y_la_cuota_quedan_por_el_total_del_papel(): void
+    {
+        $cuota = $this->cuota('50030/2026', '100000.00');
+        $this->actingAs($this->operador());
+        $this->get(route('haberes.installments.ticket.create', $cuota))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('cuota.canRecordExcess', true)->has('motivos.installment_excess'));
+
+        $this->post(route('haberes.installments.ticket', $cuota), $this->datosDeposito($cuota))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('depositos.search', DepositTicket::query()->sole()));
+        $this->assertSame('110000.75', DepositTicket::query()->sole()->amount);
+        $this->assertSame('110000.75', $cuota->refresh()->importeEsperado());
+        $this->assertSame('10000.75', $cuota->excedente());
+        $this->assertSame('employer_overpaid', $cuota->excess_reason_code?->value);
+        $this->assertDatabaseHas('audit_events', ['action' => 'cuota.excedente-registrado']);
+        $this->assertDatabaseCount('fund_receipts', 0);
+    }
+
+    public function test_el_comprobante_respeta_un_excedente_ya_registrado(): void
+    {
+        $cuota = $this->cuota('50031/2026', '100000.00');
+        $this->registrar($cuota, '110000.00')->assertSessionHasNoErrors();
+        $this->get(route('haberes.installments.ticket.create', $cuota))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('cuota.canRecordExcess', false)->where('cuota.excessAmount', '10000.00'));
+
+        $datos = $this->datosDeposito($cuota->refresh());
+        $this->post(route('haberes.installments.ticket', $cuota), $datos)->assertSessionHasErrors('amount');
+        unset($datos['excessTotal'], $datos['reasonCode'], $datos['version']);
+        $this->post(route('haberes.installments.ticket', $cuota), $datos)->assertSessionHasNoErrors();
+        $this->assertSame('110000.00', DepositTicket::query()->sole()->amount);
+    }
+
+    public function test_el_deposito_con_excedente_valida_total_motivo_version_y_dinero_imputado(): void
+    {
+        $cuota = $this->cuota('50032/2026', '100000.00');
+        $datos = $this->datosDeposito($cuota);
+        $url = route('haberes.installments.ticket', $cuota);
+        $this->actingAs($this->operador());
+        $this->post($url, [...$datos, 'excessTotal' => '90000'])->assertSessionHasErrors('amount');
+        $this->post($url, [...$datos, 'reasonCode' => ''])->assertSessionHasErrors('reasonCode');
+        $this->post($url, [...$datos, 'version' => $cuota->updated_at->copy()->subMinute()->toISOString()])->assertSessionHasErrors('amount');
+        $this->cobrarPorMostrador($cuota)->assertSessionHasNoErrors();
+        $this->post($url, [...$datos, 'version' => $cuota->refresh()->updated_at->toISOString()])->assertSessionHasErrors('amount');
+        $this->assertSame('0.00', $cuota->refresh()->excedente());
+        $this->assertDatabaseCount('deposit_tickets', 0);
+    }
+
+    public function test_un_comprobante_a_la_espera_impide_agregar_otro_con_el_mismo_excedente(): void
+    {
+        $cuota = $this->cuota('50035/2026', '100000.00');
+        $this->comprobante($cuota, '110000.75', DepositTicketStatus::Waiting);
+        $this->actingAs($this->operador())->get(route('haberes.installments.ticket.create', $cuota))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('cuota.canRecordExcess', false));
+        $this->post(route('haberes.installments.ticket', $cuota), $this->datosDeposito($cuota))->assertSessionHasErrors('amount');
+        $this->assertDatabaseCount('deposit_tickets', 1);
+        $this->assertSame('0.00', $cuota->refresh()->excedente());
+    }
+
+    public function test_registrar_depositos_no_autoriza_el_excedente(): void
+    {
+        $cuota = $this->cuota('50033/2026', '100000.00');
+        $usuario = $this->operador('contador');
+        $this->actingAs($usuario)->get(route('haberes.installments.ticket.create', $cuota))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('cuota.canRecordExcess', false));
+        $this->post(route('haberes.installments.ticket', $cuota), $this->datosDeposito($cuota))->assertForbidden();
+        $this->assertSame('0.00', $cuota->refresh()->excedente());
+    }
+
+    public function test_un_fallo_al_crear_el_comprobante_revierte_el_excedente_y_su_auditoria(): void
+    {
+        $cuota = $this->cuota('50034/2026', '100000.00');
+        DepositTicket::creating(function () use ($cuota): never {
+            $this->assertSame('10000.75', $cuota->fresh()?->excedente());
+            throw ValidationException::withMessages(['depositedAt' => 'Fallo al guardar el comprobante.']);
+        });
+
+        $this->actingAs($this->operador())->post(route('haberes.installments.ticket', $cuota), $this->datosDeposito($cuota))
+            ->assertSessionHasErrors('depositedAt');
+        $this->assertSame('0.00', $cuota->refresh()->excedente());
+        $this->assertDatabaseMissing('audit_events', ['action' => 'cuota.excedente-registrado']);
+        $this->assertDatabaseCount('deposit_tickets', 0);
+    }
+
+    /** @return array<string, mixed> */
+    private function datosDeposito(BeneficiaryInstallment $cuota): array
+    {
+        $cuenta = BankAccount::query()->firstOrCreate(
+            ['account_number' => '23456789'],
+            ['label' => 'Cta. Cte. Haberes', 'bank_name' => 'Banco Macro', 'currency' => 'ARS', 'is_active' => true],
+        );
+
+        return [
+            'bankAccountId' => $cuenta->id,
+            'depositedAt' => BusinessDate::today()->toDateString(),
+            'excessTotal' => '110000.75',
+            'version' => $cuota->updated_at->toISOString(),
+            'reasonCode' => 'employer_overpaid',
+        ];
     }
 
     // ── La base ─────────────────────────────────────────────────────────

@@ -40,9 +40,16 @@ completo.
 total y un motivo de la lista. Por mostrador va dentro de «Cobrar y emitir recibo»,
 en «Entró más de lo que se debe»: el total recibido se cobra en el mismo acto y la
 vista previa muestra el recibo como va a salir; si el cobro falla, el importe mayor
-tampoco queda. Por banco, «Registrar importe mayor», en la tarjeta de la cuota, pide
-el «Importe del comprobante» si hay uno a la espera —que lo fija— y va antes del
-cruce. Los dos caminos piden el permiso de corregir cuotas. La diferencia queda como **excedente recibido** de esa cuota: la cuota pasa a
+tampoco queda. Por banco va dentro de «Cargar comprobante», en «El depósito es por
+más de lo que se debe»: el operador copia el total del papel y elige el motivo, el
+resumen muestra lo que se debe y el excedente, y al guardar la cuota y el
+comprobante quedan por ese total en el mismo acto; si la carga falla, el importe
+mayor tampoco queda. Después sigue la búsqueda en el extracto. La sección no se
+ofrece si la cuota ya tiene un excedente —el comprobante toma ese total— ni si ya
+tiene un comprobante a la espera. «Registrar importe mayor», en la tarjeta, queda
+para corregir o quitar el excedente antes del cruce: con comprobantes a la espera,
+el total tiene que coincidir con su suma. Los dos caminos piden el permiso de
+corregir cuotas. La diferencia queda como **excedente recibido** de esa cuota: la cuota pasa a
 esperar el total, que se cobra, figura en el comprobante y se paga al beneficiario.
 No mueve dinero ni toca la caja: el dinero entra después, por el cobro o el cruce de
 siempre. Se registra antes de cualquier dinero imputado, recibo, comprobante cruzado

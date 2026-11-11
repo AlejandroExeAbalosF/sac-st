@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowRight, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
@@ -19,7 +20,9 @@ import TicketPhotoPanel, {
 } from '@/features/banking/components/ticket-photo-panel';
 import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
-import { businessToday, money } from '@/lib/format';
+import ExcessAmountSection from '@/features/haberes/components/excess-amount-section';
+import { importeMayor } from '@/features/haberes/importe-mayor';
+import { businessToday, isNonZero, money } from '@/lib/format';
 import { show as haberShow } from '@/routes/haberes/haber';
 import { ticket as registrar } from '@/routes/haberes/installments';
 
@@ -27,7 +30,18 @@ type Props = {
     cuota: {
         id: number;
         number: number;
-        /** Lo que el expediente le reconoce: es lo que se deposita. */
+        /** Lo que se debe, sin el excedente: la base del importe mayor. */
+        amountDue: string;
+        excessAmount: string;
+        /** La versión de la cuota que se vio, para no pisar otro cambio. */
+        version: string;
+        /**
+         * Si se ofrece «El depósito es por más de lo que se debe»: permiso y
+         * cuota apta. Solo evita ofrecer algo que va a rebotar; decide el
+         * servidor.
+         */
+        canRecordExcess: boolean;
+        /** Lo que la cuota espera: es lo que se deposita si no entró de más. */
         amount: string;
         concept: string | null;
         medium: string;
@@ -47,9 +61,15 @@ type Props = {
  * La foto va al lado del formulario: ver `TicketPhotoPanel`.
  *
  * Es la misma forma que «Depositar el efectivo en el banco», y por la
- * misma razón: **a quién apunta el depósito y por cuánto no se eligen**.
- * Se entra desde una cuota, así que el beneficiario, el importe y el tipo
- * los dice ella; lo que queda del formulario es lo que dice el papel.
+ * misma razón: **a quién apunta el depósito no se elige**. Se entra desde
+ * una cuota, así que el beneficiario, el importe y el tipo los dice ella;
+ * lo que queda del formulario es lo que dice el papel.
+ *
+ * El importe tiene una sola salida: si el papel trae más de lo que se
+ * debe, se despliega «El depósito es por más de lo que se debe» y se
+ * escribe el total. No es corregir el papel, es registrar el importe mayor
+ * de la cuota en el mismo acto, con su motivo, como en el cobro por
+ * mostrador.
  *
  * El comprobante no financia nada todavía: queda esperando a que el
  * crédito aparezca en el extracto. Eso es lo que dice §2.1.13 del DER, y
@@ -69,6 +89,9 @@ export default function DepositoCreate({
     } = useTicketPhoto();
 
     const form = useForm({
+        excessTotal: '',
+        reasonCode: '' as App.Modules.Haberes.Enums.HaberesReasonCode | '',
+        reason: '',
         bankAccountId: '',
         depositedAt: '',
         depositedTime: '',
@@ -77,6 +100,15 @@ export default function DepositoCreate({
         notes: '',
         photo: null as File | null,
     });
+
+    const [abierto, setAbierto] = useState(false);
+    const { total, importe, excedente, incompleto } = importeMayor(
+        cuota.canRecordExcess && abierto,
+        form.data.excessTotal,
+        cuota.amountDue,
+        cuota.amount,
+    );
+    const errores: Record<string, string | undefined> = form.errors;
 
     /*
      * Si lo que se está por cargar no corresponde a esta cuota.
@@ -119,6 +151,22 @@ export default function DepositoCreate({
 
     const enviar = (event: React.FormEvent) => {
         event.preventDefault();
+
+        if (incompleto || form.processing) {
+            return;
+        }
+
+        form.transform(({ excessTotal, reasonCode, reason, ...papel }) =>
+            total !== null && excessTotal !== ''
+                ? {
+                      ...papel,
+                      excessTotal: total,
+                      version: cuota.version,
+                      reasonCode,
+                      reason,
+                  }
+                : papel,
+        );
         form.post(registrar(cuota.id).url, { forceFormData: true });
     };
 
@@ -193,7 +241,9 @@ export default function DepositoCreate({
                          * una elección: la pantalla se abrió desde esa
                          * cuota. Que el formulario pueda contradecir a la
                          * dirección no es libertad, es una forma de
-                         * equivocarse.
+                         * equivocarse. El importe cambia solo con el
+                         * importe mayor de abajo, que cambia lo que la
+                         * cuota espera.
                          */}
                         <dl className="grid gap-3 rounded-lg bg-muted/40 p-4 sm:grid-cols-3">
                             <div>
@@ -201,7 +251,7 @@ export default function DepositoCreate({
                                     Importe depositado
                                 </dt>
                                 <dd className="font-mono text-lg font-semibold tabular-nums">
-                                    {money(cuota.amount)}
+                                    {money(importe)}
                                 </dd>
                             </div>
                             <div>
@@ -230,14 +280,52 @@ export default function DepositoCreate({
                             </div>
                         </dl>
 
-                        <p className="text-xs text-muted-foreground">
-                            Salen de la cuota: el importe es el que el
-                            expediente le reconoce y el tipo, el que corresponde
-                            a su medio. Si el papel dice otra cosa —unos pesos
-                            de diferencia, o «Transferencia»—, se corrige
-                            después desde el comprobante, que es donde se
-                            arregla todo lo que se transcribió.
-                        </p>
+                        {isNonZero(cuota.excessAmount) && (
+                            <p className="text-sm">
+                                Importe a abonar {money(cuota.amountDue)} ·
+                                Excedente recibido {money(cuota.excessAmount)}
+                            </p>
+                        )}
+                        {cuota.canRecordExcess ? (
+                            <>
+                                <p className="text-xs text-muted-foreground">
+                                    Si el papel trae más que el importe a
+                                    abonar, desplegá la sección y copiá el total
+                                    del comprobante.
+                                </p>
+                                <ExcessAmountSection
+                                    titulo="El depósito es por más de lo que se debe"
+                                    etiquetaTotal="Total depositado"
+                                    cuota={cuota}
+                                    abierto={abierto}
+                                    onAbrir={setAbierto}
+                                    total={form.data.excessTotal}
+                                    onTotal={(valor) =>
+                                        form.setData('excessTotal', valor)
+                                    }
+                                    excedente={excedente}
+                                    incompleto={incompleto}
+                                    motivo={form.data.reasonCode}
+                                    detalle={form.data.reason}
+                                    onMotivo={(codigo) =>
+                                        form.setData('reasonCode', codigo)
+                                    }
+                                    onDetalle={(texto) =>
+                                        form.setData('reason', texto)
+                                    }
+                                    errores={{
+                                        total:
+                                            errores.amount ??
+                                            errores.excessTotal ??
+                                            errores.version,
+                                        motivo: errores.reasonCode,
+                                        detalle: errores.reason,
+                                    }}
+                                />
+                            </>
+                        ) : (
+                            <InputError message={errores.amount} />
+                        )}
 
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
@@ -394,7 +482,10 @@ export default function DepositoCreate({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <Button type="submit" disabled={form.processing}>
+                            <Button
+                                type="submit"
+                                disabled={form.processing || incompleto}
+                            >
                                 Registrar y buscar en el banco
                                 <ArrowRight className="size-4" />
                             </Button>

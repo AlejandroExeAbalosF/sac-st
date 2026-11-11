@@ -2,17 +2,20 @@ import { compareAmounts, parseAmount, subtractAmounts } from '@/lib/format';
 import type { DecimalString } from '@/lib/format';
 
 /**
- * Lo que cobra el diálogo de cobro según la sección «Entró más de lo que se debe».
+ * El importe que se cobra o se deposita según la sección de importe mayor:
+ * «Entró más de lo que se debe» en el cobro por mostrador, «El depósito es
+ * por más de lo que se debe» en la carga del comprobante.
  *
- * Plegada, se cobra lo pendiente de la cuota. Abierta, el total escrito, pero
- * solo si supera lo que se debe: un total vacío o menor no puede caer en
- * silencio en el cobro de siempre, así que queda **incompleto** y el diálogo no
- * envía. Para cobrar lo que se debe, se pliega la sección.
+ * Plegada, vale lo de siempre: lo pendiente en el cobro, lo que la cuota
+ * espera en el comprobante. Abierta, el total escrito, pero solo si supera lo
+ * que se debe: un total vacío o menor no puede caer en silencio en el importe
+ * de siempre, así que queda **incompleto** y la pantalla no envía. Para usar
+ * el importe de la cuota, se pliega la sección.
  *
  * El servidor decide lo mismo por su cuenta; esto decide qué se muestra y qué
  * se envía.
  */
-export function importeMayorDelCobro(
+export function importeMayor(
     abierto: boolean,
     escrito: string,
     aAbonar: DecimalString,
@@ -21,7 +24,7 @@ export function importeMayorDelCobro(
     /** El total, si la sección está abierta y supera lo que se debe. */
     total: DecimalString | null;
     excedente: DecimalString | null;
-    aCobrar: DecimalString;
+    importe: DecimalString;
     incompleto: boolean;
 } {
     const total = abierto ? parseAmount(escrito) : '';
@@ -31,7 +34,7 @@ export function importeMayorDelCobro(
     return {
         total: mayor ? total : null,
         excedente: mayor ? diferencia : null,
-        aCobrar: mayor ? total : pendiente,
+        importe: mayor ? total : pendiente,
         incompleto: abierto && !mayor,
     };
 }
