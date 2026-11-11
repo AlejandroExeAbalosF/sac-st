@@ -70,22 +70,39 @@ const shimmer = <div className="size-full animate-pulse bg-muted" />;
  * Dibujar la primera hoja cuesta: abrir el documento, decodificarlo y
  * pintarlo en un canvas. La misma miniatura aparece en la tarjeta y en la
  * tira del visor, y volver a una pantalla no tiene por qué repetirlo. Un
- * adjunto guardado no cambia nunca, así que no hay nada que invalidar.
+ * adjunto guardado no cambia nunca, así que una miniatura lograda no hay
+ * que invalidarla.
+ *
+ * **Una que falló, sí.** `renderPdfFirstPage` no lanza: un 503 pasajero
+ * vuelve como `null`. Guardado, dejaba el ícono roto hasta recargar la
+ * aplicación aunque el archivo ya estuviera disponible.
  */
 const pdfThumbnails = new Map<string, Promise<Blob | null>>();
 
-function pdfThumbnail(item: ViewerItem): Promise<Blob | null> {
+export function pdfThumbnail(item: ViewerItem): Promise<Blob | null> {
     const cached = pdfThumbnails.get(item.key);
 
     if (cached !== undefined) {
         return cached;
     }
 
-    const promesa = import('@/lib/pdf').then(({ renderPdfFirstPage }) =>
-        renderPdfFirstPage(
-            item.source === 'remote' ? previewUrl(item.attachment) : item.file,
-        ),
-    );
+    const promesa = import('@/lib/pdf')
+        .then(({ renderPdfFirstPage }) =>
+            renderPdfFirstPage(
+                item.source === 'remote'
+                    ? previewUrl(item.attachment)
+                    : item.file,
+            ),
+        )
+        .catch(() => null)
+        .then((blob) => {
+            // Sin miniatura: el próximo montaje lo vuelve a intentar.
+            if (blob === null && pdfThumbnails.get(item.key) === promesa) {
+                pdfThumbnails.delete(item.key);
+            }
+
+            return blob;
+        });
     pdfThumbnails.set(item.key, promesa);
 
     return promesa;

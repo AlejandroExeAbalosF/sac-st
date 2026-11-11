@@ -58,10 +58,33 @@ export function localKind(file: File): AttachmentKind {
         : 'other';
 }
 
+/*
+ * La clave de un archivo local sale del objeto `File`, no de sus datos.
+ *
+ * Nombre, tamaño y fecha de modificación no lo identifican: dos PDF
+ * distintos pueden coincidir en los tres, y la miniatura del primero
+ * aparecía al elegir el segundo. El `WeakMap` no retiene archivos que ya
+ * nadie usa.
+ */
+const localKeys = new WeakMap<File, string>();
+let localSequence = 0;
+
+function localKey(file: File): string {
+    let key = localKeys.get(file);
+
+    if (key === undefined) {
+        localSequence += 1;
+        key = `local-${localSequence}`;
+        localKeys.set(file, key);
+    }
+
+    return key;
+}
+
 export function localItem(file: File): ViewerItem {
     return {
         source: 'local',
-        key: `local-${file.name}-${file.size}-${file.lastModified}`,
+        key: localKey(file),
         name: file.name,
         kind: localKind(file),
         sizeBytes: file.size,

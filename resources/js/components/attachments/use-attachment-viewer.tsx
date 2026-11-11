@@ -19,12 +19,41 @@ export function useAttachmentViewer(): {
     const [abierto, setAbierto] = useState<{
         items: ViewerItem[];
         index: number;
+        /** Lo que tenía el foco al abrir: la tarjeta, la miniatura, el enlace. */
+        origen: HTMLElement | null;
     } | null>(null);
+
+    /*
+     * Al cerrar, el foco vuelve a lo que abrió el visor.
+     *
+     * Radix lo devuelve a lo que tenía el foco cuando el diálogo se montó,
+     * pero el visor se monta tarde —se descarga al abrirlo— y se desmonta
+     * al cerrar, así que no hay garantía de que siga siendo la tarjeta. Sin
+     * esto, quien usa el teclado perdía su lugar en la galería. Va en el
+     * cuadro siguiente para quedar después del foco que pone Radix.
+     */
+    const cerrar = () => {
+        const origen = abierto?.origen ?? null;
+        setAbierto(null);
+
+        if (origen !== null) {
+            requestAnimationFrame(() => {
+                if (origen.isConnected) {
+                    origen.focus();
+                }
+            });
+        }
+    };
 
     return {
         open: (items, index = 0) => {
             if (items.length > 0) {
-                setAbierto({ items, index });
+                const activo = document.activeElement;
+                setAbierto({
+                    items,
+                    index,
+                    origen: activo instanceof HTMLElement ? activo : null,
+                });
             }
         },
         viewer:
@@ -33,7 +62,7 @@ export function useAttachmentViewer(): {
                     <AttachmentViewer
                         items={abierto.items}
                         initialIndex={abierto.index}
-                        onClose={() => setAbierto(null)}
+                        onClose={cerrar}
                     />
                 </Suspense>
             ),
