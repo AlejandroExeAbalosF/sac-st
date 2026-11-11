@@ -8,7 +8,6 @@ use App\Modules\Aranceles\Enums\FeeChargeMedium;
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
 use App\Modules\Aranceles\Models\FeeCharge;
 use App\Modules\Aranceles\Models\FeeChargeBalance;
-use App\Modules\Aranceles\Models\FeeChargeProof;
 use App\Modules\Aranceles\Support\FeeBankCredits;
 use App\Modules\Aranceles\Support\FeeChargeFunds;
 use App\Modules\Banking\Actions\RegisterBankFundReceipt;
@@ -61,10 +60,7 @@ final class IdentifyFeeCredits
                 throw ValidationException::withMessages(['credits' => 'Ese cobro ya no está pendiente.']);
             }
 
-            // Solo acá: lo que nace del crédito o de una corrección no pasó por ventanilla.
-            if (! FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->exists()) {
-                throw ValidationException::withMessages(['credits' => 'Primero hay que cargar el comprobante del depósito.']);
-            }
+            // El comprobante es opcional: el dinero se verifica contra el extracto.
 
             $this->within($cobro, $creditos, $idempotencyKey, $signedById, $actorId);
 

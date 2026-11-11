@@ -958,23 +958,22 @@ class PagoPorDepositoDeArancelesTest extends TestCase
                 ->where('cobro.pending', true));
     }
 
-    /** La regla vale venga de la tarjeta o de Banco › Movimientos: los dos llegan al Action. */
-    public function test_a_pending_charge_without_proof_cannot_be_identified(): void
+    /** El comprobante es opcional: el dinero se verifica contra el extracto. */
+    public function test_a_pending_charge_without_proof_is_identified_and_can_load_it_later(): void
     {
         $cobro = $this->sinComprobante();
         $credito = $this->credito('120');
 
-        $this->assertRechazaEn('credits', fn () => $this->identificar($cobro, $credito), 'comprobante');
         $this->actingAs($this->admin)->post(route('aranceles.pendientes.identificar', $cobro), [
             'credits' => [$credito->id], 'idempotencyKey' => 'sin-papel',
-        ])->assertSessionHasErrors('credits');
+        ])->assertSessionHasNoErrors();
 
-        $this->assertSame(FeeChargeStatus::Pending, $cobro->refresh()->status);
-        $this->assertSame(0, FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->count());
+        $this->assertSame(FeeChargeStatus::Paid, $cobro->refresh()->status);
+        $this->assertSame(1, FeeChargeFunding::query()->where('fee_charge_id', $cobro->id)->count());
+        $this->assertSame(0, FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->count());
 
-        $this->cargarComprobante($cobro, $this->admin->id);
-
-        $this->assertSame(FeeChargeStatus::Paid, $this->identificar($cobro, $credito)->status);
+        $this->actingAs($this->admin)->post(route('aranceles.cobros.comprobante.store', $cobro), $this->papel())->assertSessionHasNoErrors();
+        $this->assertSame(1, FeeChargeProof::query()->where('fee_charge_id', $cobro->id)->count());
     }
 
     /** Lo que nace del crédito no pasó por ventanilla: el extracto ya es su respaldo. */

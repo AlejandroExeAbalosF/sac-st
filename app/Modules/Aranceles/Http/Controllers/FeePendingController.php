@@ -58,7 +58,7 @@ final class FeePendingController extends Controller
             $request->user()?->can('aranceles.modificar-importe') ?? false,
         );
 
-        Toast::success('Cobro pendiente registrado.', 'Para identificar el depósito hace falta su comprobante.');
+        Toast::success('Cobro pendiente registrado.', 'Podés identificar el crédito ahora y cargar el comprobante después.');
 
         return to_route('aranceles.cobros.comprobante.create', $cobro);
     }

@@ -353,18 +353,11 @@ function FilaDeCobro({
                         ` · Comprobante por ${money(comprobante.amount)} del ${date(comprobante.depositDate)}`}
                     {comprobante?.operationNumber &&
                         `, operación ${comprobante.operationNumber}`}
-                    {pendiente && !comprobante && ' · Falta el comprobante'}
+                    {pendiente && !comprobante && ' · Sin comprobante'}
                 </p>
             </div>
             <div className="flex flex-wrap gap-1 sm:justify-end">
-                {pendiente && !comprobante && can.collect && (
-                    <Button size="sm" asChild>
-                        <Link href={cargarComprobante(cobro.id)}>
-                            Cargar comprobante
-                        </Link>
-                    </Button>
-                )}
-                {pendiente && comprobante && can.identify && (
+                {pendiente && can.identify && (
                     <Button size="sm" onClick={() => onIdentificar(cobro)}>
                         Identificar crédito
                     </Button>
@@ -393,7 +386,7 @@ function FilaDeCobro({
                 >
                     Ver comprobante
                 </AttachmentLink>
-                {can.collect && porBanco && pagado && !comprobante && (
+                {can.collect && porBanco && !anulado && !comprobante && (
                     <Button variant="ghost" size="sm" asChild>
                         <Link href={cargarComprobante(cobro.id)}>
                             Cargar comprobante

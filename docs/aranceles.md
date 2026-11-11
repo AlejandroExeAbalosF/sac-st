@@ -161,23 +161,23 @@ acciones. También es una decisión del usuario, **sin relevar con el área**.
 1. **Alta** (`aranceles.cobrar`): en `/aranceles/nuevo`, «Depósito o transferencia». El cobro queda
    pendiente, con el precio de hoy. No mueve dinero ni emite recibo. No vence y conserva su precio,
    aunque el precio cambie después (**provisorio**).
-2. **Identificar** (`aranceles.verificar-pagos`): con el comprobante cargado, desde la tarjeta del cobro se eligen uno o más créditos, o
+2. **Identificar** (`aranceles.verificar-pagos`): con o sin comprobante, desde la tarjeta del cobro se eligen uno o más créditos, o
    desde **Banco › Movimientos**, «Identificar como arancel». Solo créditos desde la apertura de la
    caja y dentro de la vigencia de la cuenta. Se usan del más antiguo al más nuevo y de cada uno se
    toma lo necesario.
 3. **Recibo:** sale al completar el total, uno solo con todos los hechos, con fecha del día.
 
-- **Comprobante** (`aranceles.cobrar`, decisión del usuario, **sin relevar con el área**): sin él, un
-  pendiente no se identifica, ni desde su tarjeta ni desde Banco › Movimientos. Lo exige
-  `IdentifyFeeCredits`; la base no puede, porque lo que nace del crédito o de una corrección no lo
-  necesita. Al registrar el pendiente se pasa a `/aranceles/cobros/{id}/comprobante`, la misma pantalla
-  de las otras cajas: se transcribe mirando la foto, que es obligatoria, y se puede dejar para después.
+- **Comprobante** (`aranceles.cobrar`, decisión del usuario, **sin relevar con el área**): es
+  opcional. Un pendiente se identifica con o sin él, desde su tarjeta o desde Banco › Movimientos,
+  y se puede cargar antes o después, aunque el cobro ya tenga recibo. Al registrar el pendiente se
+  pasa a `/aranceles/cobros/{id}/comprobante`, la misma pantalla de las otras cajas: se transcribe
+  mirando la foto, que es obligatoria cuando se carga, y se puede dejar para después.
   El importe del papel puede diferir del cobro (**provisorio**): el dinero se verifica contra el
   extracto. No mueve dinero ni emite el recibo. Ver la foto pide `adjuntos.ver`.
 - **Cambiar el comprobante** agrega otro en un cobro por banco no anulado, aunque ya tenga recibo: vale
   el último, el anterior queda guardado y cada acto queda en la auditoría. Un cobro nacido del crédito
   puede cargarlo después. La corrección crea otro cobro y el comprobante queda en el anulado, a la
-  vista: si el nuevo queda pendiente, hay que cargarlo de nuevo.
+  vista: si el nuevo queda pendiente, se identifica igual y se le puede cargar otro.
   **Base:** `fee_charge_proofs` solo se agrega; `fee_charge_proofs_guard` rechaza un cobro en efectivo
   o anulado y un archivo de otro cobro, y `fee_charge_proofs_amount_positive` exige un importe positivo.
 - **De más:** lo que sobra del crédito queda libre, sin identificar, para otro cobro o para otra

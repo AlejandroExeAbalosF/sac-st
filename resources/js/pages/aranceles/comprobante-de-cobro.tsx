@@ -73,7 +73,7 @@ export default function ComprobanteDeCobro({ cobro, today }: Props) {
                 <PageHeader
                     eyebrow="Aranceles"
                     title="Cargar el comprobante del depósito"
-                    description="Sin él, el cobro no se puede identificar contra el extracto. Cargarlo no mueve dinero."
+                    description="Podés identificar el crédito ahora y cargar el comprobante después. Cargarlo no mueve dinero."
                 />
 
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">

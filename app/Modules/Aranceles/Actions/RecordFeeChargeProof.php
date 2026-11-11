@@ -21,7 +21,7 @@ use Throwable;
 
 /**
  * Carga o cambia el comprobante del depósito de un cobro por banco: lo que dice el
- * papel y su foto. Sin él, un pendiente no se identifica.
+ * papel y su foto. Es opcional: un pendiente se identifica con o sin él.
  *
  * Solo se agrega: cambiarlo suma otro, vale el último y el anterior queda como
  * rastro. No mueve dinero ni identifica el crédito, y el importe puede diferir del

@@ -217,10 +217,26 @@ function CobrosPendientes({
                                     {date(cobro.requestedOn)}
                                     {cobro.depositProof
                                         ? ` · Comprobante por ${money(cobro.depositProof.amount)} del ${date(cobro.depositProof.depositDate)}`
-                                        : ' · Falta el comprobante'}
+                                        : ' · Sin comprobante'}
                                 </span>
                             </span>
-                            {cobro.depositProof ? (
+                            <span className="flex flex-wrap gap-1">
+                                {!cobro.depositProof &&
+                                    puedeCargarComprobante && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            asChild
+                                        >
+                                            <Link
+                                                href={cargarComprobante(
+                                                    cobro.id,
+                                                )}
+                                            >
+                                                Cargar comprobante
+                                            </Link>
+                                        </Button>
+                                    )}
                                 <Button
                                     size="sm"
                                     disabled={processing}
@@ -230,17 +246,7 @@ function CobrosPendientes({
                                         ? 'Aplicar y emitir recibo'
                                         : 'Registrar ingreso parcial'}
                                 </Button>
-                            ) : (
-                                puedeCargarComprobante && (
-                                    <Button size="sm" variant="outline" asChild>
-                                        <Link
-                                            href={cargarComprobante(cobro.id)}
-                                        >
-                                            Cargar comprobante
-                                        </Link>
-                                    </Button>
-                                )
-                            )}
+                            </span>
                         </li>
                     );
                 })}

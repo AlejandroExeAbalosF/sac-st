@@ -11,7 +11,7 @@ use App\Support\BusinessDate;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
-/** El comprobante que un pendiente necesita para poder identificarse. */
+/** El comprobante del depósito de un cobro por banco, cargado como desde la pantalla. */
 trait LoadsFeeChargeProof
 {
     protected function conComprobante(FeeCharge $cobro, ?int $actorId = null, string $importe = '120'): FeeCharge
