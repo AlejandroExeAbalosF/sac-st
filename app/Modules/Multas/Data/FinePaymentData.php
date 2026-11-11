@@ -15,6 +15,7 @@ use App\Modules\Multas\Enums\FineTimeliness;
 use App\Modules\Multas\Enums\PresentationPrecision;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
@@ -85,7 +86,7 @@ final class FinePaymentData extends Data
         public ?string $correctsInFine,
         /** El informado que este corrige. */
         public ?int $replacesPaymentId,
-        /** @var list<FineAttachmentData> */
+        /** @var list<AttachmentData> */
         public array $attachments,
         /** Un cobro de caja: dónde está la plata y su depósito (M06). */
         public ?FineDepositData $deposit = null,
@@ -95,7 +96,7 @@ final class FinePaymentData extends Data
      * Espera cargados `application.fundReceipt`, `paymentReceipt.receipt`, `creator`, `voiding`, `appeal`,
      * `correctedBy.newPayment.fine` y `correctionOf.correctedPayment.fine`.
      *
-     * @param  list<FineAttachmentData>  $adjuntos
+     * @param  list<AttachmentData>  $adjuntos
      */
     public static function fromModel(FinePayment $pago, array $adjuntos = [], ?FineDepositData $deposito = null): self
     {

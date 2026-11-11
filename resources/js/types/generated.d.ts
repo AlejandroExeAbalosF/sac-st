@@ -1119,14 +1119,6 @@ declare namespace App {
         }
         namespace Multas {
             namespace Data {
-                export type FineAttachmentData = {
-                    id: number;
-                    title: string;
-                    originalFilename: string;
-                    viewable: boolean;
-                    createdByName: string | null;
-                    createdAt: string;
-                };
                 export type FineBalanceData = {
                     obligation: string;
                     paid: string;
@@ -1226,7 +1218,7 @@ declare namespace App {
                     disposition: App.Modules.Banking.Enums.ChequeDisposition | null;
                     regularized: boolean;
                     replacementChequeNumber: string | null;
-                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    attachments: App.Modules.Shared.Data.AttachmentData[];
                 };
                 export type FineCorrectionTargetData = {
                     id: number;
@@ -1255,7 +1247,7 @@ declare namespace App {
                     depositDate: string | null;
                     operationNumber: string | null;
                     creditedOn: string | null;
-                    ticket: App.Modules.Multas.Data.FineAttachmentData | null;
+                    ticket: App.Modules.Shared.Data.AttachmentData | null;
                     cancelled: App.Modules.Multas.Data.FineCancelledDepositData[];
                     chequeNumber: string | null;
                     chequeBank: string | null;
@@ -1286,7 +1278,7 @@ declare namespace App {
                     payments: App.Modules.Multas.Data.FinePaymentData[];
                     createdByName: string | null;
                     createdAt: string | null;
-                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    attachments: App.Modules.Shared.Data.AttachmentData[];
                 };
                 export type FineDocumentData = {
                     id: number;
@@ -1315,7 +1307,7 @@ declare namespace App {
                     reviewedAt: string | null;
                     createdByName: string | null;
                     createdAt: string | null;
-                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    attachments: App.Modules.Shared.Data.AttachmentData[];
                     bankCredit: App.Modules.Multas.Data.FineBankCreditData | null;
                 };
                 export type FineListItemData = {
@@ -1369,7 +1361,7 @@ declare namespace App {
                     correctsPaymentId: number | null;
                     correctsInFine: string | null;
                     replacesPaymentId: number | null;
-                    attachments: App.Modules.Multas.Data.FineAttachmentData[];
+                    attachments: App.Modules.Shared.Data.AttachmentData[];
                     deposit: App.Modules.Multas.Data.FineDepositData | null;
                 };
                 export type FinePendingPaymentData = {

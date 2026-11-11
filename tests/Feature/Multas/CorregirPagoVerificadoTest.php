@@ -611,7 +611,7 @@ class CorregirPagoVerificadoTest extends TestCase
 
         expect($pendientes())->toContain($pago->id);
 
-        $deposito = app(FineDeposits::class)->forPayments([$pago->refresh()->load('application')])[$pago->id];
+        $deposito = app(FineDeposits::class)->forPayments([$pago->refresh()->load('application')], null)[$pago->id];
         expect($deposito->voided)->toBeTrue()
             ->and($deposito->openRejectionId)->toBeNull()
             ->and($deposito->rejections)->toHaveCount(1);

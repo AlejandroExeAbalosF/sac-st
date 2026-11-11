@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Data;
 
 use App\Modules\Banking\Enums\ChequeDisposition;
 use App\Modules\Banking\Enums\ChequeRejectionBankStatus;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -34,7 +35,7 @@ final class FineChequeRejectionData extends Data
         public ?ChequeDisposition $disposition,
         public bool $regularized,
         public ?string $replacementChequeNumber,
-        /** @var list<FineAttachmentData> */
+        /** @var list<AttachmentData> */
         public array $attachments,
     ) {}
 }

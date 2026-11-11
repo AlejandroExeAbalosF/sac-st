@@ -10,6 +10,7 @@ use App\Modules\Multas\Enums\HistoricalMovementKind;
 use App\Modules\Multas\Enums\HistoricalMovementStatus;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Support\PartialDate;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Support\Reason;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -34,7 +35,7 @@ final class FineHistoricalMovementData extends Data
         public ?string $reviewedAt,
         public ?string $createdByName,
         public ?string $createdAt,
-        /** @var list<FineAttachmentData> */
+        /** @var list<AttachmentData> */
         public array $attachments,
         /** El crédito del banco que lo respalda, si viene de uno. */
         public ?FineBankCreditData $bankCredit,
@@ -43,7 +44,7 @@ final class FineHistoricalMovementData extends Data
     /**
      * Espera cargados `creator`, `reviewer` y `bankTransaction`.
      *
-     * @param  list<FineAttachmentData>  $adjuntos
+     * @param  list<AttachmentData>  $adjuntos
      */
     public static function fromModel(FineHistoricalMovement $antecedente, array $adjuntos): self
     {

@@ -29,7 +29,6 @@ use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\AppealAmount;
 use App\Modules\Multas\Support\FineAppeals;
-use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Multas\Support\FineCaseListQuery;
 use App\Modules\Multas\Support\FineCaseNumber;
@@ -39,6 +38,7 @@ use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Multas\Support\PartialDate;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Attachments;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Database\Like;
@@ -221,7 +221,7 @@ final class FineController extends Controller
      * El expediente va en la firma aunque no se use: la ruta lo trae antes que
      * la multa, y es el que acota la búsqueda de la multa por su número.
      */
-    public function show(Request $request, FineCase $fineCase, Fine $fine, FineAttachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos, FineAppeals $recursos, FineCashReadiness $preparacion): Response
+    public function show(Request $request, FineCase $fineCase, Fine $fine, Attachments $adjuntos, FineBankCredits $creditos, FineDeposits $depositos, FineAppeals $recursos, FineCashReadiness $preparacion): Response
     {
         $fine->load([
             'fineCase',
@@ -260,19 +260,19 @@ final class FineController extends Controller
         return Inertia::render('multas/show', [
             'multa' => FineDetailData::fromModel(
                 $fine,
-                $adjuntos->for(AttachmentSubject::Fine, [$fine->id])[$fine->id] ?? [],
-                $adjuntos->for(AttachmentSubject::FineHistoricalMovement, array_values($fine->historicalMovements->modelKeys())),
-                $adjuntos->for(AttachmentSubject::FinePayment, array_values($fine->payments->modelKeys())),
-                $depositos->forPayments($fine->payments),
+                $adjuntos->allFor(AttachmentSubject::Fine, [$fine->id], $request->user())[$fine->id] ?? [],
+                $adjuntos->allFor(AttachmentSubject::FineHistoricalMovement, array_values($fine->historicalMovements->modelKeys()), $request->user()),
+                $adjuntos->allFor(AttachmentSubject::FinePayment, array_values($fine->payments->modelKeys()), $request->user()),
+                $depositos->forPayments($fine->payments, $request->user()),
             ),
             'documentosDelExpediente' => $fine->fineCase->documents
                 ->sortBy('id')
                 ->map(fn (FineDocument $documento): FineDocumentData => FineDocumentData::fromModel($documento))
                 ->values(),
             // Los papeles del expediente sin documento propio; la multa los muestra igual.
-            'adjuntosDelExpediente' => $adjuntos->for(AttachmentSubject::FineCase, [$fine->fine_case_id])[$fine->fine_case_id] ?? [],
+            'adjuntosDelExpediente' => $adjuntos->allFor(AttachmentSubject::FineCase, [$fine->fine_case_id], $request->user())[$fine->fine_case_id] ?? [],
             // La foto de cada resolución y de cada acta de la multa, por id del documento.
-            'adjuntosDeDocumentos' => $adjuntos->for(AttachmentSubject::FineDocument, array_values($fine->documents->modelKeys())),
+            'adjuntosDeDocumentos' => $adjuntos->allFor(AttachmentSubject::FineDocument, array_values($fine->documents->modelKeys()), $request->user()),
             /*
              * Los créditos viejos de la cuenta de Multas, para respaldar un
              * pago anterior. Se piden con una recarga parcial al buscar.
@@ -356,7 +356,6 @@ final class FineController extends Controller
                 // Corregir el importe sin resolución, y revertir esa corrección.
                 'correctAmount' => $usuario?->can('multas.corregir-importe') ?? false,
                 'replaceOrigin' => $usuario?->can('multas.reemplazar-origen') ?? false,
-                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 // Sin la caja abierta con su cuenta no se sabe qué crédito es viejo.
                 'linkBankCredit' => $creditos->book() !== null,
             ],

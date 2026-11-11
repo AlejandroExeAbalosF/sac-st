@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { AttachmentGallery } from '@/components/attachments/attachment-gallery';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { AttachmentList } from '@/features/multas/components/attachments';
 import {
     CompleteRejectionDialog,
     ReplaceChequeDialog,
@@ -25,14 +25,12 @@ export default function ChequeRejections({
     amount,
     canManage,
     canReplace,
-    canViewAttachments,
     cobroAnulado = false,
 }: {
     rechazos: Rechazo[];
     amount: string;
     canManage: boolean;
     canReplace: boolean;
-    canViewAttachments: boolean;
     /** El cobro se anuló: el cheque ya no espera reemplazo. */
     cobroAnulado?: boolean;
 }) {
@@ -45,7 +43,6 @@ export default function ChequeRejections({
                     amount={amount}
                     canManage={canManage}
                     canReplace={canReplace}
-                    canViewAttachments={canViewAttachments}
                     cobroAnulado={cobroAnulado}
                 />
             ))}
@@ -58,14 +55,12 @@ function Rechazo({
     amount,
     canManage,
     canReplace,
-    canViewAttachments,
     cobroAnulado,
 }: {
     rechazo: Rechazo;
     amount: string;
     canManage: boolean;
     canReplace: boolean;
-    canViewAttachments: boolean;
     cobroAnulado: boolean;
 }) {
     const [dialogo, setDialogo] = useState<Dialogo | null>(null);
@@ -131,10 +126,7 @@ function Rechazo({
                     : 'Falta registrar qué se hizo con el cheque.'}
             </p>
             {r.attachments.length > 0 && (
-                <AttachmentList
-                    adjuntos={r.attachments}
-                    canView={canViewAttachments}
-                />
+                <AttachmentGallery attachments={r.attachments} />
             )}
 
             {bancoAbierto && (

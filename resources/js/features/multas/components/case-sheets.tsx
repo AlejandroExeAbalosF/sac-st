@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Paperclip, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { AttachmentGallery } from '@/components/attachments/attachment-gallery';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -16,15 +17,14 @@ import {
     DOCUMENT_ROLE,
     partialDate,
 } from '@/features/multas/labels';
-import { AttachmentList } from './attachments';
 
 type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Multa = App.Modules.Multas.Data.FineCaseFineData;
-type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
+type Adjunto = App.Modules.Shared.Data.AttachmentData;
 
 type DocumentControls = {
     attachments: Record<number, Adjunto[] | undefined>;
-    can: { register: boolean; adjust: boolean; viewAttachments: boolean };
+    can: { register: boolean; adjust: boolean };
     onAttach: (document: Documento) => void;
     onRevise: (document: Documento) => void;
 };
@@ -130,10 +130,7 @@ function DocumentHeader({
                 </div>
             </div>
             {files.length > 0 ? (
-                <AttachmentList
-                    adjuntos={files}
-                    canView={can.viewAttachments}
-                />
+                <AttachmentGallery attachments={files} />
             ) : (
                 <p className="text-xs text-muted-foreground">
                     Sin archivos adjuntos.

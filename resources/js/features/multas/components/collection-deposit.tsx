@@ -1,11 +1,11 @@
 import { Link } from '@inertiajs/react';
 import { Ban, Landmark, Undo2 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentGallery } from '@/components/attachments/attachment-gallery';
 import StatusBadge from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import CancelTransferDialog from '@/features/banking/components/cancel-transfer-dialog';
 import CreditMatchDialog from '@/features/banking/components/credit-match-dialog';
-import { AttachmentList } from '@/features/multas/components/attachments';
 import { RejectChequeDialog } from '@/features/multas/components/cheque-rejection-dialogs';
 import ChequeRejections from '@/features/multas/components/cheque-rejections';
 import { COLLECTION_PLACE } from '@/features/multas/labels';
@@ -38,7 +38,6 @@ export default function CollectionDeposit({
     desde,
     canDeposit,
     canConfirm,
-    canViewAttachments,
     isCheque = false,
     canManageRejections = false,
     canReplaceCheque = false,
@@ -50,7 +49,6 @@ export default function CollectionDeposit({
     desde: 'pendientes' | 'multa';
     canDeposit: boolean;
     canConfirm: boolean;
-    canViewAttachments: boolean;
     isCheque?: boolean;
     canManageRejections?: boolean;
     canReplaceCheque?: boolean;
@@ -135,10 +133,7 @@ export default function CollectionDeposit({
             </div>
 
             {deposito.ticket && (
-                <AttachmentList
-                    adjuntos={[deposito.ticket]}
-                    canView={canViewAttachments}
-                />
+                <AttachmentGallery attachments={[deposito.ticket]} />
             )}
 
             {deposito.cancelled.map((c) => (
@@ -155,7 +150,6 @@ export default function CollectionDeposit({
                     canManage={canManageRejections}
                     canReplace={canReplaceCheque && !deposito.voided}
                     cobroAnulado={deposito.voided}
-                    canViewAttachments={canViewAttachments}
                 />
             )}
 

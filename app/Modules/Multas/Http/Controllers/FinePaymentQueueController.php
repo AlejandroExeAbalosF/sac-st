@@ -64,7 +64,6 @@ final class FinePaymentQueueController extends Controller
                 // Depositar exige la caja abierta con alguna cuenta habilitada.
                 'deposit' => $deposita && $this->creditos->book() !== null,
                 'confirmDeposit' => $concilia,
-                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
                 'manageRejections' => $usuario?->can('multas.gestionar-rechazos') ?? false,
                 'replaceCheque' => $usuario?->can('multas.cobrar') ?? false,
             ],
@@ -100,7 +99,7 @@ final class FinePaymentQueueController extends Controller
             ->orderBy('id')
             ->get();
 
-        $depositos = $this->depositos->forPayments($pagos);
+        $depositos = $this->depositos->forPayments($pagos, request()->user());
 
         return array_values($pagos
             ->map(fn (FinePayment $pago): FinePendingPaymentData => FinePendingPaymentData::fromModel($pago, $depositos[$pago->id] ?? null))

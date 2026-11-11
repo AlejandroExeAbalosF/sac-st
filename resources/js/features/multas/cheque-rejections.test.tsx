@@ -9,7 +9,6 @@ describe('Alcance vigente del rechazo de cheques', () => {
                 amount="20000.00"
                 canManage
                 canReplace
-                canViewAttachments={false}
                 rechazos={[
                     {
                         id: 1,

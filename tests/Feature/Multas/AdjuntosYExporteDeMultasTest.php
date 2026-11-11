@@ -9,6 +9,7 @@ use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Support\FineListQuery;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
 use App\Support\Excel\SpreadsheetReader;
@@ -57,12 +58,49 @@ class AdjuntosYExporteDeMultasTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->has('adjuntos', 1)
                 ->where('adjuntos.0.title', 'Resolución N°0649/26')
-                ->where('adjuntos.0.viewable', true));
+                ->where('adjuntos.0.kind', 'image')
+                // Consulta tiene `adjuntos.ver`: la pantalla sabe que lo puede pedir.
+                ->where('adjuntos.0.canOpen', true));
         $this->actingAs($consulta)
             ->get(route('multas.show', $multa->showParameters()))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('multa.attachments', 0)
                 ->has('adjuntosDelExpediente', 1));
+    }
+
+    /**
+     * Un papel reservado figura en la ficha, pero quien no lo puede abrir
+     * recibe `canOpen` en falso: la tarjeta no pide la miniatura, que
+     * volvería con un 403.
+     */
+    public function test_a_restricted_file_is_listed_but_not_offered(): void
+    {
+        $multa = $this->multa();
+        Attachment::query()->create([
+            'subject_type' => AttachmentSubject::Fine,
+            'subject_id' => $multa->id,
+            'document_type' => 'fine_file',
+            'title' => 'Nota médica',
+            'storage_disk' => 'local',
+            'object_key' => 'fine/nota-medica.pdf',
+            'original_filename' => 'nota-medica.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 2048,
+            'sha256' => hash('sha256', 'nota-medica'),
+            'source' => 'uploaded',
+            'confidentiality' => Confidentiality::Restricted,
+        ]);
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('multa.attachments.0.title', 'Nota médica')
+                ->where('multa.attachments.0.kind', 'pdf')
+                ->where('multa.attachments.0.canOpen', false));
+
+        $this->actingAs($this->operador('contador'))
+            ->get(route('multas.show', $multa->showParameters()))
+            ->assertInertia(fn (Assert $page) => $page->where('multa.attachments.0.canOpen', true));
     }
 
     public function test_a_fine_and_a_previous_payment_keep_their_own_files(): void
@@ -90,7 +128,8 @@ class AdjuntosYExporteDeMultasTest extends TestCase
                 ->has('multa.historicalMovements.0.attachments', 1)
                 ->where('multa.historicalMovements.0.attachments.0.originalFilename', 'recibo.webp')
                 ->where('multa.attachments.0.createdByName', $operador->name)
-                ->where('can.viewAttachments', true));
+                ->where('multa.attachments.0.kind', 'pdf')
+                ->where('multa.attachments.0.canOpen', true));
 
         // El comprobante del antecedente se audita sobre su multa: es donde se lee.
         $evento = AuditEvent::query()->where('action', 'multa.respaldo-de-antecedente-agregado')->sole();

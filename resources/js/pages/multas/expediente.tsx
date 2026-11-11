@@ -7,12 +7,10 @@ import {
     TriangleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentGallery } from '@/components/attachments/attachment-gallery';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import {
-    AttachFileDialog,
-    AttachmentList,
-} from '@/features/multas/components/attachments';
+import { AttachFileDialog } from '@/features/multas/components/attachments';
 import {
     AddDocumentDialog,
     ReviseCaseDialog,
@@ -27,7 +25,7 @@ import { create as addFine } from '@/routes/multas/expedientes/multas';
 type Expediente = App.Modules.Multas.Data.FineCaseData;
 type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Multa = App.Modules.Multas.Data.FineCaseFineData;
-type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
+type Adjunto = App.Modules.Shared.Data.AttachmentData;
 
 type Props = {
     expediente: Expediente;
@@ -35,7 +33,7 @@ type Props = {
     adjuntos: Adjunto[];
     /** La foto de cada resolución y de cada acta, por id del documento. */
     adjuntosDeDocumentos: Record<number, Adjunto[] | undefined>;
-    can: { register: boolean; adjust: boolean; viewAttachments: boolean };
+    can: { register: boolean; adjust: boolean };
 };
 
 type Dialogo =
@@ -166,10 +164,7 @@ export default function ExpedienteDeMultas({
                                 del expediente.
                             </p>
                         ) : (
-                            <AttachmentList
-                                adjuntos={adjuntos}
-                                canView={can.viewAttachments}
-                            />
+                            <AttachmentGallery attachments={adjuntos} />
                         )}
                     </div>
                 </section>

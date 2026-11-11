@@ -53,6 +53,37 @@ final class Attachments
         return $porSujeto;
     }
 
+    /**
+     * Todos los archivos de cada sujeto, del más viejo al más nuevo.
+     *
+     * Para las fichas que muestran el legajo entero —una multa, sus pagos
+     * anteriores, sus documentos—: no hay uno vigente, están todos.
+     *
+     * @param  array<int>  $subjectIds
+     * @return array<int, list<AttachmentData>>
+     */
+    public function allFor(AttachmentSubject $subject, array $subjectIds, ?User $viewer): array
+    {
+        if ($subjectIds === []) {
+            return [];
+        }
+
+        $porSujeto = [];
+
+        $adjuntos = Attachment::query()
+            ->with('uploader:id,name')
+            ->where('subject_type', $subject->value)
+            ->whereIn('subject_id', $subjectIds)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($adjuntos as $adjunto) {
+            $porSujeto[$adjunto->subject_id][] = AttachmentData::fromModel($adjunto, $viewer);
+        }
+
+        return $porSujeto;
+    }
+
     /** El vigente de un solo sujeto. */
     public function latestOf(
         AttachmentSubject $subject,

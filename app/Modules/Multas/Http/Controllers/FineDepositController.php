@@ -46,7 +46,7 @@ final class FineDepositController extends Controller
     public function create(Request $request, FinePayment $payment, CashBoxBankAccounts $cuentas): Response
     {
         $payment->load(['fine.fineCase', 'application.fundReceipt', 'paymentReceipt.receipt']);
-        $deposito = $this->depositos->forPayments([$payment])[$payment->id] ?? null;
+        $deposito = $this->depositos->forPayments([$payment], $request->user())[$payment->id] ?? null;
         // Cada período de las cuentas de la caja: el formulario muestra las vigentes en la fecha del depósito.
         $opciones = $cuentas->depositOptions($this->depositos->cashBoxId(), Currency::from($payment->fine->currency));
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Multas\Data;
 
 use App\Modules\Multas\Enums\FineCollectionPlace;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -25,7 +26,7 @@ final class FineDepositData extends Data
         public ?string $operationNumber,
         /** El día del crédito en el extracto. */
         public ?string $creditedOn,
-        public ?FineAttachmentData $ticket,
+        public ?AttachmentData $ticket,
         /** @var list<FineCancelledDepositData> */
         public array $cancelled,
         /** El cheque vigente de la cadena: el original o su último reemplazo. */

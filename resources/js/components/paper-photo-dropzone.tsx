@@ -1,7 +1,11 @@
-import { FileText, ImageUp, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ImageUp, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { AttachmentThumbnail } from '@/components/attachments/attachment-preview';
+import { localItem } from '@/components/attachments/types';
+import { useAttachmentViewer } from '@/components/attachments/use-attachment-viewer';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { fileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const ACEPTA = 'image/jpeg,image/png,image/webp,application/pdf';
@@ -15,7 +19,7 @@ const ACEPTA = 'image/jpeg,image/png,image/webp,application/pdf';
  * el archivo soltado encima, y que también se abre con un clic o con el
  * teclado. Elegida la foto, muestra cuál es —una miniatura, o el ícono si
  * es un PDF— para que el operador vea que subió la correcta antes de
- * guardar.
+ * guardar. Un clic en la miniatura la abre en el visor, con zoom.
  *
  * Qué tipos y tamaños se aceptan lo decide el servidor
  * (`ScannedDocument`); acá solo se avisa, para no enterarse por un error.
@@ -37,25 +41,15 @@ export default function PaperPhotoDropzone({
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [encima, setEncima] = useState(false);
-    const esPdf = foto?.type === 'application/pdf';
-
+    const { open, viewer } = useAttachmentViewer();
     /*
-     * La miniatura sale de una URL local del archivo. Se crea cuando cambia
-     * la foto y se libera al cambiarla o al cerrar el diálogo: sin eso cada
-     * foto elegida queda retenida en memoria hasta recargar la página.
+     * La miniatura —una foto, o la primera hoja de un PDF— la dibuja
+     * `AttachmentThumbnail`, que también libera la URL local del archivo.
      */
-    const miniatura = useMemo(
-        () => (foto !== null && !esPdf ? URL.createObjectURL(foto) : null),
-        [foto, esPdf],
+    const item = useMemo(
+        () => (foto === null ? null : localItem(foto)),
+        [foto],
     );
-
-    useEffect(() => {
-        if (miniatura === null) {
-            return;
-        }
-
-        return () => URL.revokeObjectURL(miniatura);
-    }, [miniatura]);
 
     const abrir = () => inputRef.current?.click();
 
@@ -142,26 +136,23 @@ export default function PaperPhotoDropzone({
                     </button>
                 ) : (
                     <div className="flex items-center gap-3 p-2">
-                        {miniatura !== null ? (
-                            <img
-                                src={miniatura}
-                                alt=""
-                                className="size-12 shrink-0 rounded object-cover"
-                            />
-                        ) : (
-                            <span className="flex size-12 shrink-0 items-center justify-center rounded bg-muted">
-                                <FileText
-                                    className="size-6 text-muted-foreground"
-                                    aria-hidden="true"
-                                />
-                            </span>
+                        {item !== null && (
+                            <button
+                                type="button"
+                                onClick={() => open([item])}
+                                aria-label={`Ver ${foto.name} en grande`}
+                                title="Ver en grande"
+                                className="size-12 shrink-0 cursor-zoom-in overflow-hidden rounded bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                <AttachmentThumbnail item={item} />
+                            </button>
                         )}
                         <span className="grid min-w-0 flex-1 gap-0.5">
                             <span className="truncate text-sm">
                                 {foto.name}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {pesoLegible(foto.size)}
+                                {fileSize(foto.size)}
                                 {encima && ' · soltá otra para reemplazarla'}
                             </span>
                         </span>
@@ -189,15 +180,7 @@ export default function PaperPhotoDropzone({
             </div>
 
             <InputError message={error} />
+            {viewer}
         </div>
     );
-}
-
-/** El tamaño de un archivo, como lo diría una persona. */
-function pesoLegible(bytes: number): string {
-    if (bytes < 1024 * 1024) {
-        return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-    }
-
-    return `${(bytes / (1024 * 1024)).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB`;
 }

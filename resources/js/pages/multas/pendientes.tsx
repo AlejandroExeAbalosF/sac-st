@@ -16,7 +16,6 @@ type Permisos = {
     verify: boolean;
     deposit: boolean;
     confirmDeposit: boolean;
-    viewAttachments: boolean;
     manageRejections: boolean;
     replaceCheque: boolean;
 };
@@ -271,7 +270,6 @@ function Cobros({
                                     desde="pendientes"
                                     canDeposit={can.deposit}
                                     canConfirm={can.confirmDeposit}
-                                    canViewAttachments={can.viewAttachments}
                                     isCheque={fila.payment.medium === 'cheque'}
                                     canManageRejections={can.manageRejections}
                                     canReplaceCheque={can.replaceCheque}

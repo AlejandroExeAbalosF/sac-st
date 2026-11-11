@@ -70,7 +70,7 @@ final class FineBankCreditController extends Controller
             ->with(['fine.fineCase', 'application.fundReceipt', 'paymentReceipt.receipt', 'creator:id,name'])
             ->orderBy('id')
             ->get();
-        $depositos = $this->depositos->forPayments($enTransito);
+        $depositos = $this->depositos->forPayments($enTransito, $request->user());
 
         return Inertia::render('multas/identificar-credito', [
             'credit' => FineBankCreditData::fromModel($transaction),

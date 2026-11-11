@@ -13,6 +13,7 @@ import {
     Unlink,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentGallery } from '@/components/attachments/attachment-gallery';
 import DataField, { EmptyValue } from '@/components/data-field';
 import Money from '@/components/money';
 import PageHeader from '@/components/page-header';
@@ -22,10 +23,7 @@ import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
 import type { CajaPendiente } from '@/features/caja/components/cash-box-not-ready';
 import AdjustDebtDialog from '@/features/multas/components/adjust-debt-dialog';
 import AppealDialog from '@/features/multas/components/appeal-dialog';
-import {
-    AttachFileDialog,
-    AttachmentList,
-} from '@/features/multas/components/attachments';
+import { AttachFileDialog } from '@/features/multas/components/attachments';
 import BankPaymentDialog from '@/features/multas/components/bank-payment-dialog';
 import { ReviseDocumentDialog } from '@/features/multas/components/case-dialogs';
 import CollectPaymentDialog from '@/features/multas/components/collect-payment-dialog';
@@ -80,7 +78,7 @@ type Documento = App.Modules.Multas.Data.FineDocumentData;
 type Papel = App.Modules.Multas.Enums.FineDocumentRole;
 type Movimiento = App.Modules.Multas.Data.FineDebtEntryData;
 type Antecedente = App.Modules.Multas.Data.FineHistoricalMovementData;
-type Adjunto = App.Modules.Multas.Data.FineAttachmentData;
+type Adjunto = App.Modules.Shared.Data.AttachmentData;
 type Credito = App.Modules.Multas.Data.FineBankCreditData;
 type Pago = App.Modules.Multas.Data.FinePaymentData;
 
@@ -128,7 +126,6 @@ type Props = {
         adjust: boolean;
         correctAmount: boolean;
         replaceOrigin: boolean;
-        viewAttachments: boolean;
         linkBankCredit: boolean;
         deposit: boolean;
         confirmDeposit: boolean;
@@ -530,13 +527,12 @@ export default function MultaShow({
                                 {(adjuntosDeDocumentos[documento.id] ?? [])
                                     .length > 0 && (
                                     <div className="basis-full pt-1">
-                                        <AttachmentList
-                                            adjuntos={
+                                        <AttachmentGallery
+                                            attachments={
                                                 adjuntosDeDocumentos[
                                                     documento.id
                                                 ] ?? []
                                             }
-                                            canView={can.viewAttachments}
                                         />
                                     </div>
                                 )}
@@ -592,9 +588,8 @@ export default function MultaShow({
                         ) : (
                             <>
                                 {multa.attachments.length > 0 && (
-                                    <AttachmentList
-                                        adjuntos={multa.attachments}
-                                        canView={can.viewAttachments}
+                                    <AttachmentGallery
+                                        attachments={multa.attachments}
                                     />
                                 )}
                                 {adjuntosDelExpediente.length > 0 && (
@@ -602,9 +597,8 @@ export default function MultaShow({
                                         <p className="text-xs tracking-wide text-field-label uppercase">
                                             Del expediente
                                         </p>
-                                        <AttachmentList
-                                            adjuntos={adjuntosDelExpediente}
-                                            canView={can.viewAttachments}
+                                        <AttachmentGallery
+                                            attachments={adjuntosDelExpediente}
                                         />
                                     </div>
                                 )}
@@ -1157,9 +1151,6 @@ export default function MultaShow({
                                                     canConfirm={
                                                         can.confirmDeposit
                                                     }
-                                                    canViewAttachments={
-                                                        can.viewAttachments
-                                                    }
                                                     isCheque={
                                                         pago.medium === 'cheque'
                                                     }
@@ -1174,10 +1165,9 @@ export default function MultaShow({
                                         )}
                                         {pago.attachments.length > 0 && (
                                             <div className="w-full">
-                                                <AttachmentList
-                                                    adjuntos={pago.attachments}
-                                                    canView={
-                                                        can.viewAttachments
+                                                <AttachmentGallery
+                                                    attachments={
+                                                        pago.attachments
                                                     }
                                                 />
                                             </div>
@@ -1333,12 +1323,9 @@ export default function MultaShow({
                                         </span>
                                         {antecedente.attachments.length > 0 && (
                                             <div className="w-full">
-                                                <AttachmentList
-                                                    adjuntos={
+                                                <AttachmentGallery
+                                                    attachments={
                                                         antecedente.attachments
-                                                    }
-                                                    canView={
-                                                        can.viewAttachments
                                                     }
                                                 />
                                             </div>

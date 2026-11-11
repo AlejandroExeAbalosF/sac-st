@@ -15,9 +15,9 @@ use App\Modules\Multas\Http\Requests\ReviseFineRecordRequest;
 use App\Modules\Multas\Http\Requests\StoreFineDocumentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
-use App\Modules\Multas\Support\FineAttachments;
 use App\Modules\Multas\Support\NewDocument;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Support\Attachments;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Ui\Toast;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -32,7 +32,7 @@ use Inertia\Response;
  */
 final class FineCaseController extends Controller
 {
-    public function show(Request $request, FineCase $fineCase, FineAttachments $adjuntos): Response
+    public function show(Request $request, FineCase $fineCase, Attachments $adjuntos): Response
     {
         $fineCase->load('documents');
 
@@ -50,13 +50,12 @@ final class FineCaseController extends Controller
             'motivos' => FineReasonAct::options(),
             'multas' => $multas->map(fn (Fine $multa): FineCaseFineData => FineCaseFineData::fromModel($multa))->values(),
             // Los papeles del expediente sin documento propio, y lo subido antes de que cada documento tuviera el suyo.
-            'adjuntos' => $adjuntos->for(AttachmentSubject::FineCase, [$fineCase->id])[$fineCase->id] ?? [],
+            'adjuntos' => $adjuntos->allFor(AttachmentSubject::FineCase, [$fineCase->id], $usuario)[$fineCase->id] ?? [],
             // La foto de cada resolución y de cada acta, por id del documento.
-            'adjuntosDeDocumentos' => $adjuntos->for(AttachmentSubject::FineDocument, array_values($fineCase->documents->modelKeys())),
+            'adjuntosDeDocumentos' => $adjuntos->allFor(AttachmentSubject::FineDocument, array_values($fineCase->documents->modelKeys()), $usuario),
             'can' => [
                 'register' => $usuario?->can('multas.registrar') ?? false,
                 'adjust' => $usuario?->can('multas.ajustar') ?? false,
-                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }

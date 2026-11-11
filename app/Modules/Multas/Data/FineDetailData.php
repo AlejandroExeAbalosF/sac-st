@@ -14,6 +14,7 @@ use App\Modules\Multas\Models\FineDocument;
 use App\Modules\Multas\Models\FineHistoricalMovement;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Multas\Support\PartialDate;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -54,7 +55,7 @@ final class FineDetailData extends Data
         public array $payments,
         public ?string $createdByName,
         public ?string $createdAt,
-        /** @var list<FineAttachmentData> */
+        /** @var list<AttachmentData> */
         public array $attachments,
     ) {}
 
@@ -64,9 +65,9 @@ final class FineDetailData extends Data
      * `historicalMovements.{creator,reviewer,bankTransaction}` y
      * `payments.{application.fundReceipt,paymentReceipt.receipt,creator}`.
      *
-     * @param  list<FineAttachmentData>  $adjuntos  los de la multa
-     * @param  array<int, list<FineAttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior
-     * @param  array<int, list<FineAttachmentData>>  $adjuntosDePagos  por id del pago
+     * @param  list<AttachmentData>  $adjuntos  los de la multa
+     * @param  array<int, list<AttachmentData>>  $adjuntosDeAntecedentes  por id del pago anterior
+     * @param  array<int, list<AttachmentData>>  $adjuntosDePagos  por id del pago
      * @param  array<int, FineDepositData>  $depositos  por id del pago: dónde está la plata de cada cobro de caja
      */
     public static function fromModel(Fine $multa, array $adjuntos, array $adjuntosDeAntecedentes, array $adjuntosDePagos = [], array $depositos = []): self

@@ -20,6 +20,7 @@ use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Attachments;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -37,7 +38,7 @@ final class FineDeposits
 {
     private ?int $cajaId = null;
 
-    public function __construct(private readonly FineAttachments $adjuntos) {}
+    public function __construct(private readonly Attachments $adjuntos) {}
 
     /** El instrumento vigente del cobro: el que va al banco. */
     public function receiptOf(FinePayment $pago): ?FundReceipt
@@ -158,9 +159,10 @@ final class FineDeposits
      * reemplazar: falta el aviso y el papel, y lo que diga el banco.
      *
      * @param  iterable<FinePayment>  $pagos  con `application` cargada
+     * @param  User|null  $viewer  quien mira: decide qué tickets puede abrir
      * @return array<int, FineDepositData> por id del pago; los cobros de caja aplicados y los anulados con rechazo
      */
-    public function forPayments(iterable $pagos): array
+    public function forPayments(iterable $pagos, ?User $viewer): array
     {
         $raizDe = [];
         $anulados = [];
@@ -178,7 +180,7 @@ final class FineDeposits
         }
 
         if ($anulados !== []) {
-            $conRechazo = array_keys($this->rejectionsOf(array_values(array_unique($anulados))));
+            $conRechazo = array_keys($this->rejectionsOf(array_values(array_unique($anulados)), $viewer));
             $anulados = array_filter($anulados, fn (int $raiz): bool => in_array($raiz, $conRechazo, true));
             $raizDe += $anulados;
         }
@@ -212,8 +214,9 @@ final class FineDeposits
             ->whereNull('a.reversal_of_id')
             ->pluck('m.transaction_date', 'a.financial_event_id');
 
-        $tickets = $this->adjuntos->for(AttachmentSubject::CashTransfer, array_values($vivos->pluck('id')->all()));
-        $rechazos = $this->rejectionsOf($raices);
+        // El vigente: si el ticket se volvió a cargar, el último.
+        $tickets = $this->adjuntos->latestFor(AttachmentSubject::CashTransfer, array_values($vivos->pluck('id')->all()), $viewer, 'cash_transfer_ticket');
+        $rechazos = $this->rejectionsOf($raices, $viewer);
 
         $resultado = [];
 
@@ -237,7 +240,7 @@ final class FineDeposits
                 creditedOn: ! $rechazado && $vivo?->credit_event_id !== null && isset($acreditados[$vivo->credit_event_id])
                     ? (string) $acreditados[$vivo->credit_event_id]
                     : null,
-                ticket: $rechazado || $vivo === null ? null : ($tickets[$vivo->id][0] ?? null),
+                ticket: $rechazado || $vivo === null ? null : ($tickets[$vivo->id] ?? null),
                 cancelled: array_values($suyos
                     ->filter(fn (CashToBankTransfer $t): bool => $t->status === CashTransferStatus::Cancelled)
                     ->map(fn (CashToBankTransfer $t): FineCancelledDepositData => new FineCancelledDepositData(
@@ -327,7 +330,7 @@ final class FineDeposits
      * @param  list<int>  $raices
      * @return array<int, list<FineChequeRejectionData>> por id de la raíz
      */
-    private function rejectionsOf(array $raices): array
+    private function rejectionsOf(array $raices, ?User $viewer): array
     {
         $rechazos = ChequeRejection::query()
             ->with(['fundReceipt', 'replacement', 'transfer', 'registrar:id,name'])
@@ -343,7 +346,7 @@ final class FineDeposits
         $movimientos = DB::table('bank_transactions')
             ->whereIn('id', $rechazos->pluck('credit_bank_transaction_id')->merge($rechazos->pluck('debit_bank_transaction_id'))->filter()->values()->all())
             ->pluck('transaction_date', 'id');
-        $adjuntos = $this->adjuntos->for(AttachmentSubject::ChequeRejection, array_values($rechazos->modelKeys()));
+        $adjuntos = $this->adjuntos->allFor(AttachmentSubject::ChequeRejection, array_values($rechazos->modelKeys()), $viewer);
 
         $porRaiz = [];
 
