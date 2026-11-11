@@ -11,6 +11,8 @@ const adjunto = (cambios: Partial<Attachment> = {}): Attachment => ({
     sizeBytes: 90_000,
     canOpen: true,
     canRename: false,
+    canVoid: false,
+    voided: null,
     createdByName: 'Operador',
     createdAt: '2026-11-10T13:00:00Z',
     ...cambios,

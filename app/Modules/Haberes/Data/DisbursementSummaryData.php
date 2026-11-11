@@ -9,6 +9,7 @@ use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
@@ -60,6 +61,8 @@ final class DisbursementSummaryData extends Data
         public ?string $transferReference,
         /** La foto o el PDF del informe, si se adjuntó. */
         public ?AttachmentData $reportAttachment,
+        /** Cuántos informes tiene y cuántos anulados: con el único anulado, el camino a él. */
+        public ?AttachmentHistoryData $reportHistory,
         /** El CBU al que se pidió transferir, congelado. */
         public ?string $beneficiaryCbu,
         /** El débito del extracto que prueba que el dinero salió. */
@@ -85,7 +88,7 @@ final class DisbursementSummaryData extends Data
         public ?string $validatedAt,
     ) {}
 
-    public static function fromModel(Disbursement $disbursement, ?User $viewer): self
+    public static function fromModel(Disbursement $disbursement, ?User $viewer, ?AttachmentHistoryData $reportHistory = null): self
     {
         $debito = $disbursement->bankTransaction;
         $comision = $disbursement->feeBankTransaction;
@@ -103,6 +106,7 @@ final class DisbursementSummaryData extends Data
             reportAttachment: $disbursement->reportDocument === null
                 ? null
                 : AttachmentData::fromModel($disbursement->reportDocument, $viewer),
+            reportHistory: $reportHistory,
             beneficiaryCbu: $disbursement->beneficiary_cbu_snapshot,
             debitTransactionId: $debito?->id,
             debitDate: $debito?->transaction_date?->format('Y-m-d'),

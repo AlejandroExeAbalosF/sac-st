@@ -1,9 +1,11 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
+    Ban,
     ChevronLeft,
     ChevronRight,
     Download,
     Loader2,
+    MoreVertical,
     Pencil,
     RotateCw,
     X,
@@ -12,6 +14,12 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { fileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
@@ -23,6 +31,7 @@ import {
     AttachmentTitleEditor,
     renameAttachment,
 } from './attachment-title-editor';
+import { AttachmentVoidDialog } from './attachment-void-dialog';
 import { ImageStage } from './image-stage';
 import type { ViewerItem } from './types';
 import { downloadUrl, previewUrl } from './types';
@@ -166,6 +175,9 @@ export default function AttachmentViewer({
     const [titulos, setTitulos] = useState<Record<string, string>>({});
     const [editando, setEditando] = useState(false);
     const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
+    const [anulando, setAnulando] = useState(false);
+    // Que el menú no le devuelva el foco a su botón al elegir corregir.
+    const aEditar = useRef(false);
 
     // Si la lista se acorta con el visor abierto, el índice queda acotado.
     const safeIndex = Math.min(index, Math.max(items.length - 1, 0));
@@ -246,7 +258,9 @@ export default function AttachmentViewer({
             : item?.name;
     const titulo =
         item === undefined ? 'Archivo' : (titulos[item.key] ?? item.name);
-    const renombrable = item?.source === 'remote' && item.attachment.canRename;
+    const remoto = item?.source === 'remote' ? item.attachment : null;
+    const renombrable = remoto?.canRename === true;
+    const anulable = remoto?.canVoid === true;
 
     const guardarTitulo = (valor: string | null) => {
         if (valor === null || item?.source !== 'remote') {
@@ -329,14 +343,53 @@ export default function AttachmentViewer({
                         </div>
 
                         <div className="flex items-center gap-0.5">
-                            {renombrable && !editando && (
+                            {(renombrable || anulable) && !editando && (
                                 <>
-                                    <ViewerButton
-                                        label="Corregir descripción"
-                                        onClick={() => setEditando(true)}
-                                    >
-                                        <Pencil className="size-5" />
-                                    </ViewerButton>
+                                    <DropdownMenu modal={false}>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                aria-label="Acciones del archivo"
+                                                title="Acciones del archivo"
+                                                className="flex size-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+                                            >
+                                                <MoreVertical className="size-5" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="w-52"
+                                            onCloseAutoFocus={(e) => {
+                                                if (aEditar.current) {
+                                                    e.preventDefault();
+                                                    aEditar.current = false;
+                                                }
+                                            }}
+                                        >
+                                            {renombrable && (
+                                                <DropdownMenuItem
+                                                    onSelect={() => {
+                                                        aEditar.current = true;
+                                                        setEditando(true);
+                                                    }}
+                                                >
+                                                    <Pencil className="size-4" />
+                                                    Corregir descripción
+                                                </DropdownMenuItem>
+                                            )}
+                                            {anulable && (
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        setAnulando(true)
+                                                    }
+                                                    className="text-destructive-strong focus:text-destructive-strong"
+                                                >
+                                                    <Ban className="size-4" />
+                                                    Anular
+                                                </DropdownMenuItem>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                     <span className="mx-1 h-6 w-px bg-white/15" />
                                 </>
                             )}
@@ -449,6 +502,18 @@ export default function AttachmentViewer({
                                 </button>
                             ))}
                         </div>
+                    )}
+                    {/*
+                     * Anular cierra el visor: la pantalla de atrás se recarga
+                     * sin ese archivo, y la copia que tiene el visor ya no
+                     * dice la verdad.
+                     */}
+                    {anulando && remoto !== null && (
+                        <AttachmentVoidDialog
+                            attachment={remoto}
+                            onClose={() => setAnulando(false)}
+                            onVoided={onClose}
+                        />
                     )}
                 </DialogPrimitive.Content>
             </DialogPrimitive.Portal>

@@ -41,6 +41,8 @@ const RUTAS_SIN_PANTALLA = [
     // Archivos.
     'adjuntos.download',
     'adjuntos.preview',
+    // El historial de archivos responde JSON al diálogo: no dibuja una pantalla.
+    'adjuntos.history',
     'caja.arqueos.sheet',
     'caja.cierres.sheet',
     'caja.rendition',

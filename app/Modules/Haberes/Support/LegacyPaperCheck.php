@@ -131,6 +131,8 @@ final class LegacyPaperCheck
                 ->where('subject_type', AttachmentSubject::LegacyDocument->value)
                 ->where('sha256', $adjunto->sha256)
                 ->whereNotIn('id', $propios)
+                // Una foto anulada ya no respalda a ningún papel: no cuenta como repetida.
+                ->whereNull('voided_at')
                 ->exists();
 
             if (! $repetida) {

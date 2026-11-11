@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Modules\Ledger\Enums\CashBoxAbility;
 use App\Modules\Ledger\Support\CashBoxModules;
+use App\Modules\Shared\Enums\SharedReasonAct;
 use App\Support\Navigation\Breadcrumbs;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -219,6 +220,12 @@ class HandleInertiaRequests extends Middleware
              * que cada visor repita un nombre de ruta a mano lo reabre.
              */
             'framableDocuments' => fn (): array => $this->plantillasEnmarcables(),
+            /*
+             * Los motivos de anular un adjunto. Van aparte de `motivos`:
+             * esa prop la define cada pantalla con los actos de su módulo,
+             * y el visor que anula se abre desde cualquiera.
+             */
+            'attachmentReasons' => fn (): array => $user === null ? [] : SharedReasonAct::options(),
         ];
     }
 

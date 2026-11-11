@@ -32,6 +32,10 @@ final class RenameAttachment
         return DB::transaction(function () use ($attachment, $nuevo, $actor): Attachment {
             $adjunto = Attachment::query()->lockForUpdate()->findOrFail($attachment->id);
 
+            if (! $adjunto->canBeRenamed()) {
+                throw ValidationException::withMessages(['title' => 'Un archivo anulado no se renombra.']);
+            }
+
             if (! Gate::forUser($actor)->allows('rename', $adjunto)) {
                 throw ValidationException::withMessages(['title' => 'No podés corregir la descripción de este archivo.']);
             }

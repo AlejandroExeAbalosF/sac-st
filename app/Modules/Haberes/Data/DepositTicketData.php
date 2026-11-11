@@ -8,6 +8,7 @@ use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
@@ -42,12 +43,14 @@ final class DepositTicketData extends Data
         public ?string $discardedReason,
         /** La foto del comprobante, para verla al lado del formulario. */
         public ?AttachmentData $attachment,
+        /** Cuántas fotos tiene y cuántas anuladas: con la única anulada, el camino a ella. */
+        public ?AttachmentHistoryData $attachmentHistory,
         /** Cuántos días lleva esperando. Un ticket viejo sin aparecer es una señal. */
         public int $waitingDays,
     ) {}
 
     /** La foto llega resuelta: en la cola son veinticinco tickets por página. */
-    public static function fromModel(DepositTicket $ticket, ?AttachmentData $attachment): self
+    public static function fromModel(DepositTicket $ticket, ?AttachmentData $attachment, ?AttachmentHistoryData $attachmentHistory = null): self
     {
         $cuota = $ticket->installment;
 
@@ -83,6 +86,7 @@ final class DepositTicketData extends Data
              * foto mejor y, como `attachments` es inmutable, las dos quedan.
              */
             attachment: $attachment,
+            attachmentHistory: $attachmentHistory,
             waitingDays: (int) $ticket->deposited_at->diffInDays(BusinessDate::today(), false),
         );
     }

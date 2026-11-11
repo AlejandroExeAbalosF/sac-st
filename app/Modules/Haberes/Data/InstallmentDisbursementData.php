@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Support\DisbursementReadiness;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Models\Receipt;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -75,7 +76,7 @@ final class InstallmentDisbursementData extends Data
         public bool $needsReceipt,
     ) {}
 
-    public static function fromReadiness(DisbursementReadiness $estado, ?User $viewer): self
+    public static function fromReadiness(DisbursementReadiness $estado, ?User $viewer, ?AttachmentHistoryData $reportHistory = null): self
     {
         return new self(
             channel: $estado->channel,
@@ -86,7 +87,7 @@ final class InstallmentDisbursementData extends Data
             amount: $estado->amount,
             disbursement: $estado->disbursement === null
                 ? null
-                : DisbursementSummaryData::fromModel($estado->disbursement, $viewer),
+                : DisbursementSummaryData::fromModel($estado->disbursement, $viewer, $reportHistory),
             receipt: $estado->expenseReceipt === null
                 ? null
                 : InstallmentReceiptData::fromModel($estado->expenseReceipt),

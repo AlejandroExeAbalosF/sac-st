@@ -9,6 +9,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentInlinePreview } from '@/components/attachments/attachment-inline-preview';
 import PageHeader from '@/components/page-header';
 import ReasonFields from '@/components/reason-fields';
@@ -641,6 +642,11 @@ function ComprobanteAdjunto({ ticket }: { ticket: Ticket }) {
                         </p>
                     </div>
                 )}
+                <AttachmentHistoryButton
+                    history={ticket.attachmentHistory}
+                    hasCurrent={ticket.attachment !== null}
+                    className="mt-1 px-1"
+                />
             </div>
 
             <dl className="mt-3 space-y-2 rounded-lg border p-4 text-sm">

@@ -1,4 +1,11 @@
-import { Download, Lock, MoreVertical, Pencil, ZoomIn } from 'lucide-react';
+import {
+    Ban,
+    Download,
+    Lock,
+    MoreVertical,
+    Pencil,
+    ZoomIn,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
     DropdownMenu,
@@ -17,6 +24,7 @@ import {
     AttachmentTitleEditor,
     renameAttachment,
 } from './attachment-title-editor';
+import { AttachmentVoidDialog } from './attachment-void-dialog';
 import type { Attachment } from './types';
 import { canPreview, downloadUrl, remoteItem } from './types';
 
@@ -32,9 +40,11 @@ const desplegar =
 /**
  * Un archivo en mosaico: la miniatura ocupa toda la tarjeta y encima van
  * el tipo, el nombre y, al acercarse, quién lo subió, cuándo y el menú ⋮:
- * descargar y, con permiso, corregir la descripción.
+ * descargar y, con permiso, corregir la descripción o anularlo.
  *
- * El archivo en sí no se modifica: corregir es solo la descripción.
+ * El archivo en sí no se modifica: corregir es solo la descripción, y
+ * anular lo saca de la vista sin borrarlo. Uno anulado se ve atenuado, con
+ * el sello y el motivo.
  */
 export function AttachmentCard({
     attachment,
@@ -49,6 +59,8 @@ export function AttachmentCard({
     const [editando, setEditando] = useState(false);
     const [menuAbierto, setMenuAbierto] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [anulando, setAnulando] = useState(false);
+    const anulado = attachment.voided;
     /*
      * Al cerrarse, el menú devuelve el foco a su botón. Si se eligió
      * corregir, ese foco se lo sacaría al campo recién abierto y el
@@ -57,11 +69,14 @@ export function AttachmentCard({
     const aEditar = useRef(false);
     const extension = extensionOf(attachment.originalFilename);
     const ampliable = onOpen !== undefined && canPreview(attachment);
-    const detalle = [
-        fileSize(attachment.sizeBytes),
-        attachment.createdByName ?? 'Sin dato',
-        dateTime(attachment.createdAt),
-    ].join(' · ');
+    const detalle =
+        anulado !== null
+            ? `Anulado por ${anulado.byName ?? 'sin dato'} · ${anulado.reason}`
+            : [
+                  fileSize(attachment.sizeBytes),
+                  attachment.createdByName ?? 'Sin dato',
+                  dateTime(attachment.createdAt),
+              ].join(' · ');
 
     return (
         <div
@@ -71,7 +86,12 @@ export function AttachmentCard({
                 className,
             )}
         >
-            <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100">
+            <div
+                className={cn(
+                    'absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100',
+                    anulado !== null && 'opacity-60 grayscale',
+                )}
+            >
                 <AttachmentThumbnail item={remoteItem(attachment)} />
             </div>
 
@@ -89,6 +109,12 @@ export function AttachmentCard({
                     <span className="rounded-full bg-black/40 p-2.5 text-white shadow-lg backdrop-blur-sm">
                         <ZoomIn className="size-5" />
                     </span>
+                </span>
+            )}
+
+            {anulado !== null && (
+                <span className="absolute top-2 left-2 rounded-md bg-destructive-soft px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wider text-destructive-strong uppercase shadow-sm">
+                    Anulado
                 </span>
             )}
 
@@ -185,6 +211,15 @@ export function AttachmentCard({
                                         Corregir descripción
                                     </DropdownMenuItem>
                                 )}
+                                {attachment.canVoid && (
+                                    <DropdownMenuItem
+                                        onSelect={() => setAnulando(true)}
+                                        className="text-destructive-strong focus:text-destructive-strong"
+                                    >
+                                        <Ban className="size-4" />
+                                        Anular
+                                    </DropdownMenuItem>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
@@ -195,6 +230,12 @@ export function AttachmentCard({
                     )}
                 </div>
             </div>
+            {anulando && (
+                <AttachmentVoidDialog
+                    attachment={attachment}
+                    onClose={() => setAnulando(false)}
+                />
+            )}
         </div>
     );
 }

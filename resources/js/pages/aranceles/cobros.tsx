@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Plus, ReceiptText, Search } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentLink } from '@/components/attachments/attachment-link';
 import DocumentInput from '@/components/document-input';
 import InputError from '@/components/input-error';
@@ -412,6 +413,10 @@ function FilaDeCobro({
                 >
                     Ver foto del talonario
                 </AttachmentLink>
+                <AttachmentHistoryButton
+                    history={cobro.talonarioPhotoHistory}
+                    hasCurrent={cobro.talonarioPhoto !== null}
+                />
                 {pagado && can.replace && (
                     <Button
                         variant="ghost"

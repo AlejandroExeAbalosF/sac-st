@@ -8,6 +8,7 @@ use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -41,6 +42,11 @@ final class InstallmentTicketData extends Data
         public string $accountLabel,
         /** La foto vigente. Puede faltar: el área no la exige. */
         public ?AttachmentData $attachment,
+        /**
+         * Cuántas fotos tiene y cuántas están anuladas: con la única
+         * anulada, el camino para llegar a ella.
+         */
+        public ?AttachmentHistoryData $attachmentHistory,
         /** El movimiento con el que se lo reconoció, si el cruce ya se hizo. */
         public ?int $bankTransactionId,
         /**
@@ -76,6 +82,7 @@ final class InstallmentTicketData extends Data
      *
      * @param  array<int, int>  $fundReceipts  id de ticket => id de recepción
      * @param  array<int, AttachmentData>  $attachments  id de ticket => su foto
+     * @param  array<int, AttachmentHistoryData>  $attachmentHistory  id de ticket => su historial de fotos
      * @param  array<int, string>  $beforeOpening  id de ticket => fecha de apertura
      */
     public static function fromModel(
@@ -83,6 +90,7 @@ final class InstallmentTicketData extends Data
         array $fundReceipts = [],
         array $attachments = [],
         array $beforeOpening = [],
+        array $attachmentHistory = [],
     ): self {
         return new self(
             id: $ticket->id,
@@ -104,6 +112,7 @@ final class InstallmentTicketData extends Data
             bankAccountId: $ticket->bank_account_id,
             accountLabel: $ticket->account->label,
             attachment: $attachments[$ticket->id] ?? null,
+            attachmentHistory: $attachmentHistory[$ticket->id] ?? null,
             bankTransactionId: $ticket->bank_transaction_id,
             fundReceiptId: $fundReceipts[$ticket->id] ?? null,
             editable: $ticket->status === DepositTicketStatus::Waiting,

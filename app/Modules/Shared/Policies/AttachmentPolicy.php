@@ -40,4 +40,10 @@ final class AttachmentPolicy
     {
         return $user->can('adjuntos.renombrar') && $this->view($user, $attachment);
     }
+
+    /** Anular: hay que poder abrirlo y tener el permiso. El estado, aparte. */
+    public function void(User $user, Attachment $attachment): bool
+    {
+        return $user->can('adjuntos.anular') && $this->view($user, $attachment);
+    }
 }

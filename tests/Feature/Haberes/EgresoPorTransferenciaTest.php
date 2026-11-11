@@ -13,6 +13,7 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\IssuePaymentOrder;
+use App\Modules\Haberes\Data\DisbursementSummaryData;
 use App\Modules\Haberes\Data\InstallmentDisbursementData;
 use App\Modules\Haberes\Data\InstallmentOrderStateData;
 use App\Modules\Haberes\Data\IssuePaymentOrderData;
@@ -30,19 +31,25 @@ use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Shared\Actions\VoidAttachment;
 use App\Modules\Shared\Enums\AttachmentKind;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Enums\SharedReasonCode;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\PersonBankAccount;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Attachments;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -150,6 +157,49 @@ class EgresoPorTransferenciaTest extends TestCase
     }
 
     /** Solo foto o PDF, como el resto de los papeles escaneados. */
+    /**
+     * Con dos informes, el egreso muestra el último vigente: si se anula, vuelve
+     * el anterior, y el historial cuenta los dos.
+     *
+     * `reportDocument()` elige con `latestOfMany()`, por fuera de
+     * `Attachments::latestFor`: sin su propio filtro seguiría mostrando el
+     * anulado.
+     */
+    public function test_anular_el_ultimo_informe_vuelve_a_mostrar_el_anterior(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaConOrden();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.report', $cuota), [
+                'reportedAt' => BusinessDate::today()->toDateString(),
+                'reference' => '83690105',
+                'document' => UploadedFile::fake()->create('informe.pdf', 120, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $egreso = Disbursement::query()->firstOrFail();
+        $primero = Attachment::query()->where('subject_id', $egreso->id)->where('document_type', Disbursement::REPORT_DOCUMENT_TYPE)->sole();
+        $segundo = Attachment::query()->create([
+            ...Arr::except($primero->getAttributes(), ['id', 'created_at']),
+            'object_key' => $primero->object_key.'-2',
+            'sha256' => hash('sha256', 'segundo informe'),
+        ]);
+
+        $estado = fn (): ?DisbursementSummaryData => InstallmentDisbursementData::fromReadiness(
+            app(DisbursementEligibility::class)->for($cuota->refresh()),
+            $this->operador(),
+        )->disbursement;
+        $this->assertSame($segundo->id, $estado()?->reportAttachment?->id);
+
+        app(VoidAttachment::class)->handle($segundo, new Reason(SharedReasonCode::Duplicate), $this->operador());
+
+        $this->assertSame($primero->id, $estado()?->reportAttachment?->id);
+
+        $historial = app(Attachments::class)->historyFor(AttachmentSubject::Disbursement, [$egreso->id], Disbursement::REPORT_DOCUMENT_TYPE)[$egreso->id];
+        $this->assertSame([2, 1], [$historial->total, $historial->voided]);
+    }
+
     public function test_el_papel_del_informe_tiene_que_ser_foto_o_pdf(): void
     {
         Storage::fake('local');

@@ -336,6 +336,13 @@ Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 [egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php) y
 [egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php).
 
+El informe que muestra la cuota es el último **no anulado** (`Disbursement::reportDocument`,
+con las condiciones dentro de `ofMany`). La foto del comprobante de depósito, la de cada
+papel del sistema anterior y el informe del egreso son respaldos opcionales que se pueden
+anular (`attachment_is_voidable()`); al anular el vigente vuelve el anterior, y la tarjeta
+ofrece el historial. La búsqueda de fotos repetidas de `LegacyPaperCheck` no cuenta las
+anuladas.
+
 <a id="transferencia-con-comision"></a>
 
 ### Transferencia con comisión bancaria

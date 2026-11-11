@@ -78,6 +78,14 @@ final class SharedPermissionCatalog implements PermissionCatalogContributor
                 'adjuntos',
                 ['administrador', 'contador', 'administrativo'],
             ),
+            // Anular no borra: el archivo queda, fuera de la vista y con su motivo.
+            new PermissionDefinition(
+                'adjuntos.anular',
+                'Anular adjuntos',
+                'Sacar de la vista un respaldo opcional subido por error. El archivo queda guardado, con quién lo anuló y por qué. La prueba de un hecho —el ticket de un traslado, un extracto— no se anula.',
+                'adjuntos',
+                ['administrador', 'contador', 'administrativo'],
+            ),
             // Lo reservado no circula: una nota médica, un dato sensible del
             // trabajador. Quien consulta expedientes todo el día no lo abre.
             new PermissionDefinition(

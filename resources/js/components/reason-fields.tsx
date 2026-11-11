@@ -34,6 +34,7 @@ export default function ReasonFields<A extends string, C extends string>({
     detailRequired = false,
     maxLength = 500,
     excludeCodes = [],
+    options,
 }: {
     act: A;
     code: C | '';
@@ -52,9 +53,15 @@ export default function ReasonFields<A extends string, C extends string>({
     maxLength?: number;
     /** Los motivos del acto que no aplican a este caso. */
     excludeCodes?: C[];
+    /**
+     * La lista, cuando no viene en `motivos` de la pantalla: un acto que se
+     * hace desde cualquier pantalla —anular un adjunto— la recibe en su
+     * propia prop compartida.
+     */
+    options?: Opcion[];
 }) {
     const { motivos } = usePage<{ motivos?: Record<string, Opcion[]> }>().props;
-    const opciones = motivos?.[act];
+    const opciones = options ?? motivos?.[act];
 
     if (opciones === undefined) {
         throw new Error(

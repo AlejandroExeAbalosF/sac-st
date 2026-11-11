@@ -103,16 +103,27 @@ final class Disbursement extends Model
     }
 
     /**
-     * La foto o el PDF del informe del organismo, si se adjuntó: el último.
+     * La foto o el PDF del informe del organismo, si se adjuntó: el último
+     * **vigente**. Uno anulado no cuenta: si se anula el último, vuelve el
+     * anterior.
+     *
+     * Las condiciones van **dentro** de `ofMany`, no antes: `latestOfMany()`
+     * calcula el `MAX(id)` en una subconsulta que ignora los `where` de
+     * afuera. Así elegía el último adjunto de cualquier sujeto con ese id
+     * —el de un ticket, el de un recibo— y el informe desaparecía; con el
+     * último anulado, lo seguía eligiendo.
      *
      * @return HasOne<Attachment, $this>
      */
     public function reportDocument(): HasOne
     {
-        return $this->hasOne(Attachment::class, 'subject_id')
-            ->where('subject_type', AttachmentSubject::Disbursement->value)
-            ->where('document_type', self::REPORT_DOCUMENT_TYPE)
-            ->latestOfMany();
+        return $this->hasOne(Attachment::class, 'subject_id')->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query
+                ->where('subject_type', AttachmentSubject::Disbursement->value)
+                ->where('document_type', self::REPORT_DOCUMENT_TYPE)
+                ->whereNull('voided_at'),
+        );
     }
 
     /** @return BelongsTo<BeneficiaryInstallment, $this> */

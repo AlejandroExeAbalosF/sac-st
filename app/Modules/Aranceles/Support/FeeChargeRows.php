@@ -16,6 +16,7 @@ use App\Modules\Aranceles\Models\FeeChargeItem;
 use App\Modules\Aranceles\Models\FeeChargeProof;
 use App\Modules\Aranceles\Models\FeeChargeReceipt;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Support\Attachments;
@@ -78,6 +79,8 @@ final class FeeChargeRows
             $viewer,
             'talonario_photo',
         );
+        // Cuántas fotos tiene cada recibo: con la única anulada, el camino a ella.
+        $historiales = $this->adjuntos->historyFor(AttachmentSubject::Receipt, array_values($cobros->flatMap(fn (FeeCharge $c) => $c->chargeReceipts->pluck('receipt_id'))->unique()->all()), 'talonario_photo');
         // En orden, el último pisa a los anteriores.
         $comprobantes = FeeChargeProof::query()->whereIn('fee_charge_id', $ids)->orderBy('id')->get()->keyBy('fee_charge_id');
         $fotosDeComprobantes = $this->adjuntos->forIds(array_values($comprobantes->pluck('attachment_id')->all()), $viewer);
@@ -93,6 +96,7 @@ final class FeeChargeRows
                 $cobro->chargeReceipts->map(fn (FeeChargeReceipt $c): ?AttachmentData => $fotos[$c->receipt_id] ?? null)->filter()->first(),
                 $comprobantes[$cobro->id] ?? null,
                 $fotosDeComprobantes,
+                $cobro->chargeReceipts->map(fn (FeeChargeReceipt $c): ?AttachmentHistoryData => $historiales[$c->receipt_id] ?? null)->filter()->first(),
             );
         }
 
@@ -105,7 +109,7 @@ final class FeeChargeRows
      * @param  list<int>  $depositadas
      * @param  array<int, AttachmentData>  $fotosDeComprobantes  por id del adjunto
      */
-    private function build(FeeCharge $cobro, BaseCollection $importes, Collection $vinculos, array $depositadas, ?AttachmentData $foto, ?FeeChargeProof $comprobante, array $fotosDeComprobantes): FeeChargeListItemData
+    private function build(FeeCharge $cobro, BaseCollection $importes, Collection $vinculos, array $depositadas, ?AttachmentData $foto, ?FeeChargeProof $comprobante, array $fotosDeComprobantes, ?AttachmentHistoryData $historialDeFoto): FeeChargeListItemData
     {
         $vigente = $cobro->chargeReceipts->first(fn (FeeChargeReceipt $c): bool => $c->receipt->status === ReceiptStatus::Issued);
         $ultimo = $vigente ?? $cobro->chargeReceipts->first();
@@ -146,6 +150,7 @@ final class FeeChargeRows
             receiptNumber: $ultimo?->receipt->formatted_number,
             talonarioNumber: $ultimo?->receipt->talonario_number,
             talonarioPhoto: $foto,
+            talonarioPhotoHistory: $historialDeFoto,
             depositProof: $comprobante === null ? null : new FeeChargeProofData(
                 attachment: $fotosDeComprobantes[$comprobante->attachment_id] ?? null,
                 amount: Decimal::scale((string) $comprobante->amount),

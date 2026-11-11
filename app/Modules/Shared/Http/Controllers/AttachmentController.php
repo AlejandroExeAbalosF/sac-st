@@ -6,8 +6,14 @@ namespace App\Modules\Shared\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Shared\Actions\RenameAttachment;
+use App\Modules\Shared\Actions\VoidAttachment;
+use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Http\Requests\AttachmentHistoryRequest;
 use App\Modules\Shared\Http\Requests\RenameAttachmentRequest;
+use App\Modules\Shared\Http\Requests\VoidAttachmentRequest;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Support\Attachments;
 use App\Support\Ui\Toast;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -32,6 +38,39 @@ final class AttachmentController extends Controller
         $renombrar->handle($attachment, $request->string('title')->toString(), $request->user());
 
         Toast::success('Se corrigió la descripción del archivo.');
+
+        return back();
+    }
+
+    /**
+     * Todos los archivos de algo, anulados incluidos, para el historial.
+     *
+     * Lo piden las pantallas que muestran un solo archivo: con el único
+     * anulado, es el camino para ver el motivo. Cada archivo dice si quien
+     * mira lo puede abrir.
+     *
+     * @return list<AttachmentData>
+     */
+    public function history(AttachmentHistoryRequest $request, Attachments $adjuntos): array
+    {
+        $type = $request->validated('type');
+
+        return $adjuntos->historyOf(
+            AttachmentSubject::from((string) $request->validated('subject')),
+            (int) $request->validated('id'),
+            is_string($type) ? $type : null,
+            $request->user(),
+        );
+    }
+
+    /** Anula un respaldo opcional: queda guardado, fuera de la vista. */
+    public function void(VoidAttachmentRequest $request, Attachment $attachment, VoidAttachment $anular): RedirectResponse
+    {
+        Gate::authorize('void', $attachment);
+
+        $anular->handle($attachment, $request->reason(), $request->user());
+
+        Toast::success('Se anuló el archivo.', 'Queda guardado y se ve en el historial.');
 
         return back();
     }

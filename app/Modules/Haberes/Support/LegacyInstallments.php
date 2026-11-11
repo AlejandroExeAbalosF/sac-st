@@ -56,6 +56,10 @@ final class LegacyInstallments
             array_values($documentos->pluck('id')->map(intval(...))->all()),
             $viewer,
         );
+        $historiales = $this->adjuntos->historyFor(
+            AttachmentSubject::LegacyDocument,
+            array_values($documentos->pluck('id')->map(intval(...))->all()),
+        );
         $obstaculos = $this->movimientos->obstaclesFor($installmentIds);
 
         $porCuota = [];
@@ -70,6 +74,7 @@ final class LegacyInstallments
                     ->map(fn (LegacyDocument $documento): LegacyDocumentData => LegacyDocumentData::fromModel(
                         $documento,
                         $fotos[$documento->id] ?? null,
+                        $historiales[$documento->id] ?? null,
                     ))
                     ->all()),
                 obstacle: $obstaculos[$id] ?? null,

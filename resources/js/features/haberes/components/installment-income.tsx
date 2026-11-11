@@ -13,6 +13,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
@@ -237,6 +238,10 @@ function ReciboDePapel({
                 {papel.attachment !== null && (
                     <AttachmentMini attachment={papel.attachment} />
                 )}
+                <AttachmentHistoryButton
+                    history={papel.attachmentHistory}
+                    hasCurrent={papel.attachment !== null}
+                />
                 {puedeLiberar && (
                     <Button
                         variant="ghost"
@@ -932,6 +937,10 @@ function Comprobante({
                                 ? 'Comprobante cargado y encontrado en el extracto.'
                                 : 'Comprobante cargado, esperando aparecer en el extracto.'}
                         </p>
+                        <AttachmentHistoryButton
+                            history={ticket.attachmentHistory}
+                            hasCurrent={ticket.attachment !== null}
+                        />
                     </div>
                     <Button
                         variant="ghost"

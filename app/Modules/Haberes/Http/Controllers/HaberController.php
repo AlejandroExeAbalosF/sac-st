@@ -30,6 +30,7 @@ use App\Modules\Haberes\Http\Requests\CancelHaberRequest;
 use App\Modules\Haberes\Http\Requests\StoreHaberRequest;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\CashToBankTransferItem;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
@@ -47,6 +48,7 @@ use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Haberes\Support\PaymentOrderSources;
 use App\Modules\Haberes\Support\ReceiptFormData;
 use App\Modules\Ledger\Enums\Currency;
+use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\AuditEvent;
@@ -54,6 +56,7 @@ use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Pdf\IncomeReceiptPdf;
 use App\Modules\Shared\Pdf\ReceiptPdfFactory;
+use App\Modules\Shared\Support\Attachments;
 use App\Modules\Shared\Support\LastChanges;
 use App\Modules\Shared\Support\Reason;
 use App\Modules\Shared\Support\TalonarioSequence;
@@ -723,6 +726,7 @@ final class HaberController extends Controller
                 mediums: app(InstallmentFunding::class)->mediumForMany($cuotaIds),
                 ticketReceipts: app(DepositTicketLinks::class)->receipts($cuotaIds),
                 ticketAttachments: app(DepositTicketLinks::class)->attachments($cuotaIds, request()->user()),
+                ticketAttachmentHistory: app(DepositTicketLinks::class)->attachmentHistory($cuotaIds),
                 ticketsBeforeOpening: app(DepositTicketLinks::class)->beforeOpening($cuotaIds),
                 stages: app(InstallmentStages::class)->forMany($haber->installments),
                 lastChange: app(LastChanges::class)->for(
@@ -906,16 +910,34 @@ final class HaberController extends Controller
 
         $habilitacion = app(DisbursementEligibility::class);
         $medios = app(InstallmentFunding::class)->mediumForMany($cuotaIds);
-        $estados = [];
+        $habilitaciones = [];
 
         foreach ($haber->installments as $cuota) {
             // El haber ya viene cargado con su beneficiario: prestarselo
             // evita una consulta por cuota del plan.
             $cuota->setRelation('haber', $haber);
 
-            $estados[$cuota->id] = InstallmentDisbursementData::fromReadiness(
-                $habilitacion->for($cuota, $medios[$cuota->id] ?? null),
+            $habilitaciones[$cuota->id] = $habilitacion->for($cuota, $medios[$cuota->id] ?? null);
+        }
+
+        // Los informes de todos los egresos, en una consulta: con el único
+        // anulado, el historial es el camino para llegar a él.
+        $informes = app(Attachments::class)->historyFor(
+            AttachmentSubject::Disbursement,
+            array_values(array_filter(array_map(
+                fn ($estado): ?int => $estado->disbursement?->id,
+                $habilitaciones,
+            ))),
+            Disbursement::REPORT_DOCUMENT_TYPE,
+        );
+
+        $estados = [];
+
+        foreach ($habilitaciones as $cuotaId => $estado) {
+            $estados[$cuotaId] = InstallmentDisbursementData::fromReadiness(
+                $estado,
                 request()->user(),
+                $estado->disbursement === null ? null : ($informes[$estado->disbursement->id] ?? null),
             );
         }
 

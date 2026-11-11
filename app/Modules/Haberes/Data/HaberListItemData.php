@@ -14,6 +14,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Data\LastChangeData;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
@@ -131,6 +132,9 @@ final class HaberListItemData extends Data
      * @param  array<int, int>  $ticketReceipts  La recepción ya registrada
      *                                           del crédito que cruzó cada
      *                                           ticket, indexada por ticket.
+     * @param  array<int, AttachmentHistoryData>  $ticketAttachmentHistory  Cuántas fotos tiene
+     *                                                                      cada ticket y cuántas
+     *                                                                      anuladas.
      * @param  array<int, AttachmentData>  $ticketAttachments  El adjunto más nuevo de
      *                                                         cada ticket, indexado por
      *                                                         ticket.
@@ -159,6 +163,7 @@ final class HaberListItemData extends Data
         ?LastChangeData $lastChange = null,
         array $stages = [],
         array $ticketsBeforeOpening = [],
+        array $ticketAttachmentHistory = [],
     ): self {
         $cuotas = $haber->installments;
 
@@ -178,6 +183,7 @@ final class HaberListItemData extends Data
                 $ticketAttachments,
                 $stages[$cuota->id] ?? null,
                 $ticketsBeforeOpening,
+                ticketAttachmentHistory: $ticketAttachmentHistory,
             ))
             ->values()
             ->all();

@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, FileUp, Link2, Pencil, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentInlinePreview } from '@/components/attachments/attachment-inline-preview';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
@@ -107,7 +108,10 @@ export default function DepositTicketDialog({
                         )}
                     </div>
 
-                    <Foto adjunto={ticket.attachment} />
+                    <Foto
+                        adjunto={ticket.attachment}
+                        historial={ticket.attachmentHistory}
+                    />
                 </div>
 
                 {!editando && (
@@ -425,8 +429,10 @@ function Formulario({
 
 function Foto({
     adjunto,
+    historial,
 }: {
     adjunto: App.Modules.Shared.Data.AttachmentData | null;
+    historial: App.Modules.Shared.Data.AttachmentHistoryData | null;
 }) {
     if (adjunto === null) {
         return (
@@ -437,13 +443,26 @@ function Foto({
                     El área no la exige, pero sin ella no hay contra qué
                     comparar lo que se cargó.
                 </p>
+                <AttachmentHistoryButton
+                    history={historial}
+                    hasCurrent={false}
+                />
             </div>
         );
     }
 
     // Foto o PDF: el comprobante admite los dos, y un PDF dibujado como
     // `<img>` se veía como una imagen rota.
-    return <AttachmentInlinePreview attachment={adjunto} className="h-fit" />;
+    return (
+        <div className="grid h-fit gap-1">
+            <AttachmentInlinePreview attachment={adjunto} />
+            <AttachmentHistoryButton
+                history={historial}
+                hasCurrent
+                className="px-1"
+            />
+        </div>
+    );
 }
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {

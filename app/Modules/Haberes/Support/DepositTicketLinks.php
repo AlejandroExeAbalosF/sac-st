@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Support\Attachments;
@@ -133,13 +134,35 @@ final class DepositTicketLinks
             return [];
         }
 
-        /** @var list<int> $tickets */
-        $tickets = DB::table('deposit_tickets')
+        return app(Attachments::class)->latestFor(AttachmentSubject::DepositTicket, $this->ticketsOf($installmentIds), $viewer);
+    }
+
+    /**
+     * Cuántas fotos tiene cada ticket y cuántas están anuladas: con la única
+     * anulada, la tarjeta no tiene miniatura y este es el camino a ella.
+     *
+     * @param  list<int>  $installmentIds
+     * @return array<int, AttachmentHistoryData> id de ticket => su historial
+     */
+    public function attachmentHistory(array $installmentIds): array
+    {
+        if ($installmentIds === []) {
+            return [];
+        }
+
+        return app(Attachments::class)->historyFor(AttachmentSubject::DepositTicket, $this->ticketsOf($installmentIds));
+    }
+
+    /**
+     * @param  list<int>  $installmentIds
+     * @return list<int>
+     */
+    private function ticketsOf(array $installmentIds): array
+    {
+        return array_values(DB::table('deposit_tickets')
             ->whereIn('beneficiary_installment_id', $installmentIds)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
-            ->all();
-
-        return app(Attachments::class)->latestFor(AttachmentSubject::DepositTicket, $tickets, $viewer);
+            ->all());
     }
 }

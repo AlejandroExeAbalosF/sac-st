@@ -9,6 +9,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
@@ -380,7 +381,19 @@ function PasosDeTransferencia({ egreso }: { egreso: Egreso | null }) {
                 <div className="flex items-center gap-2 pl-5.5 text-xs text-muted-foreground">
                     <AttachmentMini attachment={egreso.reportAttachment} />
                     Informe del organismo
+                    <AttachmentHistoryButton
+                        history={egreso.reportHistory}
+                        hasCurrent
+                    />
                 </div>
+            )}
+            {/* Con el único informe anulado, el historial es el camino a él. */}
+            {egreso != null && egreso.reportAttachment == null && (
+                <AttachmentHistoryButton
+                    history={egreso.reportHistory}
+                    hasCurrent={false}
+                    className="pl-5.5"
+                />
             )}
             <Paso
                 hecho={egreso?.debitTransactionId != null}

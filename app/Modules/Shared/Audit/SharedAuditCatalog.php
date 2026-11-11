@@ -28,6 +28,14 @@ final class SharedAuditCatalog implements AuditCatalogContributor
         $catalog->registerActions(
             new AuditActionDefinition('numeracion.configurada', 'Se configuró la numeración de comprobantes', 'Configuración', AuditSeverity::Critical, metadata: ['motivo' => 'Motivo', 'serie_anterior' => 'Serie anterior']),
             new AuditActionDefinition('adjunto.renombrado', 'Se corrigió la descripción del adjunto', 'Adjuntos'),
+            // Crítico: saca evidencia de la vista, aunque el archivo quede guardado.
+            new AuditActionDefinition(
+                'adjunto.anulado',
+                'Se anuló el adjunto',
+                'Adjuntos',
+                AuditSeverity::Critical,
+                metadata: ['motivo' => 'Motivo', 'sujeto' => 'Lo que documentaba'],
+            ),
             new AuditActionDefinition('persona.corregida', 'Se corrigió la ficha de la persona', 'Personas'),
             new AuditActionDefinition(
                 'persona.datos-completados',

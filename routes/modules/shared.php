@@ -43,6 +43,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
      * se copian los datos.
      */
     Route::middleware('can:adjuntos.ver')->group(function (): void {
+        // Antes que `{attachment}`: el patrón numérico no la tomaría igual,
+        // pero una ruta literal delante no depende de eso.
+        Route::get('adjuntos/historial', [AttachmentController::class, 'history'])
+            ->name('adjuntos.history');
         Route::get('adjuntos/{attachment}', [AttachmentController::class, 'download'])
             ->whereNumber('attachment')
             ->name('adjuntos.download');
@@ -56,6 +60,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->whereNumber('attachment')
         ->middleware('can:adjuntos.renombrar')
         ->name('adjuntos.rename');
+
+    // Anular un respaldo opcional. El estado lo decide el adjunto; el permiso, la policy.
+    Route::post('adjuntos/{attachment}/anular', [AttachmentController::class, 'void'])
+        ->whereNumber('attachment')
+        ->middleware('can:adjuntos.anular')
+        ->name('adjuntos.void');
 
     /*
      * Configuración del sistema.

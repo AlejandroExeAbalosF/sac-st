@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -200,6 +201,8 @@ final class InstallmentListItemData extends Data
      * @param  array<int, int>  $ticketFundReceipts  La recepción nacida del
      *                                               crédito que cruzó cada
      *                                               ticket, por ticket.
+     * @param  array<int, AttachmentHistoryData>  $ticketAttachmentHistory  Cuántas fotos tiene cada
+     *                                                                      ticket y cuántas anuladas.
      * @param  array<int, AttachmentData>  $ticketAttachments  La foto de cada ticket,
      *                                                         también por ticket.
      * @param  array<int, string>  $ticketsBeforeOpening  La apertura, por ticket
@@ -225,6 +228,7 @@ final class InstallmentListItemData extends Data
         array $ticketAttachments = [],
         ?InstallmentStage $stage = null,
         array $ticketsBeforeOpening = [],
+        array $ticketAttachmentHistory = [],
     ): self {
         $etiqueta = $cuota->managementLabel;
 
@@ -264,7 +268,7 @@ final class InstallmentListItemData extends Data
             ownConcept: $cuota->description,
             depositTicket: $ticket === null
                 ? null
-                : InstallmentTicketData::fromModel($ticket, $ticketFundReceipts, $ticketAttachments, $ticketsBeforeOpening),
+                : InstallmentTicketData::fromModel($ticket, $ticketFundReceipts, $ticketAttachments, $ticketsBeforeOpening, $ticketAttachmentHistory),
             fundedAmount: $financiado,
             remainingAmount: $falta,
             overAllocatedAmount: $sobra,

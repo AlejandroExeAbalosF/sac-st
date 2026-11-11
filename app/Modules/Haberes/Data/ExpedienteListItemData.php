@@ -11,6 +11,7 @@ use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Ledger\Enums\PaymentMedium;
 use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Data\AttachmentHistoryData;
 use App\Modules\Shared\Data\LastChangeData;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\Receipt;
@@ -85,6 +86,7 @@ final class ExpedienteListItemData extends Data
     /**
      * @param  array<int, int>  $ticketReceipts  id de ticket => id de recepción
      * @param  array<int, AttachmentData>  $ticketAttachments  id de ticket => su foto
+     * @param  array<int, AttachmentHistoryData>  $ticketAttachmentHistory  id de ticket => cuántas fotos tiene y cuántas anuladas
      * @param  array<int, LastChangeData>  $haberChanges  id de haber => su último cambio
      * @param  array<int, numeric-string>  $funded  Lo imputado a cada cuota.
      * @param  array<int, Receipt>  $receipts  El recibo de ingreso por cuota.
@@ -109,6 +111,7 @@ final class ExpedienteListItemData extends Data
         array $mediums = [],
         array $stages = [],
         array $ticketsBeforeOpening = [],
+        array $ticketAttachmentHistory = [],
     ): self {
         /** @var list<HaberListItemData> $haberes */
         $haberes = $expediente->haberes
@@ -123,6 +126,7 @@ final class ExpedienteListItemData extends Data
                 lastChange: $haberChanges[$haber->id] ?? null,
                 stages: $stages,
                 ticketsBeforeOpening: $ticketsBeforeOpening,
+                ticketAttachmentHistory: $ticketAttachmentHistory,
             ))
             ->values()
             ->all();

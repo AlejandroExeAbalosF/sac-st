@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { Ban } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentHistoryButton } from '@/components/attachments/attachment-history-button';
 import { AttachmentMini } from '@/components/attachments/attachment-mini';
 import Money from '@/components/money';
 import ReasonFields from '@/components/reason-fields';
@@ -129,6 +130,10 @@ function FilaDePapel({ papel }: { papel: Papel }) {
                 {papel.attachment !== null && (
                     <AttachmentMini attachment={papel.attachment} />
                 )}
+                <AttachmentHistoryButton
+                    history={papel.attachmentHistory}
+                    hasCurrent={papel.attachment !== null}
+                />
             </span>
         </li>
     );

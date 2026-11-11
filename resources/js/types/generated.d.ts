@@ -53,6 +53,7 @@ declare namespace App {
                     readonly receiptNumber: string | null;
                     readonly talonarioNumber: string | null;
                     readonly talonarioPhoto: App.Modules.Shared.Data.AttachmentData | null;
+                    readonly talonarioPhotoHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     readonly depositProof: App.Modules.Aranceles.Data.FeeChargeProofData | null;
                     readonly voidReason: string | null;
                     readonly deposited: boolean;
@@ -336,6 +337,7 @@ declare namespace App {
                     matchedAt: string | null;
                     discardedReason: string | null;
                     attachment: App.Modules.Shared.Data.AttachmentData | null;
+                    attachmentHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     waitingDays: number;
                 };
                 export type DisbursementSummaryData = {
@@ -349,6 +351,7 @@ declare namespace App {
                     reportedAt: string | null;
                     transferReference: string | null;
                     reportAttachment: App.Modules.Shared.Data.AttachmentData | null;
+                    reportHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     beneficiaryCbu: string | null;
                     debitTransactionId: number | null;
                     debitDate: string | null;
@@ -616,6 +619,7 @@ declare namespace App {
                     bankAccountId: number;
                     accountLabel: string;
                     attachment: App.Modules.Shared.Data.AttachmentData | null;
+                    attachmentHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     bankTransactionId: number | null;
                     fundReceiptId: number | null;
                     editable: boolean;
@@ -650,6 +654,7 @@ declare namespace App {
                     issuedOn: string;
                     amount: string;
                     attachment: App.Modules.Shared.Data.AttachmentData | null;
+                    attachmentHistory: App.Modules.Shared.Data.AttachmentHistoryData | null;
                     belongsToSettlement: boolean;
                 };
                 export type LegacyFundsOptionsData = {
@@ -1478,8 +1483,22 @@ declare namespace App {
                     sizeBytes: number;
                     canOpen: boolean;
                     canRename: boolean;
+                    canVoid: boolean;
+                    voided: App.Modules.Shared.Data.AttachmentVoidData | null;
                     createdByName: string | null;
                     createdAt: string;
+                };
+                export type AttachmentHistoryData = {
+                    subjectType: App.Modules.Shared.Enums.AttachmentSubject;
+                    subjectId: number;
+                    documentType: string | null;
+                    total: number;
+                    voided: number;
+                };
+                export type AttachmentVoidData = {
+                    at: string;
+                    byName: string | null;
+                    reason: string;
                 };
                 export type AuditChangeData = {
                     field: string;
@@ -1643,6 +1662,14 @@ declare namespace App {
                     'issued' | 'voided' | 'spoiled' | 'replaced';
                 export type ReceiptType = 'income' | 'expense';
                 export type SeriesOrigin = 'system' | 'talonario_loaded';
+                export type SharedReasonAct = 'void_attachment';
+                export type SharedReasonCode =
+                    | 'wrong_file'
+                    | 'wrong_subject'
+                    | 'illegible'
+                    | 'duplicate'
+                    | 'sensitive_data'
+                    | 'other';
                 export type SystemRole =
                     | 'super-admin'
                     | 'administrador'

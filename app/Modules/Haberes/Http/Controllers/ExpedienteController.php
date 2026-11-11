@@ -348,6 +348,7 @@ final class ExpedienteController extends Controller
                 expediente: $expediente,
                 ticketReceipts: $enlaces->receipts($cuotaIds),
                 ticketAttachments: $enlaces->attachments($cuotaIds, $request->user()),
+                ticketAttachmentHistory: $enlaces->attachmentHistory($cuotaIds),
                 ticketsBeforeOpening: $enlaces->beforeOpening($cuotaIds),
                 funded: $lote['funded'],
                 receipts: $lote['receipts'],

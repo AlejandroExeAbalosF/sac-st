@@ -79,7 +79,12 @@ final class DepositTicketController extends Controller
             $request->user(),
         );
 
-        $tickets->through(fn (DepositTicket $t): DepositTicketData => DepositTicketData::fromModel($t, $fotos[$t->id] ?? null));
+        $historiales = $adjuntos->historyFor(
+            AttachmentSubject::DepositTicket,
+            array_map(fn (DepositTicket $t): int => $t->id, $tickets->items()),
+        );
+
+        $tickets->through(fn (DepositTicket $t): DepositTicketData => DepositTicketData::fromModel($t, $fotos[$t->id] ?? null, $historiales[$t->id] ?? null));
 
         return Inertia::render('haberes/depositos/index', [
             'tickets' => $tickets,
@@ -267,6 +272,7 @@ final class DepositTicketController extends Controller
             'ticket' => DepositTicketData::fromModel(
                 $ticket,
                 $adjuntos->latestOf(AttachmentSubject::DepositTicket, $ticket->id, $request->user()),
+                $adjuntos->historyFor(AttachmentSubject::DepositTicket, [$ticket->id])[$ticket->id] ?? null,
             ),
             'candidates' => array_map(
                 fn (TicketCandidate $c): TicketCandidateData => TicketCandidateData::fromCandidate($c),

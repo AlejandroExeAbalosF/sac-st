@@ -102,10 +102,32 @@ recién al abrirlo.
   `can.viewAttachments` por pantalla.
 
 Cuando un sujeto puede tener varios archivos, el que se muestra es **el más
-reciente**: los adjuntos no se reescriben, y corregir una foto suma otra. Para
-armar los DTOs en lote está `Attachments` (`App\Modules\Shared\Support`):
-`latestFor` para el vigente de cada sujeto, `allFor` para todos y `forIds` cuando
-el dominio ya guardó cuál vale. Las tres resuelven una tanda en una consulta.
+reciente que no esté anulado**: los adjuntos no se reescriben, y corregir una foto
+suma otra. Para armar los DTOs en lote está `Attachments`
+(`App\Modules\Shared\Support`): `latestFor` para el vigente de cada sujeto,
+`allFor` para todos (los anulados, marcados), `forIds` cuando el dominio ya guardó
+cuál vale, y `historyFor` para cuántos tiene cada uno y cuántos anulados. Todas
+resuelven una tanda en una consulta. Una relación que elige «el último» con
+`latestOfMany()` lleva sus condiciones **dentro** de `ofMany`: la subconsulta del
+`MAX(id)` ignora los `where` de afuera (ver `Disbursement::reportDocument`).
+
+**Anular saca un respaldo de la vista sin borrarlo.** Solo se anulan los pares
+sujeto + tipo de `Attachment::VOIDABLE` —la misma lista que
+`attachment_is_voidable()` en la base— y nunca lo que generó el sistema: el ticket
+del traslado, el extracto, la planilla de cierre, la rendición y el comprobante de
+cobro de Aranceles son la prueba de un hecho. La base además impone que todo
+adjunto nazca vigente, que se anule una sola vez sin que cambie nada más y que un
+anulado no se renombre. Se anula desde el menú ⋮ de la tarjeta o del visor, con
+`adjuntos.anular` y un motivo de `SharedReasonAct::VoidAttachment` (llega en la
+prop compartida `attachmentReasons`, no en `motivos`). Queda en la auditoría como
+`adjunto.anulado`, crítico. Al anular, el visor se cierra: la pantalla de atrás se
+recarga, y su copia de los archivos ya no dice la verdad.
+
+Donde se muestra un archivo solo —el ticket de una cuota, la foto de un papel, el
+informe del egreso, la foto del talonario— va `AttachmentHistoryButton`, con el
+`AttachmentHistoryData` del DTO: con el único anulado no queda miniatura, y el
+historial (`GET adjuntos/historial`) es el camino para ver el motivo. Las galerías
+apartan los anulados detrás de «Ver anulados».
 
 **El archivo no se reescribe; la descripción sí se corrige.** El trigger
 `attachments_immutable` deja cambiar solo `title` —compara la fila entera
