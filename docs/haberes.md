@@ -246,7 +246,8 @@ En mostrador se entrega efectivo o el cheque, según el medio real. En transfere
 el informe del organismo y el débito del extracto pueden registrarse en cualquier
 orden. Reunirlos deja el egreso listo para validar; **no lo confirma automáticamente**.
 Al registrar el informe se puede adjuntar, opcionalmente, su foto o PDF: queda como
-adjunto del egreso (`transfer_report`) y la tarjeta ofrece «Ver informe».
+adjunto del egreso (`transfer_report`), y la tarjeta lo muestra en miniatura; un clic
+lo abre en el visor.
 La validación registra el asiento, marca la cuota pagada y completa la Orden.
 
 Si el banco cobró comisión por la transferencia, el pago son dos renglones del

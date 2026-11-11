@@ -13,6 +13,7 @@ public/hot
 /vendor
 /node_modules
 /public/build
+/public/vendor/pdfjs
 /resources/js/actions
 /resources/js/routes
 /resources/js/wayfinder

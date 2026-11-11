@@ -14,7 +14,13 @@ import { pdfjs } from 'react-pdf';
  */
 const ASSETS = '/vendor/pdfjs/';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.js`;
+/*
+ * Con la versión en la dirección: el archivo no lleva hash en el nombre, y
+ * después de actualizar react-pdf el navegador podría seguir usando el
+ * worker viejo de su caché. pdf.js no abre nada si el worker y la librería
+ * no son de la misma versión.
+ */
+pdfjs.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.js?v=${pdfjs.version}`;
 
 /**
  * Las opciones de cada documento.

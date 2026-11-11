@@ -68,3 +68,65 @@ Si una vista previa tarda en cargar, reservá su espacio y mostrá un esqueleto 
 carga (`Skeleton`) hasta que aparezca el contenido o el aviso de error. Para la
 entrada de una fila nueva, usá una transición breve con `motion-safe`. Con la
 preferencia de movimiento reducido, la fila debe aparecer de inmediato.
+
+<a id="adjuntos"></a>
+
+## Adjuntos: fotos y PDF
+
+Los archivos que se suben —un ticket, la hoja de un talonario, un informe— se
+muestran con los componentes de `resources/js/components/attachments/`. No se
+arma un `<img>`, un `<iframe>` ni un enlace a `/adjuntos/{id}` por fuera de ellos.
+
+| Dónde va | Componente |
+|---|---|
+| Los archivos de algo —una multa, un pago, un documento—, en mosaico | `AttachmentGallery` |
+| Un archivo al costado de los datos que se copian de él | `AttachmentInlinePreview` |
+| Un archivo dentro de una fila: el comprobante de una cuota, un recibo de papel | `AttachmentMini` |
+| Un «Ver comprobante» en una fila de acciones | `AttachmentLink` |
+| Un archivo recién elegido, antes de subirlo | `PaperPhotoDropzone` o `TicketPhotoPanel` |
+
+Los cinco abren el mismo visor a pantalla completa (`useAttachmentViewer`), con
+zoom, rotación de fotos, descarga y paso de un archivo al siguiente. Se carga
+recién al abrirlo.
+
+**El servidor manda el adjunto entero, no su id.** Cada DTO lleva
+`AttachmentData` (`App\Modules\Shared\Data`), que dice dos cosas distintas:
+
+- `kind` (`image`, `pdf` u `other`) dice cómo se muestra. Sale del MIME guardado,
+  que se lee del contenido. Lo que no es foto ni PDF se descarga.
+- `canOpen` dice si **quien mira** puede pedirlo: tiene `adjuntos.ver` y, si el
+  archivo es reservado, `adjuntos.ver-reservados`. Lo resuelve
+  `AttachmentPolicy`, la misma que usa `AttachmentController`. Con `canOpen` en
+  falso la pantalla muestra que el archivo existe, con un candado, y **no pide
+  nada**: ni la miniatura, que volvería con un 403. No se agrega un
+  `can.viewAttachments` por pantalla.
+
+Cuando un sujeto puede tener varios archivos, el que se muestra es **el más
+reciente**: los adjuntos no se reescriben, y corregir una foto suma otra. Para
+armar los DTOs en lote está `Attachments` (`App\Modules\Shared\Support`):
+`latestFor` para el vigente de cada sujeto, `allFor` para todos y `forIds` cuando
+el dominio ya guardó cuál vale. Las tres resuelven una tanda en una consulta.
+
+No hay renombrar, reordenar ni borrar: el trigger `attachments_immutable` lo
+impide. Si se subió el archivo equivocado, se sube el correcto con una
+descripción que lo diga.
+
+### PDF con pdf.js
+
+La miniatura de un PDF es su primera hoja, y el visor dibuja todas las hojas.
+Las dos cosas las hace pdf.js en el navegador; el servidor no genera miniaturas.
+
+- pdf.js se importa siempre en forma diferida (`resources/js/lib/pdf.ts`): no
+  entra en el bundle de ninguna pantalla.
+- Su worker y sus recursos los copia `vite.config.ts` a `public/vendor/pdfjs/`
+  al arrancar Vite y al compilar. Un Worker solo se puede crear desde el mismo
+  origen, y en desarrollo Vite sirve desde otro puerto. La carpeta no se
+  versiona. La copia no es un `postinstall` porque `pnpm-workspace.yaml` apaga
+  los scripts de instalación.
+- No usa WebAssembly (`useWasm: false`), porque la CSP no habilita
+  `'wasm-unsafe-eval'`. Los PDF escaneados en JPEG 2000 o JBIG2 se decodifican
+  con la versión en JavaScript, que es más lenta.
+- Un PDF subido no se mira en un `<iframe>`. Por eso `frame-src` solo admite
+  los documentos del propio sistema, que van por `DocumentFrame`.
+- La miniatura se dibuja cuando la tarjeta entra en pantalla. Con la pestaña o
+  el panel oculto, el navegador no pinta, y la miniatura espera.
