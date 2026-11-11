@@ -132,7 +132,7 @@ final class FeePendingController extends Controller
                 ->where('status', FeeChargeStatus::Pending)
                 ->with(['items', 'balance', 'chargeReceipts.receipt'])
                 ->orderBy('id')
-                ->get())),
+                ->get(), $usuario)),
             // El precio de un cobro sin ventanilla es el de la fecha del crédito.
             'feeTypes' => FeeType::query()
                 ->where('is_active', true)

@@ -6,6 +6,7 @@ namespace App\Modules\Aranceles\Data;
 
 use App\Modules\Aranceles\Enums\FeeChargeMedium;
 use App\Modules\Aranceles\Enums\FeeChargeStatus;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /** Un cobro en el listado: quién paga y el recibo son los del recibo vigente. */
@@ -36,7 +37,7 @@ final readonly class FeeChargeListItemData
         public ?string $receiptNumber,
         public ?string $talonarioNumber,
         /** La foto de la hoja del talonario: sigue a la vista si después se reemplaza el recibo. */
-        public ?int $talonarioPhotoId,
+        public ?AttachmentData $talonarioPhoto,
         /** El último comprobante del depósito: cambiarlo agrega otro y el anterior queda. */
         public ?FeeChargeProofData $depositProof,
         public ?string $voidReason,

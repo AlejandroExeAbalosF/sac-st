@@ -84,6 +84,30 @@ final class Attachments
         return $porSujeto;
     }
 
+    /**
+     * Archivos puntuales, por su propio id.
+     *
+     * Para cuando el dominio ya eligió cuál vale —el comprobante de un cobro
+     * guarda el id de su foto— y no hay que deducirlo del sujeto.
+     *
+     * @param  array<int>  $ids
+     * @return array<int, AttachmentData> por id del adjunto
+     */
+    public function forIds(array $ids, ?User $viewer): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $porId = [];
+
+        foreach (Attachment::query()->with('uploader:id,name')->whereIn('id', $ids)->get() as $adjunto) {
+            $porId[$adjunto->id] = AttachmentData::fromModel($adjunto, $viewer);
+        }
+
+        return $porId;
+    }
+
     /** El vigente de un solo sujeto. */
     public function latestOf(
         AttachmentSubject $subject,

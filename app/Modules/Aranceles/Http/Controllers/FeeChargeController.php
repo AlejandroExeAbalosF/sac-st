@@ -72,7 +72,7 @@ final class FeeChargeController extends Controller
             // Filtrados, los pendientes son una cola: primero el que más espera.
             ->orderBy('id', $estado === FeeChargeStatus::Pending ? 'asc' : 'desc')
             ->paginate(25)
-            ->withQueryString());
+            ->withQueryString(), $request->user());
 
         return Inertia::render('aranceles/cobros', [
             'charges' => $cobros,
@@ -88,7 +88,6 @@ final class FeeChargeController extends Controller
                 'void' => $usuario?->can('aranceles.anular') ?? false,
                 'replace' => $usuario?->can('aranceles.reemplazar-recibos') ?? false,
                 'correct' => $usuario?->can('aranceles.corregir') ?? false,
-                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }
@@ -102,7 +101,7 @@ final class FeeChargeController extends Controller
     {
         abort_unless($feeCharge->status === FeeChargeStatus::Paid, 404);
 
-        return $this->formulario($request, $this->filas->row($feeCharge->load(['items', 'balance', 'chargeReceipts.receipt'])));
+        return $this->formulario($request, $this->filas->row($feeCharge->load(['items', 'balance', 'chargeReceipts.receipt']), $request->user()));
     }
 
     public function store(CollectFeeRequest $request, CollectFeeInCash $cobrar): RedirectResponse

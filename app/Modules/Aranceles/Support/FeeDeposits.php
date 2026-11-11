@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Aranceles\Support;
 
+use App\Models\User;
 use App\Modules\Aranceles\Data\FeeCashShareData;
 use App\Modules\Aranceles\Data\FeeDepositData;
 use App\Modules\Banking\Enums\CashTransferStatus;
@@ -14,8 +15,8 @@ use App\Modules\Ledger\Enums\FundReceiptOrigin;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\ReceiptStatus;
-use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\Receipt;
+use App\Modules\Shared\Support\Attachments;
 use Carbon\CarbonInterface;
 
 /**
@@ -67,7 +68,7 @@ final class FeeDeposits
      *
      * @return list<FeeDepositData>
      */
-    public function inStatus(CashTransferStatus $estado, ?int $limite = null): array
+    public function inStatus(CashTransferStatus $estado, ?User $viewer, ?int $limite = null): array
     {
         $traslados = CashToBankTransfer::query()
             ->with(['bankAccount', 'depositedBy:id,name', 'creditEvent', 'items.fundReceipt'])
@@ -82,16 +83,15 @@ final class FeeDeposits
             ->unique()
             ->all()));
 
-        $comprobantes = Attachment::query()
-            ->where('subject_type', AttachmentSubject::CashTransfer)
-            ->whereIn('subject_id', $traslados->pluck('id'))
-            ->where('document_type', 'cash_transfer_ticket')
-            ->get()
-            ->keyBy('subject_id');
+        // El vigente de cada traspaso: si el ticket se volvió a cargar, el último.
+        $comprobantes = app(Attachments::class)->latestFor(
+            AttachmentSubject::CashTransfer,
+            $traslados->modelKeys(),
+            $viewer,
+            'cash_transfer_ticket',
+        );
 
         return array_values($traslados->map(function (CashToBankTransfer $t) use ($cobros, $comprobantes): FeeDepositData {
-            /** @var Attachment|null $comprobante */
-            $comprobante = $comprobantes->get($t->id);
 
             return new FeeDepositData(
                 id: $t->id,
@@ -106,8 +106,7 @@ final class FeeDeposits
                 terminal: $t->deposit_terminal,
                 notes: $t->notes,
                 creditedOn: $t->creditEvent?->event_date->toDateString(),
-                ticketAttachmentId: $comprobante?->id,
-                ticketViewable: $comprobante?->isViewableInline() ?? false,
+                ticketAttachment: $comprobantes[$t->id] ?? null,
                 shares: array_values($t->items
                     ->sortBy('id')
                     ->map(fn ($item): FeeCashShareData => $this->parte($item->fundReceipt, $item->amount, $cobros))

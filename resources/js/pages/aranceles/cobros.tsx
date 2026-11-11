@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Plus, ReceiptText, Search } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentLink } from '@/components/attachments/attachment-link';
 import DocumentInput from '@/components/document-input';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
@@ -8,7 +9,7 @@ import PaginationFooter from '@/components/pagination-footer';
 import type { PaginationData } from '@/components/pagination-footer';
 import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -37,7 +38,6 @@ import SignerSelect, {
 } from '@/features/aranceles/components/signer-select';
 import type { Firmante } from '@/features/aranceles/components/signer-select';
 import { compareAmounts, date, money } from '@/lib/format';
-import { preview as verAdjunto } from '@/routes/adjuntos';
 import { anular, create, index, reemplazar } from '@/routes/aranceles/cobros';
 import { create as cargarComprobante } from '@/routes/aranceles/cobros/comprobante';
 import { edit as corregir } from '@/routes/aranceles/cobros/corregir';
@@ -60,7 +60,6 @@ type Props = {
         void: boolean;
         replace: boolean;
         correct: boolean;
-        viewAttachments: boolean;
     };
 };
 
@@ -387,17 +386,12 @@ function FilaDeCobro({
                         Ver recibo
                     </Button>
                 )}
-                {can.viewAttachments && comprobante && (
-                    <Button variant="ghost" size="sm" asChild>
-                        <a
-                            href={verAdjunto(comprobante.attachmentId).url}
-                            target="_blank"
-                            rel="noreferrer"
-                        >
-                            Ver comprobante
-                        </a>
-                    </Button>
-                )}
+                <AttachmentLink
+                    attachment={comprobante?.attachment ?? null}
+                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                >
+                    Ver comprobante
+                </AttachmentLink>
                 {can.collect && porBanco && pagado && !comprobante && (
                     <Button variant="ghost" size="sm" asChild>
                         <Link href={cargarComprobante(cobro.id)}>
@@ -412,17 +406,12 @@ function FilaDeCobro({
                         </Link>
                     </Button>
                 )}
-                {can.viewAttachments && cobro.talonarioPhotoId !== null && (
-                    <Button variant="ghost" size="sm" asChild>
-                        <a
-                            href={verAdjunto(cobro.talonarioPhotoId).url}
-                            target="_blank"
-                            rel="noreferrer"
-                        >
-                            Ver foto del talonario
-                        </a>
-                    </Button>
-                )}
+                <AttachmentLink
+                    attachment={cobro.talonarioPhoto}
+                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                >
+                    Ver foto del talonario
+                </AttachmentLink>
                 {pagado && can.replace && (
                     <Button
                         variant="ghost"

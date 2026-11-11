@@ -859,6 +859,12 @@ class DepositoDeArancelesTest extends TestCase
             'amount' => '120', 'depositDate' => $hoy, 'ticket' => UploadedFile::fake()->image('c.jpg'), 'idempotencyKey' => 'pantalla-2',
         ])->assertRedirect(route('aranceles.depositos.index', ['pestana' => 'transito']));
 
+        // El ticket llega a la pantalla con lo que el visor necesita.
+        $this->actingAs($this->admin)->get(route('aranceles.depositos.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('enTransito.0.ticketAttachment.kind', 'image')
+                ->where('enTransito.0.ticketAttachment.canOpen', true));
+
         $credito = $this->movimiento($this->banco, $hoy, '120.00');
 
         $this->actingAs($this->admin)->getJson(route('aranceles.depositos.candidates', $traslado))

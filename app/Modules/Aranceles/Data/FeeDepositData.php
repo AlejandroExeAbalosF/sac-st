@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Aranceles\Data;
 
 use App\Modules\Banking\Enums\CashTransferStatus;
+use App\Modules\Shared\Data\AttachmentData;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -28,8 +29,8 @@ final class FeeDepositData extends Data
         public ?string $terminal,
         public ?string $notes,
         public ?string $creditedOn,
-        public ?int $ticketAttachmentId,
-        public bool $ticketViewable,
+        /** El ticket vigente: si se volvió a cargar, el último. */
+        public ?AttachmentData $ticketAttachment,
         public array $shares,
     ) {}
 }

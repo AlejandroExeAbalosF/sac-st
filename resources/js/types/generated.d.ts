@@ -52,13 +52,13 @@ declare namespace App {
                     readonly receiptId: number | null;
                     readonly receiptNumber: string | null;
                     readonly talonarioNumber: string | null;
-                    readonly talonarioPhotoId: number | null;
+                    readonly talonarioPhoto: App.Modules.Shared.Data.AttachmentData | null;
                     readonly depositProof: App.Modules.Aranceles.Data.FeeChargeProofData | null;
                     readonly voidReason: string | null;
                     readonly deposited: boolean;
                 };
                 export type FeeChargeProofData = {
-                    readonly attachmentId: number;
+                    readonly attachment: App.Modules.Shared.Data.AttachmentData | null;
                     readonly amount: string;
                     readonly depositDate: string;
                     readonly operationNumber: string | null;
@@ -76,8 +76,7 @@ declare namespace App {
                     terminal: string | null;
                     notes: string | null;
                     creditedOn: string | null;
-                    ticketAttachmentId: number | null;
-                    ticketViewable: boolean;
+                    ticketAttachment: App.Modules.Shared.Data.AttachmentData | null;
                     shares: App.Modules.Aranceles.Data.FeeCashShareData[];
                 };
                 export type FeeTypeData = {

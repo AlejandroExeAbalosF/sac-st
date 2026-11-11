@@ -342,7 +342,8 @@ class CobroDeArancelesTest extends TestCase
         app(ReplaceFeeReceipt::class)->handle($cobro, 'AG MAX S.R.L.', null, [], $this->motivo(FeeReasonCode::WrongPayer), null, $this->admin->id);
 
         $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))
-            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.talonarioPhotoId', $foto->id));
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.talonarioPhoto.id', $foto->id)
+                ->where('charges.data.0.talonarioPhoto.kind', 'image'));
     }
 
     public function test_a_talonario_photo_requires_its_number_on_both_sides(): void
@@ -443,18 +444,28 @@ class CobroDeArancelesTest extends TestCase
         return new UploadedFile($ruta, 'hoja.png', 'image/png', null, true);
     }
 
+    /**
+     * La foto se anuncia igual, pero la pantalla sabe si quien mira la puede
+     * abrir: sin `adjuntos.ver` el enlace no se ofrece, y no hay un 403 al
+     * hacerle clic.
+     */
     public function test_the_attachment_links_are_offered_only_to_who_can_open_them(): void
     {
+        Storage::fake('local');
+        $this->abrir();
+        $this->cobrarPorPantalla([
+            'talonarioNumber' => '00686701',
+            'talonarioPhoto' => UploadedFile::fake()->image('hoja.jpg'),
+        ])->assertSessionHasNoErrors();
+
         $sinPermiso = $this->operador('consulta');
         $sinPermiso->syncRoles([]);
         $sinPermiso->givePermissionTo('aranceles.ver');
 
-        foreach (['aranceles.cobros.index', 'aranceles.depositos.index'] as $pantalla) {
-            $this->actingAs($sinPermiso)->get(route($pantalla))
-                ->assertInertia(fn (Assert $p) => $p->where('can.viewAttachments', false));
-            $this->actingAs($this->admin)->get(route($pantalla))
-                ->assertInertia(fn (Assert $p) => $p->where('can.viewAttachments', true));
-        }
+        $this->actingAs($sinPermiso)->get(route('aranceles.cobros.index'))
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.talonarioPhoto.canOpen', false));
+        $this->actingAs($this->admin)->get(route('aranceles.cobros.index'))
+            ->assertInertia(fn (Assert $p) => $p->where('charges.data.0.talonarioPhoto.canOpen', true));
     }
 
     public function test_the_list_does_not_query_per_charge(): void
@@ -505,11 +516,11 @@ class CobroDeArancelesTest extends TestCase
                 ->where('charges.data.0.payerName', 'Sin foto')
                 ->where('charges.data.0.total', '100.00')
                 ->where('charges.data.0.lines.0.amount', '100.00')
-                ->where('charges.data.0.talonarioPhotoId', null)
+                ->where('charges.data.0.talonarioPhoto', null)
                 ->where('charges.data.1.payerName', 'Con foto')
                 ->where('charges.data.1.total', '120.00')
                 ->where('charges.data.1.lines.0.amount', '120.00')
-                ->where('charges.data.1.talonarioPhotoId', $foto));
+                ->where('charges.data.1.talonarioPhoto.id', $foto));
     }
 
     public function test_a_previous_day_needs_a_talonario_and_uses_that_days_price(): void

@@ -61,16 +61,15 @@ final class FeeDepositController extends Controller
             'isOpen' => CashBookOpening::for($caja, Currency::Ars) !== null,
             'canOpenCash' => $usuario?->can('aranceles.caja.abrir') ?? false,
             'cuentas' => $cuentas->depositOptions($caja, Currency::Ars),
-            'sinComprobante' => $this->depositos->inStatus(CashTransferStatus::AwaitingTicket),
-            'enTransito' => $this->depositos->inStatus(CashTransferStatus::Deposited),
-            'acreditados' => $this->depositos->inStatus(CashTransferStatus::BankConfirmed, self::HISTORIAL),
-            'cancelados' => $this->depositos->inStatus(CashTransferStatus::Cancelled, self::HISTORIAL),
+            'sinComprobante' => $this->depositos->inStatus(CashTransferStatus::AwaitingTicket, $request->user()),
+            'enTransito' => $this->depositos->inStatus(CashTransferStatus::Deposited, $request->user()),
+            'acreditados' => $this->depositos->inStatus(CashTransferStatus::BankConfirmed, $request->user(), self::HISTORIAL),
+            'cancelados' => $this->depositos->inStatus(CashTransferStatus::Cancelled, $request->user(), self::HISTORIAL),
             'can' => [
                 'deposit' => $usuario?->can('aranceles.depositar') ?? false,
                 'adjustTransfer' => $usuario?->can('aranceles.ajustar-traspaso') ?? false,
                 'confirm' => $usuario?->can('aranceles.verificar-pagos') ?? false,
                 'cancel' => $usuario?->can('aranceles.cancelar-traspaso') ?? false,
-                'viewAttachments' => $usuario?->can('adjuntos.ver') ?? false,
             ],
         ]);
     }

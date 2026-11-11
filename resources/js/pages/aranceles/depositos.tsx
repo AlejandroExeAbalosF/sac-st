@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import { AttachmentLink } from '@/components/attachments/attachment-link';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import ListViewTab from '@/components/list-view-tab';
@@ -36,7 +37,6 @@ import CashBoxNotReady from '@/features/caja/components/cash-box-not-ready';
 import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { businessToday, date, dateTime, money } from '@/lib/format';
-import { download, preview } from '@/routes/adjuntos';
 import {
     cancel,
     candidates,
@@ -55,7 +55,6 @@ type Permisos = {
     adjustTransfer: boolean;
     confirm: boolean;
     cancel: boolean;
-    viewAttachments: boolean;
 };
 
 type Props = {
@@ -258,8 +257,7 @@ function FilaDeDeposito({
             {(deposito.ticketDate ||
                 deposito.creditedOn ||
                 deposito.notes ||
-                (can.viewAttachments &&
-                    deposito.ticketAttachmentId !== null)) && (
+                deposito.ticketAttachment?.canOpen) && (
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {deposito.ticketDate && (
                         <span>
@@ -273,31 +271,13 @@ function FilaDeDeposito({
                     {deposito.creditedOn && (
                         <span>Acreditado el {date(deposito.creditedOn)}</span>
                     )}
-                    {can.viewAttachments &&
-                        deposito.ticketAttachmentId !== null && (
-                            <a
-                                href={
-                                    deposito.ticketViewable
-                                        ? preview(deposito.ticketAttachmentId)
-                                              .url
-                                        : download(deposito.ticketAttachmentId)
-                                              .url
-                                }
-                                target={
-                                    deposito.ticketViewable
-                                        ? '_blank'
-                                        : undefined
-                                }
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                            >
-                                <Paperclip
-                                    className="size-3"
-                                    aria-hidden="true"
-                                />
-                                Ver comprobante
-                            </a>
-                        )}
+                    <AttachmentLink
+                        attachment={deposito.ticketAttachment}
+                        className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                    >
+                        <Paperclip className="size-3" aria-hidden="true" />
+                        Ver comprobante
+                    </AttachmentLink>
                     {deposito.notes && <span>{deposito.notes}</span>}
                 </p>
             )}

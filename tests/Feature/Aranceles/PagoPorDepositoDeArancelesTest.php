@@ -1018,7 +1018,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['cobro' => $cobro->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('charges.data.0.depositProof.attachmentId', $comprobante->attachment_id)
+                ->where('charges.data.0.depositProof.attachment.id', $comprobante->attachment_id)
                 ->where('charges.data.0.depositProof.amount', '150.00')
                 ->where('charges.data.0.depositProof.operationNumber', '995979830'));
         $this->assertFalse(FinancialEvent::query()->where('idempotency_key', 'like', '%'.$papel['idempotencyKey'].'%')->exists());
@@ -1035,7 +1035,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
         $this->assertNotSame($primero->attachment_id, $segundo->attachment_id);
 
         $this->actingAs($this->admin)->get(route('aranceles.cobros.index', ['cobro' => $cobro->id]))
-            ->assertInertia(fn (Assert $page) => $page->where('charges.data.0.depositProof.attachmentId', $segundo->attachment_id));
+            ->assertInertia(fn (Assert $page) => $page->where('charges.data.0.depositProof.attachment.id', $segundo->attachment_id));
 
         $this->assertSame(1, AuditEvent::query()->where('action', 'arancel.comprobante-cargado')->count());
         $this->assertSame(1, AuditEvent::query()->where('action', 'arancel.comprobante-cambiado')->count());
