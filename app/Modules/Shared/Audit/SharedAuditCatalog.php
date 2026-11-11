@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Audit;
 
 use App\Modules\Shared\Audit\References\PersonReference;
+use App\Modules\Shared\Audit\Subjects\AttachmentAuditSubject;
 use App\Modules\Shared\Audit\Subjects\DocumentSeriesSubject;
 use App\Modules\Shared\Audit\Subjects\PersonBankAccountSubject;
 use App\Modules\Shared\Audit\Subjects\PersonSubject;
@@ -13,18 +14,20 @@ use App\Modules\Shared\Audit\Subjects\UserSubject;
 use App\Modules\Shared\Enums\AuditSeverity;
 
 /**
- * Lo que Shared registra: el maestro de personas, sus cuentas bancarias,
- * los usuarios y los roles.
+ * Lo que Shared registra: los adjuntos, el maestro de personas, sus cuentas
+ * bancarias, los usuarios y los roles.
  */
 final class SharedAuditCatalog implements AuditCatalogContributor
 {
     public function register(AuditCatalog $catalog): void
     {
+        $catalog->registerCategory('Adjuntos', 55);
         $catalog->registerCategory('Personas', 60);
         $catalog->registerCategory('Configuración', 70);
 
         $catalog->registerActions(
             new AuditActionDefinition('numeracion.configurada', 'Se configuró la numeración de comprobantes', 'Configuración', AuditSeverity::Critical, metadata: ['motivo' => 'Motivo', 'serie_anterior' => 'Serie anterior']),
+            new AuditActionDefinition('adjunto.renombrado', 'Se corrigió la descripción del adjunto', 'Adjuntos'),
             new AuditActionDefinition('persona.corregida', 'Se corrigió la ficha de la persona', 'Personas'),
             new AuditActionDefinition(
                 'persona.datos-completados',
@@ -64,6 +67,7 @@ final class SharedAuditCatalog implements AuditCatalogContributor
             ),
         );
 
+        $catalog->registerSubject(new AttachmentAuditSubject);
         $catalog->registerSubject(new DocumentSeriesSubject);
         $catalog->registerSubject(new UserSubject);
         $catalog->registerSubject(new RoleSubject);

@@ -37,6 +37,8 @@ final class AttachmentData extends Data
          * pedía la miniatura y se encontraba con un 403.
          */
         public bool $canOpen,
+        /** Si quien mira puede corregir la descripción. */
+        public bool $canRename,
         public ?string $createdByName,
         public string $createdAt,
     ) {}
@@ -51,6 +53,7 @@ final class AttachmentData extends Data
             kind: $adjunto->kind(),
             sizeBytes: $adjunto->size_bytes,
             canOpen: $viewer !== null && Gate::forUser($viewer)->allows('view', $adjunto),
+            canRename: $viewer !== null && Gate::forUser($viewer)->allows('rename', $adjunto),
             createdByName: $adjunto->uploader?->name,
             createdAt: $adjunto->created_at->toIso8601String(),
         );

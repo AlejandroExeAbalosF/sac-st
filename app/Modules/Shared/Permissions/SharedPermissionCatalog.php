@@ -70,6 +70,14 @@ final class SharedPermissionCatalog implements PermissionCatalogContributor
                 'adjuntos',
                 ['administrador', 'contador', 'administrativo'],
             ),
+            // Corregir la descripción, no el archivo: el archivo no se reescribe.
+            new PermissionDefinition(
+                'adjuntos.renombrar',
+                'Corregir la descripción de adjuntos',
+                'Cambiar la descripción de un adjunto, por ejemplo un número de foja mal tipeado. El archivo no cambia y queda la descripción anterior en la auditoría.',
+                'adjuntos',
+                ['administrador', 'contador', 'administrativo'],
+            ),
             // Lo reservado no circula: una nota médica, un dato sensible del
             // trabajador. Quien consulta expedientes todo el día no lo abre.
             new PermissionDefinition(

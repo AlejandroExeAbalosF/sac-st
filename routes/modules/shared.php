@@ -51,6 +51,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
             ->name('adjuntos.preview');
     });
 
+    // Corregir la descripción. Quién puede lo decide `AttachmentPolicy::rename`.
+    Route::patch('adjuntos/{attachment}/titulo', [AttachmentController::class, 'rename'])
+        ->whereNumber('attachment')
+        ->middleware('can:adjuntos.renombrar')
+        ->name('adjuntos.rename');
+
     /*
      * Configuración del sistema.
      *

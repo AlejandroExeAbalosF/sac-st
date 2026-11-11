@@ -7,11 +7,13 @@ namespace Tests\Feature\Shared;
 use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
+use App\Modules\Shared\Actions\RenameAttachment;
 use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Enums\AttachmentKind;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Support\Attachments;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,13 +33,105 @@ class AdjuntosTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Lo que identifica el archivo no cambia: solo la descripción se corrige. */
     public function test_un_adjunto_no_se_puede_editar(): void
+    {
+        $adjunto = $this->adjunto();
+
+        foreach (['mime_type' => 'image/png', 'sha256' => str_repeat('0', 64), 'original_filename' => 'otro.pdf'] as $columna => $valor) {
+            try {
+                DB::transaction(fn () => DB::table('attachments')->where('id', $adjunto->id)->update([$columna => $valor]));
+                $this->fail("La base dejó cambiar {$columna}.");
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('Un adjunto no se edita', $e->getMessage());
+            }
+        }
+    }
+
+    /** Ni siquiera la descripción junto con otra columna. */
+    public function test_la_descripcion_no_sirve_de_puerta_para_cambiar_otra_columna(): void
     {
         $adjunto = $this->adjunto();
 
         $this->expectException(QueryException::class);
 
-        DB::table('attachments')->where('id', $adjunto->id)->update(['title' => 'otro']);
+        DB::table('attachments')->where('id', $adjunto->id)->update(['title' => 'otro', 'size_bytes' => 1]);
+    }
+
+    public function test_la_base_deja_corregir_la_descripcion_pero_no_vaciarla(): void
+    {
+        $adjunto = $this->adjunto();
+
+        DB::table('attachments')->where('id', $adjunto->id)->update(['title' => 'Resolución 1234/25, foja 3']);
+        $this->assertSame('Resolución 1234/25, foja 3', $adjunto->fresh()?->title);
+
+        $this->expectException(QueryException::class);
+        DB::table('attachments')->where('id', $adjunto->id)->update(['title' => '   ']);
+    }
+
+    /**
+     * Corregir la descripción desde la pantalla deja el título anterior en
+     * la auditoría, y el archivo igual.
+     */
+    public function test_se_corrige_la_descripcion_y_queda_auditada(): void
+    {
+        $adjunto = $this->adjunto();
+        $operador = $this->operador();
+
+        $this->actingAs($operador)
+            ->from('/inicio')
+            ->patch(route('adjuntos.rename', $adjunto), ['title' => '  Resolución 1234/25  '])
+            ->assertRedirect('/inicio')
+            ->assertSessionHasNoErrors();
+
+        $corregido = $adjunto->fresh();
+        $this->assertSame('Resolución 1234/25', $corregido?->title);
+        $this->assertSame($adjunto->object_key, $corregido?->object_key);
+
+        $evento = AuditEvent::query()->where('action', 'adjunto.renombrado')->sole();
+        $this->assertSame('Attachment', $evento->subject_type);
+        $this->assertSame($adjunto->id, $evento->subject_id);
+        $this->assertSame(['title' => $adjunto->title], $evento->old_values);
+        $this->assertSame(['title' => 'Resolución 1234/25'], $evento->new_values);
+        $this->assertSame($operador->id, $evento->user_id);
+    }
+
+    /** El título anterior auditado es el de la base, no el que tenía la pantalla. */
+    public function test_la_auditoria_registra_el_titulo_que_de_verdad_se_reemplazo(): void
+    {
+        $adjunto = $this->adjunto();
+        $enPantalla = $adjunto->replicate();
+        $enPantalla->id = $adjunto->id;
+        DB::table('attachments')->where('id', $adjunto->id)->update(['title' => 'Lo corrigió otra persona']);
+
+        app(RenameAttachment::class)->handle($enPantalla, 'Versión final', $this->operador());
+
+        $this->assertSame(
+            ['title' => 'Lo corrigió otra persona'],
+            AuditEvent::query()->where('action', 'adjunto.renombrado')->sole()->old_values,
+        );
+    }
+
+    public function test_sin_permiso_no_se_corrige_la_descripcion(): void
+    {
+        $adjunto = $this->adjunto();
+
+        $this->actingAs($this->operador('consulta'))
+            ->patch(route('adjuntos.rename', $adjunto), ['title' => 'otro'])
+            ->assertForbidden();
+
+        $this->assertFalse(AttachmentData::fromModel($adjunto, $this->operador('consulta'))->canRename);
+        $this->assertTrue(AttachmentData::fromModel($adjunto, $this->operador())->canRename);
+    }
+
+    /** Quien no puede ver un reservado tampoco lo renombra. */
+    public function test_un_reservado_no_lo_renombra_quien_no_lo_puede_ver(): void
+    {
+        $adjunto = $this->adjunto(confidencialidad: Confidentiality::Restricted);
+
+        $this->actingAs($this->operador('administrativo'))
+            ->patch(route('adjuntos.rename', $adjunto), ['title' => 'otro'])
+            ->assertForbidden();
     }
 
     public function test_un_adjunto_no_se_puede_borrar(): void

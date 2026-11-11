@@ -107,9 +107,22 @@ armar los DTOs en lote está `Attachments` (`App\Modules\Shared\Support`):
 `latestFor` para el vigente de cada sujeto, `allFor` para todos y `forIds` cuando
 el dominio ya guardó cuál vale. Las tres resuelven una tanda en una consulta.
 
-No hay renombrar, reordenar ni borrar: el trigger `attachments_immutable` lo
-impide. Si se subió el archivo equivocado, se sube el correcto con una
-descripción que lo diga.
+**El archivo no se reescribe; la descripción sí se corrige.** El trigger
+`attachments_immutable` deja cambiar solo `title` —compara la fila entera
+menos esa columna, así que una columna nueva queda protegida sola— y no lo
+deja vacío. Se corrige desde el menú ⋮ de la tarjeta o desde el lápiz del
+visor, con el permiso `adjuntos.renombrar`, y la descripción anterior queda en
+la auditoría (`adjunto.renombrado`). `RenameAttachment` relee la fila
+bloqueada: lo que se audita es lo que de verdad se reemplazó. Si se subió el
+archivo equivocado, se sube el correcto con una descripción que lo diga.
+
+**El estado del archivo y el permiso van por separado.** `Gate::before` le
+concede todo al administrador antes de llegar a `AttachmentPolicy`, así que la
+policy solo responde por quien opera; si el archivo admite el cambio lo dice
+el propio adjunto. El DTO y la Action exigen las dos cosas.
+
+El campo de la descripción va marcado con `data-local-escape`: Escape cancela
+la edición y no cierra el visor que lo contiene.
 
 ### PDF con pdf.js
 

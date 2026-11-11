@@ -1477,6 +1477,7 @@ declare namespace App {
                     kind: App.Modules.Shared.Enums.AttachmentKind;
                     sizeBytes: number;
                     canOpen: boolean;
+                    canRename: boolean;
                     createdByName: string | null;
                     createdAt: string;
                 };

@@ -4,6 +4,7 @@ import {
     ChevronRight,
     Download,
     Loader2,
+    Pencil,
     RotateCw,
     X,
     ZoomIn,
@@ -18,6 +19,10 @@ import {
     extensionOf,
     FileKindBadge,
 } from './attachment-preview';
+import {
+    AttachmentTitleEditor,
+    renameAttachment,
+} from './attachment-title-editor';
 import { ImageStage } from './image-stage';
 import type { ViewerItem } from './types';
 import { downloadUrl, previewUrl } from './types';
@@ -153,6 +158,14 @@ export default function AttachmentViewer({
         total: number;
     } | null>(null);
     const filmstripRef = useRef<HTMLDivElement>(null);
+    /*
+     * Los títulos corregidos mientras el visor está abierto, por elemento.
+     * El visor trabaja sobre la copia que recibió al abrirse: la pantalla
+     * de atrás se recarga con el título nuevo, pero esta copia no.
+     */
+    const [titulos, setTitulos] = useState<Record<string, string>>({});
+    const [editando, setEditando] = useState(false);
+    const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
 
     // Si la lista se acorta con el visor abierto, el índice queda acotado.
     const safeIndex = Math.min(index, Math.max(items.length - 1, 0));
@@ -165,6 +178,8 @@ export default function AttachmentViewer({
         }
 
         setIndex(target);
+        setEditando(false);
+        setErrorTitulo(null);
         setZoom(1);
         setRotation(0);
         setPageInfo(null);
@@ -229,6 +244,27 @@ export default function AttachmentViewer({
         item?.source === 'remote'
             ? item.attachment.originalFilename
             : item?.name;
+    const titulo =
+        item === undefined ? 'Archivo' : (titulos[item.key] ?? item.name);
+    const renombrable = item?.source === 'remote' && item.attachment.canRename;
+
+    const guardarTitulo = (valor: string | null) => {
+        if (valor === null || item?.source !== 'remote') {
+            setEditando(false);
+            setErrorTitulo(null);
+
+            return;
+        }
+
+        renameAttachment(item.attachment.id, valor, {
+            onSuccess: () => {
+                setTitulos((t) => ({ ...t, [item.key]: valor }));
+                setEditando(false);
+                setErrorTitulo(null);
+            },
+            onError: setErrorTitulo,
+        });
+    };
 
     return (
         <DialogPrimitive.Root open onOpenChange={(open) => !open && onClose()}>
@@ -237,6 +273,19 @@ export default function AttachmentViewer({
                 <DialogPrimitive.Content
                     aria-describedby={undefined}
                     onKeyDown={onKeyDown}
+                    /*
+                     * Escape en el campo de la descripción cancela la
+                     * edición, no cierra el visor: Radix escucha la tecla
+                     * antes que el campo.
+                     */
+                    onEscapeKeyDown={(e) => {
+                        if (
+                            e.target instanceof HTMLElement &&
+                            e.target.closest('[data-local-escape]')
+                        ) {
+                            e.preventDefault();
+                        }
+                    }}
                     className="fixed inset-0 z-50 flex flex-col text-white outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98] motion-reduce:animate-none"
                 >
                     <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-black/55 px-3 py-2 backdrop-blur-md sm:px-4">
@@ -247,9 +296,24 @@ export default function AttachmentViewer({
                             />
                         )}
                         <div className="min-w-0 flex-1">
-                            <DialogPrimitive.Title className="truncate text-sm font-semibold sm:text-base">
-                                {item?.name ?? 'Archivo'}
+                            <DialogPrimitive.Title
+                                className={cn(
+                                    'truncate text-sm font-semibold sm:text-base',
+                                    editando && 'sr-only',
+                                )}
+                            >
+                                {titulo}
                             </DialogPrimitive.Title>
+                            {editando && (
+                                <div className="max-w-md">
+                                    <AttachmentTitleEditor
+                                        initial={titulo}
+                                        tone="dark"
+                                        error={errorTitulo}
+                                        onDone={guardarTitulo}
+                                    />
+                                </div>
+                            )}
                             <p className="text-xs text-white/60">
                                 {[
                                     hasMany &&
@@ -265,6 +329,17 @@ export default function AttachmentViewer({
                         </div>
 
                         <div className="flex items-center gap-0.5">
+                            {renombrable && !editando && (
+                                <>
+                                    <ViewerButton
+                                        label="Corregir descripción"
+                                        onClick={() => setEditando(true)}
+                                    >
+                                        <Pencil className="size-5" />
+                                    </ViewerButton>
+                                    <span className="mx-1 h-6 w-px bg-white/15" />
+                                </>
+                            )}
                             <ViewerButton
                                 label="Alejar (−)"
                                 onClick={() => setZoom((z) => nextZoom(z, -1))}
@@ -361,7 +436,7 @@ export default function AttachmentViewer({
                                     type="button"
                                     data-index={i}
                                     onClick={() => goTo(i)}
-                                    aria-label={`Ver ${it.name}`}
+                                    aria-label={`Ver ${titulos[it.key] ?? it.name}`}
                                     aria-current={i === safeIndex}
                                     className={cn(
                                         'relative h-14 w-20 shrink-0 overflow-hidden rounded-md bg-white/10 transition-opacity duration-200',

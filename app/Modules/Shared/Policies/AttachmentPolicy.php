@@ -27,4 +27,17 @@ final class AttachmentPolicy
         return $attachment->confidentiality !== Confidentiality::Restricted
             || $user->can('adjuntos.ver-reservados');
     }
+
+    /**
+     * Corregir la descripción: hay que poder abrirlo y tener el permiso.
+     *
+     * Solo responde por el operador. Si el archivo admite el cambio lo dice
+     * el propio adjunto, porque `Gate::before` le concede todo al
+     * administrador antes de llegar acá: la policy no puede ser quien
+     * cuide el estado del archivo.
+     */
+    public function rename(User $user, Attachment $attachment): bool
+    {
+        return $user->can('adjuntos.renombrar') && $this->view($user, $attachment);
+    }
 }

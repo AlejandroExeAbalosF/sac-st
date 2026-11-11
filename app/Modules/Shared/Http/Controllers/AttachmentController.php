@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Shared\Actions\RenameAttachment;
+use App\Modules\Shared\Http\Requests\RenameAttachmentRequest;
 use App\Modules\Shared\Models\Attachment;
+use App\Support\Ui\Toast;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -20,6 +24,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class AttachmentController extends Controller
 {
+    /** Corrige la descripción; el archivo queda igual. */
+    public function rename(RenameAttachmentRequest $request, Attachment $attachment, RenameAttachment $renombrar): RedirectResponse
+    {
+        Gate::authorize('rename', $attachment);
+
+        $renombrar->handle($attachment, $request->string('title')->toString(), $request->user());
+
+        Toast::success('Se corrigió la descripción del archivo.');
+
+        return back();
+    }
+
     /** Descarga el archivo. */
     public function download(Attachment $attachment): StreamedResponse
     {
