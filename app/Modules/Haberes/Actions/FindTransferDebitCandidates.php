@@ -7,12 +7,16 @@ namespace App\Modules\Haberes\Actions;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankTransaction;
-use App\Modules\Banking\Support\AllocatableAmount;
+use App\Modules\Banking\Support\TransferFees;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\TransferDebitCandidate;
+use App\Modules\Haberes\Support\TransferDebitMatch;
+use App\Modules\Haberes\Support\TransferDebitPair;
 use App\Support\Money\Decimal;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * Busca en el extracto el débito con que el organismo pagó.
@@ -22,6 +26,12 @@ use App\Support\Money\Decimal;
  * Con los tickets del expediente hay que averiguar de quién viene un
  * crédito anónimo; acá el candidato o coincide o es otro pago.
  *
+ * **El pago puede ser dos renglones.** Una transferencia MacrOnline E-set
+ * trae su comisión aparte, con la misma referencia, y la comisión la
+ * absorbe el beneficiario: la Orden se cancela con los dos. Qué cuenta
+ * como pago lo decide `TransferDebitPair`, la misma regla que aplican la
+ * vinculación y la validación.
+ *
  * **No vincula: propone.** Confirmar es de una persona, porque un débito
  * mal atribuido daría por pagada una cuota con la transferencia de otra —y
  * dejaría a un trabajador esperando un dinero que el sistema cree
@@ -29,15 +39,7 @@ use App\Support\Money\Decimal;
  */
 final class FindTransferDebitCandidates
 {
-    /**
-     * Hacia atrás no se busca **nada**: el organismo no puede haber
-     * transferido antes de que se le pidiera. La única tolerancia es de un
-     * día, y solo por si la Orden se fechó con un día de diferencia
-     * respecto de cuando salió.
-     */
-    private const DAYS_BEFORE_ORDER = 1;
-
-    public function __construct(private readonly AllocatableAmount $disponible) {}
+    public function __construct(private readonly TransferDebitPair $par) {}
 
     /**
      * Los débitos que podrían ser el pago de esta cuota.
@@ -46,6 +48,10 @@ final class FindTransferDebitCandidates
      * no existir: el §12.4 contempla que el débito se reconozca antes de
      * que el organismo informe, y ése es justamente el momento en que
      * alguien pide esta lista.
+     *
+     * Devuelve los que coinciden y los que quedan **para revisión**: el
+     * importe cierra, pero el extracto no alcanza para afirmarlo solo. La
+     * pantalla muestra a los segundos sin dejarlos elegir.
      *
      * @return list<TransferDebitCandidate>
      */
@@ -69,30 +75,41 @@ final class FindTransferDebitCandidates
 
         $importe = $disbursement->amount ?? $orden->amount;
 
-        $desde = $orden->order_date->copy()->subDays(self::DAYS_BEFORE_ORDER);
+        $desde = $orden->order_date->copy()->subDays(TransferDebitPair::DAYS_BEFORE_ORDER);
 
         /*
-         * Importe exacto, sin tolerancia: las comisiones son movimientos
-         * aparte en el extracto real, así que el débito de una
-         * transferencia sale completo. Si difiere, es otro pago.
+         * Una primera criba en la base, solo para no traer el extracto
+         * entero: el débito que iguala el importe, o el que lo iguala con
+         * una comisión de su operación. Quién coincide de verdad lo dice
+         * `TransferDebitPair`, igual que al vincular y al validar.
          */
         $movimientos = BankTransaction::query()
             ->where('bank_account_id', $orden->organism_bank_account_id)
             ->where('direction', TransactionDirection::Debit->value)
             ->where('reconciliation_status', '!=', ReconciliationStatus::Ignored->value)
             ->whereDate('transaction_date', '>=', $desde->toDateString())
-            ->whereRaw('ABS(amount) = ?::numeric', [$importe])
+            ->where(fn (Builder $q) => $q
+                ->whereNull('causal_code')
+                ->orWhereNotIn('causal_code', TransferFees::CAUSALS))
+            ->where(fn (Builder $q) => $q
+                ->whereRaw('ABS(amount) = ?::numeric', [$importe])
+                ->orWhereExists(fn (QueryBuilder $comision) => $comision
+                    ->selectRaw('1')
+                    ->from('bank_transactions as f')
+                    ->whereIn('bank_transactions.causal_code', array_keys(TransferFees::PAIRS))
+                    ->whereColumn('f.bank_account_id', 'bank_transactions.bank_account_id')
+                    ->whereColumn('f.transaction_date', 'bank_transactions.transaction_date')
+                    ->whereColumn('f.operation_id', 'bank_transactions.operation_id')
+                    ->where('f.direction', TransactionDirection::Debit->value)
+                    ->whereIn('f.causal_code', TransferFees::CAUSALS)
+                    ->whereRaw('ABS(bank_transactions.amount) + ABS(f.amount) = ?::numeric', [$importe])))
             ->orderBy('transaction_date')
             ->get();
 
         $candidatos = $movimientos
-            /*
-             * Lo que ya está imputado no se ofrece: un débito consumido
-             * por otro egreso no puede ser además éste, o sería la misma
-             * plata saliendo dos veces.
-             */
-            ->filter(fn (BankTransaction $m): bool => ! Decimal::equals($this->disponible->for($m), '0'))
-            ->map(fn (BankTransaction $m): TransferDebitCandidate => $this->describe($installment, $orden, $disbursement, $m))
+            ->map(fn (BankTransaction $m): TransferDebitMatch => $this->par->resolve($m, $orden, $importe, $disbursement?->id))
+            ->filter(fn (TransferDebitMatch $par): bool => $par->problem === null)
+            ->map(fn (TransferDebitMatch $par): TransferDebitCandidate => $this->describe($installment, $orden, $disbursement, $par))
             ->sortBy(fn (TransferDebitCandidate $c): int => $c->rank())
             ->values()
             ->all();
@@ -105,8 +122,10 @@ final class FindTransferDebitCandidates
         BeneficiaryInstallment $installment,
         PaymentOrder $orden,
         ?Disbursement $disbursement,
-        BankTransaction $movimiento,
+        TransferDebitMatch $par,
     ): TransferDebitCandidate {
+        $movimiento = $par->transfer;
+
         /*
          * La referencia de la que se mide la cercanía es la del informe
          * del organismo; si todavía no informó, la de la Orden. Un débito
@@ -125,7 +144,9 @@ final class FindTransferDebitCandidates
         $beneficiario = $installment->haber->beneficiary->name;
         $porBeneficiario = $this->mencionaAlBeneficiario($movimiento, $beneficiario);
 
-        $signals = ['importe' => 'exacto'];
+        $signals = ['importe' => $par->fee === null
+            ? 'exacto'
+            : 'exacto con la comisión de $'.Decimal::format($par->feeAmount() ?? '0')];
 
         $signals['fecha'] = match (true) {
             $dias === 0 => 'el mismo día',
@@ -144,6 +165,8 @@ final class FindTransferDebitCandidates
 
         return new TransferDebitCandidate(
             transaction: $movimiento,
+            fee: $par->fee,
+            reviewReason: $par->reviewReason,
             dayGap: $dias,
             referenceMatches: $porReferencia,
             beneficiaryMatches: $porBeneficiario,

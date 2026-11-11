@@ -242,6 +242,12 @@ el informe del organismo y el débito del extracto pueden registrarse en cualqui
 orden. Reunirlos deja el egreso listo para validar; **no lo confirma automáticamente**.
 La validación registra el asiento, marca la cuota pagada y completa la Orden.
 
+Si el banco cobró comisión por la transferencia, el pago son dos renglones del
+extracto: el diálogo del débito muestra «Transferencia + comisión = Orden», se elige
+la transferencia y la comisión se vincula sola. La comisión la absorbe el
+beneficiario, así que el recibo de egreso dice lo que él recibió y aclara la
+comisión. Regla: [transferencia con comisión](haberes-reglas.md#transferencia-con-comision).
+
 El recibo de egreso requiere un egreso confirmado. En `/haberes/planillas` siguen
 las colas «Por entregar» y «Transferencias sin confirmar», y se puede consultar
 e imprimir «Todas las cuotas». Esta última incluye vigentes, pagadas, históricas

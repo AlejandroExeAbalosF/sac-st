@@ -64,6 +64,7 @@ final class BankMovementIdentifications
             $concept = match ($row->allocation_role) {
                 'cash_deposit_confirmation' => 'Depósito de efectivo acreditado',
                 'payment_confirmation' => 'Pago bancario confirmado',
+                'bank_fee' => 'Comisión bancaria de un pago',
                 default => 'Ingreso bancario registrado',
             };
             $result[(int) $row->bank_transaction_id][] = [

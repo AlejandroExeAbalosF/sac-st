@@ -10,6 +10,7 @@ use App\Modules\Haberes\Actions\DeliverAndIssueExpenseReceipt;
 use App\Modules\Haberes\Actions\FindTransferDebitCandidates;
 use App\Modules\Haberes\Actions\IssueExpenseReceipt;
 use App\Modules\Haberes\Actions\LinkTransferDebit;
+use App\Modules\Haberes\Actions\ListUnmatchedTransferDebits;
 use App\Modules\Haberes\Actions\RegisterTransferReport;
 use App\Modules\Haberes\Actions\ValidateTransferDisbursement;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
@@ -17,8 +18,10 @@ use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\ReceiptFormData;
 use App\Modules\Haberes\Support\TransferDebitCandidate;
+use App\Modules\Haberes\Support\TransferDebitMatch;
 use App\Modules\Shared\Pdf\ExpenseReceiptPdf;
 use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
 use App\Support\Validation\ScannedDocument;
 use Carbon\CarbonImmutable;
@@ -160,24 +163,67 @@ final class DisbursementController extends Controller
      * Propone, no vincula: la lista sale con las señales en palabras para
      * que quien confirma entienda por qué un candidato está primero, sobre
      * todo cuando el orden está equivocado.
+     *
+     * `others` son los débitos sin conciliar de la cuenta que **no** son este
+     * pago, cada uno con su motivo. Solo se consultan: sirven para entender
+     * por qué no aparece el pago, no para elegirlo.
      */
     public function debitCandidates(
         BeneficiaryInstallment $installment,
         FindTransferDebitCandidates $buscar,
+        ListUnmatchedTransferDebits $otros,
     ): JsonResponse {
         return response()->json([
             'candidates' => array_map(
                 fn (TransferDebitCandidate $c): array => [
-                    'id' => $c->transaction->id,
-                    'date' => $c->transaction->transaction_date?->format('Y-m-d'),
-                    'amount' => $c->transaction->amount,
-                    'description' => $c->transaction->description ?? $c->transaction->counterparty_name,
-                    'operationId' => $c->transaction->operation_id,
+                    ...$this->debito($c->transaction, $c->fee),
+                    'reviewReason' => $c->reviewReason,
                     'signals' => $c->signals,
                 ],
                 $buscar->handle($installment),
             ),
+            'others' => array_map(
+                fn (TransferDebitMatch $par): array => [
+                    ...$this->debito($par->transfer, $par->fee),
+                    'reason' => $par->rejection(),
+                ],
+                $otros->handle($installment),
+            ),
         ]);
+    }
+
+    /**
+     * Un débito del extracto con su comisión, como lo muestra el diálogo.
+     *
+     * @return array<string, mixed>
+     */
+    private function debito(BankTransaction $transferencia, ?BankTransaction $comision): array
+    {
+        return [
+            'id' => $transferencia->id,
+            'date' => $transferencia->transaction_date?->format('Y-m-d'),
+            'amount' => $transferencia->amount,
+            'description' => $transferencia->description ?? $transferencia->counterparty_name,
+            'operationId' => $transferencia->operation_id,
+            'causalCode' => $transferencia->causal_code,
+            'transferAmount' => Decimal::abs($transferencia->amount),
+            // La suma la hace el servidor: el front no opera importes.
+            'total' => Decimal::add(
+                Decimal::abs($transferencia->amount),
+                $comision === null ? '0' : Decimal::abs($comision->amount),
+            ),
+            /*
+             * La comisión de la misma operación, que se vincula sola con la
+             * transferencia. Se muestra para que quien elige vea que los dos
+             * renglones suman la Orden.
+             */
+            'fee' => $comision === null ? null : [
+                'id' => $comision->id,
+                'causalCode' => $comision->causal_code,
+                'amount' => Decimal::abs($comision->amount),
+                'description' => $comision->description,
+            ],
+        ];
     }
 
     /** Reconoce el débito que prueba que el dinero salió — §2.3.2. */
@@ -326,6 +372,7 @@ final class DisbursementController extends Controller
             amount: $estado->amount,
             talonarioNumber: $request->string('talonarioNumber')->toString() ?: null,
             printsTalonarioNumber: $request->boolean('printsTalonarioNumber'),
+            disbursement: $estado->disbursement,
         );
 
         return response($pdf->preview(

@@ -8,6 +8,7 @@ use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
@@ -35,6 +36,7 @@ final class DisbursementSummaryData extends Data
         'cashDeliveredBy:id,name',
         'validatedBy:id,name',
         'bankTransaction:id,transaction_date,amount,operation_id,description,counterparty_name',
+        'feeBankTransaction:id,amount',
     ];
 
     public function __construct(
@@ -60,6 +62,19 @@ final class DisbursementSummaryData extends Data
         public ?string $debitDate,
         public ?string $debitOperationId,
         public ?string $debitDescription,
+        /**
+         * Lo que llegó a la cuenta del beneficiario: la transferencia.
+         *
+         * @var numeric-string|null
+         */
+        public ?string $debitAmount,
+        /**
+         * La comisión que el banco cobró por la transferencia, a cargo del
+         * beneficiario. Nula si no hubo.
+         *
+         * @var numeric-string|null
+         */
+        public ?string $feeAmount,
         /** Quién cotejó Orden, informe y débito (§2.3.4). */
         public ?string $validatedByName,
         public ?string $validatedAt,
@@ -68,6 +83,7 @@ final class DisbursementSummaryData extends Data
     public static function fromModel(Disbursement $disbursement): self
     {
         $debito = $disbursement->bankTransaction;
+        $comision = $disbursement->feeBankTransaction;
 
         return new self(
             id: $disbursement->id,
@@ -84,6 +100,8 @@ final class DisbursementSummaryData extends Data
             debitDate: $debito?->transaction_date?->format('Y-m-d'),
             debitOperationId: $debito?->operation_id,
             debitDescription: $debito->description ?? $debito?->counterparty_name,
+            debitAmount: $debito === null ? null : Decimal::abs($debito->amount),
+            feeAmount: $comision === null ? null : Decimal::abs($comision->amount),
             validatedByName: $disbursement->validatedBy?->name,
             validatedAt: $disbursement->validated_at === null ? null : BusinessDate::fromInstant($disbursement->validated_at)->toDateString(),
         );

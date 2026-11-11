@@ -336,6 +336,63 @@ Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 [egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php) y
 [egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php).
 
+<a id="transferencia-con-comision"></a>
+
+### Transferencia con comisión bancaria
+
+Una transferencia MacrOnline E-set sale del extracto en dos débitos con la misma
+cuenta, fecha y operación: la transferencia (causal `3913`) y la comisión (`3914`).
+**La comisión la absorbe el beneficiario** (decisión del usuario, 10/11/2026, sobre la
+evidencia del extracto; **falta cotejarla con la contadora**: cómo registra hoy esas
+filas y qué importe consigna en el recibo): la Orden
+se cancela con los dos débitos y el trabajador recibe la transferencia.
+
+`TransferDebitPair` es la única definición de la regla, y la aplican igual el
+buscador, la vinculación y la validación:
+
+- la transferencia es un débito de la cuenta de la Orden, no anterior a ella (un día
+  de margen) y no es una comisión;
+- solo una transferencia E-set (3913) lleva comisión, y es la 3914 de la misma cuenta,
+  fecha y operación no vacía (`TransferFees`,
+  en Banking). Sin comisión, el pago es la transferencia sola; con dos o más, el
+  caso queda **para revisión** y no se vincula. Una comisión fuera del circuito
+  también deja el caso para revisión;
+- transferencia + comisión suman **exacto** el importe del egreso. Una transferencia
+  que sola iguala la Orden pero trajo comisión no coincide;
+- cada movimiento está entero, sin imputaciones y sin otro egreso vivo que lo reserve.
+
+El diálogo muestra la comisión debajo de su transferencia y la marca con ella. Debajo,
+plegados y solo para consultar, lista los demás débitos sin conciliar de la cuenta
+desde 30 días antes de la Orden, cada uno con el motivo por el que no es el pago
+(`ListUnmatchedTransferDebits`, que usa la misma regla).
+
+Se elige la transferencia; la comisión se vincula sola (`fee_bank_transaction_id`).
+Validar revisa el par de nuevo bajo lock, asienta la Orden contra dos créditos a
+`BANK_ACCOUNT` e imputa `payment_confirmation` a la transferencia y `bank_fee` a la
+comisión. El recibo de egreso dice **lo acreditado** —firmar por la Orden sería
+declarar haber recibido de más— y aclara en el concepto «Cuota $X − comisión
+bancaria $Y». En el libro del día la comisión ocupa su propio renglón, y el cierre
+descuenta la Orden una sola vez.
+
+PostgreSQL impone, sin depender del Action:
+
+| Garantía | Dónde |
+| --- | --- |
+| Un débito o una comisión, en un solo egreso vivo; ni transferencia de uno y comisión de otro | `disbursements_one_live_per_debit`, `disbursements_one_live_per_fee`, `disbursements_debits_not_shared` |
+| Al confirmar (o insertar confirmado): débitos de la cuenta de la Orden, el par 3913 + 3914 de la misma operación, que suman el egreso | `disbursements_transfer_debits_match` |
+| Fuera del circuito, solo un movimiento sin imputaciones ni egreso vivo que lo reserve | `bank_transactions_ignore_only_unused` |
+| La comisión de un egreso confirmado no cambia | `disbursements_append_only` |
+| `payment_confirmation` y `bank_fee`, solo sobre débitos enteros y sin otro uso | `payment_debit_movement_whole` |
+
+Una comisión excluida por error se reincorpora desde Banco › Movimientos
+([reincorporar](caja-de-haberes.md#reincorporar-movimiento)); después el par se
+vincula y se valida como cualquier otro.
+
+Evidencia: [regla](../app/Modules/Haberes/Support/TransferDebitPair.php),
+[comisiones del banco](../app/Modules/Banking/Support/TransferFees.php),
+[migración](../database/migrations/2026_11_10_020000_add_bank_fee_to_disbursements.php) y
+[pruebas](../tests/Feature/Haberes/EgresoConComisionBancariaTest.php).
+
 <a id="historicos"></a>
 
 ## Cuotas pagadas fuera del circuito

@@ -13,8 +13,9 @@ namespace App\Modules\Banking\Enums;
  * importe y la fecha.
  *
  * `Ignored` es la salida para lo que nunca va a tener un evento
- * financiero detrás: la comisión de $121, la transferencia entre dos
- * cuentas del propio organismo. Exige motivo y responsable.
+ * financiero detrás: la transferencia entre dos cuentas del propio
+ * organismo, una comisión suelta. La comisión de la transferencia de un
+ * egreso no: esa se imputa con el pago. Exige motivo y responsable.
  */
 enum ReconciliationStatus: string
 {

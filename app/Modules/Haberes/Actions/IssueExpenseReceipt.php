@@ -23,6 +23,7 @@ use App\Modules\Shared\Models\DocumentSeries;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\TalonarioSequence;
 use App\Support\BusinessDate;
+use App\Support\Money\Decimal;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
@@ -57,6 +58,12 @@ use Throwable;
  * quien depositó; acá, al beneficiario que cobró. El empleador no
  * desaparece: el formulario también lo imprime, y va en
  * `counterparty_name_snapshot`.
+ *
+ * **Dice lo que el trabajador recibió, no lo que autorizó la Orden.** Si el
+ * banco cobró comisión por la transferencia, la absorbe el beneficiario: la
+ * cuota se cancela por el total, pero a su cuenta llegó la transferencia.
+ * El papel lo hace firmar por esa suma —firmar por el total sería declarar
+ * haber recibido de más— y aclara en el concepto cómo se compone.
  */
 final class IssueExpenseReceipt
 {
@@ -160,11 +167,12 @@ final class IssueExpenseReceipt
                 ...$this->componer(
                     $installment,
                     $disbursement->method,
-                    $disbursement->amount,
+                    $this->creditedAmount($disbursement),
                     $talonarioNumber,
                     $issueDate ?? $disbursement->payment_date,
                     $actorId,
                     $printsTalonarioNumber,
+                    $this->feeNote($disbursement),
                 ),
                 'document_series_id' => $numero['series_id'],
                 'number' => $numero['number'],
@@ -241,6 +249,9 @@ final class IssueExpenseReceipt
      * que le falta es el número definitivo, que se toma al emitir bajo
      * lock.
      *
+     * Con un egreso ya registrado, el importe y la aclaración de la comisión
+     * salen de él, igual que al emitir.
+     *
      * @param  numeric-string|null  $amount
      */
     public function preview(
@@ -249,17 +260,21 @@ final class IssueExpenseReceipt
         ?string $amount = null,
         ?string $talonarioNumber = null,
         bool $printsTalonarioNumber = false,
+        ?Disbursement $disbursement = null,
     ): Receipt {
         $installment->loadMissing(['haber.beneficiary', 'haber.expediente.employer']);
 
         $recibo = new Receipt($this->componer(
             $installment,
             $method ?? DisbursementMethod::Cash,
-            $amount ?? $this->financiacion->allocated($installment),
+            $disbursement === null
+                ? ($amount ?? $this->financiacion->allocated($installment))
+                : $this->creditedAmount($disbursement),
             $talonarioNumber,
             null,
             null,
             $printsTalonarioNumber,
+            $disbursement === null ? null : $this->feeNote($disbursement),
         ));
 
         $serie = DocumentSeries::activeForCode(ReceiptType::Expense->seriesCode());
@@ -283,6 +298,7 @@ final class IssueExpenseReceipt
      * que garantiza que lo que se mira sea lo que se imprime.
      *
      * @param  numeric-string  $amount
+     * @param  string|null  $feeNote  cómo se compone el importe cuando el banco cobró comisión
      * @return array<string, mixed>
      */
     private function componer(
@@ -293,6 +309,7 @@ final class IssueExpenseReceipt
         ?CarbonInterface $issueDate,
         ?int $actorId,
         bool $printsTalonarioNumber,
+        ?string $feeNote = null,
     ): array {
         $haber = $installment->haber;
         $expediente = $haber->expediente;
@@ -312,7 +329,7 @@ final class IssueExpenseReceipt
              */
             'person_id' => $haber->beneficiary_id,
             'beneficiary_installment_id' => $installment->id,
-            'concept_snapshot' => $installment->description ?? $haber->concept,
+            'concept_snapshot' => $this->concepto($installment->description ?? $haber->concept, $feeNote),
             /*
              * La casilla que el formulario marca describe **la salida**
              * (§2.4.6): con qué se le pagó al beneficiario, no cómo había
@@ -356,6 +373,71 @@ final class IssueExpenseReceipt
      * Solo el último: si hubo tres intentos, cada uno apunta al anterior y
      * la cadena se lee entera desde el vigente hacia atrás.
      */
+    /**
+     * Lo que llegó a la cuenta del beneficiario.
+     *
+     * Sin comisión es el egreso entero. Con comisión, el egreso menos lo
+     * que cobró el banco, que es exactamente la transferencia: la base lo
+     * exige al confirmar.
+     *
+     * @return numeric-string
+     */
+    private function creditedAmount(Disbursement $disbursement): string
+    {
+        $comision = $this->feeAmount($disbursement);
+
+        return $comision === null
+            ? $disbursement->amount
+            : Decimal::sub($disbursement->amount, $comision);
+    }
+
+    /** «Cuota $891.962,00 − comisión bancaria $121,00», o nada. */
+    private function feeNote(Disbursement $disbursement): ?string
+    {
+        $comision = $this->feeAmount($disbursement);
+
+        return $comision === null ? null : sprintf(
+            'Cuota $%s − comisión bancaria $%s',
+            Decimal::format($disbursement->amount),
+            Decimal::format($comision),
+        );
+    }
+
+    /** @return numeric-string|null */
+    private function feeAmount(Disbursement $disbursement): ?string
+    {
+        if ($disbursement->fee_bank_transaction_id === null) {
+            return null;
+        }
+
+        $disbursement->loadMissing('feeBankTransaction');
+
+        return $disbursement->feeBankTransaction === null
+            ? null
+            : Decimal::abs($disbursement->feeBankTransaction->amount);
+    }
+
+    /**
+     * El concepto, con la aclaración de la comisión al final.
+     *
+     * La aclaración no se recorta: es la que explica por qué el papel dice
+     * menos que la Orden. Si no entra todo, cede el concepto.
+     */
+    private function concepto(?string $concepto, ?string $feeNote): ?string
+    {
+        if ($feeNote === null) {
+            return $concepto;
+        }
+
+        $separador = ' — ';
+        $lugar = 300 - mb_strlen($feeNote) - mb_strlen($separador);
+        $concepto = trim((string) $concepto);
+
+        return $concepto === ''
+            ? $feeNote
+            : mb_substr($concepto, 0, max(0, $lugar)).$separador.$feeNote;
+    }
+
     private function ultimoAnulado(BeneficiaryInstallment $installment): ?Receipt
     {
         return Receipt::query()

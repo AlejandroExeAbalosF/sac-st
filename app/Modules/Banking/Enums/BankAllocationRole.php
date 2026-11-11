@@ -29,6 +29,16 @@ enum BankAllocationRole: string
     /** El débito con que el banco revierte un cheque rechazado. */
     case ChequeRejectionDebit = 'cheque_rejection_debit';
 
+    /**
+     * La comisión que el banco debitó por la transferencia de un pago.
+     *
+     * Es parte del mismo pago que `PaymentConfirmation`: el beneficiario la
+     * absorbe, así que transferencia y comisión suman lo que autorizó la
+     * Orden. Va en su propio rol para que el extracto diga por separado
+     * cuánto se transfirió y cuánto cobró el banco.
+     */
+    case BankFee = 'bank_fee';
+
     public function label(): string
     {
         return match ($this) {
@@ -37,12 +47,13 @@ enum BankAllocationRole: string
             self::CashDepositConfirmation => 'Acreditación de depósito',
             self::ChequeRejectionCredit => 'Crédito de un cheque rechazado',
             self::ChequeRejectionDebit => 'Débito de un cheque rechazado',
+            self::BankFee => 'Comisión bancaria del pago',
         };
     }
 
     /** Si el rol espera un crédito o un débito en el extracto. */
     public function expectsCredit(): bool
     {
-        return $this !== self::PaymentConfirmation && $this !== self::ChequeRejectionDebit;
+        return ! in_array($this, [self::PaymentConfirmation, self::ChequeRejectionDebit, self::BankFee], true);
     }
 }

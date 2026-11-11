@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $beneficiary_cbu_snapshot
  * @property string|null $transfer_reference
  * @property int|null $bank_transaction_id
+ * @property int|null $fee_bank_transaction_id
  * @property CarbonInterface|null $report_received_at
  * @property CarbonInterface|null $bank_debit_observed_at
  * @property int|null $validated_by
@@ -58,6 +59,7 @@ final class Disbursement extends Model
         'beneficiary_cbu_snapshot',
         'transfer_reference',
         'bank_transaction_id',
+        'fee_bank_transaction_id',
         'report_received_at',
         'bank_debit_observed_at',
         'validated_by',
@@ -80,6 +82,18 @@ final class Disbursement extends Model
     public function bankTransaction(): BelongsTo
     {
         return $this->belongsTo(BankTransaction::class);
+    }
+
+    /**
+     * La comisión que el banco debitó por esa transferencia.
+     *
+     * La absorbe el beneficiario: transferencia + comisión es lo que
+     * autorizó la Orden, y la transferencia sola es lo que él recibió.
+     */
+    /** @return BelongsTo<BankTransaction, $this> */
+    public function feeBankTransaction(): BelongsTo
+    {
+        return $this->belongsTo(BankTransaction::class, 'fee_bank_transaction_id');
     }
 
     /** @return BelongsTo<BeneficiaryInstallment, $this> */

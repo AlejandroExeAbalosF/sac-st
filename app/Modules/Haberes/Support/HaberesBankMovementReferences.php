@@ -102,17 +102,26 @@ final class HaberesBankMovementReferences implements BankMovementReferences
             }
         }
 
-        $egresos = $this->conCuota(DB::table('disbursements as d'), 'd.beneficiary_installment_id')
-            ->whereIn('d.bank_transaction_id', $ids)
-            ->whereNotIn('d.status', ['reversed', 'failed'])
-            ->selectRaw('d.bank_transaction_id AS transaction_id, d.beneficiary_installment_id AS installment_id, bi.installment_number, h.id AS haber_id, h.haber_number, e.id AS expediente_id, e.display_number, p.name AS beneficiary, d.amount, d.status')
-            ->get();
-        foreach ($egresos as $row) {
-            $porMovimiento[$row->transaction_id][$row->installment_id] = $this->reference(
-                $row,
-                $row->status === 'confirmed' ? 'payment_confirmed' : 'debit_linked',
-                Decimal::scale((string) $row->amount),
-            );
+        /*
+         * El egreso por transferencia, desde cada uno de sus débitos: la
+         * transferencia y, si el banco la cobró, la comisión. Los dos llevan
+         * a la misma cuota, cada uno con su propio importe —el del
+         * movimiento, no el del egreso—, que es lo que ese renglón explica.
+         */
+        foreach (['d.bank_transaction_id', 'd.fee_bank_transaction_id'] as $columna) {
+            $egresos = $this->conCuota(DB::table('disbursements as d'), 'd.beneficiary_installment_id')
+                ->join('bank_transactions as bt', 'bt.id', '=', $columna)
+                ->whereIn($columna, $ids)
+                ->whereNotIn('d.status', ['reversed', 'failed'])
+                ->selectRaw("{$columna} AS transaction_id, d.beneficiary_installment_id AS installment_id, bi.installment_number, h.id AS haber_id, h.haber_number, e.id AS expediente_id, e.display_number, p.name AS beneficiary, ABS(bt.amount) AS amount, d.status")
+                ->get();
+            foreach ($egresos as $row) {
+                $porMovimiento[$row->transaction_id][$row->installment_id] = $this->reference(
+                    $row,
+                    $row->status === 'confirmed' ? 'payment_confirmed' : 'debit_linked',
+                    Decimal::scale((string) $row->amount),
+                );
+            }
         }
 
         return array_map(fn (array $references): array => array_values($references), $porMovimiento);

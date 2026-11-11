@@ -6,11 +6,14 @@ namespace App\Modules\Banking\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Actions\IgnoreBankTransaction;
+use App\Modules\Banking\Actions\RestoreBankTransaction;
 use App\Modules\Banking\Data\BankAccountData;
 use App\Modules\Banking\Data\BankTransactionListItemData;
+use App\Modules\Banking\Enums\BankingReasonAct;
 use App\Modules\Banking\Enums\ReconciliationStatus;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Http\Requests\IgnoreBankTransactionRequest;
+use App\Modules\Banking\Http\Requests\RestoreBankTransactionRequest;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Support\BankCreditHandlers;
@@ -88,6 +91,9 @@ final class BankTransactionController extends Controller
                 'buscar' => $search === '' ? null : $search,
             ],
             'canIgnore' => $request->user()?->can('banco.movimientos.ignorar') ?? false,
+            'canRestore' => $request->user()?->can('banco.movimientos.reincorporar') ?? false,
+            // La lista de motivos de cada acto: la pantalla no la repite.
+            'motivos' => BankingReasonAct::options(),
             'canImport' => $request->user()?->can('banco.extractos.importar') ?? false,
             'hasAnyTransactions' => BankTransaction::query()->exists(),
         ]);
@@ -107,6 +113,23 @@ final class BankTransactionController extends Controller
         }
 
         return back()->with('status', 'Movimiento marcado como fuera del circuito.');
+    }
+
+    /** Devuelve a la conciliación un movimiento que se dejó fuera del circuito. */
+    public function restore(
+        RestoreBankTransactionRequest $request,
+        BankTransaction $transaction,
+        RestoreBankTransaction $restore,
+    ): RedirectResponse {
+        try {
+            $restore->handle($transaction, $request->reason(), (int) $request->user()?->id);
+        } catch (RuntimeException $e) {
+            Toast::error($e->getMessage());
+
+            return back();
+        }
+
+        return back()->with('status', 'Movimiento reincorporado a la conciliación.');
     }
 
     /**

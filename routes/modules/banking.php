@@ -75,4 +75,10 @@ Route::middleware(['auth', 'verified'])->prefix('banco')->name('banco.')->group(
             ->whereNumber('transaction')
             ->name('movimientos.ignore');
     });
+
+    Route::middleware('can:banco.movimientos.reincorporar')->group(function (): void {
+        Route::patch('movimientos/{transaction}/reincorporar', [BankTransactionController::class, 'restore'])
+            ->whereNumber('transaction')
+            ->name('movimientos.restore');
+    });
 });

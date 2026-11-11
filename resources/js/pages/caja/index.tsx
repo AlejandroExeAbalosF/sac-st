@@ -608,7 +608,13 @@ function Bloque({
     return (
         <>
             {filas.map((fila) => (
-                <tr key={`${rotulo}-${fila.receiptId ?? `e${fila.eventId}`}`}>
+                /*
+                 * La comisión bancaria de un recibo no tiene recibo ni asiento
+                 * propios: la identifica su rótulo, que nombra el recibo.
+                 */
+                <tr
+                    key={`${rotulo}-${fila.receiptId ?? (fila.eventId !== null ? `e${fila.eventId}` : fila.number)}`}
+                >
                     <td className="px-4 py-1.5 font-mono text-xs">
                         <ReciboLink fila={fila} enlaces={enlaces} />
                     </td>

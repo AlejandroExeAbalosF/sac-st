@@ -216,6 +216,7 @@ final class DisbursementEligibility
                 'cashDeliveredBy:id,name',
                 'validatedBy:id,name',
                 'bankTransaction:id,transaction_date,amount,operation_id,description,counterparty_name',
+                'feeBankTransaction:id,amount',
             ])
             ->first();
     }

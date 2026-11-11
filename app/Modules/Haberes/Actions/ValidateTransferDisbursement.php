@@ -14,7 +14,10 @@ use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\Disbursement;
+use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\InstallmentCashBox;
+use App\Modules\Haberes\Support\TransferDebitMatch;
+use App\Modules\Haberes\Support\TransferDebitPair;
 use App\Modules\Haberes\Support\TransferStage;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -49,12 +52,27 @@ use Illuminate\Validation\ValidationException;
  * necesita el evento financiero, que nace en este momento. Con ella el
  * débito queda sin saldo libre y deja de ofrecerse como candidato de otra
  * Orden: es lo que impide que la misma transferencia pague dos cuotas.
+ *
+ * **Con comisión, el banco tiene dos patas.** La comisión la absorbe el
+ * beneficiario, así que el egreso sigue siendo por lo que autorizó la
+ * Orden, y sale de la cuenta en dos renglones:
+ *
+ * ```text
+ *   Débito   BENEFICIARY_FUNDS   891.962,00   la Orden
+ *   Crédito  BANK_ACCOUNT        891.841,00   la transferencia
+ *   Crédito  BANK_ACCOUNT            121,00   la comisión
+ * ```
+ *
+ * Cada crédito se imputa a su movimiento, con su rol: el extracto queda
+ * conciliado completo y dice por separado cuánto se transfirió y cuánto
+ * cobró el banco.
  */
 final class ValidateTransferDisbursement
 {
     public function __construct(
         private readonly PostJournalEntry $asentar,
         private readonly AllocatableAmount $disponible,
+        private readonly TransferDebitPair $par,
         private readonly TransferStage $etapa,
         private readonly InstallmentCashBox $cajaDeLaCuota,
         private readonly RecordAuditEvent $auditar,
@@ -86,6 +104,20 @@ final class ValidateTransferDisbursement
             $orden = $egreso->paymentOrder;
             $cuota = $egreso->installment;
             $importe = Decimal::scale($egreso->amount);
+
+            /*
+             * Un egreso por transferencia sin Orden no llega acá —lo impide
+             * `disbursements_transfer_needs_order_check`—, pero el tipo no
+             * lo sabe.
+             */
+            if ($orden === null) {
+                throw ValidationException::withMessages([
+                    'installmentId' => 'El egreso por transferencia no tiene su Orden de Pago.',
+                ]);
+            }
+
+            $par = $this->parVigente($egreso, $movimiento, $orden);
+            $comision = $par->fee;
 
             /*
              * La fecha del pago es la del débito: cuándo salió el dinero lo
@@ -120,17 +152,24 @@ final class ValidateTransferDisbursement
                     EntryLine::debit(LedgerAccount::BeneficiaryFunds, $importe)
                         ->in($moneda)
                         ->forInstallment($cuota->haber_id, $cuota->id)
-                        ->onBankAccount($orden?->organism_bank_account_id)
+                        ->onBankAccount($orden->organism_bank_account_id)
                         ->onCashBox($caja),
-                    EntryLine::credit(LedgerAccount::BankAccount, $importe)
+                    EntryLine::credit(LedgerAccount::BankAccount, $par->transferAmount())
                         ->in($moneda)
-                        ->onBankAccount($orden?->organism_bank_account_id)
-                        ->onCashBox($caja),
+                        ->onBankAccount($orden->organism_bank_account_id)
+                        ->onCashBox($caja)
+                        ->describedAs($comision === null ? null : 'Transferencia al beneficiario'),
+                    ...($comision === null ? [] : [
+                        EntryLine::credit(LedgerAccount::BankAccount, (string) $par->feeAmount())
+                            ->in($moneda)
+                            ->onBankAccount($orden->organism_bank_account_id)
+                            ->onCashBox($caja)
+                            ->describedAs('Comisión bancaria a cargo del beneficiario'),
+                    ]),
                 ],
                 date: BusinessDate::today(),
                 cashBoxId: $caja,
-                description: 'Egreso por transferencia'
-                    .($orden === null ? '' : " — Orden {$orden->formatted_number}"),
+                description: "Egreso por transferencia — Orden {$orden->formatted_number}",
                 actorId: $actorId,
             );
 
@@ -138,12 +177,25 @@ final class ValidateTransferDisbursement
                 'bank_transaction_id' => $movimiento->id,
                 'financial_event_id' => $evento->id,
                 'allocation_role' => BankAllocationRole::PaymentConfirmation,
-                'amount' => $importe,
+                'amount' => $par->transferAmount(),
                 'allocated_by' => $actorId,
                 'allocated_at' => now(),
             ]);
 
             $this->updateReconciliation($movimiento);
+
+            if ($comision !== null) {
+                BankTransactionAllocation::query()->create([
+                    'bank_transaction_id' => $comision->id,
+                    'financial_event_id' => $evento->id,
+                    'allocation_role' => BankAllocationRole::BankFee,
+                    'amount' => $par->feeAmount(),
+                    'allocated_by' => $actorId,
+                    'allocated_at' => now(),
+                ]);
+
+                $this->updateReconciliation($comision);
+            }
 
             $egreso->forceFill([
                 'financial_event_id' => $evento->id,
@@ -165,12 +217,15 @@ final class ValidateTransferDisbursement
              * ocupar el lugar de la cuota, que es lo que el índice único
              * parcial administra.
              */
-            $orden?->forceFill(['status' => PaymentOrderStatus::Completed])->save();
+            $orden->forceFill(['status' => PaymentOrderStatus::Completed])->save();
 
             $this->auditar->handle('egreso.validado', $egreso, after: [
                 'beneficiary_installment_id' => $cuota->id,
-                'payment_order_id' => $orden?->id,
+                'payment_order_id' => $orden->id,
                 'bank_transaction_id' => $movimiento->id,
+                'fee_bank_transaction_id' => $comision?->id,
+                'transfer_amount' => $par->transferAmount(),
+                'fee_amount' => $par->feeAmount(),
                 'financial_event_id' => $evento->id,
                 'amount' => $importe,
                 'payment_date' => $fecha->toDateString(),
@@ -196,6 +251,38 @@ final class ValidateTransferDisbursement
                 'installmentId' => $falta,
             ]);
         }
+    }
+
+    /**
+     * El par que se vinculó, comprobado de nuevo bajo lock.
+     *
+     * Entre vincular y validar pueden pasar días, y la regla es la misma que
+     * aplicó la vinculación: los dos movimientos tienen que seguir enteros,
+     * libres y sumando la Orden. Si la comisión que la regla encuentra hoy
+     * no es la que se vinculó —se importó después, o quedó fuera del
+     * circuito—, el egreso se desvincula y se vuelve a elegir.
+     *
+     * @throws ValidationException
+     */
+    private function parVigente(Disbursement $egreso, BankTransaction $movimiento, PaymentOrder $orden): TransferDebitMatch
+    {
+        $par = $this->par->resolve($movimiento, $orden, $egreso->amount, $egreso->id, lock: true);
+
+        if (! $par->matches()) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'El débito vinculado ya no cierra con la Orden: '.$par->rejection()
+                    .' Hay que desvincularlo y volver a elegirlo.',
+            ]);
+        }
+
+        if ($par->fee?->id !== $egreso->fee_bank_transaction_id) {
+            throw ValidationException::withMessages([
+                'installmentId' => 'La comisión de esa operación no es la que se vinculó. '
+                    .'Hay que desvincular el débito y volver a elegirlo.',
+            ]);
+        }
+
+        return $par;
     }
 
     /**

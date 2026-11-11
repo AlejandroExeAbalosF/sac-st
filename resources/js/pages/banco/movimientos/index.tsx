@@ -1,10 +1,11 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeftRight, EyeOff, Link2, Search } from 'lucide-react';
+import { ArrowLeftRight, EyeOff, Link2, RotateCcw, Search } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import PaginationFooter from '@/components/pagination-footer';
 import type { PaginationData } from '@/components/pagination-footer';
+import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { cuit as formatCuit, date, money } from '@/lib/format';
 import { create as createExtracto } from '@/routes/banco/extractos';
-import { ignore, index } from '@/routes/banco/movimientos';
+import { ignore, index, restore } from '@/routes/banco/movimientos';
 
 type Movimiento = App.Modules.Banking.Data.BankTransactionListItemData;
 type Cuenta = App.Modules.Banking.Data.BankAccountData;
@@ -46,6 +47,7 @@ type Props = {
         buscar: string | null;
     };
     canIgnore: boolean;
+    canRestore: boolean;
     canImport: boolean;
     hasAnyTransactions: boolean;
     /** El último saldo que informó un extracto, por cuenta activa. */
@@ -131,6 +133,7 @@ export default function MovimientosIndex({
     accounts,
     filters,
     canIgnore,
+    canRestore,
     canImport,
     hasAnyTransactions,
     balances,
@@ -140,6 +143,9 @@ export default function MovimientosIndex({
 }: Props) {
     const [buscar, setBuscar] = useState(filters.buscar ?? '');
     const [ignorando, setIgnorando] = useState<Movimiento | null>(null);
+    const [reincorporando, setReincorporando] = useState<Movimiento | null>(
+        null,
+    );
     const filtersActive = Boolean(
         filters.cuenta || filters.estado || filters.sentido || filters.buscar,
     );
@@ -562,6 +568,26 @@ export default function MovimientosIndex({
                                                             />
                                                         </Button>
                                                     )}
+                                                {canRestore &&
+                                                    m.reconciliationStatus ===
+                                                        'ignored' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="size-11 sm:size-9"
+                                                            aria-label={`Reincorporar a la conciliación el movimiento del ${date(m.transactionDate)}${m.description ? `: ${m.description}` : ''}`}
+                                                            onClick={() =>
+                                                                setReincorporando(
+                                                                    m,
+                                                                )
+                                                            }
+                                                        >
+                                                            <RotateCcw
+                                                                className="size-4"
+                                                                aria-hidden="true"
+                                                            />
+                                                        </Button>
+                                                    )}
                                             </div>
                                         </td>
                                     </tr>
@@ -584,6 +610,13 @@ export default function MovimientosIndex({
                 movimiento={ignorando}
                 onClose={() => setIgnorando(null)}
             />
+
+            {reincorporando !== null && (
+                <DialogoReincorporar
+                    movimiento={reincorporando}
+                    onClose={() => setReincorporando(null)}
+                />
+            )}
         </>
     );
 }
@@ -653,6 +686,73 @@ function DialogoIgnorar({
                         </Button>
                         <Button type="submit" disabled={form.processing}>
                             Confirmar
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * La vuelta de excluir: el movimiento vuelve a la cola para imputarse. El
+ * motivo con que se había excluido queda en la auditoría.
+ */
+function DialogoReincorporar({
+    movimiento,
+    onClose,
+}: {
+    movimiento: Movimiento;
+    onClose: () => void;
+}) {
+    const { data, setData, patch, processing, errors } = useForm({
+        reasonCode: '' as App.Modules.Banking.Enums.BankingReasonCode | '',
+        reason: '',
+    });
+
+    const enviar = (event: React.FormEvent) => {
+        event.preventDefault();
+        patch(restore(movimiento.id).url, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
+    };
+
+    return (
+        <Dialog open onOpenChange={(abierto) => !abierto && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reincorporar a la conciliación</DialogTitle>
+                    <DialogDescription>
+                        El movimiento vuelve a los pendientes de identificar y
+                        se puede imputar.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form onSubmit={enviar} className="grid gap-4">
+                    <ReasonFields
+                        act="restore"
+                        code={data.reasonCode}
+                        detail={data.reason}
+                        onCodeChange={(codigo) => setData('reasonCode', codigo)}
+                        onDetailChange={(detalle) => setData('reason', detalle)}
+                        codeError={errors.reasonCode}
+                        detailError={errors.reason}
+                        idPrefix={`reincorporar-${movimiento.id}`}
+                        maxLength={300}
+                    />
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                            disabled={processing}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            Reincorporar
                         </Button>
                     </DialogFooter>
                 </form>

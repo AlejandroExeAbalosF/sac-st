@@ -9,6 +9,7 @@ use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankStatementRow;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Shared\Models\AuditEvent;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -110,6 +111,97 @@ class MovimientosBancariosTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * La vuelta: el movimiento vuelve a la cola sin el motivo de la fila, y
+     * la auditoría conserva las dos decisiones.
+     */
+    public function test_un_movimiento_fuera_del_circuito_se_reincorpora(): void
+    {
+        $movimiento = $this->excluido();
+
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('banco.movimientos.restore', $movimiento), [
+                'reasonCode' => 'belongs_to_payment',
+                'reason' => 'Es la comisión de la transferencia de una Orden.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $movimiento->refresh();
+
+        $this->assertSame(ReconciliationStatus::Pending, $movimiento->reconciliation_status);
+        $this->assertNull($movimiento->ignored_reason);
+        $this->assertNull($movimiento->ignored_by);
+        $this->assertNull($movimiento->ignored_at);
+
+        $evento = AuditEvent::query()->where('action', 'banco.movimiento.reincorporado')->latest('id')->firstOrFail();
+
+        $this->assertSame('Comisión bancaria.', $evento->before('ignored_reason'));
+        $this->assertSame(
+            'Corresponde a un pago del circuito: Es la comisión de la transferencia de una Orden.',
+            $evento->metadata['reason'] ?? null,
+        );
+        $this->assertSame('belongs_to_payment', $evento->metadata['motivo_codigo'] ?? null);
+    }
+
+    /** El motivo sale de la lista; con «Otro», el detalle es el motivo. */
+    public function test_reincorporar_exige_motivo_de_la_lista(): void
+    {
+        $movimiento = $this->excluido();
+        $contador = $this->operador('contador');
+
+        $this->actingAs($contador)
+            ->patch(route('banco.movimientos.restore', $movimiento), [])
+            ->assertSessionHasErrors('reasonCode');
+
+        $this->actingAs($contador)
+            ->patch(route('banco.movimientos.restore', $movimiento), ['reasonCode' => 'duplicate'])
+            ->assertSessionHasErrors('reasonCode');
+
+        $this->actingAs($contador)
+            ->patch(route('banco.movimientos.restore', $movimiento), ['reasonCode' => 'other'])
+            ->assertSessionHasErrors('reason');
+
+        $this->assertSame(ReconciliationStatus::Ignored, $movimiento->refresh()->reconciliation_status);
+    }
+
+    /** Solo se reincorpora lo que está fuera del circuito. */
+    public function test_no_se_reincorpora_un_movimiento_que_no_estaba_excluido(): void
+    {
+        $this->importar();
+        $movimiento = BankTransaction::query()->firstOrFail();
+
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('banco.movimientos.restore', $movimiento), ['reasonCode' => 'ignored_by_mistake'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(ReconciliationStatus::Pending, $movimiento->refresh()->reconciliation_status);
+        $this->assertSame(0, AuditEvent::query()->where('action', 'banco.movimiento.reincorporado')->count());
+    }
+
+    /** Pesa lo mismo que excluir: quien carga todos los días no lo hace. */
+    public function test_quien_carga_todos_los_dias_no_reincorpora(): void
+    {
+        $movimiento = $this->excluido();
+
+        $this->actingAs($this->operador('administrativo'))
+            ->patch(route('banco.movimientos.restore', $movimiento), ['reasonCode' => 'ignored_by_mistake'])
+            ->assertForbidden();
+
+        $this->assertSame(ReconciliationStatus::Ignored, $movimiento->refresh()->reconciliation_status);
+    }
+
+    /** La base no deja un movimiento pendiente con el motivo de la exclusión. */
+    public function test_la_base_rechaza_un_pendiente_con_motivo_de_exclusion(): void
+    {
+        $movimiento = $this->excluido();
+
+        $this->expectException(QueryException::class);
+
+        DB::table('bank_transactions')
+            ->where('id', $movimiento->id)
+            ->update(['reconciliation_status' => 'pending']);
+    }
+
     public function test_quien_solo_consulta_no_importa_extractos(): void
     {
         $cuenta = $this->cuenta();
@@ -205,6 +297,19 @@ class MovimientosBancariosTest extends TestCase
         $this->actingAs($this->operador('administrativo'))
             ->delete(route('banco.extractos.destroy', $import))
             ->assertForbidden();
+    }
+
+    /** Un movimiento del extracto, ya dejado fuera del circuito. */
+    private function excluido(): BankTransaction
+    {
+        $this->importar();
+        $movimiento = BankTransaction::query()->firstOrFail();
+
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('banco.movimientos.ignore', $movimiento), ['reason' => 'Comisión bancaria.'])
+            ->assertSessionHasNoErrors();
+
+        return $movimiento->refresh();
     }
 
     private function cuenta(): BankAccount

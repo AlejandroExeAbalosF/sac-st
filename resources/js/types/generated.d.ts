@@ -228,7 +228,11 @@ declare namespace App {
                     | 'payment_confirmation'
                     | 'cash_deposit_confirmation'
                     | 'cheque_rejection_credit'
-                    | 'cheque_rejection_debit';
+                    | 'cheque_rejection_debit'
+                    | 'bank_fee';
+                export type BankingReasonAct = 'restore';
+                export type BankingReasonCode =
+                    'ignored_by_mistake' | 'belongs_to_payment' | 'other';
                 export type CashTransferStatus =
                     | 'awaiting_ticket'
                     | 'deposited'
@@ -350,6 +354,8 @@ declare namespace App {
                     debitDate: string | null;
                     debitOperationId: string | null;
                     debitDescription: string | null;
+                    debitAmount: string | null;
+                    feeAmount: string | null;
                     validatedByName: string | null;
                     validatedAt: string | null;
                 };

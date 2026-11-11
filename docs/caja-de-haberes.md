@@ -172,6 +172,24 @@ el detalle explica el total de cada día. Vale para las tres cajas. Anulado el m
 ninguno de los dos. Cómo lo asienta el área en papel **no está relevado**. Los cierres ya
 congelados no cambian: la fila nueva aparece en la pantalla y en los cierres que se hagan desde ahora.
 
+**Una transferencia con comisión bancaria** sale en dos renglones del bloque de egresos: el del
+recibo, por lo que recibió el beneficiario, y «Comisión bancaria del recibo N», por lo que cobró el
+banco. La comisión la absorbe el beneficiario, así que los dos suman la Orden, y el cierre la
+descuenta de los depósitos directos una sola vez. La comisión queda imputada al pago en el extracto;
+no se marca fuera del circuito. Regla:
+[transferencia con comisión](haberes-reglas.md#transferencia-con-comision).
+
+<a id="reincorporar-movimiento"></a>
+
+**Reincorporar un movimiento** devuelve a los pendientes uno que se había dejado fuera del circuito:
+Banco › Movimientos, en la fila excluida. Lo pueden hacer el administrador y el contador
+(`banco.movimientos.reincorporar`, el mismo peso que excluir). Pide el motivo de una lista
+(`BankingReasonAct::Restore`: «Se excluyó por error», «Corresponde a un pago del circuito», «Otro»
+con detalle obligatorio), que **no sale del relevamiento**. El motivo de la exclusión se borra de la
+fila —la base exige que un pendiente no lo tenga— y queda, con el nuevo, en la auditoría
+(`banco.movimiento.reincorporado`). Excluir solo se permite sin imputaciones, así que el movimiento
+vuelve a `pending` sin nada que recalcular. **Action:** `RestoreBankTransaction`.
+
 Lista también **los asientos que movieron el día**, con su rótulo, su importe y el
 día en que se revirtió si se revirtió. Es lo único que explica una jornada donde
 el libro cambió y no hay comprobante que lo respalde —una reversión, por ejemplo—.
@@ -555,7 +573,8 @@ directos».
 Una fecha antigua no demuestra por sí sola que el movimiento haya sido
 incluido correctamente en el saldo inicial. Se debe verificar esa inclusión;
 si corresponde apartarlo de la conciliación corriente, se documenta el motivo
-en el extracto mediante la acción existente de ignorar. Los fondos históricos
+en el extracto mediante la acción existente de ignorar —y si fue un error, se
+[reincorpora](#reincorporar-movimiento)—. Los fondos históricos
 pendientes se reservan desde su cuota; los pagos ya realizados se documentan
 como cuotas históricas pagadas. Una omisión en la apertura requiere revisión y
 corrección justificada, no un ingreso o egreso nuevo que duplique el dinero.

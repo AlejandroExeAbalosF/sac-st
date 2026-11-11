@@ -47,6 +47,14 @@ final class BankingAuditCatalog implements AuditCatalogContributor
                 'Banco',
                 AuditSeverity::Critical,
             ),
+            // La vuelta: el motivo con que se había excluido queda en `before`.
+            new AuditActionDefinition(
+                'banco.movimiento.reincorporado',
+                'Se reincorporó un movimiento a la conciliación',
+                'Banco',
+                AuditSeverity::Critical,
+                metadata: ['reason' => 'Motivo'],
+            ),
 
             new AuditActionDefinition('caja.cuenta.habilitada', 'Se habilitó una cuenta para la caja', 'Caja', AuditSeverity::Critical, metadata: ['caja' => 'Caja']),
             new AuditActionDefinition('caja.cuenta.retirada', 'Se dio de baja una cuenta de la caja', 'Caja', AuditSeverity::Critical, metadata: ['caja' => 'Caja', 'predeterminada' => 'Nueva predeterminada']),

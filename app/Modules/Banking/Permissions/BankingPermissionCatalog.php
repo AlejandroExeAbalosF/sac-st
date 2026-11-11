@@ -62,6 +62,16 @@ final class BankingPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // La vuelta de lo anterior, con el mismo peso: devuelve un
+            // movimiento a la cola y lo deja disponible para imputarse.
+            new PermissionDefinition(
+                'banco.movimientos.reincorporar',
+                'Reincorporar movimientos fuera del circuito',
+                'Devolver a la conciliación un movimiento que se había dejado fuera del circuito.',
+                'banco',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
             new PermissionDefinition(
                 'banco.extractos.revertir',
                 'Revertir la importación de un extracto',

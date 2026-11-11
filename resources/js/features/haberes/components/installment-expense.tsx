@@ -14,7 +14,7 @@ import Money from '@/components/money';
 import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
-import { date } from '@/lib/format';
+import { date, money } from '@/lib/format';
 import { unlinkDebit as desvincular } from '@/routes/haberes/installments/disbursement';
 import PayBeneficiaryDialog from './pay-beneficiary-dialog';
 import ReceiptViewerDialog from './receipt-viewer-dialog';
@@ -297,7 +297,16 @@ export default function InstallmentExpense({
                                 : date(egreso.debitDate) +
                                   (egreso.debitOperationId == null
                                       ? ''
-                                      : ` · Op. ${egreso.debitOperationId}`)
+                                      : ` · Op. ${egreso.debitOperationId}`) +
+                                  /*
+                                   * Con comisión, el pago son dos renglones:
+                                   * lo que recibió el beneficiario y lo que
+                                   * cobró el banco, a su cargo.
+                                   */
+                                  (egreso.feeAmount == null ||
+                                  egreso.debitAmount == null
+                                      ? ''
+                                      : ` · ${money(egreso.debitAmount)} transferidos + ${money(egreso.feeAmount)} de comisión`)
                         }
                     />
                 </div>
@@ -376,6 +385,13 @@ export default function InstallmentExpense({
 
 /** El pago ya asentado, con quién lo respalda. */
 function PagoHecho({ egreso }: { egreso: Egreso }) {
+    /*
+     * Con comisión bancaria, lo transferido es menos que la Orden: la
+     * diferencia la cobró el banco y la absorbe el beneficiario.
+     */
+    const conComision =
+        egreso.feeAmount !== null && egreso.debitAmount !== null;
+
     return (
         <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -390,7 +406,19 @@ function PagoHecho({ egreso }: { egreso: Egreso }) {
                           ? 'Transferido por el organismo'
                           : 'Entregado en efectivo'}
                 </span>
-                <Money value={egreso.amount} className="text-sm" />
+                <Money
+                    value={
+                        conComision && egreso.debitAmount !== null
+                            ? egreso.debitAmount
+                            : egreso.amount
+                    }
+                    className="text-sm"
+                />
+                {conComision && egreso.feeAmount !== null && (
+                    <span className="text-xs text-muted-foreground">
+                        + {money(egreso.feeAmount)} de comisión bancaria
+                    </span>
+                )}
                 {egreso.paymentDate !== null && (
                     <span className="text-xs text-muted-foreground">
                         {date(egreso.paymentDate)}

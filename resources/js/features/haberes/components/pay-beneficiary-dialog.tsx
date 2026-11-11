@@ -85,6 +85,15 @@ export default function PayBeneficiaryDialog({
      * dos, esto solo emite: el dinero ya salió.
      */
     const soloEmite = estado.needsReceipt;
+    /*
+     * Con comisión bancaria, lo entregado es la transferencia: la comisión
+     * la absorbe el beneficiario, y el recibo dice esa suma.
+     */
+    const comision = estado.disbursement?.feeAmount ?? null;
+    const entregado =
+        comision !== null && estado.disbursement?.debitAmount != null
+            ? estado.disbursement.debitAmount
+            : estado.amount;
 
     const form = useForm({
         talonarioNumber: '',
@@ -201,9 +210,19 @@ export default function PayBeneficiaryDialog({
                                         Se entrega
                                     </dt>
                                     <dd className="font-mono font-semibold tabular-nums">
-                                        {money(estado.amount)}
+                                        {money(entregado)}
                                     </dd>
                                 </div>
+                                {comision !== null && (
+                                    <div className="flex justify-between gap-3">
+                                        <dt className="text-xs text-field-label">
+                                            Comisión bancaria
+                                        </dt>
+                                        <dd className="font-mono tabular-nums">
+                                            {money(comision)}
+                                        </dd>
+                                    </div>
+                                )}
                                 <div className="flex justify-between gap-3">
                                     <dt className="text-xs text-field-label">
                                         Medio

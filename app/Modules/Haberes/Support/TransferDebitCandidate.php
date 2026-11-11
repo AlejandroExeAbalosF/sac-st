@@ -19,7 +19,12 @@ final readonly class TransferDebitCandidate
      * @param  array<string, string>  $signals  qué coincidió, en palabras
      */
     public function __construct(
+        /** La transferencia: lo que recibió el beneficiario. */
         public BankTransaction $transaction,
+        /** La comisión de la misma operación, si el banco la cobró. */
+        public ?BankTransaction $fee,
+        /** Si cierra pero no se puede elegir, por qué. */
+        public ?string $reviewReason,
         /** Días entre el informe del organismo y el débito. */
         public int $dayGap,
         public bool $referenceMatches,
@@ -30,13 +35,16 @@ final readonly class TransferDebitCandidate
     /**
      * El orden: primero la referencia informada cuando coincide, después
      * el nombre del beneficiario, y por último la cercanía en el tiempo.
+     * Los que quedan para revisión van al final: se muestran, pero no se
+     * eligen.
      *
      * El importe no ordena porque es un filtro duro — todos los candidatos
-     * lo tienen exacto.
+     * lo tienen exacto, con su comisión o sin ella.
      */
     public function rank(): int
     {
-        return ($this->referenceMatches ? 0 : 10_000)
+        return ($this->reviewReason === null ? 0 : 100_000)
+            + ($this->referenceMatches ? 0 : 10_000)
             + ($this->beneficiaryMatches ? 0 : 1_000)
             + abs($this->dayGap);
     }
