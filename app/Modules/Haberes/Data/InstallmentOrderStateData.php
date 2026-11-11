@@ -108,9 +108,14 @@ final class InstallmentOrderStateData extends Data
                 ),
                 $estado->missing,
             ),
-            order: $estado->activeOrder === null
+            /*
+             * La vigente o, con la cuota ya pagada, la que cumplió: sus
+             * papeles se siguen consultando. Que esté completada lo dice su
+             * estado, y la pantalla no ofrece corregirla ni anularla.
+             */
+            order: ($estado->activeOrder ?? $estado->completedOrder) === null
                 ? null
-                : PaymentOrderSummaryData::fromModel($estado->activeOrder),
+                : PaymentOrderSummaryData::fromModel($estado->activeOrder ?? $estado->completedOrder),
             deposits: $depositos,
             depositsTotal: $total,
             organismAccountLabel: $organismAccountLabel,

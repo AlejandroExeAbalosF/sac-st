@@ -172,11 +172,10 @@ el detalle explica el total de cada día. Vale para las tres cajas. Anulado el m
 ninguno de los dos. Cómo lo asienta el área en papel **no está relevado**. Los cierres ya
 congelados no cambian: la fila nueva aparece en la pantalla y en los cierres que se hagan desde ahora.
 
-**Una transferencia con comisión bancaria** sale en dos renglones del bloque de egresos: el del
-recibo, por lo que recibió el beneficiario, y «Comisión bancaria del recibo N», por lo que cobró el
-banco. La comisión la absorbe el beneficiario, así que los dos suman la Orden, y el cierre la
-descuenta de los depósitos directos una sola vez. La comisión queda imputada al pago en el extracto;
-no se marca fuera del circuito. Regla:
+**Una transferencia con comisión bancaria** sale en un solo renglón del bloque de egresos: el del
+recibo, por el importe de la Orden, que incluye la comisión que cobró el banco y absorbe el
+beneficiario. El cierre la descuenta de los depósitos directos una sola vez. En el extracto, la
+comisión queda imputada al pago; no se marca fuera del circuito. Regla:
 [transferencia con comisión](haberes-reglas.md#transferencia-con-comision).
 
 <a id="reincorporar-movimiento"></a>

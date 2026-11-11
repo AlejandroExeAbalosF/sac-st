@@ -224,6 +224,11 @@ su Pase. La reemplazante conserva el vínculo y consume un número nuevo.
 
 La anulación de la Orden no revierte el ingreso ni libera sus imputaciones por sí sola.
 
+Validado el pago, la Orden queda «Completada»: deja de ocupar el lugar de la cuota, pero
+la sección «Documentación de pago» la sigue mostrando para ver la Orden y su Pase, sin
+opción de corregirla ni anularla. En el egreso pagado siguen a la vista el informe y el
+débito que lo respaldan.
+
 Reglas: [Orden y Pase](haberes-reglas.md#orden-y-pase) y
 [foja del CBU](haberes-reglas.md#foja-cbu).
 
@@ -240,13 +245,15 @@ Reglas: [Orden y Pase](haberes-reglas.md#orden-y-pase) y
 En mostrador se entrega efectivo o el cheque, según el medio real. En transferencia,
 el informe del organismo y el débito del extracto pueden registrarse en cualquier
 orden. Reunirlos deja el egreso listo para validar; **no lo confirma automáticamente**.
+Al registrar el informe se puede adjuntar, opcionalmente, su foto o PDF: queda como
+adjunto del egreso (`transfer_report`) y la tarjeta ofrece «Ver informe».
 La validación registra el asiento, marca la cuota pagada y completa la Orden.
 
 Si el banco cobró comisión por la transferencia, el pago son dos renglones del
 extracto: el diálogo del débito muestra «Transferencia + comisión = Orden», se elige
 la transferencia y la comisión se vincula sola. La comisión la absorbe el
-beneficiario, así que el recibo de egreso dice lo que él recibió y aclara la
-comisión. Regla: [transferencia con comisión](haberes-reglas.md#transferencia-con-comision).
+beneficiario. El recibo de egreso dice el importe de la Orden, que es el egreso que
+confirma el informe del organismo, y aclara la comisión y lo acreditado. Regla: [transferencia con comisión](haberes-reglas.md#transferencia-con-comision).
 
 El recibo de egreso requiere un egreso confirmado. En `/haberes/planillas` siguen
 las colas «Por entregar» y «Transferencias sin confirmar», y se puede consultar

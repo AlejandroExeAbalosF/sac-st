@@ -9,10 +9,13 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Ledger\Models\FinancialEvent;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\Attachment;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * El dinero saliendo hacia su dueño — §9.7 del DER.
@@ -48,6 +51,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 final class Disbursement extends Model
 {
+    /** El tipo de documento del papel del informe, entre los adjuntos del egreso. */
+    public const REPORT_DOCUMENT_TYPE = 'transfer_report';
+
     protected $fillable = [
         'financial_event_id',
         'beneficiary_installment_id',
@@ -94,6 +100,19 @@ final class Disbursement extends Model
     public function feeBankTransaction(): BelongsTo
     {
         return $this->belongsTo(BankTransaction::class, 'fee_bank_transaction_id');
+    }
+
+    /**
+     * La foto o el PDF del informe del organismo, si se adjuntó: el último.
+     *
+     * @return HasOne<Attachment, $this>
+     */
+    public function reportDocument(): HasOne
+    {
+        return $this->hasOne(Attachment::class, 'subject_id')
+            ->where('subject_type', AttachmentSubject::Disbursement->value)
+            ->where('document_type', self::REPORT_DOCUMENT_TYPE)
+            ->latestOfMany();
     }
 
     /** @return BelongsTo<BeneficiaryInstallment, $this> */

@@ -149,20 +149,6 @@ final class CashDayBook
             ? $this->bankIncomeOfReceipts(array_values($filas->map(fn (object $fila): int => (int) $fila->id)->all()), $cashBoxId, $from, $to, $currency)
             : [];
 
-        /*
-         * Lo que salió del banco por cada recibo de egreso bancario. Suele ser
-         * lo mismo que dice el papel; la excepción es la comisión que el banco
-         * cobró por la transferencia y absorbió el beneficiario: el recibo
-         * dice lo que él recibió, y la cuenta perdió además la comisión.
-         */
-        $salidasBancarias = $this->bankIncomeOfReceipts(
-            array_values($filas
-                ->filter(fn (object $fila): bool => $fila->receipt_type === 'expense' && $fila->medium_snapshot === 'bank')
-                ->map(fn (object $fila): int => (int) $fila->id)
-                ->all()),
-            $cashBoxId, $from, $to, $currency,
-        );
-
         foreach ($filas as $fila) {
             $bloque = $fila->receipt_type === 'income' ? 'income' : 'expense';
             $banco = $fila->medium_snapshot === 'bank' ? Decimal::scale((string) $fila->amount) : '0.00';
@@ -198,27 +184,6 @@ final class CashDayBook
                 'cheques' => $fila->medium_snapshot === 'cheque' ? Decimal::scale((string) $fila->amount) : '0.00',
                 'bank' => $banco,
             ];
-
-            /*
-             * La comisión va en su propio renglón y no sumada al del recibo:
-             * el renglón del recibo tiene que decir lo mismo que el papel, y
-             * el total del día, lo mismo que el cierre.
-             */
-            if (! $ingresoPrevio && isset($salidasBancarias[(int) $fila->id])) {
-                $comision = Decimal::sub(Decimal::sub('0', $salidasBancarias[(int) $fila->id]), $banco);
-
-                if (Decimal::isNegative(Decimal::sub('0', $comision))) {
-                    $libro['expense'][] = [
-                        'number' => sprintf('Comisión bancaria del recibo %s', $fila->talonario_number ?? $fila->formatted_number),
-                        'receiptId' => null,
-                        'eventId' => null,
-                        'installmentId' => null,
-                        'cash' => '0.00',
-                        'cheques' => '0.00',
-                        'bank' => Decimal::scale($comision),
-                    ];
-                }
-            }
         }
 
         foreach ($this->chequeIncidents($cashBoxId, $from, $to, $currency) as $bloque => $filasDelHecho) {

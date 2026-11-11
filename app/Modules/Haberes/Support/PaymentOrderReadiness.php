@@ -46,6 +46,14 @@ final readonly class PaymentOrderReadiness
         public ?IncomeEvidence $incomeReceipt,
         public array $rows,
         public ?int $organismBankAccountId,
+        /**
+         * La Orden que ya cumplió su cometido: el pago se validó con ella.
+         *
+         * Deja de ser vigente —no ocupa el lugar de la cuota ni se edita ni
+         * se anula—, pero sus papeles siguen siendo los que el organismo
+         * tiene y se siguen consultando.
+         */
+        public ?PaymentOrder $completedOrder = null,
     ) {}
 
     /**

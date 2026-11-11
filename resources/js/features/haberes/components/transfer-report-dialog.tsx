@@ -3,6 +3,7 @@ import { Megaphone } from 'lucide-react';
 import { useState } from 'react';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
+import PaperPhotoDropzone from '@/components/paper-photo-dropzone';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -32,6 +33,9 @@ type Estado = App.Modules.Haberes.Data.InstallmentDisbursementData;
  * La referencia es opcional porque no siempre viene, pero cuando está es
  * lo que después hace que el débito se reconozca solo entre veinte
  * movimientos del mismo importe.
+ *
+ * El papel del informe —foto o PDF— también es opcional, y queda como
+ * adjunto del egreso.
  */
 export default function TransferReportDialog({
     cuota,
@@ -50,6 +54,7 @@ export default function TransferReportDialog({
         reportedAt: hoy,
         reference: '',
         notes: '',
+        document: null as File | null,
     });
 
     const { errors } = usePage().props as unknown as {
@@ -155,6 +160,16 @@ export default function TransferReportDialog({
                         />
                         <InputError message={form.errors.notes} />
                     </div>
+
+                    <PaperPhotoDropzone
+                        id={`informe-papel-${cuota.id}`}
+                        foto={form.data.document}
+                        onElegir={(archivo) =>
+                            form.setData('document', archivo)
+                        }
+                        error={form.errors.document}
+                        label="Informe del organismo"
+                    />
 
                     {enviado && <InputError message={erroresDelServidor} />}
 

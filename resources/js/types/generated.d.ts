@@ -349,6 +349,7 @@ declare namespace App {
                     notes: string | null;
                     reportedAt: string | null;
                     transferReference: string | null;
+                    reportAttachmentId: number | null;
                     beneficiaryCbu: string | null;
                     debitTransactionId: number | null;
                     debitDate: string | null;
@@ -833,6 +834,7 @@ declare namespace App {
                     | 'funds_release'
                     | 'fund_receipt_reversal'
                     | 'deposit_ticket_unlink'
+                    | 'debit_unlink'
                     | 'installment_excess'
                     | 'installment_excess_removal';
                 export type HaberesReasonCode =

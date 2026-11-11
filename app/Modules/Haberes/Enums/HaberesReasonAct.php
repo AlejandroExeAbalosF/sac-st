@@ -31,6 +31,8 @@ enum HaberesReasonAct: string implements ReasonAct
     case FundsRelease = 'funds_release';
     case FundReceiptReversal = 'fund_receipt_reversal';
     case DepositTicketUnlink = 'deposit_ticket_unlink';
+    /** Desvincular el débito de un egreso sin validar. Sin columna: queda en la auditoría. */
+    case DebitUnlink = 'debit_unlink';
     /** Registrar lo que entró de más en una cuota. Columna: `excess_reason_code`. */
     case InstallmentExcess = 'installment_excess';
     /** Quitar un excedente cargado por error. Sin columna: queda en la auditoría. */
@@ -53,6 +55,7 @@ enum HaberesReasonAct: string implements ReasonAct
             self::FundsRelease => [HaberesReasonCode::WrongAmount, HaberesReasonCode::WrongInstallment, HaberesReasonCode::WrongExpediente, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
             self::FundReceiptReversal => [HaberesReasonCode::Duplicate, HaberesReasonCode::WrongExpediente, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
             self::DepositTicketUnlink => [HaberesReasonCode::WrongCredit, HaberesReasonCode::WrongReceipt, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
+            self::DebitUnlink => [HaberesReasonCode::WrongCredit, HaberesReasonCode::WrongInstallment, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
             self::InstallmentExcess => [HaberesReasonCode::EmployerOverpaid, HaberesReasonCode::EmployerSettlementError, HaberesReasonCode::Other],
             self::InstallmentExcessRemoval => [HaberesReasonCode::DataEntryError, HaberesReasonCode::WrongAmount, HaberesReasonCode::Other],
         };

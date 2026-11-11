@@ -13,6 +13,7 @@ use App\Modules\Haberes\Actions\LinkTransferDebit;
 use App\Modules\Haberes\Actions\ListUnmatchedTransferDebits;
 use App\Modules\Haberes\Actions\RegisterTransferReport;
 use App\Modules\Haberes\Actions\ValidateTransferDisbursement;
+use App\Modules\Haberes\Enums\HaberesReasonAct;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Support\DisbursementEligibility;
@@ -20,6 +21,7 @@ use App\Modules\Haberes\Support\ReceiptFormData;
 use App\Modules\Haberes\Support\TransferDebitCandidate;
 use App\Modules\Haberes\Support\TransferDebitMatch;
 use App\Modules\Shared\Pdf\ExpenseReceiptPdf;
+use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use App\Support\Ui\Toast;
@@ -29,6 +31,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
@@ -137,8 +140,10 @@ final class DisbursementController extends Controller
             'reportedAt' => ['nullable', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
             'reference' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'document' => ScannedDocument::rules(required: false),
         ], [
             'reportedAt.before_or_equal' => 'La fecha del informe no puede ser futura.',
+            ...ScannedDocument::messages('document', 'El informe'),
         ]);
 
         $informar->handle(
@@ -149,6 +154,7 @@ final class DisbursementController extends Controller
             reference: $validado['reference'] ?? null,
             actorId: $request->user()?->id,
             notes: $validado['notes'] ?? null,
+            document: $request->file('document'),
         );
 
         return back()->with(
@@ -259,14 +265,17 @@ final class DisbursementController extends Controller
         LinkTransferDebit $vincular,
         DisbursementEligibility $habilitacion,
     ): RedirectResponse {
-        $validado = $request->validate([
-            'reason' => ['nullable', 'string', 'max:300'],
-        ]);
+        $validado = $request->validate(
+            Reason::rules(HaberesReasonAct::DebitUnlink, max: 300),
+            Reason::messages(),
+        );
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::DebitUnlink)
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
 
         $vincular->undo(
             $this->egresoEnCurso($installment, $habilitacion),
+            $motivo,
             $request->user()?->id,
-            $validado['reason'] ?? null,
         );
 
         Toast::success('Débito desvinculado.', 'El egreso vuelve a esperar el movimiento correcto.');

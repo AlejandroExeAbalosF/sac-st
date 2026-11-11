@@ -101,8 +101,16 @@ export default function PaymentOrderPanel({
                 <OrdenEmitida
                     orden={orden}
                     puedeVer={permisos.ver}
-                    puedeEditar={permisos.emitir}
-                    puedeAnular={permisos.anular}
+                    /*
+                     * La Orden que ya pagó la cuota se consulta, pero no
+                     * se corrige ni se anula: el pago está asentado con ella.
+                     */
+                    puedeEditar={
+                        permisos.emitir && orden.status !== 'completed'
+                    }
+                    puedeAnular={
+                        permisos.anular && orden.status !== 'completed'
+                    }
                     onVer={() => setViendo(true)}
                     onEditar={() => setCorrigiendo(true)}
                     onAnular={() => setAnulando(true)}

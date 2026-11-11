@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Support;
 
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentChannel;
+use App\Modules\Haberes\Enums\PaymentOrderStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Ledger\Enums\PaymentMedium;
@@ -95,6 +96,7 @@ final class PaymentOrderEligibility
             incomeReceipt: $recibo,
             rows: $renglones,
             organismBankAccountId: $cuentaOrganismo,
+            completedOrder: $vigente === null ? $this->ordenCumplida($installment) : null,
         );
     }
 
@@ -247,6 +249,17 @@ final class PaymentOrderEligibility
             ->active()
             ->where('beneficiary_installment_id', $installment->id)
             ->with(['pase', 'organismBankAccount:id,label,bank_name,account_number'])
+            ->first();
+    }
+
+    /** La que pagó la cuota: la última completada, con su Pase. */
+    private function ordenCumplida(BeneficiaryInstallment $installment): ?PaymentOrder
+    {
+        return PaymentOrder::query()
+            ->where('status', PaymentOrderStatus::Completed->value)
+            ->where('beneficiary_installment_id', $installment->id)
+            ->with(['pase', 'organismBankAccount:id,label,bank_name,account_number'])
+            ->latest('id')
             ->first();
     }
 

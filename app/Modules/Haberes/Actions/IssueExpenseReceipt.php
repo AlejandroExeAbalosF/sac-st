@@ -59,11 +59,10 @@ use Throwable;
  * desaparece: el formulario también lo imprime, y va en
  * `counterparty_name_snapshot`.
  *
- * **Dice lo que el trabajador recibió, no lo que autorizó la Orden.** Si el
- * banco cobró comisión por la transferencia, la absorbe el beneficiario: la
- * cuota se cancela por el total, pero a su cuenta llegó la transferencia.
- * El papel lo hace firmar por esa suma —firmar por el total sería declarar
- * haber recibido de más— y aclara en el concepto cómo se compone.
+ * **Dice el egreso que confirmó el organismo**, que es el importe de la
+ * Orden: su informe lo da por pagado completo, sin descontar comisiones. Si
+ * el banco cobró comisión por la transferencia —la absorbe el beneficiario—,
+ * el concepto lo aclara junto con lo que llegó a su cuenta.
  */
 final class IssueExpenseReceipt
 {
@@ -167,7 +166,7 @@ final class IssueExpenseReceipt
                 ...$this->componer(
                     $installment,
                     $disbursement->method,
-                    $this->creditedAmount($disbursement),
+                    $disbursement->amount,
                     $talonarioNumber,
                     $issueDate ?? $disbursement->payment_date,
                     $actorId,
@@ -269,7 +268,7 @@ final class IssueExpenseReceipt
             $method ?? DisbursementMethod::Cash,
             $disbursement === null
                 ? ($amount ?? $this->financiacion->allocated($installment))
-                : $this->creditedAmount($disbursement),
+                : $disbursement->amount,
             $talonarioNumber,
             null,
             null,
@@ -368,38 +367,19 @@ final class IssueExpenseReceipt
     }
 
     /**
-     * El último recibo de egreso anulado de esta cuota, si lo hubo.
+     * «Incluye comisión bancaria $121,00 (acreditado $891.841,00)», o nada.
      *
-     * Solo el último: si hubo tres intentos, cada uno apunta al anterior y
-     * la cadena se lee entera desde el vigente hacia atrás.
+     * Lo acreditado es el egreso menos la comisión, que es exactamente la
+     * transferencia: la base lo exige al confirmar.
      */
-    /**
-     * Lo que llegó a la cuenta del beneficiario.
-     *
-     * Sin comisión es el egreso entero. Con comisión, el egreso menos lo
-     * que cobró el banco, que es exactamente la transferencia: la base lo
-     * exige al confirmar.
-     *
-     * @return numeric-string
-     */
-    private function creditedAmount(Disbursement $disbursement): string
-    {
-        $comision = $this->feeAmount($disbursement);
-
-        return $comision === null
-            ? $disbursement->amount
-            : Decimal::sub($disbursement->amount, $comision);
-    }
-
-    /** «Cuota $891.962,00 − comisión bancaria $121,00», o nada. */
     private function feeNote(Disbursement $disbursement): ?string
     {
         $comision = $this->feeAmount($disbursement);
 
         return $comision === null ? null : sprintf(
-            'Cuota $%s − comisión bancaria $%s',
-            Decimal::format($disbursement->amount),
+            'Incluye comisión bancaria $%s (acreditado $%s)',
             Decimal::format($comision),
+            Decimal::format(Decimal::sub($disbursement->amount, $comision)),
         );
     }
 
@@ -420,8 +400,8 @@ final class IssueExpenseReceipt
     /**
      * El concepto, con la aclaración de la comisión al final.
      *
-     * La aclaración no se recorta: es la que explica por qué el papel dice
-     * menos que la Orden. Si no entra todo, cede el concepto.
+     * La aclaración no se recorta: es la que explica cuánto llegó a la
+     * cuenta del beneficiario. Si no entra todo, cede el concepto.
      */
     private function concepto(?string $concepto, ?string $feeNote): ?string
     {
@@ -438,6 +418,12 @@ final class IssueExpenseReceipt
             : mb_substr($concepto, 0, max(0, $lugar)).$separador.$feeNote;
     }
 
+    /**
+     * El último recibo de egreso anulado de esta cuota, si lo hubo.
+     *
+     * Solo el último: si hubo tres intentos, cada uno apunta al anterior y
+     * la cadena se lee entera desde el vigente hacia atrás.
+     */
     private function ultimoAnulado(BeneficiaryInstallment $installment): ?Receipt
     {
         return Receipt::query()

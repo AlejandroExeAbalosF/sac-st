@@ -369,10 +369,11 @@ desde 30 días antes de la Orden, cada uno con el motivo por el que no es el pag
 Se elige la transferencia; la comisión se vincula sola (`fee_bank_transaction_id`).
 Validar revisa el par de nuevo bajo lock, asienta la Orden contra dos créditos a
 `BANK_ACCOUNT` e imputa `payment_confirmation` a la transferencia y `bank_fee` a la
-comisión. El recibo de egreso dice **lo acreditado** —firmar por la Orden sería
-declarar haber recibido de más— y aclara en el concepto «Cuota $X − comisión
-bancaria $Y». En el libro del día la comisión ocupa su propio renglón, y el cierre
-descuenta la Orden una sola vez.
+comisión. El recibo de egreso dice **el egreso que confirmó el organismo**, que es
+el importe de la Orden: su informe da el pago por hecho completo, sin descontar
+comisiones (decisión del usuario, 11/11/2026, sobre el informe del S.A.F.). El
+concepto aclara «Incluye comisión bancaria $Y (acreditado $Z)». En el libro del día
+el recibo es un solo renglón por el total, y el cierre descuenta la Orden una vez.
 
 PostgreSQL impone, sin depender del Action:
 
@@ -519,6 +520,7 @@ usa Multas ([Multas](multas-reglas.md#motivos)).
 | Liberar dinero de una cuota | `funding_allocations.reversal_reason_code` | CHECK `funding_allocations_reversal_reason_code_check`, con la lista |
 | Revertir una recepción | `fund_receipts.reversal_reason_code` | CHECK `fund_receipts_reversal_reason_code_check`: exige código y forma, no la lista |
 | Desvincular un comprobante de su movimiento | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
+| Desvincular el débito de un egreso sin validar | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
 | Descartar un comprobante de depósito | `deposit_tickets.discarded_reason_code` | CHECK `deposit_tickets_discarded_check` |
 
 - Cada columna acepta solo los códigos de su acto, y hay código exactamente

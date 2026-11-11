@@ -11,9 +11,15 @@ use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\TransferStage;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Actions\StoreAttachment;
+use App\Modules\Shared\Enums\AttachmentSource;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Models\Attachment;
 use Carbon\CarbonInterface;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * El organismo informó que transfirió — §2.3.1 del DER.
@@ -28,12 +34,20 @@ use Illuminate\Validation\ValidationException;
  * no hay nada que registrar: la Orden es un pedido, no un pago. Si el
  * débito se reconoció primero —§12.4, que también ocurre— el egreso ya
  * está y esto solo le agrega el informe.
+ *
+ * **El papel del aviso, si lo hay.** Opcionalmente se adjunta la foto o el
+ * PDF del informe, como adjunto del egreso (`transfer_report`). Se guarda en
+ * la misma transacción que el informe; si algo falla, el archivo se borra y
+ * no queda un adjunto huérfano. Un informe que se vuelve a cargar suma su
+ * archivo: los anteriores quedan, porque un adjunto no se borra, y la
+ * tarjeta muestra el último.
  */
 final class RegisterTransferReport
 {
     public function __construct(
         private readonly TransferStage $etapa,
         private readonly RecordAuditEvent $auditar,
+        private readonly StoreAttachment $adjuntos,
     ) {}
 
     /**
@@ -49,9 +63,34 @@ final class RegisterTransferReport
         ?string $reference = null,
         ?int $actorId = null,
         ?string $notes = null,
+        ?UploadedFile $document = null,
+    ): Disbursement {
+        $adjunto = null;
+
+        try {
+            return $this->registrar($installment, $reportedAt, $reference, $actorId, $notes, $document, $adjunto);
+        } catch (Throwable $e) {
+            // El archivo ya se escribió en el disco; sin su fila, se borra.
+            if ($adjunto !== null) {
+                $this->adjuntos->deleteFile(['disk' => $adjunto->storage_disk, 'key' => $adjunto->object_key]);
+            }
+
+            throw $e;
+        }
+    }
+
+    /** @throws ValidationException */
+    private function registrar(
+        BeneficiaryInstallment $installment,
+        ?CarbonInterface $reportedAt,
+        ?string $reference,
+        ?int $actorId,
+        ?string $notes,
+        ?UploadedFile $document,
+        ?Attachment &$adjunto,
     ): Disbursement {
         return DB::transaction(function () use (
-            $installment, $reportedAt, $reference, $actorId, $notes
+            $installment, $reportedAt, $reference, $actorId, $notes, $document, &$adjunto
         ): Disbursement {
             $orden = $this->ordenVigente($installment);
             $egreso = $this->egresoEnCurso($installment, $orden, $actorId);
@@ -76,10 +115,25 @@ final class RegisterTransferReport
             /* El estado sale de lo que hay registrado, nunca a mano. */
             $egreso->forceFill(['status' => $this->etapa->for($egreso)])->save();
 
+            if ($document !== null) {
+                $egreso->loadMissing('paymentOrder');
+
+                $adjunto = $this->adjuntos->handle(
+                    file: $document,
+                    subject: AttachmentSubject::Disbursement,
+                    subjectId: $egreso->id,
+                    documentType: Disbursement::REPORT_DOCUMENT_TYPE,
+                    userId: $actorId,
+                    title: 'Informe de la transferencia — Orden '.($egreso->paymentOrder->formatted_number ?? $orden->formatted_number),
+                    source: AttachmentSource::Scanned,
+                );
+            }
+
             $this->auditar->handle('egreso.informado', $egreso, before: $antes, after: [
                 'report_received_at' => $egreso->report_received_at?->toDateTimeString(),
                 'transfer_reference' => $egreso->transfer_reference,
                 'status' => $egreso->status->value,
+                'attachment_id' => $adjunto?->id,
             ], actorId: $actorId);
 
             return $egreso;

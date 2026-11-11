@@ -1,9 +1,9 @@
-import { router } from '@inertiajs/react';
 import {
     Banknote,
     CircleCheck,
     CircleDashed,
     Eye,
+    FileText,
     HandCoins,
     Landmark,
     Megaphone,
@@ -15,11 +15,12 @@ import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { date, money } from '@/lib/format';
-import { unlinkDebit as desvincular } from '@/routes/haberes/installments/disbursement';
+import { preview as verAdjunto } from '@/routes/adjuntos';
 import PayBeneficiaryDialog from './pay-beneficiary-dialog';
 import ReceiptViewerDialog from './receipt-viewer-dialog';
 import TransferDebitDialog from './transfer-debit-dialog';
 import TransferReportDialog from './transfer-report-dialog';
+import UnlinkDebitDialog from './unlink-debit-dialog';
 import ValidateTransferDialog from './validate-transfer-dialog';
 
 type Cuota = App.Modules.Haberes.Data.InstallmentListItemData;
@@ -76,6 +77,7 @@ export default function InstallmentExpense({
     const [informando, setInformando] = useState(false);
     const [buscandoDebito, setBuscandoDebito] = useState(false);
     const [validando, setValidando] = useState(false);
+    const [desvinculando, setDesvinculando] = useState(false);
 
     const egreso = estado.disbursement;
     const pagado = egreso?.status === 'confirmed';
@@ -118,6 +120,14 @@ export default function InstallmentExpense({
                 />
             )}
 
+            {desvinculando && (
+                <UnlinkDebitDialog
+                    cuotaId={cuota.id}
+                    conComision={estado.disbursement?.feeAmount != null}
+                    onClose={() => setDesvinculando(false)}
+                />
+            )}
+
             {validando && (
                 <ValidateTransferDialog
                     cuota={cuota}
@@ -149,6 +159,10 @@ export default function InstallmentExpense({
             <>
                 <div className="space-y-2">
                     <PagoHecho egreso={egreso} />
+
+                    {egreso.method === 'bank_transfer' && (
+                        <PasosDeTransferencia egreso={egreso} />
+                    )}
 
                     {estado.receipt !== null ? (
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -275,41 +289,7 @@ export default function InstallmentExpense({
                  * solo —invariantes 12 y 13— y por eso se muestran juntos
                  * con lo que le falta a cada uno.
                  */}
-                <div className="space-y-1.5">
-                    <Paso
-                        hecho={egreso?.reportedAt != null}
-                        titulo="El organismo informó"
-                        detalle={
-                            egreso?.reportedAt == null
-                                ? 'Todavía no avisó que transfirió.'
-                                : date(egreso.reportedAt) +
-                                  (egreso.transferReference == null
-                                      ? ''
-                                      : ` · Ref. ${egreso.transferReference}`)
-                        }
-                    />
-                    <Paso
-                        hecho={egreso?.debitTransactionId != null}
-                        titulo="El débito en el extracto"
-                        detalle={
-                            egreso?.debitDate == null
-                                ? 'Todavía no se reconoció el movimiento.'
-                                : date(egreso.debitDate) +
-                                  (egreso.debitOperationId == null
-                                      ? ''
-                                      : ` · Op. ${egreso.debitOperationId}`) +
-                                  /*
-                                   * Con comisión, el pago son dos renglones:
-                                   * lo que recibió el beneficiario y lo que
-                                   * cobró el banco, a su cargo.
-                                   */
-                                  (egreso.feeAmount == null ||
-                                  egreso.debitAmount == null
-                                      ? ''
-                                      : ` · ${money(egreso.debitAmount)} transferidos + ${money(egreso.feeAmount)} de comisión`)
-                        }
-                    />
-                </div>
+                <PasosDeTransferencia egreso={egreso} />
 
                 {estado.pendingStep !== null && (
                     <p className="text-xs text-muted-foreground">
@@ -347,13 +327,7 @@ export default function InstallmentExpense({
                             variant="ghost"
                             size="sm"
                             className="h-8 text-xs"
-                            onClick={() =>
-                                router.post(
-                                    desvincular(cuota.id).url,
-                                    {},
-                                    { preserveScroll: true },
-                                )
-                            }
+                            onClick={() => setDesvinculando(true)}
                         >
                             <Undo2 className="size-3.5" />
                             Era otro débito
@@ -383,14 +357,71 @@ export default function InstallmentExpense({
     );
 }
 
+/**
+ * El informe y el débito: los dos hechos del egreso bancario, con lo que
+ * falta de cada uno. Siguen a la vista con el pago validado, porque son lo
+ * que lo respalda.
+ */
+function PasosDeTransferencia({ egreso }: { egreso: Egreso | null }) {
+    return (
+        <div className="space-y-1.5">
+            <Paso
+                hecho={egreso?.reportedAt != null}
+                titulo="El organismo informó"
+                detalle={
+                    egreso?.reportedAt == null
+                        ? 'Todavía no avisó que transfirió.'
+                        : date(egreso.reportedAt) +
+                          (egreso.transferReference == null
+                              ? ''
+                              : ` · Ref. ${egreso.transferReference}`)
+                }
+                accion={
+                    egreso?.reportAttachmentId != null && (
+                        <a
+                            href={verAdjunto(egreso.reportAttachmentId).url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="ml-1.5 inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                            <FileText className="size-3.5" aria-hidden="true" />
+                            Ver informe
+                        </a>
+                    )
+                }
+            />
+            <Paso
+                hecho={egreso?.debitTransactionId != null}
+                titulo="El débito en el extracto"
+                detalle={
+                    egreso?.debitDate == null
+                        ? 'Todavía no se reconoció el movimiento.'
+                        : date(egreso.debitDate) +
+                          (egreso.debitOperationId == null
+                              ? ''
+                              : ` · Op. ${egreso.debitOperationId}`) +
+                          /*
+                           * Con comisión, el pago son dos renglones:
+                           * lo que recibió el beneficiario y lo que
+                           * cobró el banco, a su cargo.
+                           */
+                          (egreso.feeAmount == null ||
+                          egreso.debitAmount == null
+                              ? ''
+                              : ` · ${money(egreso.debitAmount)} transferidos + ${money(egreso.feeAmount)} de comisión`)
+                }
+            />
+        </div>
+    );
+}
+
 /** El pago ya asentado, con quién lo respalda. */
 function PagoHecho({ egreso }: { egreso: Egreso }) {
     /*
-     * Con comisión bancaria, lo transferido es menos que la Orden: la
-     * diferencia la cobró el banco y la absorbe el beneficiario.
+     * El egreso es el de la Orden, como lo confirmó el organismo. Si el
+     * banco cobró comisión —la absorbe el beneficiario—, va incluida.
      */
-    const conComision =
-        egreso.feeAmount !== null && egreso.debitAmount !== null;
+    const conComision = egreso.feeAmount !== null;
 
     return (
         <>
@@ -406,17 +437,10 @@ function PagoHecho({ egreso }: { egreso: Egreso }) {
                           ? 'Transferido por el organismo'
                           : 'Entregado en efectivo'}
                 </span>
-                <Money
-                    value={
-                        conComision && egreso.debitAmount !== null
-                            ? egreso.debitAmount
-                            : egreso.amount
-                    }
-                    className="text-sm"
-                />
+                <Money value={egreso.amount} className="text-sm" />
                 {conComision && egreso.feeAmount !== null && (
                     <span className="text-xs text-muted-foreground">
-                        + {money(egreso.feeAmount)} de comisión bancaria
+                        incluye {money(egreso.feeAmount)} de comisión bancaria
                     </span>
                 )}
                 {egreso.paymentDate !== null && (
@@ -450,10 +474,13 @@ function Paso({
     hecho,
     titulo,
     detalle,
+    accion,
 }: {
     hecho: boolean;
     titulo: string;
     detalle: string;
+    /** Algo para abrir, al final del renglón: el papel del informe. */
+    accion?: React.ReactNode;
 }) {
     return (
         <div className="flex items-start gap-2 text-xs">
@@ -475,6 +502,7 @@ function Paso({
                     {titulo}
                 </span>
                 <span className="text-muted-foreground"> — {detalle}</span>
+                {accion}
             </span>
         </div>
     );

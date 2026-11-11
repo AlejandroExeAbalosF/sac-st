@@ -172,10 +172,10 @@ class EgresoConComisionBancariaTest extends TestCase
     }
 
     /**
-     * El recibo hace firmar al trabajador por lo que recibió, y aclara cómo
-     * se compone: firmar por la Orden sería declarar $121 de más.
+     * El recibo dice el egreso que confirmó el organismo —el de la Orden,
+     * sin descontar la comisión— y aclara cuánto llegó a la cuenta.
      */
-    public function test_el_recibo_dice_lo_acreditado_y_aclara_la_comision(): void
+    public function test_el_recibo_dice_el_egreso_de_la_orden_y_aclara_la_comision(): void
     {
         $cuota = $this->cuotaValidadaConComision('121.00');
         $orden = $this->orden($cuota);
@@ -184,9 +184,9 @@ class EgresoConComisionBancariaTest extends TestCase
 
         $recibo = $this->recibosDeEgreso()->firstOrFail();
 
-        $this->assertSame(Decimal::sub($orden->amount, '121.00'), $recibo->amount);
+        $this->assertSame($orden->amount, $recibo->amount);
         $this->assertStringEndsWith(
-            sprintf('Cuota $%s − comisión bancaria $121,00', Decimal::format($orden->amount)),
+            sprintf('Incluye comisión bancaria $121,00 (acreditado $%s)', Decimal::format(Decimal::sub($orden->amount, '121.00'))),
             (string) $recibo->concept_snapshot,
         );
     }
@@ -213,7 +213,8 @@ class EgresoConComisionBancariaTest extends TestCase
 
     /**
      * La planilla descuenta la Orden una sola vez: el cierre suma las dos
-     * patas del banco, y el libro del día pone la comisión en su renglón.
+     * patas del banco, y el libro del día lleva un renglón por el recibo,
+     * que dice el total.
      */
     public function test_la_planilla_descuenta_la_orden_una_sola_vez(): void
     {
@@ -230,8 +231,7 @@ class EgresoConComisionBancariaTest extends TestCase
 
         $this->assertSame(
             [
-                [(string) ($recibo->talonario_number ?? $recibo->formatted_number), Decimal::sub($orden->amount, '121.00')],
-                ['Comisión bancaria del recibo '.($recibo->talonario_number ?? $recibo->formatted_number), '121.00'],
+                [(string) ($recibo->talonario_number ?? $recibo->formatted_number), $orden->amount],
             ],
             array_map(fn (array $fila): array => [$fila['number'], $fila['bank']], $libro['expense']),
         );

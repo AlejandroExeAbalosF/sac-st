@@ -13,6 +13,8 @@ use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DepositCashToBank;
 use App\Modules\Haberes\Actions\IssuePaymentOrder;
+use App\Modules\Haberes\Data\InstallmentDisbursementData;
+use App\Modules\Haberes\Data\InstallmentOrderStateData;
 use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
@@ -25,9 +27,12 @@ use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\DisbursementEligibility;
+use App\Modules\Haberes\Support\PaymentOrderEligibility;
 use App\Modules\Ledger\Actions\ClosePeriod;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Shared\Enums\ReceiptType;
+use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
 use App\Modules\Shared\Models\PersonBankAccount;
 use App\Modules\Shared\Models\Receipt;
@@ -38,6 +43,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
@@ -107,6 +113,71 @@ class EgresoPorTransferenciaTest extends TestCase
         // Y el circuito bancario sí está abierto.
         $this->assertTrue($estado->canReportTransfer());
         $this->assertTrue($estado->canLinkDebit());
+    }
+
+    /**
+     * El papel del informe se adjunta al egreso, y la tarjeta lo ofrece para
+     * verlo.
+     */
+    public function test_el_informe_guarda_su_papel_adjunto(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaConOrden();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.report', $cuota), [
+                'reportedAt' => BusinessDate::today()->toDateString(),
+                'reference' => '83690105',
+                'document' => UploadedFile::fake()->create('informe.pdf', 120, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $egreso = Disbursement::query()->firstOrFail();
+        $adjunto = Attachment::query()
+            ->where('subject_type', 'disbursement')
+            ->where('subject_id', $egreso->id)
+            ->where('document_type', Disbursement::REPORT_DOCUMENT_TYPE)
+            ->firstOrFail();
+
+        Storage::disk($adjunto->storage_disk)->assertExists($adjunto->object_key);
+
+        $estado = InstallmentDisbursementData::fromReadiness(app(DisbursementEligibility::class)->for($cuota->refresh()));
+        $this->assertSame($adjunto->id, $estado->disbursement?->reportAttachmentId);
+    }
+
+    /** Solo foto o PDF, como el resto de los papeles escaneados. */
+    public function test_el_papel_del_informe_tiene_que_ser_foto_o_pdf(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaConOrden();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.report', $cuota), [
+                'reportedAt' => BusinessDate::today()->toDateString(),
+                'document' => UploadedFile::fake()->create('informe.docx', 20, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+            ])
+            ->assertSessionHasErrors('document');
+
+        $this->assertSame(0, Disbursement::query()->count());
+    }
+
+    /** Si el informe se rechaza, su archivo no queda huérfano en el disco. */
+    public function test_un_informe_rechazado_no_deja_su_archivo(): void
+    {
+        Storage::fake('local');
+        $cuota = $this->cuotaValidada();
+        $antes = Attachment::query()->count();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.report', $cuota), [
+                'reportedAt' => BusinessDate::today()->toDateString(),
+                'document' => UploadedFile::fake()->create('informe.pdf', 120, 'application/pdf'),
+            ])
+            ->assertSessionHasErrors('installmentId');
+
+        $this->assertSame($antes, Attachment::query()->count());
+        // Los adjuntos se guardan bajo la carpeta de su sujeto.
+        $this->assertSame([], Storage::disk('local')->allFiles('disbursement'));
     }
 
     /** Invariante 12: un informe sin débito no genera egreso. */
@@ -358,6 +429,26 @@ class EgresoPorTransferenciaTest extends TestCase
         );
     }
 
+    /**
+     * Pagada la cuota, la Orden deja de estar vigente pero sus papeles se
+     * siguen consultando: la sección la muestra completada.
+     */
+    public function test_la_orden_cumplida_se_sigue_mostrando(): void
+    {
+        $cuota = $this->cuotaValidada();
+        $orden = PaymentOrder::query()->firstOrFail();
+
+        $estado = InstallmentOrderStateData::fromReadiness(
+            $cuota,
+            app(PaymentOrderEligibility::class)->for($cuota),
+        );
+
+        $this->assertSame($orden->id, $estado->order?->id);
+        $this->assertSame(PaymentOrderStatus::Completed, $estado->order->status);
+        // Y no se puede emitir otra: la cuota ya está pagada.
+        $this->assertFalse($estado->canIssue);
+    }
+
     /** Un débito mal atribuido se corrige mientras no esté validado. */
     public function test_el_debito_se_desvincula_antes_de_validar(): void
     {
@@ -368,6 +459,7 @@ class EgresoPorTransferenciaTest extends TestCase
 
         $this->actingAs($this->operador())
             ->post(route('haberes.installments.disbursement.unlink-debit', $cuota), [
+                'reasonCode' => 'wrong_credit',
                 'reason' => 'Era el pago de otra Orden.',
             ])
             ->assertSessionHasNoErrors();
@@ -376,6 +468,30 @@ class EgresoPorTransferenciaTest extends TestCase
 
         $this->assertNull($egreso->bank_transaction_id);
         $this->assertSame(DisbursementStatus::ReportReceived, $egreso->status);
+
+        // El motivo queda en la auditoría, con su código para contarlo.
+        $evento = AuditEvent::query()->where('action', 'egreso.debito-desvinculado')->latest('id')->firstOrFail();
+        $this->assertSame('Era otro movimiento del extracto: Era el pago de otra Orden.', $evento->metadata['reason'] ?? null);
+        $this->assertSame('wrong_credit', $evento->metadata['motivo_codigo'] ?? null);
+    }
+
+    /** Desvincular pide el motivo de la lista: sin él, nada cambia. */
+    public function test_desvincular_el_debito_exige_motivo(): void
+    {
+        $cuota = $this->cuotaConOrden();
+
+        $this->informar($cuota);
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.unlink-debit', $cuota), [])
+            ->assertSessionHasErrors('reasonCode');
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.unlink-debit', $cuota), ['reasonCode' => 'other'])
+            ->assertSessionHasErrors('reason');
+
+        $this->assertNotNull(Disbursement::query()->firstOrFail()->bank_transaction_id);
     }
 
     /** Validado ya no: hay un asiento y una imputación que lo referencian. */
@@ -384,7 +500,7 @@ class EgresoPorTransferenciaTest extends TestCase
         $cuota = $this->cuotaValidada();
 
         $this->actingAs($this->operador())
-            ->post(route('haberes.installments.disbursement.unlink-debit', $cuota), [])
+            ->post(route('haberes.installments.disbursement.unlink-debit', $cuota), ['reasonCode' => 'wrong_credit'])
             ->assertSessionHasErrors('installmentId');
 
         $this->assertNotNull(Disbursement::query()->firstOrFail()->bank_transaction_id);

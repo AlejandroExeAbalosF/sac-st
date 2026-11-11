@@ -146,7 +146,7 @@ final class HaberesAuditCatalog implements AuditCatalogContributor
             new AuditActionDefinition('egreso.entregado', 'Se entregó el pago al beneficiario', 'Pagos'),
             new AuditActionDefinition('egreso.informado', 'Se informó la transferencia', 'Pagos'),
             new AuditActionDefinition('egreso.debito-reconocido', 'Se reconoció el débito en el extracto', 'Pagos'),
-            new AuditActionDefinition('egreso.debito-desvinculado', 'Se desvinculó el débito del extracto', 'Pagos'),
+            new AuditActionDefinition('egreso.debito-desvinculado', 'Se desvinculó el débito del extracto', 'Pagos', metadata: ['reason' => 'Motivo']),
             new AuditActionDefinition('egreso.validado', 'Se validó el egreso', 'Pagos'),
             new AuditActionDefinition('recibo-egreso.emitido', 'Se emitió el recibo de egreso', 'Pagos'),
         );

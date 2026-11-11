@@ -37,6 +37,7 @@ final class DisbursementSummaryData extends Data
         'validatedBy:id,name',
         'bankTransaction:id,transaction_date,amount,operation_id,description,counterparty_name',
         'feeBankTransaction:id,amount',
+        'reportDocument',
     ];
 
     public function __construct(
@@ -55,6 +56,8 @@ final class DisbursementSummaryData extends Data
         public ?string $reportedAt,
         /** Con qué número identificó la transferencia. */
         public ?string $transferReference,
+        /** La foto o el PDF del informe, si se adjuntó. */
+        public ?int $reportAttachmentId,
         /** El CBU al que se pidió transferir, congelado. */
         public ?string $beneficiaryCbu,
         /** El débito del extracto que prueba que el dinero salió. */
@@ -95,6 +98,7 @@ final class DisbursementSummaryData extends Data
             notes: $disbursement->notes,
             reportedAt: $disbursement->report_received_at === null ? null : BusinessDate::fromInstant($disbursement->report_received_at)->toDateString(),
             transferReference: $disbursement->transfer_reference,
+            reportAttachmentId: $disbursement->reportDocument?->id,
             beneficiaryCbu: $disbursement->beneficiary_cbu_snapshot,
             debitTransactionId: $debito?->id,
             debitDate: $debito?->transaction_date?->format('Y-m-d'),

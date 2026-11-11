@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\TransferDebitPair;
 use App\Modules\Haberes\Support\TransferStage;
 use App\Modules\Shared\Actions\RecordAuditEvent;
+use App\Modules\Shared\Support\Reason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -97,7 +98,7 @@ final class LinkTransferDebit
      *
      * @throws ValidationException
      */
-    public function undo(Disbursement $disbursement, ?int $actorId = null, ?string $reason = null): Disbursement
+    public function undo(Disbursement $disbursement, Reason $reason, ?int $actorId = null): Disbursement
     {
         return DB::transaction(function () use ($disbursement, $actorId, $reason): Disbursement {
             if ($disbursement->status === DisbursementStatus::Confirmed) {
@@ -122,7 +123,8 @@ final class LinkTransferDebit
                 'egreso.debito-desvinculado',
                 $disbursement,
                 before: ['bank_transaction_id' => $antes, 'fee_bank_transaction_id' => $comision],
-                after: ['status' => $disbursement->status->value, 'reason' => $reason],
+                after: ['status' => $disbursement->status->value],
+                metadata: $reason->auditMetadata(),
                 actorId: $actorId,
             );
 
