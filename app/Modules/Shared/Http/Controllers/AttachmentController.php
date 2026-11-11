@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -16,14 +15,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * Los adjuntos viven en el disco privado (`storage/app/private`), fuera de
  * la raíz pública: no hay URL adivinable que los exponga. Esta es la única
- * puerta, y comprueba permisos antes de abrirla.
+ * puerta, y comprueba permisos antes de abrirla: los de `AttachmentPolicy`,
+ * los mismos que la pantalla consulta para saber si puede pedir el archivo.
  */
 final class AttachmentController extends Controller
 {
     /** Descarga el archivo. */
-    public function download(Request $request, Attachment $attachment): StreamedResponse
+    public function download(Attachment $attachment): StreamedResponse
     {
-        $this->assertCanSee($request, $attachment);
+        Gate::authorize('view', $attachment);
 
         return Storage::disk($attachment->storage_disk)
             ->download($attachment->object_key, $attachment->original_filename);
@@ -37,9 +37,9 @@ final class AttachmentController extends Controller
      * «ver» un `.xls` abriría una descarga igual, con el rodeo de una
      * pestaña en blanco.
      */
-    public function preview(Request $request, Attachment $attachment): StreamedResponse
+    public function preview(Attachment $attachment): StreamedResponse
     {
-        $this->assertCanSee($request, $attachment);
+        Gate::authorize('view', $attachment);
 
         abort_unless($attachment->isViewableInline(), 404);
 
@@ -62,16 +62,5 @@ final class AttachmentController extends Controller
              */
             'inline',
         );
-    }
-
-    private function assertCanSee(Request $request, Attachment $attachment): void
-    {
-        if ($attachment->confidentiality === Confidentiality::Restricted) {
-            abort_unless(
-                $request->user()?->can('adjuntos.ver-reservados') ?? false,
-                403,
-                'Este archivo es reservado.',
-            );
-        }
     }
 }

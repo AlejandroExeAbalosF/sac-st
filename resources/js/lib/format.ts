@@ -368,3 +368,17 @@ export function dateTime(value: string | Date | null | undefined): string {
 
     return `${parte('day')}/${parte('month')}/${parte('year')} ${parte('hour')}:${parte('minute')}`;
 }
+
+/**
+ * El peso de un archivo, como lo diría una persona: `840 KB`, `2,4 MB`.
+ *
+ * Nunca menos de 1 KB: un archivo de 300 bytes que se muestra como
+ * «0 KB» parece vacío.
+ */
+export function fileSize(bytes: number): string {
+    if (bytes < 1024 * 1024) {
+        return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB`;
+}

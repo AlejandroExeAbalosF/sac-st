@@ -5,6 +5,8 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+# pdf.js: lo copia `vite.config.ts` desde node_modules al arrancar o compilar.
+/public/vendor/pdfjs
 /storage/*.key
 /storage/pail
 

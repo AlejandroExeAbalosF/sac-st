@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Shared;
 
+use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Banking\Models\BankStatementImport;
+use App\Modules\Shared\Data\AttachmentData;
+use App\Modules\Shared\Enums\AttachmentKind;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Support\Attachments;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -136,6 +140,89 @@ class AdjuntosTest extends TestCase
             ->assertOk();
     }
 
+    /** La vista previa responde a la misma regla que la descarga. */
+    public function test_lo_reservado_tampoco_se_ve_en_pantalla_sin_permiso(): void
+    {
+        $adjunto = $this->adjunto(confidencialidad: Confidentiality::Restricted);
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('adjuntos.preview', $adjunto))
+            ->assertForbidden();
+    }
+
+    /** Sin `adjuntos.ver` no hay archivo, aunque sea interno. */
+    public function test_sin_permiso_de_ver_adjuntos_no_se_abre_ninguno(): void
+    {
+        $adjunto = $this->adjunto();
+        $sinPermisos = User::factory()->create();
+
+        $this->actingAs($sinPermisos)
+            ->get(route('adjuntos.preview', $adjunto))
+            ->assertForbidden();
+
+        $this->assertFalse(AttachmentData::fromModel($adjunto, $sinPermisos)->canOpen);
+    }
+
+    /**
+     * Lo que la pantalla recibe dice qué puede pedir.
+     *
+     * `canOpen` sale de la misma policy que el controlador: si dijera que
+     * sí donde el servidor dice que no, la tarjeta pediría una miniatura
+     * que vuelve con un 403.
+     */
+    public function test_la_pantalla_sabe_si_puede_pedir_el_archivo(): void
+    {
+        $reservado = $this->adjunto(confidencialidad: Confidentiality::Restricted);
+
+        $this->assertFalse(AttachmentData::fromModel($reservado, $this->operador('consulta'))->canOpen);
+        $this->assertTrue(AttachmentData::fromModel($reservado, $this->operador('contador'))->canOpen);
+        $this->assertFalse(AttachmentData::fromModel($reservado, null)->canOpen);
+    }
+
+    /** Foto, hoja de PDF o archivo para descargar, según el tipo guardado. */
+    public function test_el_tipo_de_vista_sale_del_mime(): void
+    {
+        $this->assertSame(AttachmentKind::Image, $this->adjunto('foto.webp', 'image/webp')->kind());
+        $this->assertSame(AttachmentKind::Pdf, $this->adjunto('hoja.pdf', 'application/pdf')->kind());
+        $this->assertSame(AttachmentKind::Other, $this->adjunto('planilla.csv', 'text/csv')->kind());
+        // Un SVG es `image/`, pero no se muestra: es un documento con scripts.
+        $this->assertSame(AttachmentKind::Other, $this->adjunto('dibujo.svg', 'image/svg+xml')->kind());
+    }
+
+    /**
+     * El vigente de cada sujeto es el más reciente, en una sola consulta.
+     *
+     * Corregir con una foto mejor deja las dos —los adjuntos no se
+     * reescriben—, y la que se muestra es la nueva.
+     */
+    public function test_el_vigente_es_el_mas_reciente_de_cada_sujeto(): void
+    {
+        $viejo = $this->adjunto('viejo.pdf', sujeto: 1);
+        $nuevo = $this->adjunto('nuevo.pdf', sujeto: 1);
+        $otro = $this->adjunto('otro.pdf', sujeto: 2);
+        $this->adjunto('caratula.pdf', sujeto: 2, tipo: 'otro_papel');
+
+        $consultas = 0;
+        DB::listen(function () use (&$consultas): void {
+            $consultas++;
+        });
+
+        $vigentes = app(Attachments::class)->latestFor(
+            AttachmentSubject::Expediente,
+            [1, 2, 3],
+            null,
+            documentType: 'caratula',
+        );
+
+        $ids = array_map(fn (AttachmentData $a): int => $a->id, $vigentes);
+        ksort($ids);
+
+        $this->assertSame([1 => $nuevo->id, 2 => $otro->id], $ids);
+        $this->assertNotSame($viejo->id, $vigentes[1]->id);
+        // Los adjuntos y sus autores: dos consultas, no una por sujeto.
+        $this->assertLessThanOrEqual(2, $consultas);
+    }
+
     public function test_sin_sesion_no_hay_archivos(): void
     {
         $adjunto = $this->adjunto();
@@ -226,13 +313,15 @@ class AdjuntosTest extends TestCase
         string $filename = 'documento.pdf',
         string $mime = 'application/pdf',
         Confidentiality $confidencialidad = Confidentiality::Internal,
+        int $sujeto = 1,
+        string $tipo = 'caratula',
     ): Attachment {
         Storage::disk('local')->put('expediente/'.$filename, 'contenido');
 
         return Attachment::query()->create([
             'subject_type' => AttachmentSubject::Expediente,
-            'subject_id' => 1,
-            'document_type' => 'caratula',
+            'subject_id' => $sujeto,
+            'document_type' => $tipo,
             'title' => $filename,
             'storage_disk' => 'local',
             'object_key' => 'expediente/'.$filename,

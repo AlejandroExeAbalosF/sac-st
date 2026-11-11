@@ -10,6 +10,7 @@ use App\Modules\Haberes\Enums\HaberWorkflowStatus;
 use App\Modules\Haberes\Enums\InstallmentStage;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Data\LastChangeData;
 use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Models\Receipt;
@@ -83,7 +84,7 @@ final class ExpedienteListItemData extends Data
 
     /**
      * @param  array<int, int>  $ticketReceipts  id de ticket => id de recepción
-     * @param  array<int, int>  $ticketAttachments  id de ticket => id de adjunto
+     * @param  array<int, AttachmentData>  $ticketAttachments  id de ticket => su foto
      * @param  array<int, LastChangeData>  $haberChanges  id de haber => su último cambio
      * @param  array<int, numeric-string>  $funded  Lo imputado a cada cuota.
      * @param  array<int, Receipt>  $receipts  El recibo de ingreso por cuota.

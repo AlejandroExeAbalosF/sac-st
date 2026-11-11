@@ -7,6 +7,7 @@ import {
     dateTime,
     dni,
     documentMask,
+    fileSize,
     isNegative,
     isNonZero,
     money,
@@ -228,5 +229,17 @@ describe('subtractAmounts', () => {
     it('trata lo que falta como cero', () => {
         expect(subtractAmounts('100.00', null)).toBe('100.00');
         expect(subtractAmounts(null, '100.00')).toBe('-100.00');
+    });
+});
+
+describe('fileSize', () => {
+    it('muestra KB redondeados y nunca cero', () => {
+        expect(fileSize(300)).toBe('1 KB');
+        expect(fileSize(860_160)).toBe('840 KB');
+    });
+
+    it('muestra MB con un decimal y coma', () => {
+        expect(fileSize(2.4 * 1024 * 1024)).toBe('2,4 MB');
+        expect(fileSize(10 * 1024 * 1024)).toBe('10 MB');
     });
 });

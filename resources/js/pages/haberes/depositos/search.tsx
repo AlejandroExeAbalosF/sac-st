@@ -9,6 +9,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { AttachmentInlinePreview } from '@/components/attachments/attachment-inline-preview';
 import PageHeader from '@/components/page-header';
 import ReasonFields from '@/components/reason-fields';
 import StatusBadge from '@/components/status-badge';
@@ -23,7 +24,6 @@ import {
 } from '@/components/ui/dialog';
 import { cuit as formatCuit, date, money } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { preview } from '@/routes/adjuntos';
 import { create as importarExtracto } from '@/routes/banco/extractos';
 import { discard, link, search, unlink } from '@/routes/depositos';
 
@@ -626,20 +626,9 @@ function SinCandidatos({
 function ComprobanteAdjunto({ ticket }: { ticket: Ticket }) {
     return (
         <div className="lg:sticky lg:top-22 lg:self-start">
-            <div className="rounded-lg border p-2">
-                {ticket.attachmentId ? (
-                    <a
-                        href={preview(ticket.attachmentId).url}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Abrir el comprobante en tamaño completo"
-                    >
-                        <img
-                            src={preview(ticket.attachmentId).url}
-                            alt="Comprobante del depósito"
-                            className="w-full rounded"
-                        />
-                    </a>
+            <div className={cn(!ticket.attachment && 'rounded-lg border p-2')}>
+                {ticket.attachment ? (
+                    <AttachmentInlinePreview attachment={ticket.attachment} />
                 ) : (
                     <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
                         <AlertTriangle className="size-6 text-warning-strong" />

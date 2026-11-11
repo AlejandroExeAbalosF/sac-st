@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Shared\Models;
 
 use App\Models\User;
+use App\Modules\Shared\Enums\AttachmentKind;
 use App\Modules\Shared\Enums\AttachmentSource;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Enums\Confidentiality;
+use App\Modules\Shared\Policies\AttachmentPolicy;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $created_by
  * @property CarbonInterface $created_at
  */
+#[UsePolicy(AttachmentPolicy::class)]
 final class Attachment extends Model
 {
     /** Inmutable: no hay `updated_at` que tenga sentido. */
@@ -93,6 +97,16 @@ final class Attachment extends Model
     public function isViewableInline(): bool
     {
         return in_array($this->mime_type, self::INLINE_MIME_TYPES, true);
+    }
+
+    /** Cómo se muestra: foto, hoja de PDF o archivo para descargar. */
+    public function kind(): AttachmentKind
+    {
+        return match (true) {
+            ! $this->isViewableInline() => AttachmentKind::Other,
+            $this->mime_type === 'application/pdf' => AttachmentKind::Pdf,
+            default => AttachmentKind::Image,
+        };
     }
 
     /** @return array<string, string> */

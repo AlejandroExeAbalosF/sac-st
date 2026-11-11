@@ -12,6 +12,7 @@ use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -199,8 +200,8 @@ final class InstallmentListItemData extends Data
      * @param  array<int, int>  $ticketFundReceipts  La recepción nacida del
      *                                               crédito que cruzó cada
      *                                               ticket, por ticket.
-     * @param  array<int, int>  $ticketAttachments  La foto de cada ticket,
-     *                                              también por ticket.
+     * @param  array<int, AttachmentData>  $ticketAttachments  La foto de cada ticket,
+     *                                                         también por ticket.
      * @param  array<int, string>  $ticketsBeforeOpening  La apertura, por ticket
      *                                                    cruzado con un crédito
      *                                                    anterior a ella.

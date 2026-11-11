@@ -7,8 +7,7 @@ namespace App\Modules\Haberes\Data;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
-use App\Modules\Shared\Enums\AttachmentSubject;
-use App\Modules\Shared\Models\Attachment;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
@@ -42,12 +41,13 @@ final class DepositTicketData extends Data
         public ?string $matchedAt,
         public ?string $discardedReason,
         /** La foto del comprobante, para verla al lado del formulario. */
-        public ?int $attachmentId,
+        public ?AttachmentData $attachment,
         /** Cuántos días lleva esperando. Un ticket viejo sin aparecer es una señal. */
         public int $waitingDays,
     ) {}
 
-    public static function fromModel(DepositTicket $ticket): self
+    /** La foto llega resuelta: en la cola son veinticinco tickets por página. */
+    public static function fromModel(DepositTicket $ticket, ?AttachmentData $attachment): self
     {
         $cuota = $ticket->installment;
 
@@ -78,15 +78,11 @@ final class DepositTicketData extends Data
             matchedAt: $ticket->matched_at?->toIso8601String(),
             discardedReason: Reason::text($ticket->discarded_reason_code, $ticket->discarded_reason),
             /*
-             * La última foto, no la primera. Corregir un ticket puede
-             * traer una foto mejor —la anterior salió borrosa— y como
-             * `attachments` es inmutable las dos quedan. La vigente es la
-             * más reciente.
+             * La última foto, no la primera: la elige
+             * `Attachments::latestFor`. Corregir un ticket puede traer una
+             * foto mejor y, como `attachments` es inmutable, las dos quedan.
              */
-            attachmentId: Attachment::query()
-                ->forSubject(AttachmentSubject::DepositTicket, $ticket->id)
-                ->latest('id')
-                ->value('id'),
+            attachment: $attachment,
             waitingDays: (int) $ticket->deposited_at->diffInDays(BusinessDate::today(), false),
         );
     }

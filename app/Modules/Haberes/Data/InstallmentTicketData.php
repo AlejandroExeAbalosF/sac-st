@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Data;
 use App\Modules\Haberes\Enums\DepositKind;
 use App\Modules\Haberes\Enums\DepositTicketStatus;
 use App\Modules\Haberes\Models\DepositTicket;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Support\BusinessDate;
 use Spatie\LaravelData\Data;
 use Spatie\TypeScriptTransformer\Attributes\TypeScript;
@@ -39,7 +40,7 @@ final class InstallmentTicketData extends Data
         public int $bankAccountId,
         public string $accountLabel,
         /** La foto vigente. Puede faltar: el área no la exige. */
-        public ?int $attachmentId,
+        public ?AttachmentData $attachment,
         /** El movimiento con el que se lo reconoció, si el cruce ya se hizo. */
         public ?int $bankTransactionId,
         /**
@@ -74,7 +75,7 @@ final class InstallmentTicketData extends Data
      * por ticket serían consultas extra por cada fila de un plan largo.
      *
      * @param  array<int, int>  $fundReceipts  id de ticket => id de recepción
-     * @param  array<int, int>  $attachments  id de ticket => id de adjunto
+     * @param  array<int, AttachmentData>  $attachments  id de ticket => su foto
      * @param  array<int, string>  $beforeOpening  id de ticket => fecha de apertura
      */
     public static function fromModel(
@@ -102,7 +103,7 @@ final class InstallmentTicketData extends Data
             notes: $ticket->notes,
             bankAccountId: $ticket->bank_account_id,
             accountLabel: $ticket->account->label,
-            attachmentId: $attachments[$ticket->id] ?? null,
+            attachment: $attachments[$ticket->id] ?? null,
             bankTransactionId: $ticket->bank_transaction_id,
             fundReceiptId: $fundReceipts[$ticket->id] ?? null,
             editable: $ticket->status === DepositTicketStatus::Waiting,

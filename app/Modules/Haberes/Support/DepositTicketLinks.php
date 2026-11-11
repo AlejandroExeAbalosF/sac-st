@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Haberes\Support;
 
+use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Support\Attachments;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -118,27 +121,25 @@ final class DepositTicketLinks
     }
 
     /**
-     * El adjunto más nuevo de cada ticket.
+     * La foto vigente de cada ticket —la más nueva—, con lo que la
+     * pantalla necesita para mostrarla.
      *
      * @param  list<int>  $installmentIds
-     * @return array<int, int> id de ticket => id de adjunto
+     * @return array<int, AttachmentData> id de ticket => su foto
      */
-    public function attachments(array $installmentIds): array
+    public function attachments(array $installmentIds, ?User $viewer): array
     {
         if ($installmentIds === []) {
             return [];
         }
 
-        return DB::table('deposit_tickets')
-            ->join('attachments', function ($join): void {
-                $join->on('attachments.subject_id', '=', 'deposit_tickets.id')
-                    ->where('attachments.subject_type', AttachmentSubject::DepositTicket->value);
-            })
-            ->whereIn('deposit_tickets.beneficiary_installment_id', $installmentIds)
-            ->groupBy('deposit_tickets.id')
-            ->selectRaw('deposit_tickets.id AS ticket, MAX(attachments.id) AS adjunto')
-            ->pluck('adjunto', 'ticket')
+        /** @var list<int> $tickets */
+        $tickets = DB::table('deposit_tickets')
+            ->whereIn('beneficiary_installment_id', $installmentIds)
+            ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+
+        return app(Attachments::class)->latestFor(AttachmentSubject::DepositTicket, $tickets, $viewer);
     }
 }

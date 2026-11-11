@@ -31,6 +31,8 @@ use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\HaberesCashBox;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\TicketCandidate;
+use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Support\Attachments;
 use App\Modules\Shared\Support\Reason;
 use App\Support\Pdf\Worksheet;
 use App\Support\Ui\Toast;
@@ -55,7 +57,7 @@ final class DepositTicketController extends Controller
      * —o el depósito nunca se hizo, o falta importar un período— y tiene
      * que estar arriba, no perdido al final de la lista.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, Attachments $adjuntos): Response
     {
         $estado = $request->query('estado', DepositTicketStatus::Waiting->value);
 
@@ -69,8 +71,15 @@ final class DepositTicketController extends Controller
             ->orderBy('deposited_at')
             ->orderBy('id')
             ->paginate(25)
-            ->withQueryString()
-            ->through(fn (DepositTicket $t): DepositTicketData => DepositTicketData::fromModel($t));
+            ->withQueryString();
+
+        $fotos = $adjuntos->latestFor(
+            AttachmentSubject::DepositTicket,
+            array_map(fn (DepositTicket $t): int => $t->id, $tickets->items()),
+            $request->user(),
+        );
+
+        $tickets->through(fn (DepositTicket $t): DepositTicketData => DepositTicketData::fromModel($t, $fotos[$t->id] ?? null));
 
         return Inertia::render('haberes/depositos/index', [
             'tickets' => $tickets,
@@ -235,6 +244,7 @@ final class DepositTicketController extends Controller
         FindTicketCandidates $buscar,
         ListAvailableCredits $disponibles,
         DepositTicketLinks $enlaces,
+        Attachments $adjuntos,
     ): Response {
         $ticket->load(['expediente.employer', 'account', 'installment', 'transaction']);
 
@@ -254,7 +264,10 @@ final class DepositTicketController extends Controller
         return Inertia::render('haberes/depositos/search', [
             // Las listas de motivos de cada acto: la pantalla no las repite.
             'motivos' => HaberesReasonAct::options(),
-            'ticket' => DepositTicketData::fromModel($ticket),
+            'ticket' => DepositTicketData::fromModel(
+                $ticket,
+                $adjuntos->latestOf(AttachmentSubject::DepositTicket, $ticket->id, $request->user()),
+            ),
             'candidates' => array_map(
                 fn (TicketCandidate $c): TicketCandidateData => TicketCandidateData::fromCandidate($c),
                 $resultado->candidates,

@@ -722,7 +722,7 @@ final class HaberController extends Controller
                 cancelledTransfers: $this->trasladosCancelados($cuotaIds),
                 mediums: app(InstallmentFunding::class)->mediumForMany($cuotaIds),
                 ticketReceipts: app(DepositTicketLinks::class)->receipts($cuotaIds),
-                ticketAttachments: app(DepositTicketLinks::class)->attachments($cuotaIds),
+                ticketAttachments: app(DepositTicketLinks::class)->attachments($cuotaIds, request()->user()),
                 ticketsBeforeOpening: app(DepositTicketLinks::class)->beforeOpening($cuotaIds),
                 stages: app(InstallmentStages::class)->forMany($haber->installments),
                 lastChange: app(LastChanges::class)->for(

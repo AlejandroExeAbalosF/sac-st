@@ -336,7 +336,7 @@ declare namespace App {
                     matchSignals: Record<string, string> | null;
                     matchedAt: string | null;
                     discardedReason: string | null;
-                    attachmentId: number | null;
+                    attachment: App.Modules.Shared.Data.AttachmentData | null;
                     waitingDays: number;
                 };
                 export type DisbursementSummaryData = {
@@ -616,7 +616,7 @@ declare namespace App {
                     notes: string | null;
                     bankAccountId: number;
                     accountLabel: string;
-                    attachmentId: number | null;
+                    attachment: App.Modules.Shared.Data.AttachmentData | null;
                     bankTransactionId: number | null;
                     fundReceiptId: number | null;
                     editable: boolean;
@@ -1479,6 +1479,16 @@ declare namespace App {
                     isCurrent: boolean;
                     revokeLockedReason: string | null;
                 };
+                export type AttachmentData = {
+                    id: number;
+                    title: string;
+                    originalFilename: string;
+                    kind: App.Modules.Shared.Enums.AttachmentKind;
+                    sizeBytes: number;
+                    canOpen: boolean;
+                    createdByName: string | null;
+                    createdAt: string;
+                };
                 export type AuditChangeData = {
                     field: string;
                     before: string | null;
@@ -1593,6 +1603,7 @@ declare namespace App {
                 };
             }
             namespace Enums {
+                export type AttachmentKind = 'image' | 'pdf' | 'other';
                 export type AttachmentSource =
                     'generated' | 'uploaded' | 'scanned';
                 export type AttachmentSubject =

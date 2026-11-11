@@ -11,9 +11,11 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\DepositTicket;
 use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Shared\Enums\AttachmentSubject;
+use App\Modules\Shared\Enums\Confidentiality;
 use App\Modules\Shared\Models\Attachment;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -69,7 +71,7 @@ class ComprobanteEnLaTarjetaTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('haber.installments.0.depositTicket.id', $nuevo->id)
-                ->where('haber.installments.0.depositTicket.attachmentId', $delNuevo->id));
+                ->where('haber.installments.0.depositTicket.attachment.id', $delNuevo->id));
 
         $this->assertNotSame(
             $delViejo->id,
@@ -97,9 +99,60 @@ class ComprobanteEnLaTarjetaTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where(
-                    'expediente.haberes.0.installments.0.depositTicket.attachmentId',
+                    'expediente.haberes.0.installments.0.depositTicket.attachment.id',
                     $adjunto->id,
                 ));
+    }
+
+    /**
+     * Un ticket corregido con una foto mejor muestra la nueva en la cola y
+     * en la búsqueda del movimiento, no solo en la tarjeta.
+     *
+     * La cola resuelve las fotos en lote y la búsqueda de a una: las dos
+     * tienen que quedarse con la más reciente.
+     */
+    public function test_la_cola_y_la_busqueda_muestran_la_foto_corregida(): void
+    {
+        $ticket = $this->comprobante($this->cuota(), '2026-04-24');
+        $this->adjuntoDe($ticket);
+        $corregida = $this->adjuntoDe($ticket, mime: 'application/pdf');
+
+        $this->actingAs($this->operador())
+            ->get(route('depositos.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tickets.data.0.attachment.id', $corregida->id)
+                ->where('tickets.data.0.attachment.kind', 'pdf'));
+
+        $this->actingAs($this->operador())
+            ->get(route('depositos.search', $ticket))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('ticket.attachment.id', $corregida->id)
+                ->where('ticket.attachment.kind', 'pdf')
+                ->where('ticket.attachment.canOpen', true));
+    }
+
+    /**
+     * Una foto reservada se anuncia, pero la pantalla sabe que no la puede
+     * pedir: sin eso, la miniatura se encontraba con un 403.
+     */
+    public function test_una_foto_reservada_no_se_ofrece_a_quien_no_la_puede_abrir(): void
+    {
+        $ticket = $this->comprobante($this->cuota(), '2026-04-24');
+        $adjunto = $this->adjuntoDe($ticket, confidencialidad: Confidentiality::Restricted);
+
+        $this->actingAs($this->operador('consulta'))
+            ->get(route('depositos.search', $ticket))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('ticket.attachment.id', $adjunto->id)
+                ->where('ticket.attachment.canOpen', false));
+
+        $this->actingAs($this->operador('contador'))
+            ->get(route('depositos.search', $ticket))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('ticket.attachment.canOpen', true));
     }
 
     /*
@@ -146,20 +199,26 @@ class ComprobanteEnLaTarjetaTest extends TestCase
         );
     }
 
-    private function adjuntoDe(DepositTicket $ticket): Attachment
-    {
+    private function adjuntoDe(
+        DepositTicket $ticket,
+        string $mime = 'image/jpeg',
+        Confidentiality $confidencialidad = Confidentiality::Internal,
+    ): Attachment {
+        $clave = 'tickets/'.$ticket->id.'-'.Str::random(8);
+
         return Attachment::query()->create([
             'subject_type' => AttachmentSubject::DepositTicket->value,
             'subject_id' => $ticket->id,
             'document_type' => 'deposit_ticket',
             'title' => 'Comprobante '.$ticket->id,
             'storage_disk' => 'local',
-            'object_key' => 'tickets/'.$ticket->id.'.jpg',
+            'object_key' => $clave,
             'original_filename' => 'ticket.jpg',
-            'mime_type' => 'image/jpeg',
+            'mime_type' => $mime,
             'size_bytes' => 1024,
-            'sha256' => hash('sha256', (string) $ticket->id),
+            'sha256' => hash('sha256', $clave),
             'source' => 'scanned',
+            'confidentiality' => $confidencialidad,
             'created_by' => $this->operador()->id,
         ]);
     }

@@ -13,6 +13,7 @@ use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Enums\PaymentMedium;
+use App\Modules\Shared\Data\AttachmentData;
 use App\Modules\Shared\Data\LastChangeData;
 use App\Modules\Shared\Models\Receipt;
 use App\Support\Money\Decimal;
@@ -130,9 +131,9 @@ final class HaberListItemData extends Data
      * @param  array<int, int>  $ticketReceipts  La recepción ya registrada
      *                                           del crédito que cruzó cada
      *                                           ticket, indexada por ticket.
-     * @param  array<int, int>  $ticketAttachments  El adjunto más nuevo de
-     *                                              cada ticket, indexado por
-     *                                              ticket.
+     * @param  array<int, AttachmentData>  $ticketAttachments  El adjunto más nuevo de
+     *                                                         cada ticket, indexado por
+     *                                                         ticket.
      * @param  array<int, CashToBankTransfer>  $transfers  El traslado al
      *                                                     banco por cuota,
      *                                                     cuando el efectivo

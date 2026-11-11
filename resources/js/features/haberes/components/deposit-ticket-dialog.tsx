@@ -2,6 +2,7 @@ import { Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, FileUp, Link2, Pencil, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import AmountInput from '@/components/amount-input';
+import { AttachmentInlinePreview } from '@/components/attachments/attachment-inline-preview';
 import DateInput from '@/components/date-input';
 import InputError from '@/components/input-error';
 import Money from '@/components/money';
@@ -26,7 +27,6 @@ import {
 import { useCuentasDelDia } from '@/features/caja/cuentas-del-dia';
 import type { PeriodoDeCuenta } from '@/features/caja/cuentas-del-dia';
 import { date } from '@/lib/format';
-import { preview } from '@/routes/adjuntos';
 import { search as buscarTicket, update as corregir } from '@/routes/depositos';
 
 type Ticket = App.Modules.Haberes.Data.InstallmentTicketData;
@@ -107,7 +107,7 @@ export default function DepositTicketDialog({
                         )}
                     </div>
 
-                    <Foto attachmentId={ticket.attachmentId} />
+                    <Foto adjunto={ticket.attachment} />
                 </div>
 
                 {!editando && (
@@ -378,7 +378,7 @@ function Formulario({
                         onClick={() => inputFoto.current?.click()}
                     >
                         <FileUp className="size-4" />
-                        {ticket.attachmentId === null
+                        {ticket.attachment === null
                             ? 'Agregar foto'
                             : 'Reemplazar por otra foto'}
                     </Button>
@@ -402,7 +402,7 @@ function Formulario({
                         </span>
                     )}
                 </div>
-                {ticket.attachmentId !== null && (
+                {ticket.attachment !== null && (
                     <p className="text-xs text-muted-foreground">
                         La foto anterior no se borra: queda como rastro de lo
                         que se estuvo mirando.
@@ -423,8 +423,12 @@ function Formulario({
     );
 }
 
-function Foto({ attachmentId }: { attachmentId: number | null }) {
-    if (attachmentId === null) {
+function Foto({
+    adjunto,
+}: {
+    adjunto: App.Modules.Shared.Data.AttachmentData | null;
+}) {
+    if (adjunto === null) {
         return (
             <div className="flex h-fit flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-10 text-center">
                 <AlertTriangle className="size-5 text-warning-strong" />
@@ -437,21 +441,9 @@ function Foto({ attachmentId }: { attachmentId: number | null }) {
         );
     }
 
-    return (
-        <a
-            href={preview(attachmentId).url}
-            target="_blank"
-            rel="noreferrer"
-            title="Abrir el comprobante en tamaño completo"
-            className="h-fit rounded-lg border p-2"
-        >
-            <img
-                src={preview(attachmentId).url}
-                alt="Comprobante del depósito"
-                className="w-full rounded"
-            />
-        </a>
-    );
+    // Foto o PDF: el comprobante admite los dos, y un PDF dibujado como
+    // `<img>` se veía como una imagen rota.
+    return <AttachmentInlinePreview attachment={adjunto} className="h-fit" />;
 }
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
