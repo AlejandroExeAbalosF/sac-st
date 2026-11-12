@@ -342,7 +342,12 @@ Circuito en [multas.md › Importar la planilla histórica](multas.md#importacio
   avanza: `reported` → `applied` o `discarded`. Lo aplicado y lo descartado no
   cambian, y los datos del pago no se editan: un informado mal cargado se corrige
   con otro que lo reemplaza ([corrección](#correccion)). **Base:**
-  `fine_payments_guard`.
+  `fine_payments_guard`. La única excepción es la fecha de pago del comprobante
+  (`declared_paid_on`), que es informativa: se completa o se corrige mientras el pago
+  está `reported`, con el archivo del comprobante, y queda fija al verificarlo. Una
+  corrección la conserva si no trae otra. **Base:** `fine_payments_guard`
+  (`2026_11_12_000000`). **Action:** `RecordFinePaymentProof`, que audita
+  `multa.fecha-de-pago-cargada` con la fecha anterior y la nueva.
 - La presentación tiene fecha y precisión (`instant` / `day` / `unknown`). Si no es
   el instante de la carga, lleva respaldo. **Base:** CHECK.
 - El recurso del 20 %: base = obligación vigente al registrarlo, congelada; el

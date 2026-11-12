@@ -285,6 +285,12 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['titulo' => 'Descripción', 'archivo' => 'Archivo'],
             ),
             new AuditActionDefinition(
+                'multa.fecha-de-pago-cargada',
+                'Se cargó o corrigió la fecha de pago del comprobante de un pago bancario',
+                'Multas',
+                metadata: ['antes' => 'Fecha anterior', 'despues' => 'Fecha nueva'],
+            ),
+            new AuditActionDefinition(
                 'multa.pago-cobrado',
                 'Se cobró un pago de la multa en caja',
                 'Multas',

@@ -33,6 +33,7 @@ import CorrectPaymentDialog from '@/features/multas/components/correct-payment-d
 import FineReceiptDialog from '@/features/multas/components/fine-receipt-dialog';
 import HistoricalMovementDialog from '@/features/multas/components/historical-movement-dialog';
 import LinkDocumentDialog from '@/features/multas/components/link-document-dialog';
+import PaymentProofDialog from '@/features/multas/components/payment-proof-dialog';
 import ReasonDialog from '@/features/multas/components/reason-dialog';
 import ReplaceOriginDialog from '@/features/multas/components/replace-origin-dialog';
 import ResolveAppealDialog from '@/features/multas/components/resolve-appeal-dialog';
@@ -92,6 +93,8 @@ type Props = {
     creditosDelBanco?: Credito[];
     /** Los créditos libres posteriores a la apertura; llegan al buscar. */
     creditosDisponibles?: Credito[];
+    /** Los créditos que coinciden con el pago que se verifica; llegan al abrir «Verificar». */
+    candidatosDelPago?: App.Modules.Multas.Data.FineCreditCandidateData[];
     /** Para corregir un pago verificado: las multas de destino, al buscar. */
     multasDestino?: App.Modules.Multas.Data.FineCorrectionTargetData[];
     /** El crédito que respalda cada pago verificado, por id del pago; llega al abrir. */
@@ -123,6 +126,8 @@ type Props = {
         collect: boolean;
         reportBank: boolean;
         verifyBank: boolean;
+        /** Buscar a mano en el extracto al verificar: solo super-admin. */
+        searchCredits: boolean;
         adjust: boolean;
         correctAmount: boolean;
         replaceOrigin: boolean;
@@ -184,6 +189,7 @@ export default function MultaShow({
     adjuntosDeDocumentos,
     creditosDelBanco,
     creditosDisponibles,
+    candidatosDelPago,
     multasDestino,
     creditosActuales,
     recurso,
@@ -1056,12 +1062,10 @@ export default function MultaShow({
                                                                 numero: pago.receiptNumber as string,
                                                             })
                                                         }
+                                                        aria-label={`Ver el recibo ${pago.talonarioNumber ?? pago.receiptNumber}`}
                                                     >
                                                         <Receipt aria-hidden="true" />
-                                                        <span className="font-mono">
-                                                            {pago.talonarioNumber ??
-                                                                pago.receiptNumber}
-                                                        </span>
+                                                        Recibo
                                                     </Button>
                                                 )}
                                         </span>
@@ -1376,9 +1380,6 @@ export default function MultaShow({
             {dialogo?.tipo === 'banco' && (
                 <BankPaymentDialog
                     fineId={multa.id}
-                    canVerify={can.verifyBank}
-                    creditos={creditosDisponibles}
-                    firmantes={firmantes}
                     idempotencyKey={cobroKey}
                     onClose={cerrar}
                 />
@@ -1408,6 +1409,8 @@ export default function MultaShow({
             {dialogo?.tipo === 'verificar' && (
                 <VerifyPaymentDialog
                     pago={dialogo.pago}
+                    candidatos={candidatosDelPago}
+                    puedeBuscar={can.searchCredits}
                     creditos={creditosDisponibles}
                     firmantes={firmantes}
                     onClose={cerrar}
@@ -1486,29 +1489,24 @@ export default function MultaShow({
                 ) : (
                     <BankPaymentDialog
                         fineId={multa.id}
-                        canVerify={false}
-                        firmantes={firmantes}
                         idempotencyKey={cobroKey}
                         corrige={dialogo.pago}
                         onClose={cerrar}
                     />
                 ))}
-            {dialogo?.tipo === 'adjuntar-pago' && (
-                <AttachFileDialog
-                    url={attachToPayment(dialogo.pago.id).url}
-                    title={
-                        dialogo.pago.appealKind !== null
-                            ? 'Respaldo del recurso'
-                            : 'Comprobante del pago'
-                    }
-                    description={
-                        dialogo.pago.appealKind !== null
-                            ? 'El recibo externo u otro papel que respalda el recurso.'
-                            : 'La transferencia o la boleta del depósito realizado por el infractor.'
-                    }
-                    onClose={cerrar}
-                />
-            )}
+            {dialogo?.tipo === 'adjuntar-pago' &&
+                dialogo.pago.appealKind === null && (
+                    <PaymentProofDialog pago={dialogo.pago} onClose={cerrar} />
+                )}
+            {dialogo?.tipo === 'adjuntar-pago' &&
+                dialogo.pago.appealKind !== null && (
+                    <AttachFileDialog
+                        url={attachToPayment(dialogo.pago.id).url}
+                        title="Respaldo del recurso"
+                        description="El recibo externo u otro papel que respalda el recurso."
+                        onClose={cerrar}
+                    />
+                )}
             {dialogo?.tipo === 'recibo' && (
                 <FineReceiptDialog
                     receiptId={dialogo.id}

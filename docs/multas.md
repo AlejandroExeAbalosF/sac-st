@@ -849,22 +849,36 @@ un cheque electrónico** (M02):
 
 - **Informar** (quien cobra o quien concilia): el pago queda *informado*, sin tocar
   el saldo ni llevar recibo. Se carga el importe, cuándo se presentó el comprobante
-  —hoy, o un día anterior con su respaldo: el sello de Mesa de Entradas, una nota—,
-  la fecha de pago que dice el comprobante y, si es una transferencia judicial, el
-  expediente judicial. El comprobante se adjunta al pago («Comprobante»).
+  —hoy, o un día anterior con su respaldo: el sello de Mesa de Entradas, una nota—
+  y, si es una transferencia judicial, el expediente judicial.
+- **Comprobante** (quien informa): cuando aparece el papel, se carga la fecha de pago
+  que dice y su archivo, juntos o por separado; los dos son opcionales. La fecha se
+  completa o se corrige mientras el pago está informado, y cada cambio queda en la
+  auditoría; verificado, queda fija y solo se suma otro archivo. Es informativa: no
+  mueve el saldo ni decide el término.
 - **Verificar** (`multas.verificar-pagos`): se elige el crédito del extracto. Tiene
   que ser de la cuenta de Multas, desde la apertura de la caja, libre y **por
   el importe entero del pago**: un pago, un crédito, hasta que el área responda P14.
-  Al verificar, el pago se aplica, sale el recibo (casilla «Depósito Cta.») y el
+  Al abrir, el diálogo propone los créditos libres de ese importe, con sus señales en
+  palabras: primero el del CUIT de la persona de la multa, después los más cercanos a
+  la fecha del comprobante (o a la presentación, si no se cargó), como hace Haberes con
+  el ticket. Proponer no identifica: elige quien verifica, y «Verificar y emitir recibo»
+  no se habilita hasta elegir uno. Buscar a mano en todo el extracto es solo de
+  super-admin (`dev.buscar-creditos-multas`, decisión del usuario, 12/11/2026): si el
+  crédito no aparece, lo habitual es que el importe informado esté mal y se corrija el
+  pago. Al verificar, el pago se aplica, sale el recibo (casilla «Depósito Cta.») y el
   crédito deja de figurar como sin identificar en Banco › Movimientos.
-- **Reconocerlo del extracto**: quien concilia puede marcar «el crédito ya está en
-  el extracto» y hacer las dos cosas en un acto, por el importe del crédito. La
-  presentación es ese momento: identificar después del último día del mes de la
-  multa es fuera de término (M08).
-- **Corregir** (quien informa): un informado mal cargado —el importe, el medio, la
-  fecha de pago— se reemplaza por otro. El anterior queda descartado con el motivo,
-  y el corregido conserva la misma presentación: la fecha de presentación no se
-  corrige. Se puede corregir aunque otro pago ya haya cancelado la multa; lo que
+- **Reconocerlo del extracto**: un crédito que nadie informó se identifica desde
+  Banco › Movimientos («Identificar crédito»): quien concilia elige la multa y hace
+  las dos cosas en un acto, por el importe del crédito. La presentación es ese
+  momento: identificar después del último día del mes de la multa es fuera de
+  término (M08). «Pago por banco», en la ficha, ya no lo ofrece: ahí solo se
+  informa, con la fecha real de presentación, y se verifica después, igual que en
+  Haberes se carga el comprobante y luego se cruza con el extracto.
+- **Corregir** (quien informa): un informado mal cargado —el importe, el medio— se
+  reemplaza por otro. El anterior queda descartado con el motivo, y el corregido
+  conserva la misma presentación y la fecha de pago del comprobante: la fecha de
+  presentación no se corrige. Se puede corregir aunque otro pago ya haya cancelado la multa; lo que
   sobre queda como excedente al verificarlo. Un depósito de recurso se corrige
   como depósito: si se pagó en efectivo, se descarta y se cobra en la caja. Lo ya
   aplicado tiene recibo y no se corrige así: un cobro de la caja [se anula](#anular-cobro)

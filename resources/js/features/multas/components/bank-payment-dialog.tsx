@@ -1,5 +1,4 @@
 import { useForm } from '@inertiajs/react';
-import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import DateInput from '@/components/date-input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,20 +12,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Firmante } from '@/features/multas/components/collect-payment-dialog';
-import CreditPicker from '@/features/multas/components/credit-picker';
 import FormDialog, {
     FieldError,
 } from '@/features/multas/components/form-dialog';
-import ReceiptFields, {
-    receiptPayload,
-    SIN_FIRMANTE,
-} from '@/features/multas/components/receipt-fields';
 import { businessToday, money, parseAmount } from '@/lib/format';
 import { store } from '@/routes/multas/pagos-bancarios';
-import { store as storeVerified } from '@/routes/multas/pagos-bancarios/verificados';
 
-type Credito = App.Modules.Multas.Data.FineBankCreditData;
 type Pago = App.Modules.Multas.Data.FinePaymentData;
 type Medio = 'bank_transfer' | 'direct_deposit' | 'echeq';
 
@@ -37,44 +28,37 @@ const MEDIOS: Record<Medio, string> = {
 };
 
 /**
- * Un pago que llega por el banco (M02).
+ * Un pago que llega por el banco (M02): solo se **informa**.
  *
- * Lo normal es **informarlo**: alguien presentó el comprobante y queda a la
- * espera del crédito, sin tocar el saldo. Quien concilia puede, además,
- * reconocerlo directamente del extracto: elige el crédito y el pago se aplica
- * en el acto, por el importe del crédito, con su recibo.
+ * Alguien presentó el comprobante y el pago queda a la espera del crédito,
+ * sin tocar el saldo. Conciliarlo es otro paso, con «Verificar» en la fila
+ * del pago, igual que en Haberes se carga el comprobante y después se cruza
+ * con el extracto. Informar primero es lo que permite cargar la fecha real
+ * de presentación, que decide el término (M08).
+ *
+ * Un crédito que nadie informó se identifica desde Banco › Movimientos. La
+ * fecha de pago del comprobante se carga con su archivo, en «Comprobante».
  */
 export default function BankPaymentDialog({
     fineId,
-    canVerify,
-    creditos,
-    firmantes,
     idempotencyKey,
     corrige,
     onClose,
 }: {
     fineId: number;
-    canVerify: boolean;
-    creditos?: Credito[];
-    firmantes: Firmante[];
     idempotencyKey: string;
     /** El pago informado que se corrige, si es una corrección. */
     corrige?: Pago;
     onClose: () => void;
 }) {
-    const [delExtracto, setDelExtracto] = useState(false);
     const hoy = businessToday();
     const { data, setData, post, transform, processing, errors } = useForm({
         medium: (corrige?.medium ?? 'bank_transfer') as Medio,
         amount: corrige ? money(corrige.amount, { symbol: false }) : '',
         presentedOn: hoy,
         presentationEvidence: '',
-        declaredPaidOn: corrige?.declaredPaidOn ?? '',
         judicial: Boolean(corrige?.judicialReference),
         judicialReference: corrige?.judicialReference ?? '',
-        bankTransactionId: null as number | null,
-        talonarioNumber: '',
-        signedById: SIN_FIRMANTE,
         correctionReason: '',
     });
     const errores = errors as Record<string, string | undefined>;
@@ -87,22 +71,6 @@ export default function BankPaymentDialog({
                 ? data.judicialReference.trim()
                 : null;
 
-        if (delExtracto) {
-            transform((datos) => ({
-                medium: datos.medium,
-                bankTransactionId: datos.bankTransactionId,
-                judicialReference: judicial,
-                ...receiptPayload(datos.talonarioNumber, datos.signedById),
-                idempotencyKey,
-            }));
-            post(storeVerified(fineId).url, {
-                preserveScroll: true,
-                onSuccess: onClose,
-            });
-
-            return;
-        }
-
         transform((datos) => ({
             medium: datos.medium,
             amount: parseAmount(datos.amount),
@@ -110,7 +78,6 @@ export default function BankPaymentDialog({
             presentationEvidence: atrasado
                 ? datos.presentationEvidence.trim()
                 : null,
-            declaredPaidOn: datos.declaredPaidOn || null,
             judicialReference: judicial,
             ...(corrige
                 ? {
@@ -129,39 +96,13 @@ export default function BankPaymentDialog({
             description={
                 corrige
                     ? 'El informado se descarta con el motivo y queda este en su lugar, con la misma presentación.'
-                    : delExtracto
-                      ? 'Elegí el crédito del extracto que trajo el pago. Se aplica en el acto, por el importe del crédito, y sale el recibo.'
-                      : 'El pago queda informado hasta verificarlo contra el extracto: todavía no reduce el saldo.'
+                    : 'El pago queda informado hasta verificarlo contra el extracto: todavía no reduce el saldo.'
             }
             onClose={onClose}
             onSubmit={enviar}
             processing={processing}
-            submitLabel={
-                corrige
-                    ? 'Corregir'
-                    : delExtracto
-                      ? 'Verificar y emitir recibo'
-                      : 'Informar'
-            }
+            submitLabel={corrige ? 'Corregir' : 'Informar'}
         >
-            {canVerify && (
-                <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
-                    <Checkbox
-                        className="mt-0.5"
-                        checked={delExtracto}
-                        onCheckedChange={(v) => setDelExtracto(v === true)}
-                    />
-                    <span>
-                        <span className="font-medium">
-                            El crédito ya está en el extracto
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Se identifica y se verifica en el mismo acto.
-                        </span>
-                    </span>
-                </label>
-            )}
-
             <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                     <Label htmlFor="banco-medio">Medio</Label>
@@ -182,113 +123,65 @@ export default function BankPaymentDialog({
                     </Select>
                     <FieldError message={errors.medium} />
                 </div>
-                {!delExtracto && (
-                    <div>
-                        <Label htmlFor="banco-importe">Importe</Label>
-                        <div className="mt-1">
-                            <AmountInput
-                                id="banco-importe"
-                                value={data.amount}
-                                onChange={(v) => setData('amount', v)}
-                                placeholder="0,00"
-                                aria-invalid={Boolean(errors.amount)}
-                            />
-                        </div>
-                        <FieldError message={errors.amount} />
+                <div>
+                    <Label htmlFor="banco-importe">Importe</Label>
+                    <div className="mt-1">
+                        <AmountInput
+                            id="banco-importe"
+                            value={data.amount}
+                            onChange={(v) => setData('amount', v)}
+                            placeholder="0,00"
+                            aria-invalid={Boolean(errors.amount)}
+                        />
                     </div>
-                )}
+                    <FieldError message={errors.amount} />
+                </div>
             </div>
 
-            {delExtracto ? (
-                <>
-                    <CreditPicker
-                        prop="creditosDisponibles"
-                        param="disponible"
-                        creditos={creditos}
-                        selected={data.bankTransactionId}
-                        onSelect={(id) => setData('bankTransactionId', id)}
-                        emptyText="No hay créditos posteriores a la apertura que coincidan y estén libres."
-                        error={errors.bankTransactionId}
-                    />
-                    <ReceiptFields
-                        idPrefix="banco"
-                        talonarioNumber={data.talonarioNumber}
-                        onTalonarioChange={(v) => setData('talonarioNumber', v)}
-                        signedById={data.signedById}
-                        onSignedByChange={(v) => setData('signedById', v)}
-                        firmantes={firmantes}
-                        errors={errors}
-                    />
-                </>
-            ) : (
-                <>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        {!corrige && (
-                            <div>
-                                <Label
-                                    htmlFor="banco-presentado"
-                                    className="block sm:min-h-8"
-                                >
-                                    Presentado el
-                                </Label>
-                                <DateInput
-                                    id="banco-presentado"
-                                    className="mt-1"
-                                    max={hoy}
-                                    value={data.presentedOn}
-                                    onChange={(e) =>
-                                        setData('presentedOn', e.target.value)
-                                    }
-                                    aria-invalid={Boolean(errors.presentedOn)}
-                                />
-                                <FieldError message={errors.presentedOn} />
-                            </div>
-                        )}
-                        <div>
-                            <Label
-                                htmlFor="banco-pagado"
-                                className="block sm:min-h-8"
-                            >
-                                Pagado el (según el comprobante)
-                            </Label>
-                            <DateInput
-                                id="banco-pagado"
-                                className="mt-1"
-                                max={hoy}
-                                value={data.declaredPaidOn}
-                                onChange={(e) =>
-                                    setData('declaredPaidOn', e.target.value)
-                                }
-                                aria-invalid={Boolean(errors.declaredPaidOn)}
-                            />
-                            <FieldError message={errors.declaredPaidOn} />
-                        </div>
+            {!corrige && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <Label htmlFor="banco-presentado">Presentado el</Label>
+                        <DateInput
+                            id="banco-presentado"
+                            className="mt-1"
+                            max={hoy}
+                            value={data.presentedOn}
+                            onChange={(e) =>
+                                setData('presentedOn', e.target.value)
+                            }
+                            aria-invalid={Boolean(errors.presentedOn)}
+                            aria-describedby="banco-presentado-ayuda"
+                        />
+                        <p
+                            id="banco-presentado-ayuda"
+                            className="mt-1 text-xs text-muted-foreground"
+                        >
+                            Día en que se avisó el pago a la Secretaría. Define
+                            si está en término.
+                        </p>
+                        <FieldError message={errors.presentedOn} />
                     </div>
-                    {atrasado && (
-                        <div>
-                            <Label htmlFor="banco-respaldo">
-                                Respaldo de la presentación
-                            </Label>
-                            <Input
-                                id="banco-respaldo"
-                                className="mt-1"
-                                maxLength={300}
-                                value={data.presentationEvidence}
-                                onChange={(e) =>
-                                    setData(
-                                        'presentationEvidence',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Sello de Mesa de Entradas, nota de la empresa…"
-                                aria-invalid={Boolean(
-                                    errors.presentationEvidence,
-                                )}
-                            />
-                            <FieldError message={errors.presentationEvidence} />
-                        </div>
-                    )}
-                </>
+                </div>
+            )}
+            {atrasado && (
+                <div>
+                    <Label htmlFor="banco-respaldo">
+                        Respaldo de la presentación
+                    </Label>
+                    <Input
+                        id="banco-respaldo"
+                        className="mt-1"
+                        maxLength={300}
+                        value={data.presentationEvidence}
+                        onChange={(e) =>
+                            setData('presentationEvidence', e.target.value)
+                        }
+                        placeholder="Sello de Mesa de Entradas, nota de la empresa…"
+                        aria-invalid={Boolean(errors.presentationEvidence)}
+                    />
+                    <FieldError message={errors.presentationEvidence} />
+                </div>
             )}
 
             {transferencia && (

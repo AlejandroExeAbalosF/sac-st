@@ -124,6 +124,19 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            /*
+             * Al verificar, el diálogo propone los créditos del importe entero.
+             * Buscar a mano en todo el extracto queda fuera de la operación
+             * diaria (decisión del usuario, 12/11/2026): el prefijo `dev.` lo
+             * deja fuera del comodín del administrador, solo para super-admin.
+             */
+            new PermissionDefinition(
+                'dev.buscar-creditos-multas',
+                'Buscar créditos a mano al verificar un pago de multas',
+                'Buscar en el extracto, además de los créditos que el diálogo propone, al verificar un pago de multas. Solo lo tiene super-admin.',
+                'desarrollo',
+                ['super-admin'],
+            ),
             // Registrar un rechazo cambia lo que la caja y el banco dicen tener,
             // y lo que se imputa del extracto es conciliación: quien concilia.
             // Recibir el reemplazo es un cobro de mostrador (`multas.cobrar`).

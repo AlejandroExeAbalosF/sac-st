@@ -1231,6 +1231,11 @@ declare namespace App {
                     caseLabel: string;
                     debt: string;
                 };
+                export type FineCreditCandidateData = {
+                    credit: App.Modules.Multas.Data.FineBankCreditData;
+                    signals: Record<string, string>;
+                    payerMatches: boolean;
+                };
                 export type FineDebtEntryData = {
                     id: number;
                     kind: App.Modules.Multas.Enums.FineDebtEntryKind;

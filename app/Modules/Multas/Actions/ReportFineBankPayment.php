@@ -120,7 +120,13 @@ final class ReportFineBankPayment
                 'amount' => $importe,
                 ...$presentacion,
                 'reported_at' => $ahora,
-                'declared_paid_on' => $declaredPaidOn?->toDateString(),
+                /*
+                 * La fecha del comprobante se carga con su archivo, en
+                 * `RecordFinePaymentProof`: una corrección la conserva si no
+                 * trae otra.
+                 */
+                'declared_paid_on' => $declaredPaidOn?->toDateString()
+                    ?? $replaces?->declared_paid_on?->toDateString(),
                 'payer_person_id' => $multa->person_id,
                 'payer_name' => $multa->caption,
                 'replaces_fine_payment_id' => $replaces?->id,

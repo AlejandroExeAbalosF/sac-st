@@ -28,6 +28,7 @@ use App\Modules\Multas\Support\FineBankCredits;
 use App\Modules\Shared\Enums\AttachmentSubject;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Models\Person;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
@@ -253,6 +254,150 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $adjunto = Attachment::query()->sole();
         expect($adjunto->subject_type)->toBe(AttachmentSubject::FinePayment)
             ->and($adjunto->subject_id)->toBe($pago->id);
+    }
+
+    /** La fecha del comprobante se carga con su archivo, o sola, y se corrige mientras el pago está informado. */
+    public function test_the_paid_date_comes_with_the_proof_while_the_payment_is_reported(): void
+    {
+        $multa = $this->escenario();
+        $pago = $this->informar($multa, '100.00');
+        $this->actingAs($this->operador());
+
+        // Sin fecha ni archivo no hay nada que guardar.
+        $this->post(route('multas.pagos.comprobante.store', $pago), [])->assertSessionHasErrors('file');
+
+        $this->post(route('multas.pagos.comprobante.store', $pago), ['declaredPaidOn' => '2026-06-08'])
+            ->assertSessionHasNoErrors();
+        expect($pago->refresh()->declared_paid_on?->toDateString())->toBe('2026-06-08')
+            ->and(Attachment::query()->count())->toBe(0);
+
+        // Se corrige junto con el archivo, en el mismo acto.
+        $this->post(route('multas.pagos.comprobante.store', $pago), [
+            'declaredPaidOn' => '2026-06-09', 'file' => UploadedFile::fake()->image('transferencia.jpg'),
+        ])->assertSessionHasNoErrors();
+        expect($pago->refresh()->declared_paid_on?->toDateString())->toBe('2026-06-09')
+            ->and(Attachment::query()->sole()->subject_id)->toBe($pago->id);
+
+        // Cada cambio queda auditado, con la fecha anterior y la nueva.
+        $cambios = DB::table('audit_events')->where('action', 'multa.fecha-de-pago-cargada')->orderBy('id')->pluck('metadata')
+            ->map(fn (string $m): array => json_decode($m, true, flags: JSON_THROW_ON_ERROR))->all();
+        expect($cambios)->toHaveCount(2)
+            ->and($cambios[0])->toMatchArray(['antes' => null, 'despues' => '2026-06-08'])
+            ->and($cambios[1])->toMatchArray(['antes' => '2026-06-08', 'despues' => '2026-06-09']);
+    }
+
+    /** Verificado, la fecha queda con el pago y su recibo: solo se suma otro archivo. */
+    public function test_a_verified_payment_keeps_its_paid_date(): void
+    {
+        $multa = $this->escenario();
+        $credito = $this->movimiento($this->laCuenta, '2026-06-10', '300000.00');
+        $pago = $this->informar($multa, '300000.00');
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.verify', $pago), ['bankTransactionId' => $credito->id])
+            ->assertSessionHasNoErrors();
+
+        $this->post(route('multas.pagos.comprobante.store', $pago), ['declaredPaidOn' => '2026-06-08'])
+            ->assertSessionHasErrors('declaredPaidOn');
+        $this->post(route('multas.pagos.comprobante.store', $pago), ['file' => UploadedFile::fake()->image('transferencia.jpg')])
+            ->assertSessionHasNoErrors();
+
+        expect($pago->refresh()->declared_paid_on)->toBeNull()
+            ->and(Attachment::query()->count())->toBe(1);
+    }
+
+    /** La base: de un pago solo cambia la fecha del comprobante, y solo mientras está informado. */
+    public function test_the_database_lets_only_the_paid_date_change_while_reported(): void
+    {
+        $multa = $this->escenario();
+        $credito = $this->movimiento($this->laCuenta, '2026-06-10', '300000.00');
+        $pago = $this->informar($multa, '300000.00');
+
+        $pago->forceFill(['declared_paid_on' => '2026-06-08'])->save();
+        expect($pago->refresh()->declared_paid_on?->toDateString())->toBe('2026-06-08');
+
+        $this->rechaza('no se editan', fn () => $pago->forceFill(['amount' => '1.00'])->save());
+
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.verify', $pago), ['bankTransactionId' => $credito->id])
+            ->assertSessionHasNoErrors();
+
+        $this->rechaza('mientras el pago está informado', fn () => $pago->refresh()->forceFill(['declared_paid_on' => '2026-06-09'])->save());
+    }
+
+    /**
+     * Al verificar se proponen los créditos del importe entero: primero el del
+     * CUIT de la persona de la multa, después los más cercanos a la fecha del
+     * comprobante. Los de otro importe o ya usados no se proponen.
+     */
+    public function test_verifying_proposes_the_credits_that_match_the_payment(): void
+    {
+        $multa = $this->escenario();
+        $persona = Person::query()->create(['type' => 'company', 'legal_name' => 'CRISTOMAX S.A.S', 'document' => '30712345678', 'is_active' => true]);
+        $this->actingAs($this->operador())->post(route('multas.revisiones.store', $multa), [
+            'caption' => 'CRISTOMAX S.A.S', 'personId' => $persona->id, 'registeredOn' => '2026-05-07',
+            'expected' => ['caption' => 'CRISTOMAX S.A.S', 'personId' => null, 'registeredOn' => '2026-05-07'],
+        ])->assertSessionHasNoErrors();
+
+        $lejano = $this->movimiento($this->laCuenta, '2026-06-20', '300000.00');
+        $cercano = $this->movimiento($this->laCuenta, '2026-06-09', '300000.00');
+        $delPagador = $this->movimiento($this->laCuenta, '2026-06-25', '300000.00');
+        $delPagador->forceFill(['counterparty_identifier' => '30-71234567-8'])->save();
+        $this->movimiento($this->laCuenta, '2026-06-08', '299999.00');
+
+        $pago = $this->informar($multa->refresh(), '300000.00');
+        $this->post(route('multas.pagos.comprobante.store', $pago), ['declaredPaidOn' => '2026-06-08'])->assertSessionHasNoErrors();
+
+        $candidatos = app(FineBankCredits::class)->candidatesFor($pago->refresh());
+
+        // La ficha los entrega al abrir «Verificar», en una recarga parcial.
+        $version = $this->get(route('multas.show', $multa->showParameters()))->viewData('page')['version'];
+        $this->get(route('multas.show', [...$multa->showParameters(), 'candidatos' => $pago->id]), [
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'multas/show',
+            'X-Inertia-Partial-Data' => 'candidatosDelPago',
+            'X-Inertia-Version' => $version,
+        ])
+            ->assertJsonCount(3, 'props.candidatosDelPago')
+            ->assertJsonPath('props.candidatosDelPago.0.credit.id', $delPagador->id);
+
+        expect(array_map(fn ($c) => $c->credit->id, $candidatos))->toBe([$delPagador->id, $cercano->id, $lejano->id])
+            ->and($candidatos[0]->payerMatches)->toBeTrue()
+            ->and($candidatos[0]->signals['CUIT del concepto'])->toContain('es el de la persona de la multa')
+            ->and($candidatos[1]->signals)->toMatchArray(['importe' => 'exacto', 'fecha' => 'un día después del pago según el comprobante']);
+
+        // Ya verificado, el pago no tiene candidatos.
+        $this->actingAs($this->operador('contador'))
+            ->post(route('multas.pagos.verify', $pago), ['bankTransactionId' => $cercano->id])
+            ->assertSessionHasNoErrors();
+        expect(app(FineBankCredits::class)->candidatesFor($pago->refresh()))->toBe([]);
+    }
+
+    /** Buscar a mano en el extracto al verificar es solo de super-admin: el administrador no lo hereda. */
+    public function test_only_super_admin_searches_credits_by_hand(): void
+    {
+        $multa = $this->escenario();
+
+        foreach (['contador' => false, 'administrador' => false, 'super-admin' => true] as $rol => $puede) {
+            $this->actingAs($this->operador($rol))
+                ->get(route('multas.show', $multa->showParameters()))
+                ->assertInertia(fn (Assert $page) => $page->where('can.searchCredits', $puede));
+        }
+    }
+
+    /** Una corrección conserva la fecha del comprobante del informado que reemplaza. */
+    public function test_a_correction_keeps_the_paid_date(): void
+    {
+        $multa = $this->escenario();
+        $anterior = $this->informar($multa, '30000.00');
+        $this->actingAs($this->operador())
+            ->post(route('multas.pagos.comprobante.store', $anterior), ['declaredPaidOn' => '2026-06-08'])
+            ->assertSessionHasNoErrors();
+
+        $this->post(route('multas.pagos-bancarios.store', $multa), [
+            ...$this->informe('300000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'Faltaba un cero en el importe',
+        ])->assertSessionHasNoErrors();
+
+        expect(FinePayment::query()->latest('id')->firstOrFail()->declared_paid_on?->toDateString())->toBe('2026-06-08');
     }
 
     // ── Corregir un informado ───────────────────────────────────────────

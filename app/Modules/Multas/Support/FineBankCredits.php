@@ -11,11 +11,16 @@ use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\CashBookOpening;
 use App\Modules\Multas\Data\FineBankCreditData;
+use App\Modules\Multas\Data\FineCreditCandidateData;
 use App\Modules\Multas\Enums\FinePaymentStatus;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Models\CashBox;
+use App\Modules\Shared\Models\Person;
+use App\Support\BusinessDate;
 use App\Support\Database\Like;
 use App\Support\Money\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -94,6 +99,102 @@ final class FineBankCredits
         }
 
         return $this->buscar($this->pending($apertura), $termino, $limite);
+    }
+
+    /**
+     * Los créditos que pueden respaldar un pago informado, los más probables
+     * primero, para que quien verifica no tenga que buscarlos.
+     *
+     * Filtro duro: libres, desde la apertura y **por el importe entero** del
+     * pago, como exige verificar (P14 provisorio). Lo demás ordena: primero el
+     * CUIT del concepto que es el de la persona de la multa, después la
+     * cercanía a la fecha del comprobante —o a la presentación, si no se
+     * cargó—. Proponer no identifica: elige una persona, y el Action vuelve a
+     * controlar todo.
+     *
+     * @return list<FineCreditCandidateData>
+     */
+    public function candidatesFor(FinePayment $pago, int $limite = 10): array
+    {
+        $apertura = $this->book();
+
+        if ($apertura === null || $pago->status !== FinePaymentStatus::Reported) {
+            return [];
+        }
+
+        $conFecha = $pago->declared_paid_on !== null;
+        $referencia = $conFecha
+            ? CarbonImmutable::parse($pago->declared_paid_on->toDateString())
+            : ($pago->presented_at === null ? null : BusinessDate::fromInstant($pago->presented_at));
+        $documento = $pago->payer_person_id === null
+            ? null
+            : Person::query()->whereKey($pago->payer_person_id)->value('document');
+
+        $candidatos = $this->pending($apertura)
+            ->where('amount', $pago->amount)
+            ->orderByDesc('transaction_date')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (BankTransaction $credito): array => $this->candidato($credito, $referencia, $conFecha, $documento))
+            ->sortBy([
+                fn (array $a, array $b): int => $b['candidato']->payerMatches <=> $a['candidato']->payerMatches,
+                fn (array $a, array $b): int => $a['distancia'] <=> $b['distancia'],
+            ])
+            ->take($limite)
+            ->pluck('candidato')
+            ->all();
+
+        return array_values($candidatos);
+    }
+
+    /**
+     * @return array{candidato: FineCreditCandidateData, distancia: int}
+     */
+    private function candidato(BankTransaction $credito, ?CarbonImmutable $referencia, bool $conFecha, ?string $documento): array
+    {
+        $senales = ['importe' => 'exacto'];
+        $distancia = PHP_INT_MAX;
+
+        if ($referencia !== null && $credito->transaction_date !== null) {
+            $dias = (int) $referencia->diffInDays(CarbonImmutable::parse($credito->transaction_date->toDateString()), false);
+            $distancia = abs($dias);
+            $base = $conFecha ? 'del pago según el comprobante' : 'de la presentación';
+            $senales['fecha'] = match (true) {
+                $dias === 0 => "el mismo día {$base}",
+                $dias === 1 => "un día después {$base}",
+                $dias > 1 => "{$dias} días después {$base}",
+                $dias === -1 => "un día antes {$base}",
+                default => abs($dias)." días antes {$base}",
+            };
+        }
+
+        /*
+         * El CUIT del concepto contra el de la persona de la multa. Que no
+         * coincida no descarta el crédito —puede pagar el estudio contable o
+         * una empresa vinculada—, pero quien verifica tiene que verlo.
+         */
+        $cuit = $credito->counterparty_identifier;
+        $coincide = false;
+
+        if ($cuit !== null) {
+            $coincide = $documento !== null && $this->digitos($cuit) === $this->digitos($documento);
+            $senales['CUIT del concepto'] = $cuit.match (true) {
+                $coincide => ' — es el de la persona de la multa',
+                $documento === null => ' — la multa no tiene persona con documento',
+                default => ' — no es el de la persona de la multa',
+            };
+        }
+
+        return [
+            'candidato' => new FineCreditCandidateData(FineBankCreditData::fromModel($credito), $senales, $coincide),
+            'distancia' => $distancia,
+        ];
+    }
+
+    private function digitos(string $valor): string
+    {
+        return (string) preg_replace('/\D/', '', $valor);
     }
 
     /**

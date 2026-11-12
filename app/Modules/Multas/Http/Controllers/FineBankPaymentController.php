@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Multas\Actions\AttachFineFile;
 use App\Modules\Multas\Actions\CorrectVerifiedFinePayment;
 use App\Modules\Multas\Actions\DiscardFinePayment;
+use App\Modules\Multas\Actions\RecordFinePaymentProof;
 use App\Modules\Multas\Actions\RecordVerifiedFineBankPayment;
 use App\Modules\Multas\Actions\ReportFineBankPayment;
 use App\Modules\Multas\Actions\VerifyFineBankPayment;
@@ -18,6 +19,7 @@ use App\Modules\Multas\Http\Requests\ReasonRequest;
 use App\Modules\Multas\Http\Requests\RecordVerifiedFineBankPaymentRequest;
 use App\Modules\Multas\Http\Requests\ReportFineBankPaymentRequest;
 use App\Modules\Multas\Http\Requests\StoreFineAttachmentRequest;
+use App\Modules\Multas\Http\Requests\StoreFinePaymentProofRequest;
 use App\Modules\Multas\Http\Requests\VerifyFineBankPaymentRequest;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FinePayment;
@@ -152,6 +154,28 @@ final class FineBankPaymentController extends Controller
         $adjuntar->handle($payment, $archivo, $request->validated('title'), $request->user()?->id);
 
         Toast::success('Comprobante agregado al pago.');
+
+        return back();
+    }
+
+    /** La fecha de pago del comprobante y su archivo, juntos o por separado. */
+    public function proof(StoreFinePaymentProofRequest $request, FinePayment $payment, RecordFinePaymentProof $registrar): RedirectResponse
+    {
+        $this->puedeInformar($request);
+
+        $fecha = $request->validated('declaredPaidOn');
+        $archivo = $request->file('file');
+
+        $registrar->handle(
+            $payment,
+            conFecha: $request->has('declaredPaidOn'),
+            pagadoEl: is_string($fecha) ? CarbonImmutable::parse($fecha) : null,
+            archivo: $archivo instanceof UploadedFile ? $archivo : null,
+            title: $request->validated('title'),
+            actorId: $request->user()?->id,
+        );
+
+        Toast::success('Comprobante del pago actualizado.');
 
         return back();
     }

@@ -285,6 +285,16 @@ final class FineController extends Controller
              */
             'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),
             /*
+             * Los créditos más probables para un pago informado de esta
+             * multa, al abrir «Verificar»: el importe entero, el CUIT y la
+             * cercanía a la fecha del comprobante.
+             */
+            'candidatosDelPago' => Inertia::optional(function () use ($request, $fine, $creditos): array {
+                $pago = FinePayment::query()->where('fine_id', $fine->id)->find($request->integer('candidatos'));
+
+                return $pago === null ? [] : $creditos->candidatesFor($pago);
+            }),
+            /*
              * Las multas a las que puede pasar un pago verificado, y el crédito
              * que ya lo respalda, para corregirlo. También al buscar.
              */
@@ -342,6 +352,8 @@ final class FineController extends Controller
                 'reportBank' => $cobra || $verifica,
                 // Verificar contra el extracto exige la caja abierta con su cuenta.
                 'verifyBank' => $verifica && $cajaAbierta && $creditos->book() !== null,
+                // Buscar a mano en el extracto al verificar, además de lo propuesto: solo super-admin.
+                'searchCredits' => $usuario?->can('dev.buscar-creditos-multas') ?? false,
                 // Depositar lo cobrado y confirmar su acreditación, con la cuenta del libro.
                 'deposit' => $deposita && $creditos->book() !== null,
                 'confirmDeposit' => $verifica,

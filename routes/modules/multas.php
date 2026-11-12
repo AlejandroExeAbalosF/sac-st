@@ -187,6 +187,7 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
     Route::middleware('can:multas.ver')->group(function (): void {
         Route::post('{fine}/pagos-bancarios', [FineBankPaymentController::class, 'store'])->whereNumber('fine')->name('pagos-bancarios.store');
         Route::post('pagos/{payment}/adjuntos', [FineBankPaymentController::class, 'attach'])->whereNumber('payment')->name('pagos.adjuntos.store');
+        Route::post('pagos/{payment}/comprobante', [FineBankPaymentController::class, 'proof'])->whereNumber('payment')->name('pagos.comprobante.store');
         Route::post('{fine}/recursos', [FineAppealController::class, 'store'])->whereNumber('fine')->name('recursos.store');
     });
 
