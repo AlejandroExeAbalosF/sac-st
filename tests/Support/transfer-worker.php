@@ -20,6 +20,7 @@ use App\Modules\Banking\Models\ChequeRejection;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
+use App\Modules\Multas\Actions\ConsolidateFineImportRow;
 use App\Modules\Multas\Actions\CorrectVerifiedFinePayment;
 use App\Modules\Multas\Actions\DepositFineCollection;
 use App\Modules\Multas\Actions\RecordFineChequeMovements;
@@ -31,6 +32,7 @@ use App\Modules\Multas\Enums\AppealKind;
 use App\Modules\Multas\Enums\FinePaymentMedium;
 use App\Modules\Multas\Enums\FineReasonCode;
 use App\Modules\Multas\Models\Fine;
+use App\Modules\Multas\Models\FineImportRow;
 use App\Modules\Multas\Models\FinePayment;
 use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
@@ -137,6 +139,10 @@ try {
             'worker-cheque-credit-'.$input['tag'], $input['actor'],
         );
         $result = ['status' => 'done', 'bank' => $rechazo->bank_status->value];
+    } elseif ($input['mode'] === 'consolidate-import-row') {
+        // Consolidar una fila de la planilla mientras otro lote consolida la misma multa.
+        $hecho = app(ConsolidateFineImportRow::class)->handle(FineImportRow::query()->findOrFail($input['row']), $input['actor']);
+        $result = ['status' => 'done', 'consolidated' => $hecho];
     } elseif ($input['mode'] === 'void') {
         // Anular un cobro mientras otro lo deposita.
         app(VoidFineCollection::class)->handle(

@@ -53,6 +53,7 @@ const RUTAS_SIN_PANTALLA = [
     'aranceles.cobros.preview',
     'configuracion.auditoria.exportar',
     'multas.exportar',
+    'multas.importaciones.export',
     'multas.movimientos.exportar',
     'multas.rendiciones.pdf',
     'multas.rendiciones.view',

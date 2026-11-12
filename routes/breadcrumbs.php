@@ -11,6 +11,7 @@ use App\Modules\Haberes\Models\Haber;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Models\Fine;
 use App\Modules\Multas\Models\FineCase;
+use App\Modules\Multas\Models\FineImportBatch;
 use App\Modules\Multas\Models\FinePayment;
 use App\Support\Navigation\Breadcrumbs;
 use App\Support\Navigation\Crumb;
@@ -405,6 +406,17 @@ Breadcrumbs::for('multas.caja.cuentas.index', fn (): array => [
     Crumb::make('Multas', (auth()->user()?->can('multas.ver') ?? false) ? route('multas.index') : null),
     Crumb::make('Caja del día', route('multas.caja.dia')),
     Crumb::make('Cuentas de la caja'),
+]);
+
+Breadcrumbs::for('multas.importaciones.index', fn (): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Importar planilla'),
+]);
+
+Breadcrumbs::for('multas.importaciones.show', fn (FineImportBatch $batch): array => [
+    Crumb::make('Multas', route('multas.index')),
+    Crumb::make('Importar planilla', route('multas.importaciones.index')),
+    Crumb::make("N.º {$batch->id}"),
 ]);
 
 Breadcrumbs::for('multas.pendientes.index', fn (): array => [

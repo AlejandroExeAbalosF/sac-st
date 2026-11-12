@@ -318,7 +318,8 @@ final class ApplyFinePayment
 
         $previos = FineHistoricalMovement::query()
             ->where('fine_id', $multa->id)
-            ->where('status', HistoricalMovementStatus::Validated)
+            // Los que cuentan en el saldo: validados, o importados de la planilla.
+            ->whereIn('status', [HistoricalMovementStatus::Validated, HistoricalMovementStatus::Provisional])
             ->where('kind', HistoricalMovementKind::Payment)
             ->orderBy('occurred_on')
             ->get()

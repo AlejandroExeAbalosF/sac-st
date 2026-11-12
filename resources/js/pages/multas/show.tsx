@@ -1287,8 +1287,10 @@ export default function MultaShow({
                                                     </Button>
                                                 )}
                                             {can.adjust &&
-                                                antecedente.status ===
-                                                    'pending_review' && (
+                                                (antecedente.status ===
+                                                    'pending_review' ||
+                                                    antecedente.status ===
+                                                        'provisional') && (
                                                     <>
                                                         <Button
                                                             size="sm"

@@ -181,7 +181,7 @@ No hay `fines.category`: el tipo laboral / higiene y seguridad vive en el acta
 
 ```text
 obligation         = constitución + aumentos − reducciones ± reversiones
-historical_paid    = pagos anteriores validados − devoluciones anteriores validadas
+historical_paid    = pagos anteriores que cuentan − devoluciones anteriores que cuentan
 operational_paid   = suma de fine_payment_applications.amount (cada recepción entera)
 debt               = max(obligation − operational_paid − historical_paid, 0)
 excess             = max(operational_paid + historical_paid − obligation, 0)
@@ -189,27 +189,82 @@ operational_excess = max(operational_paid − max(obligation − historical_paid
 ```
 
 El histórico consume la obligación primero porque es anterior: `operational_excess`
-es la parte del excedente hecha de plata que está en el libro.
+es la parte del excedente hecha de plata que está en el libro. Cuentan los
+antecedentes `validated` y los `provisional` de la [importación](#importacion).
 
 <a id="antecedentes"></a>
 
 ## Pagos anteriores al sistema
 
 - No generan `financial_events`.
-- Cuentan en el saldo solo validados. Se revisan una vez y la revisión no modifica
-  sus datos; descartar exige motivo. **Base:** `fine_historical_review_once` y CHECK.
-- Una devolución se valida solo si la cubren pagos anteriores ya validados de la
-  misma multa: si no, la multa terminaría debiendo más que su obligación. Queda
-  pendiente hasta que se valide el pago que devuelve. **Base:**
+- Cuentan en el saldo validados o provisionales. Se revisan una vez —de pendiente o
+  provisional a validado o descartado— y la revisión no modifica sus datos;
+  descartar exige motivo. **Base:** `fine_historical_review_once` y
+  `fine_historical_movements_reviewed_check`.
+- Una devolución cuenta solo si la cubren pagos anteriores que cuentan en la misma
+  multa: si no, la multa terminaría debiendo más que su obligación. Queda pendiente
+  hasta que se valide el pago que devuelve. **Base:**
   `fine_historical_refund_covered`, con bloqueo de la multa.
+- Validar un provisional no reclasifica nada: ya contaba. Rechazarlo baja lo pagado,
+  corre la conciliación del excedente y se impide si deja sin cubrir una devolución
+  que cuenta. **Base:** `fine_historical_rejection_keeps_refunds`; **Action:**
+  `ReviewFineHistoricalMovement`.
 - No se borran. **Base.**
+
+<a id="importacion"></a>
+
+## Importación de la planilla histórica
+
+Circuito en [multas.md › Importar la planilla histórica](multas.md#importacion).
+
+- **Lote.** Pasa `reading → ready | failed`, `ready | consolidated → consolidating`
+  y `consolidating → consolidated | ready`, nada más; el corte es un mes entero y
+  el hash del archivo tiene forma de SHA-256. **Base:**
+  `fine_import_batches_guard`, `fine_import_batches_cutoff_check` y
+  `fine_import_batches_sha_check`. Que haya apertura y que el corte sea su mes lo
+  pone el **Action** (`StartFineImport`); lo que la base mira al grabar un pago es la
+  apertura misma (`fine_historical_import_guard`).
+- **Lo que dijo el archivo no cambia.** Las celdas originales, los datos
+  normalizados, la clave de identidad y el tipo de fila no se editan; los problemas y
+  la fila anterior solo se agregan al final, y solo mientras el lote se lee. Un pie
+  de control no tiene identidad ni multa. **Base:** `fine_import_rows_guard`,
+  `fine_import_rows_footer_check`.
+- **Decisiones.** Una por problema y fila, sobre un problema que bloquea esa fila, con
+  una acción que ese problema admite; excluir pide motivo; vincular y elegir
+  expediente llevan su destino. **Base:** `fine_import_resolutions_guard`,
+  `fine_import_action_allowed` y los CHECK de `fine_import_resolutions`; **Action:**
+  `ResolveFineImportIssue` (que el destino sea uno de los candidatos que encontró el
+  importador, y que «agregar meses» solo valga cuando cambiaron solo meses), y
+  `ResolveFineImportIssueInBulk`, solo para los problemas de total y saldo
+  (`FineImportIssue::bulk()`).
+- **Consolidación.** Una fila recibe su multa una vez, solo mientras el lote
+  consolida, sin exclusión y con todos sus bloqueos resueltos. **Base:**
+  `fine_import_rows_guard`. Una misma identidad no se consolida dos veces, aunque la
+  consoliden dos lotes a la vez: **Base:** `fine_import_rows_one_fine_per_identity`.
+  Que la multa vinculada sea la que se eligió y que no haya asientos ni recibos es
+  del **Action** (`ConsolidateFineImportRow`).
+- **Pagos importados.** Un antecedente con origen `import` lleva su fila
+  (`fine_import_rows`, misma multa) y entra provisional, con precisión de mes y antes
+  del mes del corte; provisional solo puede ser uno importado; hay uno por multa,
+  tipo y mes. **Base:** `fine_historical_movements_import_row_check`,
+  `fine_historical_movements_import_row_fk`,
+  `fine_historical_movements_provisional_check`, `fine_historical_import_guard` y
+  `fine_historical_movements_one_import_per_month`.
+- **Celdas desde el corte.** Nacen pendientes y pasan una vez a identificadas o
+  descartadas, con quién y motivo. **Base:** `fine_import_cells_guard` y
+  `fine_import_cells_resolved_check`.
+- **No se borran.** Lotes, filas, decisiones y celdas. **Base:** los guards de cada
+  tabla.
+- **No relevado con el área:** qué son las actas «RUBRICA» y «OBST», los pagos
+  mayores que la multa (¿intereses?), los sobrepagos y si el corte también vale para
+  los pagos anteriores cargados a mano, que hoy no lo tienen.
 
 <a id="adjuntos"></a>
 
 ## Archivos
 
-- Un archivo de Multas es un `attachments` con sujeto `fine_case`, `fine` o
-  `fine_historical_movement`. **Base:** `attachments_subject_type_check`.
+- Un archivo de Multas es un `attachments` con sujeto `fine_case`, `fine`,
+  `fine_historical_movement` o `fine_import` (la planilla de un lote). **Base:** `attachments_subject_type_check`.
 - No se edita ni se borra. **Base:** `attachments_immutable`; solo el archivo de un
   extracto importado se borra, al revertir la importación.
 - Que el sujeto exista: `subject_id` es polimórfico y no tiene FK, como en el resto

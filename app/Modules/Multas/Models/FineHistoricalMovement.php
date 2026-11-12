@@ -35,6 +35,7 @@ use Illuminate\Support\Carbon;
  * @property FineReasonCode|null $review_reason_code
  * @property string|null $review_note
  * @property FineProvenance $provenance
+ * @property int|null $import_row_id La fila de la planilla que lo trajo, si se importó.
  * @property int|null $created_by
  * @property Carbon|null $created_at
  * @property-read User|null $creator
@@ -61,6 +62,7 @@ final class FineHistoricalMovement extends Model
         'review_reason_code',
         'review_note',
         'provenance',
+        'import_row_id',
         'created_by',
     ];
 

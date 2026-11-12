@@ -84,6 +84,16 @@ final class MultasPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Trae la cuenta corriente histórica entera: crea multas y pagos
+            // anteriores al sistema. Pocas manos (decisión del 11/11/2026).
+            new PermissionDefinition(
+                'multas.importar',
+                'Importar la planilla histórica de Multas',
+                'Subir la cuenta corriente de Multas en Excel, revisar sus problemas, marcar los pagos posteriores a la apertura y consolidarla. Crea multas y pagos anteriores al sistema, sin asientos ni recibos.',
+                'multas',
+                ['administrador'],
+                sensitive: true,
+            ),
             // Deshace una conciliación ya hecha y mueve dinero entre multas:
             // queda solo en el administrador, y la base lo repite.
             new PermissionDefinition(

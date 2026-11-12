@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Audit;
 
 use App\Modules\Multas\Audit\Subjects\FineCaseSubject;
 use App\Modules\Multas\Audit\Subjects\FineDocumentSubject;
+use App\Modules\Multas\Audit\Subjects\FineImportBatchSubject;
 use App\Modules\Multas\Audit\Subjects\FineSubject;
 use App\Modules\Shared\Audit\AuditActionDefinition;
 use App\Modules\Shared\Audit\AuditCatalog;
@@ -222,6 +223,41 @@ final class MultasAuditCatalog implements AuditCatalogContributor
                 metadata: ['medio' => 'Medio', 'amount' => 'Importe', 'recibo' => 'Recibo', 'reason' => 'Motivo'],
             ),
             new AuditActionDefinition(
+                'multa.importacion-subida',
+                'Se subió la planilla histórica de Multas para importar',
+                'Multas',
+                AuditSeverity::Normal,
+                metadata: ['hojas' => 'Hojas'],
+            ),
+            new AuditActionDefinition(
+                'multa.importacion-leida',
+                'Se terminó de leer la planilla histórica de Multas',
+                'Multas',
+                AuditSeverity::Normal,
+                metadata: ['filas' => 'Filas', 'bloqueadas' => 'Con problemas que bloquean'],
+            ),
+            new AuditActionDefinition(
+                'multa.importacion-resolucion',
+                'Se resolvió un problema de la planilla histórica de Multas',
+                'Multas',
+                AuditSeverity::Normal,
+                metadata: ['fila' => 'Fila', 'problema' => 'Problema', 'accion' => 'Decisión', 'reason' => 'Motivo'],
+            ),
+            new AuditActionDefinition(
+                'multa.importacion-celda',
+                'Se marcó un pago de la planilla posterior a la apertura',
+                'Multas',
+                AuditSeverity::Normal,
+                metadata: ['fila' => 'Celda', 'amount' => 'Importe', 'estado' => 'Estado', 'reason' => 'Nota'],
+            ),
+            new AuditActionDefinition(
+                'multa.importacion-consolidada',
+                'Se consolidó la planilla histórica de Multas',
+                'Multas',
+                AuditSeverity::Critical,
+                metadata: ['consolidadas' => 'Filas consolidadas', 'con_error' => 'Filas con error'],
+            ),
+            new AuditActionDefinition(
                 'multa.pago-bancario-anulado',
                 'Se anuló un pago bancario verificado y su recibo, y el crédito quedó libre',
                 'Multas',
@@ -320,5 +356,6 @@ final class MultasAuditCatalog implements AuditCatalogContributor
         $catalog->registerSubject(new FineCaseSubject);
         $catalog->registerSubject(new FineDocumentSubject);
         $catalog->registerSubject(new FineSubject);
+        $catalog->registerSubject(new FineImportBatchSubject);
     }
 }

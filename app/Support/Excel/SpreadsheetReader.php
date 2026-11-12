@@ -6,6 +6,9 @@ namespace App\Support\Excel;
 
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\Ods;
+use PhpOffice\PhpSpreadsheet\Reader\Xls;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
 
@@ -78,6 +81,100 @@ final class SpreadsheetReader
         $this->assertReadable($path);
 
         return $this->readSpreadsheet($path);
+    }
+
+    /**
+     * Los nombres de las hojas de una planilla, en orden.
+     *
+     * @return list<string>
+     */
+    public function sheetNames(string $path): array
+    {
+        $this->assertReadable($path);
+
+        return array_values($this->readerFor($path)->listWorksheetNames($path));
+    }
+
+    /**
+     * Las celdas con datos de una hoja, sin materializar las vacías.
+     *
+     * Para planillas grandes y con fórmulas, como la cuenta corriente de un
+     * área: una hoja de ocho mil filas por noventa columnas, recorrida celda
+     * por celda, ocupa más de un gigabyte; leyendo solo las que existen, cien
+     * megas. De una fórmula sale el **resultado que guardó Excel**, con la
+     * fórmula al lado; si el archivo no guardó ese resultado, se dice.
+     *
+     * @return list<array{row: int, cells: array<string, array{value: string, formula: string|null, missing: bool}>}>
+     */
+    public function sheetCells(string $path, string $sheet, int $maxColumns): array
+    {
+        $this->assertReadable($path);
+
+        $reader = $this->readerFor($path);
+        $reader->setLoadSheetsOnly([$sheet]);
+        $reader->setReadEmptyCells(false);
+        $reader->setReadFilter(new BoundedReadFilter($this->maxRows + 1, $maxColumns));
+
+        $book = $reader->load($path);
+        $hoja = $book->getActiveSheet();
+        $filas = [];
+
+        foreach ($hoja->getRowIterator() as $fila) {
+            $iterador = $fila->getCellIterator();
+            $iterador->setIterateOnlyExistingCells(true);
+            $celdas = [];
+
+            foreach ($iterador as $celda) {
+                $formula = $celda->isFormula() ? (string) $celda->getValue() : null;
+
+                if ($formula !== null) {
+                    $guardado = $celda->getOldCalculatedValue();
+                    $valor = match (true) {
+                        $guardado === null || $guardado === '' => '',
+                        is_int($guardado) || is_float($guardado) => $this->toDecimalString((float) $guardado),
+                        is_bool($guardado) => $guardado ? '1' : '0',
+                        default => $this->toUtf8(trim(is_scalar($guardado) ? (string) $guardado : '')),
+                    };
+                    $celdas[$celda->getColumn()] = ['value' => $valor, 'formula' => $formula, 'missing' => $guardado === null];
+
+                    continue;
+                }
+
+                $valor = $this->cellToString($celda);
+
+                if ($valor !== '') {
+                    $celdas[$celda->getColumn()] = ['value' => $valor, 'formula' => null, 'missing' => false];
+                }
+            }
+
+            if ($celdas !== []) {
+                $filas[] = ['row' => $fila->getRowIndex(), 'cells' => $celdas];
+            }
+        }
+
+        $book->disconnectWorksheets();
+
+        if ($filas !== [] && $filas[count($filas) - 1]['row'] > $this->maxRows) {
+            throw new RuntimeException(sprintf('La hoja %s tiene más de %s filas con datos.', $sheet, number_format($this->maxRows, 0, ',', '.')));
+        }
+
+        return $filas;
+    }
+
+    private function readerFor(string $path): Xls|Xlsx|Ods
+    {
+        // Por contenido, no por extensión: ver `readSpreadsheet()`.
+        $reader = IOFactory::createReader(IOFactory::identify($path, [
+            IOFactory::READER_XLS,
+            IOFactory::READER_XLSX,
+            IOFactory::READER_ODS,
+        ]));
+
+        if (! $reader instanceof Xls && ! $reader instanceof Xlsx && ! $reader instanceof Ods) {
+            throw new RuntimeException('El archivo no es una planilla de Excel ni de OpenOffice.');
+        }
+
+        return $reader;
     }
 
     private function assertReadable(string $path): void

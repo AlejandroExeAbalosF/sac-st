@@ -19,6 +19,7 @@ use App\Modules\Multas\Http\Controllers\FineDebtController;
 use App\Modules\Multas\Http\Controllers\FineDepositController;
 use App\Modules\Multas\Http\Controllers\FineDocumentController;
 use App\Modules\Multas\Http\Controllers\FineHistoricalMovementController;
+use App\Modules\Multas\Http\Controllers\FineImportController;
 use App\Modules\Multas\Http\Controllers\FineMonthlyReportController;
 use App\Modules\Multas\Http\Controllers\FineMovementController;
 use App\Modules\Multas\Http\Controllers\FinePaymentController;
@@ -158,6 +159,18 @@ Route::middleware(['auth', 'verified'])->prefix('multas')->name('multas.')->grou
 
     Route::middleware('can:multas.anular-cobros')->group(function (): void {
         Route::post('pagos/{payment}/anular', [FinePaymentController::class, 'void'])->whereNumber('payment')->name('pagos.void');
+    });
+
+    // La planilla histórica (Etapa 9): solo el administrador.
+    Route::middleware('can:multas.importar')->group(function (): void {
+        Route::get('importaciones', [FineImportController::class, 'index'])->name('importaciones.index');
+        Route::post('importaciones', [FineImportController::class, 'store'])->name('importaciones.store');
+        Route::get('importaciones/{batch}', [FineImportController::class, 'show'])->whereNumber('batch')->name('importaciones.show');
+        Route::get('importaciones/{batch}/revision.xlsx', [FineImportController::class, 'export'])->whereNumber('batch')->name('importaciones.export');
+        Route::post('importaciones/{batch}/consolidar', [FineImportController::class, 'consolidate'])->whereNumber('batch')->name('importaciones.consolidate');
+        Route::post('importaciones/{batch}/resolver-en-bloque', [FineImportController::class, 'resolveInBulk'])->whereNumber('batch')->name('importaciones.resolve-in-bulk');
+        Route::post('importaciones/filas/{row}/resolver', [FineImportController::class, 'resolve'])->whereNumber('row')->name('importaciones.filas.resolve');
+        Route::post('importaciones/celdas/{cell}/resolver', [FineImportController::class, 'resolveCell'])->whereNumber('cell')->name('importaciones.celdas.resolve');
     });
 
     // Deshace una conciliación ya hecha: solo el administrador.

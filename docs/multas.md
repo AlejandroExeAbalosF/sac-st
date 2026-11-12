@@ -10,7 +10,7 @@ banco, el recurso del 20 %, el depósito al banco de lo cobrado y el cheque
 rechazado con su reemplazo, la caja del día con su arqueo, su cierre y su
 planilla, la identificación de los créditos de la cuenta compartida desde Banco ›
 Movimientos, los pendientes, la consulta operativa del mes y la rendición mensual a
-la SAF.
+la SAF, y la importación de la planilla histórica.
 
 **La barra lateral** tiene cuatro entradas: Expedientes, Caja del día, Pendientes y
 Calendario. La apertura se abre desde el día en que se hizo; los cierres, la
@@ -86,6 +86,7 @@ Para otra combinación está el «Agregar multa» de la cabecera, que es libre.
 | Calendario | `/multas/caja/calendario` | `multas.caja.ver` |
 | Movimientos del mes | `/multas/movimientos` | `multas.ver` |
 | Rendiciones | `/multas/rendiciones` | `multas.ver`; emitir, `multas.rendicion.emitir` |
+| Importar la planilla histórica | `/multas/importaciones` | `multas.importar` |
 
 <a id="listado"></a>
 
@@ -321,6 +322,90 @@ ajustar lo **valida**. Descartarlo pide el motivo. Se revisa una sola vez.
 
 Una **devolución** anterior se valida solo si hay pagos anteriores validados que
 la cubran; si no, queda pendiente hasta validar el pago que devuelve.
+
+Los pagos que trae la [planilla histórica](#importacion) entran distinto:
+**provisionales**, cuentan en el saldo desde que se consolidan y la ficha los muestra
+como «Importado, sin revisar», con su hoja, fila y mes. Validarlos no cambia el
+saldo, porque ya contaban; rechazarlos baja lo pagado y reconoce el excedente que
+deje de haber. Un provisional que cubre una devolución ya contada no se rechaza.
+
+---
+
+<a id="importacion"></a>
+
+## Importar la planilla histórica · `/multas/importaciones`
+
+> **En pausa** (`multas.historical_import_enabled = false`, decisión del usuario del
+> 11/11/2026): construida y probada, pero sus rutas responden 404, el botón no aparece
+> y `StartFineImport` y `StartFineImportConsolidation` la rechazan. Para retomarla:
+> verificarla en el navegador y prender el interruptor en `config/multas.php`.
+
+La cuenta corriente que el área llevaba en Excel entra al sistema por lotes. Solo el
+administrador importa (`multas.importar`), desde «Importar planilla» en Expedientes.
+Decisiones del usuario del 11/11/2026.
+
+**Qué se lee.** Solo las hojas de año, de 2007 a 2026. Los planes de pago, `OTROS`
+y `RESOL. MINISTERIAL` quedan para más adelante. Las columnas se reconocen por su
+encabezado en cada hoja —el acta sin título, el total como «TOTAL PAGADO», «Total
+Pago» o «PAGOS», los meses como fecha o como texto («SET-08», «En-15», «AGO.18»)—.
+De cada celda se guarda la coordenada, el valor, la fórmula y el resultado que el
+Excel dejó guardado; una fórmula sin resultado no se toma como cero. Las filas de
+totales, con rótulo o sin él, se guardan como **control** y nunca son multas.
+
+**Antes, la apertura.** Importar pide la caja de Multas abierta: el mes de la
+apertura es el **corte**. Los pagos de meses anteriores entran; una celda de pago
+desde el mes de la apertura no entra y queda **pendiente de identificar**, porque ese
+cobro tendría que estar en el sistema. La multa se importa igual, mostrando más deuda
+que el Excel por ese importe, hasta que alguien marque la celda como identificada
+o descartada.
+
+**El lote.** El archivo se guarda como adjunto del lote y se lee en la cola, una hoja
+por vez. La pantalla del lote se actualiza sola mientras lee o consolida, y tiene
+seis pestañas:
+
+- **Conciliación**: por hoja, las filas de detalle, las que quedan para revisar, el
+  importe y lo pagado según el detalle, al lado de los pies de control. Arriba, el
+  lote entero: listas, consolidadas, excluidas, sin cambios, con error y celdas
+  pendientes.
+- **Revisión**: cada fila con un problema que bloquea, con hoja, fila, columna y
+  valor, y las decisiones que admite. Se filtra por hoja y por problema y se exporta
+  a Excel (`/multas/importaciones/{lote}/revision.xlsx`).
+- **Pendientes de identificar**: las celdas desde el corte.
+- **Para completar**: avisos que no frenan la fila (expediente, resolución o acta
+  incompletos, sin fecha, pagado de más).
+- **Importadas** y **Excluidas**.
+
+**Qué se decide en Revisión.** Una fila entra solo con todos sus bloqueos resueltos.
+Cada decisión se toma una vez, con quién y cuándo; excluir pide el motivo y siempre
+está disponible.
+
+| Problema | Qué se puede hacer |
+| --- | --- |
+| Sin importe, carátula o expediente | Excluir: se carga a mano |
+| Ya cargada a mano | Vincular la fila a esa multa sin tocarla, o excluir. Nunca se crea otra |
+| Cambió desde una importación anterior | Agregar solo los meses nuevos anteriores al corte, o excluir. Un cambio de importe o de identidad se hace en la multa |
+| Posible coincidencia (identidad incompleta o el mismo texto en otro lote) | Es el mismo expediente (se elige), es otro, o excluir |
+| Repetida en la planilla | Quedarse con una: las otras se excluyen |
+| Total o saldo que no coincide o falta, fórmula sin resultado | Aceptar los meses como están, importar sin pagos, o excluir. **En bloque**, por problema |
+| Pago mayor que la multa | Aceptarlo, importar sin pagos, o excluir, fila por fila: puede ser con intereses o un tipeo |
+| Pago negativo o nota en la celda | Importar sin pagos, o excluir |
+| Importe en plan de pagos, restitución o una columna sin identificar | Importar sin esas columnas, o excluir |
+
+**Consolidar** es un paso explícito y se repite cuando hay más filas listas. Cada
+fila, en su transacción, crea o reutiliza el expediente por su identidad completa,
+la resolución y el acta con su texto original, la multa con procedencia
+«importada» y sin persona, su constitución por el importe y un pago anterior
+**provisional** por mes con pago, con fecha el primero del mes y la evidencia
+«Planilla 2018, fila 123, columna H (01/2019)». **No hay ingresos, asientos ni
+recibos.** Una fila que falla queda con su error y no frena las demás.
+
+**Otro lote después.** Una fila que ya se importó y no cambió se saltea. Si cambió,
+va a Revisión y no se aplica sola. Una multa ya consolidada no se consolida dos
+veces, ni desde dos lotes a la vez.
+
+**No relevado con el área**, para confirmar: qué son las actas «RUBRICA» y «OBST»;
+el importe que incluye intereses (2023, fila 550) y los pagos mayores que la multa;
+los sobrepagos; si el corte vale también para los pagos anteriores cargados a mano.
 
 ---
 
@@ -932,6 +1017,7 @@ ella. El importe y su efecto sobre el saldo no cambian.
 | `multas.caja.exportar` | Descargar la planilla de un cierre de Multas | administrador, contador, administrativo, consulta |
 | `multas.caja.regenerar-planilla` | Rehacer la planilla de un cierre de Multas | administrador |
 | `multas.rendicion.emitir` | Emitir la rendición mensual a la SAF, con el mes cerrado | administrador, contador |
+| `multas.importar` | Importar la planilla histórica, decidir su revisión y consolidarla. Sensible | administrador |
 
 Un permiso que se crea por primera vez llega con su asignación de fábrica también a
 los roles ya configurados (`RolesAndPermissionsSeeder`); uno que ya existía no se

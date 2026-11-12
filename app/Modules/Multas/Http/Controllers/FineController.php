@@ -95,6 +95,7 @@ final class FineController extends Controller
             'expedientes' => $filasDeExpedientes,
             'filters' => $filtros,
             'canRegister' => $request->user()?->can('multas.registrar') ?? false,
+            'canImport' => config('multas.historical_import_enabled', false) && ($request->user()?->can('multas.importar') ?? false),
             // La forma que espera `PaginationFooter`.
             'pagination' => Arr::only($paginador->toArray(), ['current_page', 'last_page', 'from', 'to', 'total', 'links']),
         ]);

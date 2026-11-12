@@ -53,6 +53,7 @@ enum AttachmentSubject: string
 
     /** El comprobante del depósito o la transferencia con que se paga un arancel. */
     case FeeCharge = 'fee_charge';
+    case FineImport = 'fine_import';
 
     public function label(): string
     {
@@ -74,6 +75,7 @@ enum AttachmentSubject: string
             self::FinePayment => 'Pago de una multa',
             self::ChequeRejection => 'Cheque rechazado',
             self::FeeCharge => 'Cobro de arancel',
+            self::FineImport => 'Planilla histórica de Multas',
         };
     }
 }

@@ -71,6 +71,7 @@ export const HISTORICAL_STATUS: Record<
     { label: string; tone: StatusTone }
 > = {
     pending_review: { label: 'Pendiente de revisión', tone: 'action' },
+    provisional: { label: 'Importado, sin revisar', tone: 'progress' },
     validated: { label: 'Validado', tone: 'done' },
     rejected: { label: 'Descartado', tone: 'neutral' },
 };
@@ -185,3 +186,23 @@ export function partialDate(value: string, precision: Precision): string {
 
     return date(value);
 }
+
+export const IMPORT_STATUS: Record<
+    App.Modules.Multas.Enums.FineImportStatus,
+    { label: string; tone: StatusTone }
+> = {
+    reading: { label: 'Leyendo la planilla', tone: 'progress' },
+    ready: { label: 'Listo para revisar', tone: 'action' },
+    consolidating: { label: 'Consolidando', tone: 'progress' },
+    consolidated: { label: 'Consolidado', tone: 'done' },
+    failed: { label: 'No se pudo leer', tone: 'blocked' },
+};
+
+export const IMPORT_CELL_STATUS: Record<
+    App.Modules.Multas.Enums.FineImportCellStatus,
+    { label: string; tone: StatusTone }
+> = {
+    pending: { label: 'Pendiente de identificar', tone: 'action' },
+    identified: { label: 'Identificado', tone: 'done' },
+    dismissed: { label: 'Descartado', tone: 'neutral' },
+};

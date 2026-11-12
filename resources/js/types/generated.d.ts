@@ -1315,6 +1315,79 @@ declare namespace App {
                     attachments: App.Modules.Shared.Data.AttachmentData[];
                     bankCredit: App.Modules.Multas.Data.FineBankCreditData | null;
                 };
+                export type FineImportBatchData = {
+                    id: number;
+                    filename: string;
+                    status: App.Modules.Multas.Enums.FineImportStatus;
+                    cutoffMonth: string;
+                    uploadedByName: string | null;
+                    createdAt: string | null;
+                    consolidatedAt: string | null;
+                    failure: string | null;
+                    counts: {
+                        rows: number;
+                        blocked: number;
+                        ready: number;
+                        consolidated: number;
+                        excluded: number;
+                        failed: number;
+                        unchanged: number;
+                        pendingCells: number;
+                    };
+                    reconciliation: Record<string, any>[];
+                };
+                export type FineImportCellData = {
+                    id: number;
+                    sheet: string;
+                    row: number;
+                    column: string;
+                    month: string;
+                    amount: string;
+                    caption: string;
+                    fineId: number | null;
+                    fineUrl: string | null;
+                    status: App.Modules.Multas.Enums.FineImportCellStatus;
+                    note: string | null;
+                };
+                export type FineImportRowData = {
+                    id: number;
+                    sheet: string;
+                    row: number;
+                    caseText: string;
+                    resolutionText: string;
+                    actText: string | null;
+                    caption: string;
+                    amount: string | null;
+                    paid: string;
+                    issues: {
+                        code: App.Modules.Multas.Enums.FineImportIssue;
+                        label: string;
+                        blocking: boolean;
+                        column: string | null;
+                        value: string | null;
+                        message: string;
+                        actions: {
+                            value: App.Modules.Multas.Enums.FineImportAction;
+                            label: string;
+                        }[];
+                        bulk: boolean;
+                        cases: {
+                            id: number;
+                            label: string;
+                        }[];
+                        fineId: number | null;
+                        resolution: {
+                            action: string;
+                            label: string;
+                            reason: string | null;
+                            byName: string | null;
+                            at: string | null;
+                        } | null;
+                    }[];
+                    fineId: number | null;
+                    fineUrl: string | null;
+                    failure: string | null;
+                };
                 export type FineListItemData = {
                     id: number;
                     href: string;
@@ -1404,6 +1477,48 @@ declare namespace App {
                 export type FineDocumentKind = 'resolution' | 'act' | 'other';
                 export type FineDocumentRole =
                     'origin' | 'modification' | 'ratification' | 'support';
+                export type FineImportAction =
+                    | 'exclude'
+                    | 'accept'
+                    | 'without_payments'
+                    | 'ignore_columns'
+                    | 'link'
+                    | 'add_months'
+                    | 'same_case'
+                    | 'new_case'
+                    | 'keep';
+                export type FineImportCellStatus =
+                    'pending' | 'identified' | 'dismissed';
+                export type FineImportIssue =
+                    | 'missing_amount'
+                    | 'duplicate_manual'
+                    | 'changed'
+                    | 'possible_match'
+                    | 'duplicate_in_file'
+                    | 'total_mismatch'
+                    | 'total_missing'
+                    | 'balance_mismatch'
+                    | 'balance_missing'
+                    | 'formula_without_result'
+                    | 'payment_exceeds_amount'
+                    | 'negative_payment'
+                    | 'note_in_payment'
+                    | 'plan_column'
+                    | 'refund_column'
+                    | 'unknown_column'
+                    | 'unchanged'
+                    | 'case_incomplete'
+                    | 'resolution_incomplete'
+                    | 'act_incomplete'
+                    | 'missing_date'
+                    | 'overpaid'
+                    | 'after_cutoff';
+                export type FineImportStatus =
+                    | 'reading'
+                    | 'ready'
+                    | 'consolidating'
+                    | 'consolidated'
+                    | 'failed';
                 export type FinePaymentMedium =
                     | 'cash'
                     | 'cheque'
@@ -1447,7 +1562,7 @@ declare namespace App {
                     'on_time' | 'late' | 'undetermined';
                 export type HistoricalMovementKind = 'payment' | 'refund';
                 export type HistoricalMovementStatus =
-                    'pending_review' | 'validated' | 'rejected';
+                    'pending_review' | 'provisional' | 'validated' | 'rejected';
                 export type PresentationPrecision =
                     'instant' | 'day' | 'unknown';
             }
@@ -1636,7 +1751,8 @@ declare namespace App {
                     | 'fine_historical_movement'
                     | 'fine_payment'
                     | 'cheque_rejection'
-                    | 'fee_charge';
+                    | 'fee_charge'
+                    | 'fine_import';
                 export type AuditSeverity = 'normal' | 'critical';
                 export type Confidentiality = 'internal' | 'restricted';
                 export type DocumentType =

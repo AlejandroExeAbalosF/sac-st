@@ -1,5 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, FileSpreadsheet, Maximize2, Plus, Search } from 'lucide-react';
+import {
+    Eye,
+    FileSpreadsheet,
+    Maximize2,
+    Plus,
+    Search,
+    Upload,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { ComponentProps } from 'react';
@@ -27,6 +34,7 @@ import { DEBT_STATUS, partialDate } from '@/features/multas/labels';
 import { isNonZero } from '@/lib/format';
 import { create, exportar, index } from '@/routes/multas';
 import { show as showCase } from '@/routes/multas/expedientes';
+import { index as importaciones } from '@/routes/multas/importaciones';
 
 type Multa = App.Modules.Multas.Data.FineListItemData;
 type Expediente = App.Modules.Multas.Data.FineCaseListItemData;
@@ -52,6 +60,7 @@ type Props = {
     expedientes: Expediente[];
     filters: Filtros;
     canRegister: boolean;
+    canImport: boolean;
     pagination: PaginationData;
 };
 
@@ -73,6 +82,7 @@ export default function MultasIndex({
     expedientes,
     filters,
     canRegister,
+    canImport,
     pagination,
 }: Props) {
     const [termino, setTermino] = useState(filters.q);
@@ -134,6 +144,17 @@ export default function MultasIndex({
                                         />
                                         Exportar a Excel
                                     </a>
+                                </Button>
+                            )}
+                            {canImport && (
+                                <Button variant="outline" asChild>
+                                    <Link href={importaciones()}>
+                                        <Upload
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
+                                        Importar planilla
+                                    </Link>
                                 </Button>
                             )}
                             {canRegister && (
