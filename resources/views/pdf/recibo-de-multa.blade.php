@@ -116,7 +116,7 @@
         <div class="campo rotulo" style="left: 40mm; top: 48mm;">Cheque Tercero</div>
         <div class="campo rotulo" style="left: 85mm; top: 48mm;">Orden Pago Judicial</div>
         <div class="campo rotulo" style="left: 138mm; top: 46mm; text-align: center; width: 36mm;">
-            Depósito Cta.<br>
+            {{ $esTransferencia ? 'Transf. Cta.' : 'Depósito Cta.' }}<br>
             <span style="font-size: 7pt;">{{ $cuenta ?? '' }}</span>
         </div>
 
@@ -169,6 +169,11 @@
     <div class="campo" style="left: 25mm; top: 47mm;"><span class="tilde">{{ $casilla === 'cash' ? 'X' : '' }}</span></div>
     <div class="campo" style="left: 66mm; top: 47mm;"><span class="tilde">{{ $casilla === 'cheque' ? 'X' : '' }}</span></div>
     <div class="campo" style="left: 116mm; top: 47mm;"><span class="tilde">{{ $casilla === 'judicial' ? 'X' : '' }}</span></div>
+    @if ($esTransferencia && $sobreTalonario)
+        {{-- La hoja trae «Depósito Cta.» impreso: se anota encima, como lo escribe el área a mano. --}}
+        <div class="campo escrito" style="left: 138mm; top: 42.5mm; width: 36mm; text-align: center; font-size: 7.5pt;">Transf.</div>
+    @endif
+
     {{-- El depósito no se tilda: se anota el día del crédito en el extracto,
          como en el papel. Sin esa fecha, la cruz en la primera casilla sigue
          diciendo que entró por el banco. --}}

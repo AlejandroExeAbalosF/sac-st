@@ -445,7 +445,9 @@ class CobroEnCajaDeMultasTest extends TestCase
             ->and($comprobante->snapshot['bankDate'])->toBeNull();
         $this->actingAs($this->operador())->get(route('multas.recibos.view', $comprobante->receipt_id))
             ->assertOk()->assertSee('310000999888777')->assertDontSee('310000999888778')
-            ->assertSee('<span class="casilla"></span><span class="casilla"></span><span class="casilla anio"></span>', false);
+            ->assertSee('<span class="casilla"></span><span class="casilla"></span><span class="casilla anio"></span>', false)
+            ->assertSee('Depósito Cta.')
+            ->assertDontSee('Transf');
     }
 
     /**

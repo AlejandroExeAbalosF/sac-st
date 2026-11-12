@@ -88,7 +88,17 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         expect($pago->paymentReceipt()->firstOrFail()->snapshot['bankDate'])->toBe('2026-06-10');
         $this->get(route('multas.recibos.view', $recibo->id))
             ->assertOk()
-            ->assertSee('<span class="casilla">10</span><span class="casilla">06</span><span class="casilla anio">2026</span>', false);
+            ->assertSee('<span class="casilla">10</span><span class="casilla">06</span><span class="casilla anio">2026</span>', false)
+            // En papel en blanco, el rótulo dice que fue una transferencia.
+            ->assertSee('Transf. Cta.')
+            ->assertDontSee('Depósito Cta.')
+            ->assertDontSee('Transf.<', false);
+
+        // La hoja del talonario trae «Depósito Cta.» impreso: se anota «Transf.» encima.
+        $this->get(route('multas.recibos.view', ['receipt' => $recibo->id, 'talonario' => 1]))
+            ->assertOk()
+            ->assertSee('Transf.<', false)
+            ->assertDontSee('Transf. Cta.');
     }
 
     /** El caso habitual: se reconoce el crédito en el extracto, sin informe previo. */

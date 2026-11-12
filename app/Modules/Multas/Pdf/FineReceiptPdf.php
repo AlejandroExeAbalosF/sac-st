@@ -78,6 +78,13 @@ final class FineReceiptPdf
             'fechaDeposito' => $casilla === 'deposit' && is_string($fechaDeposito)
                 ? CarbonImmutable::parse($fechaDeposito)
                 : null,
+            /*
+             * Una transferencia no es un depósito. En papel en blanco el
+             * rótulo dice «Transf. Cta.»; la hoja del talonario trae «Depósito
+             * Cta.» impreso, y ahí se anota «Transf.» encima, como lo hace el
+             * área a mano.
+             */
+            'esTransferencia' => $casilla === 'deposit' && $pago->medium === FinePaymentMedium::BankTransfer,
             'importe' => Decimal::format($recibo->amount),
             'importeEnLetras' => AmountInWords::for($recibo->amount),
             'totalMulta' => Decimal::format((string) ($comprobante->snapshot['obligation'] ?? '0')),
