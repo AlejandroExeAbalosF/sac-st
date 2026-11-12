@@ -557,8 +557,10 @@ inventado en el extracto. Un reemplazo deja esa revisión abierta.
 - Vínculos del recibo con el libro: la recepción y la aplicación, en
   `receipt_financial_events`.
 - La copia congelada (`snapshot`) guarda también el número de la cuenta que el
-  formulario imprime en «Depósito Cta.» y la fecha de cada pago anterior **con su
-  precisión**: un antecedente conocido por el mes sale «05/2026», no con un día.
+  formulario imprime en «Depósito Cta.», el día del crédito del extracto que va en
+  sus tres casillas (`bankDate`, la fecha del movimiento; vacío en un cobro en caja
+  y no impreso en una orden judicial, que tiene su propia casilla) y la fecha de
+  cada pago anterior **con su precisión**: un antecedente conocido por el mes sale «05/2026», no con un día.
   Las reimpresiones leen la copia, nunca el maestro ni el antecedente actuales.
   **Action.**
 - Una hoja del talonario se usa una sola vez por caja, aunque el recibo se haya

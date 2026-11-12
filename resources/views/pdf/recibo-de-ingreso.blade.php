@@ -234,8 +234,12 @@
     <div class="campo" style="left: 62mm; top: 44mm;">
         <span class="tilde">{{ $recibo->medium_snapshot === 'cheque' ? 'X' : '' }}</span>
     </div>
-    <div class="campo" style="left: 112mm; top: 44mm;">
-        <span class="tilde">{{ $recibo->medium_snapshot === 'bank' ? 'X' : '' }}</span>
+    {{-- El depósito no se tilda: se anota el día del crédito en el extracto,
+         como en el papel. Sin esa fecha, la cruz en la primera casilla sigue
+         diciendo que entró por el banco. --}}
+    @php($fechaDeposito = $recibo->medium_snapshot === 'bank' ? $extra->fechaDeposito : null)
+    <div class="campo" style="left: 106mm; top: 43.5mm;">
+        <span class="casilla">{{ $fechaDeposito?->format('d') ?? ($recibo->medium_snapshot === 'bank' ? 'X' : '') }}</span><span class="casilla">{{ $fechaDeposito?->format('m') }}</span><span class="casilla">{{ $fechaDeposito?->format('y') }}</span>
     </div>
 
     @if ($extra->numeroOperacion)

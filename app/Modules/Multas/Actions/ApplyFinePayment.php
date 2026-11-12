@@ -6,6 +6,7 @@ namespace App\Modules\Multas\Actions;
 
 use App\Models\User;
 use App\Modules\Banking\Models\BankAccount;
+use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\BankTransactionAllocation;
 use App\Modules\Banking\Support\CashBoxBankAccounts;
 use App\Modules\Ledger\Actions\PostJournalEntry;
@@ -243,6 +244,7 @@ final class ApplyFinePayment
         $concepto = ($cancela ? 'Pago cancelatorio de la multa' : 'Pago parcial de la multa')
             .($resolucion === null ? '' : ' por '.$resolucion);
         $firmante = $signedById === null ? null : User::query()->find($signedById);
+        $credito = $this->credito($pago, $recepcion);
 
         return [
             'receipt' => [
@@ -284,7 +286,14 @@ final class ApplyFinePayment
                  * estaba al emitir: si después se corrige el maestro, la
                  * reimpresión no puede decir otra cosa que el original.
                  */
-                'bankAccountNumber' => $this->cuenta($pago, $recepcion, $multa, $fecha),
+                'bankAccountNumber' => $this->cuenta($pago, $credito, $multa, $fecha),
+                /*
+                 * El día del crédito en el extracto, para las casillas de
+                 * «Depósito Cta.». Es la fecha del movimiento, no la de
+                 * valor: la que figura en el ticket del depósito o en el
+                 * comprobante de la transferencia.
+                 */
+                'bankDate' => $credito?->transaction_date?->toDateString(),
             ],
         ];
     }
@@ -345,14 +354,10 @@ final class ApplyFinePayment
      * Queda congelado con el recibo: cambiar la predeterminada después no
      * lo toca.
      */
-    private function cuenta(FinePayment $pago, ?FundReceipt $recepcion, Fine $multa, CarbonImmutable $fecha): ?string
+    private function cuenta(FinePayment $pago, ?BankTransaction $credito, Fine $multa, CarbonImmutable $fecha): ?string
     {
-        if (! $pago->medium->isCounter() && $recepcion !== null) {
-            $cuenta = BankTransactionAllocation::query()
-                ->where('financial_event_id', $recepcion->financial_event_id)
-                ->whereNull('reversal_of_id')
-                ->join('bank_transactions', 'bank_transactions.id', '=', 'bank_transaction_allocations.bank_transaction_id')
-                ->value('bank_transactions.bank_account_id');
+        if (! $pago->medium->isCounter()) {
+            $cuenta = $credito?->bank_account_id;
         } else {
             $caja = (int) CashBox::query()->where('code', CashBox::MULTAS)->value('id');
             $vigentes = $this->cuentas->activeOn($caja, Currency::from($multa->currency), $fecha);
@@ -360,5 +365,23 @@ final class ApplyFinePayment
         }
 
         return $cuenta === null ? null : BankAccount::query()->whereKey($cuenta)->value('account_number');
+    }
+
+    /**
+     * El crédito del extracto que respalda un pago por el banco: uno por
+     * pago, por su importe entero (P14). En la caja no hay ninguno.
+     */
+    private function credito(FinePayment $pago, ?FundReceipt $recepcion): ?BankTransaction
+    {
+        if ($pago->medium->isCounter() || $recepcion === null) {
+            return null;
+        }
+
+        return BankTransaction::query()
+            ->whereIn('id', BankTransactionAllocation::query()
+                ->select('bank_transaction_id')
+                ->where('financial_event_id', $recepcion->financial_event_id)
+                ->whereNull('reversal_of_id'))
+            ->first();
     }
 }

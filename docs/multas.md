@@ -691,7 +691,8 @@ El cobro:
   uno, sin repetir el saldo en cero. El excedente se nombra aparte —«Excedente
   pendiente»— solo sobre el talonario: en papel en blanco ya lo muestran los dos
   importes. La casilla «Depósito Cta.» lleva el número de la
-  cuenta del crédito en un pago por banco; en un cobro en caja, la cuenta solo si la
+  cuenta del crédito en un pago por banco y, en sus tres casillas, el día de ese
+  crédito en el extracto —la fecha del movimiento, como en el papel—; en un cobro en caja, la cuenta solo si la
   caja tiene una única vigente, y vacía si tiene varias —el depósito guarda la
   suya—. Lo que dice queda congelado: un ajuste posterior de la multa, un cambio en
   la cuenta o en la predeterminada no lo cambian (M09). Una hoja del talonario ya

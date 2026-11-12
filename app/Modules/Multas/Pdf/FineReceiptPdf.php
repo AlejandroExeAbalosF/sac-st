@@ -10,6 +10,7 @@ use App\Support\Money\AmountInWords;
 use App\Support\Money\Decimal;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfDocument;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 
 /**
@@ -51,6 +52,13 @@ final class FineReceiptPdf
         $comprobante->loadMissing(['receipt', 'payment']);
         $recibo = $comprobante->receipt;
         $pago = $comprobante->payment;
+        $casilla = match (true) {
+            $pago->judicial_origin => 'judicial',
+            $pago->medium === FinePaymentMedium::Cash => 'cash',
+            $pago->medium === FinePaymentMedium::Cheque => 'cheque',
+            default => 'deposit',
+        };
+        $fechaDeposito = $comprobante->snapshot['bankDate'] ?? null;
 
         return [
             'recibo' => $recibo,
@@ -59,14 +67,17 @@ final class FineReceiptPdf
             'conFondo' => $conFondo,
             // Sobre el talonario el papel ya trae su número.
             'sobreTalonario' => ! $conFondo,
-            'casilla' => match (true) {
-                $pago->judicial_origin => 'judicial',
-                $pago->medium === FinePaymentMedium::Cash => 'cash',
-                $pago->medium === FinePaymentMedium::Cheque => 'cheque',
-                default => 'deposit',
-            },
+            'casilla' => $casilla,
             // La de la copia congelada, nunca la de la configuración actual.
             'cuenta' => $comprobante->snapshot['bankAccountNumber'] ?? null,
+            /*
+             * El día del crédito del extracto, en las casillas de «Depósito
+             * Cta.». Solo cuando esa es la casilla del pago: una orden
+             * judicial también entra por el banco, pero tiene la suya.
+             */
+            'fechaDeposito' => $casilla === 'deposit' && is_string($fechaDeposito)
+                ? CarbonImmutable::parse($fechaDeposito)
+                : null,
             'importe' => Decimal::format($recibo->amount),
             'importeEnLetras' => AmountInWords::for($recibo->amount),
             'totalMulta' => Decimal::format((string) ($comprobante->snapshot['obligation'] ?? '0')),

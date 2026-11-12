@@ -440,9 +440,12 @@ class CobroEnCajaDeMultasTest extends TestCase
 
         DB::table('bank_accounts')->where('account_number', '310000999888777')->update(['account_number' => '310000999888778']);
 
-        expect($comprobante->snapshot['bankAccountNumber'])->toBe('310000999888777');
+        expect($comprobante->snapshot['bankAccountNumber'])->toBe('310000999888777')
+            // Cobrado en la caja: no hay crédito del extracto ni fecha de depósito.
+            ->and($comprobante->snapshot['bankDate'])->toBeNull();
         $this->actingAs($this->operador())->get(route('multas.recibos.view', $comprobante->receipt_id))
-            ->assertOk()->assertSee('310000999888777')->assertDontSee('310000999888778');
+            ->assertOk()->assertSee('310000999888777')->assertDontSee('310000999888778')
+            ->assertSee('<span class="casilla"></span><span class="casilla"></span><span class="casilla anio"></span>', false);
     }
 
     /**

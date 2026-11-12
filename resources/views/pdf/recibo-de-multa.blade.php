@@ -46,6 +46,16 @@
             text-align: center; line-height: 6mm; font-weight: bold;
         }
 
+        /* Las casillas de la fecha del depósito: día, mes y año, como el papel. */
+        .casilla {
+            display: inline-block;
+            width: 6.5mm; height: 6mm;
+            border: 0.3mm solid #111; border-radius: 1mm;
+            text-align: center; line-height: 6mm;
+            font-weight: bold; font-size: 7.5pt; margin-right: 0.6mm;
+        }
+        .casilla.anio { width: 10mm; }
+
         .titulo-doc {
             border: 0.35mm solid #111; border-radius: 2mm;
             padding: 1mm 6mm; display: inline-block; background: #ddd;
@@ -159,7 +169,12 @@
     <div class="campo" style="left: 25mm; top: 47mm;"><span class="tilde">{{ $casilla === 'cash' ? 'X' : '' }}</span></div>
     <div class="campo" style="left: 66mm; top: 47mm;"><span class="tilde">{{ $casilla === 'cheque' ? 'X' : '' }}</span></div>
     <div class="campo" style="left: 116mm; top: 47mm;"><span class="tilde">{{ $casilla === 'judicial' ? 'X' : '' }}</span></div>
-    <div class="campo" style="left: 176mm; top: 47mm;"><span class="tilde">{{ $casilla === 'deposit' ? 'X' : '' }}</span></div>
+    {{-- El depósito no se tilda: se anota el día del crédito en el extracto,
+         como en el papel. Sin esa fecha, la cruz en la primera casilla sigue
+         diciendo que entró por el banco. --}}
+    <div class="campo" style="left: 175mm; top: 47mm;">
+        <span class="casilla">{{ $fechaDeposito?->format('d') ?? ($casilla === 'deposit' ? 'X' : '') }}</span><span class="casilla">{{ $fechaDeposito?->format('m') }}</span><span class="casilla anio">{{ $fechaDeposito?->format('Y') }}</span>
+    </div>
 
     <div class="campo escrito" style="left: 29mm; top: 60mm; width: 164mm;">
         {{ $recibo->counterparty_name_snapshot }}

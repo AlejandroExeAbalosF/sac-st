@@ -34,6 +34,7 @@ use App\Modules\Haberes\Support\DepositTicketLinks;
 use App\Modules\Haberes\Support\HaberesBankMovementReferences;
 use App\Modules\Haberes\Support\InstallmentFunding;
 use App\Modules\Haberes\Support\PaymentOrderSources;
+use App\Modules\Haberes\Support\ReceiptFormData;
 use App\Modules\Haberes\Support\ReceiptOrigin;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Shared\Models\CashBox;
@@ -88,6 +89,8 @@ class RegistrarYAsignarTest extends TestCase
 
         $this->assertSame($esperado, $recepcion->amount);
         $this->assertTrue(app(InstallmentFunding::class)->isFullyFunded($cuota->refresh()));
+        // Las casillas de «Depósito Cta.» llevan el día del crédito en el extracto.
+        $this->assertSame('2026-08-21', app(ReceiptFormData::class)->forInstallment($cuota)->fechaDeposito?->toDateString());
     }
 
     public function test_registra_dos_creditos_del_mismo_comprobante_sin_duplicar_ingresos(): void
@@ -99,11 +102,11 @@ class RegistrarYAsignarTest extends TestCase
         $resto = Decimal::sub($importe, $mitad);
         $importacion = $this->importacion($cuenta);
         $movimientos = [];
-        foreach ([$mitad, $resto] as $parte) {
+        foreach (['2026-08-21' => $mitad, '2026-08-22' => $resto] as $fecha => $parte) {
             $movimientos[] = BankTransaction::query()->create([
                 'bank_account_id' => $cuenta->id,
                 'first_seen_import_id' => $importacion->id,
-                'transaction_date' => '2026-08-21',
+                'transaction_date' => $fecha,
                 'amount' => $parte,
                 'direction' => TransactionDirection::Credit,
                 'description' => 'Transferencia recibida',
@@ -143,6 +146,8 @@ class RegistrarYAsignarTest extends TestCase
         foreach (FundReceipt::query()->whereNull('reversal_event_id')->get() as $recepcion) {
             $this->assertSame($ticket->expediente_id, app(ReceiptOrigin::class)->for($recepcion)['expedienteId']);
         }
+        // Con dos créditos, el recibo lleva el día del último: el que completó la cuota.
+        $this->assertSame('2026-08-22', app(ReceiptFormData::class)->forInstallment($cuota)->fechaDeposito?->toDateString());
 
         $this->emitirRecibo($cuota);
         $this->anularElCobro($cuota);

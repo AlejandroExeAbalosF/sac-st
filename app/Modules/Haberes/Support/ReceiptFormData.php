@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Support;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Pdf\ReceiptPrintData;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -45,9 +46,24 @@ final class ReceiptFormData
             ])
             ->first();
 
+        /*
+         * El día del crédito en el extracto: la fecha del movimiento, que es
+         * la del ticket o la transferencia, no la de valor. Si la cuota se
+         * cubrió con varios créditos, el último: es el que la completó, y
+         * sin él no había recibo.
+         */
+        $fechaDeposito = DB::table('funding_allocations as fa')
+            ->join('fund_receipts as fr', 'fr.id', '=', 'fa.fund_receipt_id')
+            ->join('bank_transaction_allocations as bta', 'bta.financial_event_id', '=', 'fr.financial_event_id')
+            ->join('bank_transactions as bt', 'bt.id', '=', 'bta.bank_transaction_id')
+            ->where('fa.beneficiary_installment_id', $installment->id)
+            ->whereNull('bta.reversal_of_id')
+            ->max('bt.transaction_date');
+
         return new ReceiptPrintData(
             cuenta: $origen->account_number ?? null,
             numeroOperacion: $origen->operation_id ?? null,
+            fechaDeposito: is_string($fechaDeposito) ? CarbonImmutable::parse($fechaDeposito) : null,
             chequeNumero: $origen->cheque_number ?? null,
             chequeBanco: $origen->cheque_bank ?? null,
             cuotaNumero: $installment->installment_number,

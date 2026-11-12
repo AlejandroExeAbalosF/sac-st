@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Shared\Pdf;
 
+use Carbon\CarbonImmutable;
+
 /**
  * Lo que el formulario del recibo tiene además del comprobante.
  *
@@ -20,6 +22,8 @@ final readonly class ReceiptPrintData
         public ?string $cuenta = null,
         /** El número de operación del depósito, si el ticket lo trajo. */
         public ?string $numeroOperacion = null,
+        /** El día del crédito en el extracto, para las casillas de «Depósito Cta.». */
+        public ?CarbonImmutable $fechaDeposito = null,
         public ?string $chequeNumero = null,
         public ?string $chequeBanco = null,
         /** Para las casillas «Cuota [X] de [Y]». */

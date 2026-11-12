@@ -83,6 +83,12 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
 
         // Ya identificado, el crédito deja de ofrecerse.
         expect(app(FineBankCredits::class)->available(''))->toBe([]);
+
+        // Las casillas de «Depósito Cta.» llevan el día del crédito, congelado con el recibo.
+        expect($pago->paymentReceipt()->firstOrFail()->snapshot['bankDate'])->toBe('2026-06-10');
+        $this->get(route('multas.recibos.view', $recibo->id))
+            ->assertOk()
+            ->assertSee('<span class="casilla">10</span><span class="casilla">06</span><span class="casilla anio">2026</span>', false);
     }
 
     /** El caso habitual: se reconoce el crédito en el extracto, sin informe previo. */

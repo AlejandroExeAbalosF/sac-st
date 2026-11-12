@@ -140,6 +140,11 @@ total que tendrá el recibo, no solo el pendiente. En banco, el ticket
 requiere identificar los créditos cuya suma coincide exactamente con su importe y
 registrar una recepción/asignación por cada movimiento. La selección parcial no
 queda conciliada; una suma superior se rechaza en la pantalla, el Action y la base.
+En el papel, las tres casillas de «Depósito Cta.» llevan el día del crédito en el
+extracto (la fecha del movimiento, no la de valor) y «N.º Op», su número de
+operación. Con varios créditos va el día del último, que es el que completó la
+cuota. No se congela: se lee del crédito vigente al imprimir, como el número de
+operación (`ReceiptFormData`).
 
 Un crédito anterior a la apertura de los libros ya está en el saldo inicial: no se
 vincula ni se registra, y esa plata va por «Cuota del sistema anterior». La búsqueda lo
