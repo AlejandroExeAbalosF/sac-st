@@ -83,6 +83,14 @@ final class ReportFineBankPayment
             $this->recursos->assertNotFrozen($multa, 'amount');
 
             if ($replaces !== null) {
+                /*
+                 * Se relee bloqueado: lo que se hereda —la presentación, la
+                 * fecha del comprobante— es lo que tiene ahora, no lo que tenía
+                 * cuando se abrió el diálogo. Entretanto alguien pudo cargar la
+                 * fecha desde «Comprobante».
+                 */
+                $replaces = FinePayment::query()->lockForUpdate()->findOrFail($replaces->id);
+
                 if ($replaces->fine_id !== $multa->id || $replaces->appeal_kind !== null) {
                     throw ValidationException::withMessages(['replacesPaymentId' => 'Se corrige un pago informado de esta misma multa.']);
                 }

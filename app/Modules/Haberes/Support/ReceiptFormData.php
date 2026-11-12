@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Haberes\Support;
 
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Pdf\ReceiptPrintData;
 use Carbon\CarbonImmutable;
@@ -51,14 +52,13 @@ final class ReceiptFormData
          * la del ticket o la transferencia, no la de valor. Si la cuota se
          * cubrió con varios créditos, el último: es el que la completó, y
          * sin él no había recibo.
+         *
+         * Cuenta solo lo que sigue asignado: un crédito desasignado ya no
+         * financia la cuota. Si no queda nada asignado —la reimpresión de un
+         * recibo anulado, que deshizo la conciliación—, la del historial.
          */
-        $fechaDeposito = DB::table('funding_allocations as fa')
-            ->join('fund_receipts as fr', 'fr.id', '=', 'fa.fund_receipt_id')
-            ->join('bank_transaction_allocations as bta', 'bta.financial_event_id', '=', 'fr.financial_event_id')
-            ->join('bank_transactions as bt', 'bt.id', '=', 'bta.bank_transaction_id')
-            ->where('fa.beneficiary_installment_id', $installment->id)
-            ->whereNull('bta.reversal_of_id')
-            ->max('bt.transaction_date');
+        $fechaDeposito = $this->fechaDelCredito($installment, soloAsignado: true)
+            ?? $this->fechaDelCredito($installment, soloAsignado: false);
 
         return new ReceiptPrintData(
             cuenta: $origen->account_number ?? null,
@@ -76,6 +76,21 @@ final class ReceiptFormData
                 ?? $installment->haber->installments()->count(),
             observaciones: $origen->notes ?? null,
         );
+    }
+
+    /** El día del último crédito del extracto detrás de las asignaciones de la cuota. */
+    private function fechaDelCredito(BeneficiaryInstallment $installment, bool $soloAsignado): ?string
+    {
+        $fecha = FundingAllocation::query()
+            ->when($soloAsignado, fn ($q) => $q->withRemainingBalance(), fn ($q) => $q->live())
+            ->join('fund_receipts as fr', 'fr.id', '=', 'funding_allocations.fund_receipt_id')
+            ->join('bank_transaction_allocations as bta', 'bta.financial_event_id', '=', 'fr.financial_event_id')
+            ->join('bank_transactions as bt', 'bt.id', '=', 'bta.bank_transaction_id')
+            ->where('funding_allocations.beneficiary_installment_id', $installment->id)
+            ->whereNull('bta.reversal_of_id')
+            ->max('bt.transaction_date');
+
+        return is_string($fecha) ? $fecha : null;
     }
 
     /** Los renglones que el papel toma de la cuota y no de `receipts`. */

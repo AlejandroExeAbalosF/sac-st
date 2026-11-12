@@ -357,8 +357,13 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
             'X-Inertia-Partial-Data' => 'candidatosDelPago',
             'X-Inertia-Version' => $version,
         ])
-            ->assertJsonCount(3, 'props.candidatosDelPago')
-            ->assertJsonPath('props.candidatosDelPago.0.credit.id', $delPagador->id);
+            // Con el id del pago: el diálogo de otro pago no la muestra.
+            ->assertJsonPath('props.candidatosDelPago.paymentId', $pago->id)
+            ->assertJsonCount(3, 'props.candidatosDelPago.candidates')
+            ->assertJsonPath('props.candidatosDelPago.candidates.0.credit.id', $delPagador->id);
+
+        // El orden va antes del límite: con uno solo, es el del CUIT aunque sea el más lejano.
+        expect(app(FineBankCredits::class)->candidatesFor($pago, limite: 1)[0]->credit->id)->toBe($delPagador->id);
 
         expect(array_map(fn ($c) => $c->credit->id, $candidatos))->toBe([$delPagador->id, $cercano->id, $lejano->id])
             ->and($candidatos[0]->payerMatches)->toBeTrue()
@@ -382,6 +387,22 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
                 ->get(route('multas.show', $multa->showParameters()))
                 ->assertInertia(fn (Assert $page) => $page->where('can.searchCredits', $puede));
         }
+
+        // Lo decide el servidor: pedir los créditos sin el permiso no trae nada.
+        // El administrador los recibe por `multas.corregir-pagos`, para corregir un verificado.
+        $this->movimiento($this->laCuenta, '2026-06-10', '300000.00');
+        $version = $this->actingAs($this->operador('contador'))->get(route('multas.show', $multa->showParameters()))->viewData('page')['version'];
+
+        foreach (['contador' => 0, 'administrador' => 1, 'super-admin' => 1] as $rol => $cuantos) {
+            $this->actingAs($this->operador($rol))
+                ->get(route('multas.show', [...$multa->showParameters(), 'disponible' => '300000']), [
+                    'X-Inertia' => 'true',
+                    'X-Inertia-Partial-Component' => 'multas/show',
+                    'X-Inertia-Partial-Data' => 'creditosDisponibles',
+                    'X-Inertia-Version' => $version,
+                ])
+                ->assertJsonCount($cuantos, 'props.creditosDisponibles');
+        }
     }
 
     /** Una corrección conserva la fecha del comprobante del informado que reemplaza. */
@@ -396,6 +417,25 @@ class PagosBancariosYRecursoDeMultasTest extends TestCase
         $this->post(route('multas.pagos-bancarios.store', $multa), [
             ...$this->informe('300000.00'), 'replacesPaymentId' => $anterior->id, 'correctionReason' => 'Faltaba un cero en el importe',
         ])->assertSessionHasNoErrors();
+
+        expect(FinePayment::query()->latest('id')->firstOrFail()->declared_paid_on?->toDateString())->toBe('2026-06-08');
+    }
+
+    /** La corrección hereda la fecha que el pago tiene al corregirlo, no la que tenía al abrir el diálogo. */
+    public function test_a_correction_keeps_a_paid_date_loaded_meanwhile(): void
+    {
+        $multa = $this->escenario();
+        $anterior = $this->informar($multa, '30000.00');
+        $leidoAntes = FinePayment::query()->findOrFail($anterior->id);
+
+        $this->actingAs($this->operador())
+            ->post(route('multas.pagos.comprobante.store', $anterior), ['declaredPaidOn' => '2026-06-08'])
+            ->assertSessionHasNoErrors();
+
+        app(ReportFineBankPayment::class)->handle(
+            $multa, FinePaymentMedium::BankTransfer, '300000.00', (string) Str::uuid(), $this->quienAbre(),
+            replaces: $leidoAntes, correctionReason: 'Faltaba un cero en el importe',
+        );
 
         expect(FinePayment::query()->latest('id')->firstOrFail()->declared_paid_on?->toDateString())->toBe('2026-06-08');
     }

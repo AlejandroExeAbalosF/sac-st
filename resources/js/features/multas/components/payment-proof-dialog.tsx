@@ -32,9 +32,19 @@ export default function PaymentProofDialog({
         title: string;
     }>({ declaredPaidOn: pago.declaredPaidOn ?? '', file: null, title: '' });
 
+    const fechaAlAbrir = pago.declaredPaidOn ?? '';
+
     const enviar = () => {
+        /*
+         * La fecha viaja solo si se cambió: quien abrió el diálogo con la
+         * fecha vacía y solo sube la foto no tiene que borrar la que otra
+         * persona cargó mientras tanto. El servidor distingue «no vino» de
+         * «vino vacía».
+         */
+        const cambioLaFecha = conFecha && data.declaredPaidOn !== fechaAlAbrir;
+
         transform((datos) => ({
-            ...(conFecha
+            ...(cambioLaFecha
                 ? { declaredPaidOn: datos.declaredPaidOn || null }
                 : {}),
             file: datos.file,

@@ -130,35 +130,37 @@ final class FineBankCredits
             ? null
             : Person::query()->whereKey($pago->payer_person_id)->value('document');
 
-        $candidatos = $this->pending($apertura)
+        $digitos = $documento === null ? '' : $this->digitos($documento);
+
+        /*
+         * El orden va en la consulta, antes del límite: ordenar después de
+         * recortar dejaba afuera el crédito del CUIT si había muchos más
+         * nuevos del mismo importe.
+         */
+        return array_values($this->pending($apertura)
             ->where('amount', $pago->amount)
+            ->when($digitos !== '', fn (Builder $q) => $q->orderByRaw(
+                "regexp_replace(COALESCE(counterparty_identifier, ''), '\\D', '', 'g') = ? DESC",
+                [$digitos],
+            ))
+            ->when($referencia !== null, fn (Builder $q) => $q->orderByRaw(
+                'ABS(transaction_date - ?::date)',
+                [$referencia?->toDateString()],
+            ))
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
-            ->limit(100)
+            ->limit($limite)
             ->get()
-            ->map(fn (BankTransaction $credito): array => $this->candidato($credito, $referencia, $conFecha, $documento))
-            ->sortBy([
-                fn (array $a, array $b): int => $b['candidato']->payerMatches <=> $a['candidato']->payerMatches,
-                fn (array $a, array $b): int => $a['distancia'] <=> $b['distancia'],
-            ])
-            ->take($limite)
-            ->pluck('candidato')
-            ->all();
-
-        return array_values($candidatos);
+            ->map(fn (BankTransaction $credito): FineCreditCandidateData => $this->candidato($credito, $referencia, $conFecha, $documento))
+            ->all());
     }
 
-    /**
-     * @return array{candidato: FineCreditCandidateData, distancia: int}
-     */
-    private function candidato(BankTransaction $credito, ?CarbonImmutable $referencia, bool $conFecha, ?string $documento): array
+    private function candidato(BankTransaction $credito, ?CarbonImmutable $referencia, bool $conFecha, ?string $documento): FineCreditCandidateData
     {
         $senales = ['importe' => 'exacto'];
-        $distancia = PHP_INT_MAX;
 
         if ($referencia !== null && $credito->transaction_date !== null) {
             $dias = (int) $referencia->diffInDays(CarbonImmutable::parse($credito->transaction_date->toDateString()), false);
-            $distancia = abs($dias);
             $base = $conFecha ? 'del pago según el comprobante' : 'de la presentación';
             $senales['fecha'] = match (true) {
                 $dias === 0 => "el mismo día {$base}",
@@ -186,10 +188,7 @@ final class FineBankCredits
             };
         }
 
-        return [
-            'candidato' => new FineCreditCandidateData(FineBankCreditData::fromModel($credito), $senales, $coincide),
-            'distancia' => $distancia,
-        ];
+        return new FineCreditCandidateData(FineBankCreditData::fromModel($credito), $senales, $coincide);
     }
 
     private function digitos(string $valor): string

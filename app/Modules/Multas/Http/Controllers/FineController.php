@@ -283,16 +283,32 @@ final class FineController extends Controller
              * Los créditos desde la apertura de la caja que nadie
              * identificó, para verificar un pago por el banco. También al buscar.
              */
-            'creditosDisponibles' => Inertia::optional(fn (): array => $creditos->available($request->string('disponible')->toString())),
+            /*
+             * Buscar a mano en el extracto: al verificar, solo super-admin
+             * (`dev.buscar-creditos-multas`); al corregir un pago verificado,
+             * quien corrige, que elige otro crédito. La pantalla oculta el
+             * buscador, pero lo que decide es esto.
+             */
+            'creditosDisponibles' => Inertia::optional(fn (): array => ($usuario?->can('dev.buscar-creditos-multas') ?? false)
+                || ($usuario?->can('multas.corregir-pagos') ?? false)
+                ? $creditos->available($request->string('disponible')->toString())
+                : []),
             /*
              * Los créditos más probables para un pago informado de esta
              * multa, al abrir «Verificar»: el importe entero, el CUIT y la
              * cercanía a la fecha del comprobante.
              */
+            /*
+             * Van con el id del pago: la lista de un pago anterior no puede
+             * mostrarse —ni elegirse— en el diálogo de otro mientras llega la nueva.
+             */
             'candidatosDelPago' => Inertia::optional(function () use ($request, $fine, $creditos): array {
                 $pago = FinePayment::query()->where('fine_id', $fine->id)->find($request->integer('candidatos'));
 
-                return $pago === null ? [] : $creditos->candidatesFor($pago);
+                return [
+                    'paymentId' => $pago?->id,
+                    'candidates' => $pago === null ? [] : $creditos->candidatesFor($pago),
+                ];
             }),
             /*
              * Las multas a las que puede pasar un pago verificado, y el crédito

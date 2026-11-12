@@ -94,7 +94,10 @@ type Props = {
     /** Los créditos libres posteriores a la apertura; llegan al buscar. */
     creditosDisponibles?: Credito[];
     /** Los créditos que coinciden con el pago que se verifica; llegan al abrir «Verificar». */
-    candidatosDelPago?: App.Modules.Multas.Data.FineCreditCandidateData[];
+    candidatosDelPago?: {
+        paymentId: number | null;
+        candidates: App.Modules.Multas.Data.FineCreditCandidateData[];
+    };
     /** Para corregir un pago verificado: las multas de destino, al buscar. */
     multasDestino?: App.Modules.Multas.Data.FineCorrectionTargetData[];
     /** El crédito que respalda cada pago verificado, por id del pago; llega al abrir. */
@@ -1408,8 +1411,13 @@ export default function MultaShow({
                 )}
             {dialogo?.tipo === 'verificar' && (
                 <VerifyPaymentDialog
+                    key={dialogo.pago.id}
                     pago={dialogo.pago}
-                    candidatos={candidatosDelPago}
+                    candidatos={
+                        candidatosDelPago?.paymentId === dialogo.pago.id
+                            ? candidatosDelPago.candidates
+                            : undefined
+                    }
                     puedeBuscar={can.searchCredits}
                     creditos={creditosDisponibles}
                     firmantes={firmantes}

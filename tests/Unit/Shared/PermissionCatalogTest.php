@@ -59,7 +59,10 @@ class PermissionCatalogTest extends TestCase
         $catalogo = app(PermissionCatalog::class);
 
         $this->assertContains('desarrollo', array_column($catalogo->grouped(includeDeveloperAbilities: true), 'key'));
-        $this->assertSame(['dev.forzar-cbu'], $catalogo->defaultsFor(SystemRole::SuperAdmin));
+        $this->assertEqualsCanonicalizing(
+            ['dev.forzar-cbu', 'dev.buscar-creditos-multas'],
+            $catalogo->defaultsFor(SystemRole::SuperAdmin),
+        );
     }
 
     public function test_registrar_dos_veces_el_mismo_permiso_falla(): void

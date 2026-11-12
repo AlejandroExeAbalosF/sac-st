@@ -39,7 +39,10 @@ export default function VerifyPaymentDialog({
     onClose,
 }: {
     pago: Pago;
-    /** Los propuestos para este pago; llegan al abrir. */
+    /**
+     * Los propuestos para **este** pago; llegan al abrir. Quien lo usa pasa
+     * `undefined` mientras la lista que tiene sea de otro pago.
+     */
     candidatos?: Candidato[];
     /** Buscar a mano en el extracto, además de lo propuesto: solo super-admin. */
     puedeBuscar: boolean;

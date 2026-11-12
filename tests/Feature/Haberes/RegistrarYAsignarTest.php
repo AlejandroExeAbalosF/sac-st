@@ -150,6 +150,32 @@ class RegistrarYAsignarTest extends TestCase
         // Con dos créditos, el recibo lleva el día del último: el que completó la cuota.
         $this->assertSame('2026-08-22', app(ReceiptFormData::class)->forInstallment($cuota)->fechaDeposito?->toDateString());
 
+        // Desasignado del todo el del 22, ya no financia la cuota: vuelve el del 21.
+        $delVeintidos = FundingAllocation::query()->live()
+            ->join('fund_receipts', 'fund_receipts.id', '=', 'funding_allocations.fund_receipt_id')
+            ->join('bank_transaction_allocations', 'bank_transaction_allocations.financial_event_id', '=', 'fund_receipts.financial_event_id')
+            ->where('bank_transaction_allocations.bank_transaction_id', $movimientos[1]->id)
+            ->select('funding_allocations.*')
+            ->firstOrFail();
+        app(UnallocateFunds::class)->handle(
+            allocation: $delVeintidos,
+            amount: $delVeintidos->amount,
+            idempotencyKey: 'liberar-22-'.Str::random(8),
+            motivo: new Reason(HaberesReasonCode::Other, 'Prueba de la fecha del recibo.'),
+            actorId: $this->operador()->id,
+        );
+        $this->assertSame('2026-08-21', app(ReceiptFormData::class)->forInstallment($cuota)->fechaDeposito?->toDateString());
+
+        // Se vuelve a asignar la misma recepción para seguir con el recibo: vuelve el 22.
+        app(AllocateFundsToInstallment::class)->handle(
+            FundReceipt::query()->findOrFail($delVeintidos->fund_receipt_id),
+            $cuota->refresh(),
+            $delVeintidos->amount,
+            'reasignar-22-'.Str::random(8),
+            $this->operador()->id,
+        );
+        $this->assertSame('2026-08-22', app(ReceiptFormData::class)->forInstallment($cuota)->fechaDeposito?->toDateString());
+
         $this->emitirRecibo($cuota);
         $this->anularElCobro($cuota);
         $this->assertSame([], $ticket->refresh()->transactionIds());
