@@ -388,7 +388,7 @@ function ZonaDeArchivo({
                 onElegir(e.dataTransfer.files?.[0] ?? null);
             }}
             className={cn(
-                'rounded-lg border border-dashed transition-colors motion-reduce:transition-none',
+                'min-w-0 rounded-lg border border-dashed transition-colors motion-reduce:transition-none',
                 encima
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50',
