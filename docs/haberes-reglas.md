@@ -138,7 +138,10 @@ el recibo congela lo que se debía en `amount_due_snapshot`; **base**:
 entre las que `receipts_append_only()` no deja editar. La vista previa imprime el
 total que tendrá el recibo, no solo el pendiente. En banco, el ticket
 requiere identificar los créditos cuya suma coincide exactamente con su importe y
-registrar una recepción/asignación por cada movimiento. La selección parcial no
+registrar una recepción/asignación por cada movimiento. Mientras
+`haberes.split_deposit_match_enabled` esté apagado, es **un solo crédito** por el
+importe entero: la pantalla no ofrece otro y `LinkDepositTicket` rechaza más de uno
+(**Action**; la base sigue admitiendo varios, con el control de la suma). La selección parcial no
 queda conciliada; una suma superior se rechaza en la pantalla, el Action y la base.
 En el papel, las tres casillas de «Depósito Cta.» llevan el día del crédito en el
 extracto (la fecha del movimiento, no la de valor) y «N.º Op», su número de

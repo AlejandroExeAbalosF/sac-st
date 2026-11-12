@@ -247,6 +247,8 @@ class PantallasDeDepositosTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('haberes/depositos/search')
+                // En pausa: la pantalla ofrece un solo crédito por comprobante.
+                ->where('splitMatch', false)
                 ->where('periodImported', false)
                 ->has('candidates', 0)
                 ->where(

@@ -48,6 +48,11 @@ type Props = {
     canLink: boolean;
     canDiscard: boolean;
     canEditTicket: boolean;
+    /**
+     * Si se admiten varios créditos que sumen el comprobante. En pausa: sin
+     * esto se elige uno solo, por el importe entero, y el servidor rechaza más.
+     */
+    splitMatch: boolean;
 };
 
 /**
@@ -73,6 +78,7 @@ export default function DepositoSearch({
     openingDate,
     canLink,
     canDiscard,
+    splitMatch,
 }: Props) {
     const [descartando, setDescartando] = useState(false);
     const [desvinculando, setDesvinculando] = useState(false);
@@ -85,6 +91,15 @@ export default function DepositoSearch({
         0,
     );
     const objetivo = centavos(ticket.amount);
+    /*
+     * Con varios créditos, cualquiera que no pase la suma. Con uno solo,
+     * el del importe entero, y elegir otro reemplaza al anterior.
+     */
+    const admite = (importe: string) =>
+        splitMatch
+            ? total + centavos(importe) <= objetivo
+            : centavos(importe) === objetivo;
+    const noAdmite = splitMatch ? 'Supera el importe' : 'Otro importe';
     const seleccionar = (id: number, importe: string) => {
         if (seleccionados[id] !== undefined) {
             setSeleccionados((actual) => {
@@ -93,8 +108,10 @@ export default function DepositoSearch({
 
                 return copia;
             });
-        } else if (total + centavos(importe) <= objetivo) {
-            setSeleccionados((actual) => ({ ...actual, [id]: importe }));
+        } else if (admite(importe)) {
+            setSeleccionados((actual) =>
+                splitMatch ? { ...actual, [id]: importe } : { [id]: importe },
+            );
         }
     };
 
@@ -230,9 +247,11 @@ export default function DepositoSearch({
                         ) : (
                             <>
                                 <p className="text-sm text-muted-foreground">
-                                    {candidates.length === 1
-                                        ? 'Un movimiento puede formar parte del comprobante.'
-                                        : `${candidates.length} movimientos pueden formar parte del comprobante. Revisá la suma antes de conciliar.`}
+                                    {!splitMatch
+                                        ? 'El comprobante se concilia con un solo crédito, por su importe entero.'
+                                        : candidates.length === 1
+                                          ? 'Un movimiento puede formar parte del comprobante.'
+                                          : `${candidates.length} movimientos pueden formar parte del comprobante. Revisá la suma antes de conciliar.`}
                                 </p>
                                 {candidates.map((candidato) => (
                                     <TarjetaCandidato
@@ -254,10 +273,8 @@ export default function DepositoSearch({
                                                 candidato.transactionId
                                             ] !== undefined
                                         }
-                                        excede={
-                                            total + centavos(candidato.amount) >
-                                            objetivo
-                                        }
+                                        excede={!admite(candidato.amount)}
+                                        noAdmite={noAdmite}
                                         onVincular={() =>
                                             seleccionar(
                                                 candidato.transactionId,
@@ -279,8 +296,8 @@ export default function DepositoSearch({
                                 puedeVincular={canLink}
                                 esAnterior={esAnterior}
                                 seleccionados={seleccionados}
-                                total={total}
-                                objetivo={objetivo}
+                                admite={admite}
+                                varios={splitMatch}
                                 onVincular={seleccionar}
                             />
                         )}
@@ -320,6 +337,7 @@ function TarjetaCandidato({
     yaVinculado,
     seleccionado,
     excede,
+    noAdmite,
     onVincular,
 }: {
     candidato: Candidato;
@@ -328,6 +346,8 @@ function TarjetaCandidato({
     yaVinculado: boolean;
     seleccionado: boolean;
     excede: boolean;
+    /** Por qué no se puede elegir: pasa la suma, o no es el importe entero. */
+    noAdmite: string;
     onVincular: () => void;
 }) {
     const fuerte = candidato.operationMatches || candidato.employerMatches;
@@ -384,7 +404,7 @@ function TarjetaCandidato({
                         {seleccionado
                             ? 'Quitar'
                             : excede
-                              ? 'Supera el importe'
+                              ? noAdmite
                               : 'Seleccionar'}
                     </Button>
                 ) : null}
@@ -440,8 +460,8 @@ function Disponibles({
     puedeVincular,
     esAnterior,
     seleccionados,
-    total,
-    objetivo,
+    admite,
+    varios,
     onVincular,
 }: {
     ticketId: number;
@@ -452,8 +472,10 @@ function Disponibles({
     puedeVincular: boolean;
     esAnterior: (fecha: string) => boolean;
     seleccionados: Record<number, string>;
-    total: number;
-    objetivo: number;
+    /** Si ese importe se puede elegir con lo ya seleccionado. */
+    admite: (importe: string) => boolean;
+    /** Si se admiten varios créditos que sumen el comprobante. */
+    varios: boolean;
     onVincular: (transactionId: number, amount: string) => void;
 }) {
     const pedir = (nuevoOrden: string) =>
@@ -565,11 +587,7 @@ function Disponibles({
                                         className="h-8 text-xs"
                                         disabled={
                                             seleccionados[m.id] === undefined &&
-                                            total +
-                                                Math.round(
-                                                    Number(m.amount) * 100,
-                                                ) >
-                                                objetivo
+                                            !admite(m.amount)
                                         }
                                         onClick={() =>
                                             onVincular(m.id, m.amount)
@@ -587,8 +605,9 @@ function Disponibles({
             )}
 
             <p className="text-xs text-muted-foreground">
-                Podés seleccionar varios créditos. La suma debe coincidir con el
-                importe del comprobante y nunca superarlo.
+                {varios
+                    ? 'Podés seleccionar varios créditos. La suma debe coincidir con el importe del comprobante y nunca superarlo.'
+                    : 'Se elige un solo crédito, por el importe entero del comprobante. Si ninguno coincide, revisá el importe cargado.'}
             </p>
         </div>
     );

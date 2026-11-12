@@ -115,9 +115,11 @@ emisión en una transacción cuando corresponde cobrar. Obtiene el importe pendi
 y el medio de la cuota, no de un importe libre enviado por el navegador.
 
 **Depósito en cuenta.** El comprobante se carga desde la cuota. La cola `/depositos`
-permite buscar y vincular uno o varios créditos del extracto. Se seleccionan juntos:
-la suma no puede superar el importe del comprobante y solo se confirma el cruce
-cuando coincide exactamente. Cada crédito genera su propia recepción y asignación;
+permite buscar y vincular el crédito del extracto, **uno solo y por el importe
+entero** del comprobante: el cruce con varios créditos está construido pero en pausa
+(`config/haberes.php`, `split_deposit_match_enabled`). Prendido, se seleccionan
+varios juntos: la suma no puede superar el importe del comprobante y solo se
+confirma el cruce cuando coincide exactamente. Cada crédito genera su propia recepción y asignación;
 la foto del ticket por sí sola no financia la cuota.
 
 En la columna «Detalle» de `/banco/movimientos`, quien puede consultar expedientes

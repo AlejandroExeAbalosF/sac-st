@@ -54,6 +54,11 @@ final class LinkDepositTicket
             throw new RuntimeException('Elegí movimientos distintos para conciliar el comprobante.');
         }
 
+        // En pausa (`haberes.split_deposit_match_enabled`): un comprobante, un crédito.
+        if (count($ids) > 1 && ! config('haberes.split_deposit_match_enabled', false)) {
+            throw new RuntimeException('El comprobante se concilia con un solo crédito del extracto, por su importe entero.');
+        }
+
         return DB::transaction(function () use ($ticket, $ids, $userId): DepositTicket {
             $ticket = DepositTicket::query()->lockForUpdate()->findOrFail($ticket->id);
             $movimientos = BankTransaction::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();

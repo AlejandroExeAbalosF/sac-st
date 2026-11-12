@@ -301,8 +301,28 @@ class CruceDeTicketsTest extends TestCase
         app(LinkDepositTicket::class)->handle($ticket, $otro, $this->operador()->id);
     }
 
+    /** En pausa (`haberes.split_deposit_match_enabled`): un comprobante, un crédito. */
+    public function test_con_el_cruce_multiple_en_pausa_no_se_concilian_dos_creditos(): void
+    {
+        $cuenta = $this->cuenta();
+        $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
+        $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
+        $segundo = $this->movimiento($cuenta, '40000.00', '2026-04-24');
+
+        try {
+            app(LinkDepositTicket::class)->handleMany($ticket, [$primero, $segundo], $this->operador()->id);
+            $this->fail('Se concilió con dos créditos estando en pausa.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('un solo crédito', $e->getMessage());
+        }
+
+        $this->assertSame(DepositTicketStatus::Waiting, $ticket->refresh()->status);
+        $this->assertDatabaseCount('deposit_ticket_additional_transactions', 0);
+    }
+
     public function test_dos_creditos_concilian_un_comprobante_solo_si_suman_el_importe_exacto(): void
     {
+        config(['haberes.split_deposit_match_enabled' => true]);
         $cuenta = $this->cuenta();
         $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
         $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
@@ -323,6 +343,7 @@ class CruceDeTicketsTest extends TestCase
 
     public function test_no_acepta_suma_incompleta_ni_superior_al_comprobante(): void
     {
+        config(['haberes.split_deposit_match_enabled' => true]);
         $cuenta = $this->cuenta();
         $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
         $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');
@@ -342,6 +363,7 @@ class CruceDeTicketsTest extends TestCase
 
     public function test_la_base_rechaza_un_credito_adicional_que_supera_el_comprobante(): void
     {
+        config(['haberes.split_deposit_match_enabled' => true]);
         $cuenta = $this->cuenta();
         $ticket = $this->ticket($cuenta, '72000.00', '2026-04-24');
         $primero = $this->movimiento($cuenta, '32000.00', '2026-04-24');

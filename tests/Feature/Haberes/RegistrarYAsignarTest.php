@@ -95,6 +95,7 @@ class RegistrarYAsignarTest extends TestCase
 
     public function test_registra_dos_creditos_del_mismo_comprobante_sin_duplicar_ingresos(): void
     {
+        config(['haberes.split_deposit_match_enabled' => true]);
         $cuota = $this->cuota();
         $cuenta = $this->cuenta();
         $importe = $cuota->importeEsperado();

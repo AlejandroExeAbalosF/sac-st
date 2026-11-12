@@ -305,6 +305,8 @@ final class DepositTicketController extends Controller
             // Lo anterior se muestra apagado: `LinkDepositTicket` lo rechaza igual.
             'openingDate' => $enlaces->openingDate($ticket->bank_account_id),
             'canLink' => $request->user()?->can('depositos.vincular') ?? false,
+            // En pausa: sin esto, la pantalla deja elegir un solo crédito, por el importe entero.
+            'splitMatch' => (bool) config('haberes.split_deposit_match_enabled', false),
             'canDiscard' => $request->user()?->can('depositos.descartar') ?? false,
             'canEditTicket' => $request->user()?->can('depositos.registrar') ?? false,
         ]);
