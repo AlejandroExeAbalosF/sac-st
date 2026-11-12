@@ -3,72 +3,71 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
- * El cheque rechazado y su reemplazo — Multas M03, DER físico §6.6.
- *
- * Un rechazo conserva la aplicación y el recibo del pago: lo que cambia es
- * dónde está la plata, que ya no está. El cheque pasa a `REJECTED_CHEQUES`
- * —lo que la empresa tiene que regularizar— y deja de contar como fondos en
- * custodia, en tránsito o en el banco. La empresa lo regulariza con otro
- * cheque del mismo importe, que vuelve a custodia sin recibo nuevo ni nueva
- * recaudación; si también se rechaza, se repite, conservando la cadena.
- *
- * El banco se sigue aparte, con un asiento por hecho real y sin débitos
- * ficticios (`bank_status`):
- * - `not_applicable`: el cheque nunca salió de la caja, o se confirmó que el
- *   banco nunca lo acreditó;
- * - `unverified`: se depositó, el sistema no había registrado la
- *   acreditación, y el extracto todavía no dijo nada. No conciliado no es
- *   lo mismo que nunca acreditado;
- * - `debit_pending`: el banco acreditó y avisó el rechazo; el débito no
- *   está en el extracto (`PENDING_BANK_DEBITS`);
- * - `debit_recorded`: el débito está en el extracto y se imputó.
- *
- * Solo para cajas que depositan cobros enteros: en Haberes un cheque se
- * reparte entre cuotas y su rechazo tendría otra semántica.
+ * Consolidación cronológica del proceso. Cada bloque conserva la migración
+ * original para mantener visibles sus reglas y permitir el rollback inverso.
  */
 return new class extends Migration
 {
-    private const TRASLADO_CON_DEVUELTO = <<<'SQL'
-            CREATE OR REPLACE FUNCTION cash_to_bank_transfers_append_only() RETURNS trigger AS $$
-            BEGIN
-                IF TG_OP = 'DELETE' THEN
-                    RAISE EXCEPTION 'Un traslado de efectivo no se borra: se revierte.'
-                        USING ERRCODE = 'restrict_violation';
-                END IF;
+    public function up(): void
+    {
+        foreach ($this->migrations() as $migration) {
+            $this->run($migration, 'up');
+        }
+    }
 
-                IF NEW.deposit_event_id IS DISTINCT FROM OLD.deposit_event_id
-                    OR NEW.cash_box_id IS DISTINCT FROM OLD.cash_box_id
-                    OR NEW.bank_account_id IS DISTINCT FROM OLD.bank_account_id
-                    OR NEW.amount IS DISTINCT FROM OLD.amount
-                    OR NEW.deposit_date IS DISTINCT FROM OLD.deposit_date
-                THEN
-                    RAISE EXCEPTION 'Un traslado de efectivo no se edita: se revierte.'
-                        USING ERRCODE = 'restrict_violation';
-                END IF;
+    public function down(): void
+    {
+        foreach (array_reverse($this->migrations()) as $migration) {
+            $this->run($migration, 'down');
+        }
+    }
 
-                IF OLD.credit_event_id IS NOT NULL
-                    AND NEW.credit_event_id IS DISTINCT FROM OLD.credit_event_id
-                THEN
-                    RAISE EXCEPTION 'La acreditacion de un traslado no se reasigna.'
-                        USING ERRCODE = 'restrict_violation';
-                END IF;
+    private function run(Migration $migration, string $method): void
+    {
+        $callback = [$migration, $method];
 
-                IF NEW.status IS DISTINCT FROM OLD.status
-                    AND NOT (OLD.status = 'deposited' AND NEW.status IN ('bank_confirmed', 'cancelled', 'bounced'))
-                THEN
-                    RAISE EXCEPTION 'Un traslado % no pasa a %: solo avanza el que espera acreditación.', OLD.status, NEW.status
-                        USING ERRCODE = 'check_violation';
-                END IF;
+        if (! is_callable($callback)) {
+            throw new LogicException("La migración consolidada no tiene {$method}().");
+        }
 
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-        SQL;
+        $callback();
+    }
 
-    private const TRASLADO_ORIGINAL = <<<'SQL'
+    /** @return list<Migration> */
+    private function migrations(): array
+    {
+        return [
+            /**
+             * Cada cobro de caja se deposita entero, en su propio traslado — Multas M06,
+             * DER físico §7.
+             *
+             * Haberes deposita por cuota: un traslado lleva las asignaciones de una
+             * cuota, y un cheque puede viajar repartido entre varias. Multas no: cada
+             * cobro recibido por la caja va al banco completo, solo, y a la cuenta con
+             * la que opera su libro. Es una política de la caja
+             * (`cash_boxes.deposits_whole_receipts`), no de Multas, para que Aranceles la
+             * tome el día que la confirme el área.
+             *
+             * Con la política:
+             * - un traslado lleva un ítem, por el importe entero de una recepción de la
+             *   misma caja, recibida por el circuito, sin asignación a cuota;
+             * - la recepción tiene un solo traslado vigente; los cancelados quedan;
+             * - la cuenta es la del libro de la caja: la misma moneda no alcanza;
+             * - la acreditación es un crédito del extracto entero y sin otro uso: el
+             *   remanente de un crédito mayor no es la acreditación de un depósito.
+             *
+             * Y para todas las cajas, el traslado solo avanza desde `deposited`: a
+             * acreditado o a cancelado. Es lo que ya hacía Haberes; ahora lo dice la base.
+             */
+            // Migración original: 2026_10_23_000000_deposit_whole_receipts_by_cash_box.php
+            new class extends Migration
+            {
+                private const GUARDA_CON_TRANSICIONES = <<<'SQL'
             CREATE OR REPLACE FUNCTION cash_to_bank_transfers_append_only() RETURNS trigger AS $$
             BEGIN
                 IF TG_OP = 'DELETE' THEN
@@ -105,101 +104,41 @@ return new class extends Migration
             $$ LANGUAGE plpgsql;
         SQL;
 
-    private const CHEQUE_SIGUE_AL_TRASLADO = <<<'SQL'
-            CREATE OR REPLACE FUNCTION cheque_follows_transfer(p_receipt_id bigint) RETURNS void AS $$
-            DECLARE
-                v_cheque RECORD;
-                v_esperado TEXT;
+                private const GUARDA_ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION cash_to_bank_transfers_append_only() RETURNS trigger AS $$
             BEGIN
-                SELECT medium, cheque_status, cheque_number INTO v_cheque
-                  FROM fund_receipts WHERE id = p_receipt_id;
-
-                IF v_cheque.medium IS DISTINCT FROM 'cheque' THEN
-                    RETURN;
+                IF TG_OP = 'DELETE' THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se borra: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
                 END IF;
 
-                /*
-                 * Devuelto sin acreditar, o acreditado y rechazado después: en
-                 * los dos casos el cheque figura rechazado.
-                 */
-                SELECT CASE
-                         WHEN t.status = 'deposited' THEN 'deposited'
-                         WHEN t.status = 'bounced' THEN 'rejected'
-                         WHEN EXISTS (SELECT 1 FROM cheque_rejections c WHERE c.fund_receipt_id = p_receipt_id) THEN 'rejected'
-                         ELSE 'cleared'
-                       END
-                  INTO v_esperado
-                  FROM cash_to_bank_transfer_items i
-                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
-                 WHERE i.fund_receipt_id = p_receipt_id
-                   AND t.status <> 'cancelled'
-                 LIMIT 1;
-
-                IF v_esperado IS NOT NULL AND v_cheque.cheque_status IS DISTINCT FROM v_esperado THEN
-                    RAISE EXCEPTION 'El cheque % viajó en un traslado vigente: tiene que figurar %, no %.',
-                        coalesce(v_cheque.cheque_number, '(sin número)'), v_esperado, v_cheque.cheque_status
-                        USING ERRCODE = 'check_violation';
+                IF NEW.deposit_event_id IS DISTINCT FROM OLD.deposit_event_id
+                    OR NEW.cash_box_id IS DISTINCT FROM OLD.cash_box_id
+                    OR NEW.bank_account_id IS DISTINCT FROM OLD.bank_account_id
+                    OR NEW.amount IS DISTINCT FROM OLD.amount
+                    OR NEW.deposit_date IS DISTINCT FROM OLD.deposit_date
+                THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se edita: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
                 END IF;
 
-                -- Rechazado es tener un rechazo registrado, y al revés.
-                IF (v_cheque.cheque_status = 'rejected')
-                    <> EXISTS (SELECT 1 FROM cheque_rejections c WHERE c.fund_receipt_id = p_receipt_id) THEN
-                    RAISE EXCEPTION 'El cheque % figura % y su rechazo dice otra cosa: rechazado es tener el rechazo registrado.',
-                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
-                        USING ERRCODE = 'check_violation';
+                IF OLD.credit_event_id IS NOT NULL
+                    AND NEW.credit_event_id IS DISTINCT FROM OLD.credit_event_id
+                THEN
+                    RAISE EXCEPTION 'La acreditacion de un traslado no se reasigna.'
+                        USING ERRCODE = 'restrict_violation';
                 END IF;
-
-                IF v_esperado IS NULL AND v_cheque.cheque_status IN ('deposited', 'cleared') THEN
-                    RAISE EXCEPTION 'El cheque % figura % sin ningún traslado vigente que lo haya llevado al banco.',
-                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
-                        USING ERRCODE = 'check_violation';
-                END IF;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE CONSTRAINT TRIGGER cheque_follows_transfer_rejection
-                AFTER INSERT ON cheque_rejections
-                DEFERRABLE INITIALLY DEFERRED
-                FOR EACH ROW EXECUTE FUNCTION cheque_follows_transfer_from_item();
-        SQL;
-
-    private const CHEQUE_SIGUE_AL_TRASLADO_ORIGINAL = <<<'SQL'
-            CREATE OR REPLACE FUNCTION cheque_follows_transfer(p_receipt_id bigint) RETURNS void AS $$
-            DECLARE
-                v_cheque RECORD;
-                v_esperado TEXT;
-            BEGIN
-                SELECT medium, cheque_status, cheque_number INTO v_cheque
-                  FROM fund_receipts WHERE id = p_receipt_id;
-
-                IF v_cheque.medium IS DISTINCT FROM 'cheque' THEN
-                    RETURN;
-                END IF;
-
-                SELECT CASE t.status WHEN 'deposited' THEN 'deposited' ELSE 'cleared' END
-                  INTO v_esperado
-                  FROM cash_to_bank_transfer_items i
-                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
-                 WHERE i.fund_receipt_id = p_receipt_id
-                   AND t.status <> 'cancelled'
-                 LIMIT 1;
-
-                IF v_esperado IS NOT NULL AND v_cheque.cheque_status IS DISTINCT FROM v_esperado THEN
-                    RAISE EXCEPTION 'El cheque % viajó en un traslado vigente: tiene que figurar %, no %.',
-                        coalesce(v_cheque.cheque_number, '(sin número)'), v_esperado, v_cheque.cheque_status
-                        USING ERRCODE = 'check_violation';
-                END IF;
-
-                IF v_esperado IS NULL AND v_cheque.cheque_status IN ('deposited', 'cleared') THEN
-                    RAISE EXCEPTION 'El cheque % figura % sin ningún traslado vigente que lo haya llevado al banco.',
-                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
-                        USING ERRCODE = 'check_violation';
-                END IF;
+                RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
         SQL;
 
-    private const POLITICA_CON_REEMPLAZOS = <<<'SQL'
+                public function up(): void
+                {
+                    DB::unprepared(<<<'SQL'
+            ALTER TABLE cash_boxes ADD COLUMN deposits_whole_receipts boolean NOT NULL DEFAULT false;
+            UPDATE cash_boxes SET deposits_whole_receipts = true WHERE code = 'multas';
+
             CREATE OR REPLACE FUNCTION transfer_follows_box_policy(p_transfer bigint) RETURNS void AS $$
             DECLARE
                 v_traslado RECORD;
@@ -245,7 +184,7 @@ return new class extends Migration
 
                 IF v_item.funding_allocation_id IS NOT NULL
                     OR v_item.receipt_box IS DISTINCT FROM v_traslado.cash_box_id
-                    OR v_item.origin NOT IN ('received', 'replacement')
+                    OR v_item.origin <> 'received'
                     OR v_item.medium NOT IN ('cash', 'cheque') THEN
                     RAISE EXCEPTION 'Esta caja deposita cobros recibidos por su mostrador, sin asignarlos a nadie.'
                         USING ERRCODE = 'check_violation';
@@ -255,15 +194,6 @@ return new class extends Migration
                     RAISE EXCEPTION 'El cobro viaja entero: % y no %.', v_item.receipt_amount, v_item.amount
                         USING ERRCODE = 'check_violation';
                 END IF;
-
-                /*
-                 * Serializa a quienes depositan el mismo cobro: el segundo espera
-                 * acá y, al seguir, cuenta ya con el traslado del primero
-                 * confirmado. NO KEY UPDATE y no UPDATE: tiene que convivir con
-                 * el KEY SHARE que la FK del ítem deja en cada escritor; con
-                 * UPDATE, dos escritores se esperarían entre sí.
-                 */
-                PERFORM 1 FROM fund_receipts WHERE id = v_item.fund_receipt_id FOR NO KEY UPDATE;
 
                 SELECT count(DISTINCT t.id) INTO v_vigentes
                   FROM cash_to_bank_transfer_items i
@@ -276,9 +206,100 @@ return new class extends Migration
                 END IF;
             END;
             $$ LANGUAGE plpgsql;
-        SQL;
 
-    private const POLITICA_ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION transfer_follows_box_policy_transfer() RETURNS trigger AS $$
+            BEGIN
+                PERFORM transfer_follows_box_policy(NEW.id);
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE OR REPLACE FUNCTION transfer_follows_box_policy_item() RETURNS trigger AS $$
+            BEGIN
+                PERFORM transfer_follows_box_policy(NEW.cash_to_bank_transfer_id);
+                RETURN NULL;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            -- Diferidos: el traslado y su ítem se insertan en dos sentencias.
+            CREATE CONSTRAINT TRIGGER transfer_follows_box_policy_transfer
+                AFTER INSERT ON cash_to_bank_transfers DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION transfer_follows_box_policy_transfer();
+            CREATE CONSTRAINT TRIGGER transfer_follows_box_policy_item
+                AFTER INSERT ON cash_to_bank_transfer_items DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION transfer_follows_box_policy_item();
+
+            CREATE OR REPLACE FUNCTION cash_deposit_credit_whole() RETURNS trigger AS $$
+            DECLARE
+                v_entero boolean;
+                v_movimiento numeric(19, 2);
+                v_otros numeric(19, 2);
+            BEGIN
+                SELECT b.deposits_whole_receipts INTO v_entero
+                  FROM financial_events e
+                  JOIN cash_boxes b ON b.id = e.cash_box_id
+                 WHERE e.id = NEW.financial_event_id;
+
+                IF NOT coalesce(v_entero, false) THEN
+                    RETURN NEW;
+                END IF;
+
+                SELECT abs(amount) INTO v_movimiento FROM bank_transactions WHERE id = NEW.bank_transaction_id;
+                SELECT coalesce(sum(CASE WHEN reversal_of_id IS NULL THEN amount ELSE -amount END), 0) INTO v_otros
+                  FROM bank_transaction_allocations
+                 WHERE bank_transaction_id = NEW.bank_transaction_id AND id <> NEW.id;
+
+                IF NEW.amount <> v_movimiento OR v_otros <> 0 THEN
+                    RAISE EXCEPTION 'El depósito de esta caja se acredita con un crédito entero y sin otro uso: % de %, con % ya imputado.',
+                        NEW.amount, v_movimiento, v_otros
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER cash_deposit_credit_whole
+                AFTER INSERT ON bank_transaction_allocations
+                FOR EACH ROW
+                WHEN (NEW.allocation_role = 'cash_deposit_confirmation' AND NEW.reversal_of_id IS NULL)
+                EXECUTE FUNCTION cash_deposit_credit_whole();
+        SQL);
+
+                    // Solo avanza el que espera acreditación: a acreditado o a cancelado.
+                    DB::unprepared(self::GUARDA_CON_TRANSICIONES);
+                }
+
+                public function down(): void
+                {
+                    DB::unprepared(self::GUARDA_ORIGINAL);
+
+                    DB::unprepared(<<<'SQL'
+            DROP TRIGGER cash_deposit_credit_whole ON bank_transaction_allocations;
+            DROP FUNCTION cash_deposit_credit_whole();
+            DROP TRIGGER transfer_follows_box_policy_item ON cash_to_bank_transfer_items;
+            DROP TRIGGER transfer_follows_box_policy_transfer ON cash_to_bank_transfers;
+            DROP FUNCTION transfer_follows_box_policy_item();
+            DROP FUNCTION transfer_follows_box_policy_transfer();
+            DROP FUNCTION transfer_follows_box_policy(bigint);
+            ALTER TABLE cash_boxes DROP COLUMN deposits_whole_receipts;
+        SQL);
+                }
+            },
+
+            /**
+             * Un cobro, un traslado vigente: también cuando dos escriben a la vez.
+             *
+             * `transfer_follows_box_policy` contaba los traslados vigentes del cobro sin
+             * bloquear nada en común, así que dos transacciones que llegaban juntas al
+             * commit no veían el traslado de la otra y las dos pasaban. El Action ya
+             * bloquea la recepción antes de escribir; la base ahora lo hace por su
+             * cuenta, para cualquier otro escritor (revisión de la tanda 5a, R1).
+             */
+            // Migración original: 2026_10_23_005000_serialize_whole_receipt_deposits.php
+            new class extends Migration
+            {
+                private const SERIALIZADA = <<<'SQL'
             CREATE OR REPLACE FUNCTION transfer_follows_box_policy(p_transfer bigint) RETURNS void AS $$
             DECLARE
                 v_traslado RECORD;
@@ -357,7 +378,441 @@ return new class extends Migration
             $$ LANGUAGE plpgsql;
         SQL;
 
-    private const SALDOS_CON_REGULARIZACION = <<<'SQL'
+                private const ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION transfer_follows_box_policy(p_transfer bigint) RETURNS void AS $$
+            DECLARE
+                v_traslado RECORD;
+                v_cuenta bigint;
+                v_items integer;
+                v_item RECORD;
+                v_vigentes integer;
+            BEGIN
+                SELECT t.id, t.cash_box_id, t.bank_account_id, t.amount, t.status, b.deposits_whole_receipts, a.currency
+                  INTO v_traslado
+                  FROM cash_to_bank_transfers t
+                  JOIN cash_boxes b ON b.id = t.cash_box_id
+                  JOIN bank_accounts a ON a.id = t.bank_account_id
+                 WHERE t.id = p_transfer;
+
+                IF NOT FOUND OR NOT v_traslado.deposits_whole_receipts THEN
+                    RETURN;
+                END IF;
+
+                SELECT bank_account_id INTO v_cuenta
+                  FROM cash_book_openings
+                 WHERE cash_box_id = v_traslado.cash_box_id AND currency = v_traslado.currency;
+
+                IF v_cuenta IS DISTINCT FROM v_traslado.bank_account_id THEN
+                    RAISE EXCEPTION 'Esta caja deposita en la cuenta con la que opera su libro (%), no en la %.',
+                        v_cuenta, v_traslado.bank_account_id
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT count(*) INTO v_items FROM cash_to_bank_transfer_items WHERE cash_to_bank_transfer_id = p_transfer;
+
+                IF v_items <> 1 THEN
+                    RAISE EXCEPTION 'Un traslado de esta caja lleva un solo cobro, entero: tiene %.', v_items
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT i.fund_receipt_id, i.funding_allocation_id, i.amount, r.amount AS receipt_amount,
+                       r.cash_box_id AS receipt_box, r.origin, r.medium
+                  INTO v_item
+                  FROM cash_to_bank_transfer_items i
+                  JOIN fund_receipts r ON r.id = i.fund_receipt_id
+                 WHERE i.cash_to_bank_transfer_id = p_transfer;
+
+                IF v_item.funding_allocation_id IS NOT NULL
+                    OR v_item.receipt_box IS DISTINCT FROM v_traslado.cash_box_id
+                    OR v_item.origin <> 'received'
+                    OR v_item.medium NOT IN ('cash', 'cheque') THEN
+                    RAISE EXCEPTION 'Esta caja deposita cobros recibidos por su mostrador, sin asignarlos a nadie.'
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF v_item.amount <> v_item.receipt_amount OR v_traslado.amount <> v_item.receipt_amount THEN
+                    RAISE EXCEPTION 'El cobro viaja entero: % y no %.', v_item.receipt_amount, v_item.amount
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT count(DISTINCT t.id) INTO v_vigentes
+                  FROM cash_to_bank_transfer_items i
+                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
+                 WHERE i.fund_receipt_id = v_item.fund_receipt_id AND t.status <> 'cancelled';
+
+                IF v_vigentes > 1 THEN
+                    RAISE EXCEPTION 'Ese cobro ya tiene un traslado vigente: uno solo por cobro.'
+                        USING ERRCODE = 'unique_violation';
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                public function up(): void
+                {
+                    DB::unprepared(self::SERIALIZADA);
+                }
+
+                public function down(): void
+                {
+                    DB::unprepared(self::ORIGINAL);
+                }
+            },
+
+            /**
+             * El cheque rechazado y su reemplazo — Multas M03, DER físico §6.6.
+             *
+             * Un rechazo conserva la aplicación y el recibo del pago: lo que cambia es
+             * dónde está la plata, que ya no está. El cheque pasa a `REJECTED_CHEQUES`
+             * —lo que la empresa tiene que regularizar— y deja de contar como fondos en
+             * custodia, en tránsito o en el banco. La empresa lo regulariza con otro
+             * cheque del mismo importe, que vuelve a custodia sin recibo nuevo ni nueva
+             * recaudación; si también se rechaza, se repite, conservando la cadena.
+             *
+             * El banco se sigue aparte, con un asiento por hecho real y sin débitos
+             * ficticios (`bank_status`):
+             * - `not_applicable`: el cheque nunca salió de la caja, o se confirmó que el
+             *   banco nunca lo acreditó;
+             * - `unverified`: se depositó, el sistema no había registrado la
+             *   acreditación, y el extracto todavía no dijo nada. No conciliado no es
+             *   lo mismo que nunca acreditado;
+             * - `debit_pending`: el banco acreditó y avisó el rechazo; el débito no
+             *   está en el extracto (`PENDING_BANK_DEBITS`);
+             * - `debit_recorded`: el débito está en el extracto y se imputó.
+             *
+             * Solo para cajas que depositan cobros enteros: en Haberes un cheque se
+             * reparte entre cuotas y su rechazo tendría otra semántica.
+             */
+            // Migración original: 2026_10_23_010000_add_cheque_rejections.php
+            new class extends Migration
+            {
+                private const TRASLADO_CON_DEVUELTO = <<<'SQL'
+            CREATE OR REPLACE FUNCTION cash_to_bank_transfers_append_only() RETURNS trigger AS $$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se borra: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF NEW.deposit_event_id IS DISTINCT FROM OLD.deposit_event_id
+                    OR NEW.cash_box_id IS DISTINCT FROM OLD.cash_box_id
+                    OR NEW.bank_account_id IS DISTINCT FROM OLD.bank_account_id
+                    OR NEW.amount IS DISTINCT FROM OLD.amount
+                    OR NEW.deposit_date IS DISTINCT FROM OLD.deposit_date
+                THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se edita: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF OLD.credit_event_id IS NOT NULL
+                    AND NEW.credit_event_id IS DISTINCT FROM OLD.credit_event_id
+                THEN
+                    RAISE EXCEPTION 'La acreditacion de un traslado no se reasigna.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF NEW.status IS DISTINCT FROM OLD.status
+                    AND NOT (OLD.status = 'deposited' AND NEW.status IN ('bank_confirmed', 'cancelled', 'bounced'))
+                THEN
+                    RAISE EXCEPTION 'Un traslado % no pasa a %: solo avanza el que espera acreditación.', OLD.status, NEW.status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const TRASLADO_ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION cash_to_bank_transfers_append_only() RETURNS trigger AS $$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se borra: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF NEW.deposit_event_id IS DISTINCT FROM OLD.deposit_event_id
+                    OR NEW.cash_box_id IS DISTINCT FROM OLD.cash_box_id
+                    OR NEW.bank_account_id IS DISTINCT FROM OLD.bank_account_id
+                    OR NEW.amount IS DISTINCT FROM OLD.amount
+                    OR NEW.deposit_date IS DISTINCT FROM OLD.deposit_date
+                THEN
+                    RAISE EXCEPTION 'Un traslado de efectivo no se edita: se revierte.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF OLD.credit_event_id IS NOT NULL
+                    AND NEW.credit_event_id IS DISTINCT FROM OLD.credit_event_id
+                THEN
+                    RAISE EXCEPTION 'La acreditacion de un traslado no se reasigna.'
+                        USING ERRCODE = 'restrict_violation';
+                END IF;
+
+                IF NEW.status IS DISTINCT FROM OLD.status
+                    AND NOT (OLD.status = 'deposited' AND NEW.status IN ('bank_confirmed', 'cancelled'))
+                THEN
+                    RAISE EXCEPTION 'Un traslado % no pasa a %: solo avanza el que espera acreditación.', OLD.status, NEW.status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const CHEQUE_SIGUE_AL_TRASLADO = <<<'SQL'
+            CREATE OR REPLACE FUNCTION cheque_follows_transfer(p_receipt_id bigint) RETURNS void AS $$
+            DECLARE
+                v_cheque RECORD;
+                v_esperado TEXT;
+            BEGIN
+                SELECT medium, cheque_status, cheque_number INTO v_cheque
+                  FROM fund_receipts WHERE id = p_receipt_id;
+
+                IF v_cheque.medium IS DISTINCT FROM 'cheque' THEN
+                    RETURN;
+                END IF;
+
+                /*
+                 * Devuelto sin acreditar, o acreditado y rechazado después: en
+                 * los dos casos el cheque figura rechazado.
+                 */
+                SELECT CASE
+                         WHEN t.status = 'deposited' THEN 'deposited'
+                         WHEN t.status = 'bounced' THEN 'rejected'
+                         WHEN EXISTS (SELECT 1 FROM cheque_rejections c WHERE c.fund_receipt_id = p_receipt_id) THEN 'rejected'
+                         ELSE 'cleared'
+                       END
+                  INTO v_esperado
+                  FROM cash_to_bank_transfer_items i
+                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
+                 WHERE i.fund_receipt_id = p_receipt_id
+                   AND t.status <> 'cancelled'
+                 LIMIT 1;
+
+                IF v_esperado IS NOT NULL AND v_cheque.cheque_status IS DISTINCT FROM v_esperado THEN
+                    RAISE EXCEPTION 'El cheque % viajó en un traslado vigente: tiene que figurar %, no %.',
+                        coalesce(v_cheque.cheque_number, '(sin número)'), v_esperado, v_cheque.cheque_status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                -- Rechazado es tener un rechazo registrado, y al revés.
+                IF (v_cheque.cheque_status = 'rejected')
+                    <> EXISTS (SELECT 1 FROM cheque_rejections c WHERE c.fund_receipt_id = p_receipt_id) THEN
+                    RAISE EXCEPTION 'El cheque % figura % y su rechazo dice otra cosa: rechazado es tener el rechazo registrado.',
+                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF v_esperado IS NULL AND v_cheque.cheque_status IN ('deposited', 'cleared') THEN
+                    RAISE EXCEPTION 'El cheque % figura % sin ningún traslado vigente que lo haya llevado al banco.',
+                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE CONSTRAINT TRIGGER cheque_follows_transfer_rejection
+                AFTER INSERT ON cheque_rejections
+                DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW EXECUTE FUNCTION cheque_follows_transfer_from_item();
+        SQL;
+
+                private const CHEQUE_SIGUE_AL_TRASLADO_ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION cheque_follows_transfer(p_receipt_id bigint) RETURNS void AS $$
+            DECLARE
+                v_cheque RECORD;
+                v_esperado TEXT;
+            BEGIN
+                SELECT medium, cheque_status, cheque_number INTO v_cheque
+                  FROM fund_receipts WHERE id = p_receipt_id;
+
+                IF v_cheque.medium IS DISTINCT FROM 'cheque' THEN
+                    RETURN;
+                END IF;
+
+                SELECT CASE t.status WHEN 'deposited' THEN 'deposited' ELSE 'cleared' END
+                  INTO v_esperado
+                  FROM cash_to_bank_transfer_items i
+                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
+                 WHERE i.fund_receipt_id = p_receipt_id
+                   AND t.status <> 'cancelled'
+                 LIMIT 1;
+
+                IF v_esperado IS NOT NULL AND v_cheque.cheque_status IS DISTINCT FROM v_esperado THEN
+                    RAISE EXCEPTION 'El cheque % viajó en un traslado vigente: tiene que figurar %, no %.',
+                        coalesce(v_cheque.cheque_number, '(sin número)'), v_esperado, v_cheque.cheque_status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF v_esperado IS NULL AND v_cheque.cheque_status IN ('deposited', 'cleared') THEN
+                    RAISE EXCEPTION 'El cheque % figura % sin ningún traslado vigente que lo haya llevado al banco.',
+                        coalesce(v_cheque.cheque_number, '(sin número)'), v_cheque.cheque_status
+                        USING ERRCODE = 'check_violation';
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const POLITICA_CON_REEMPLAZOS = <<<'SQL'
+            CREATE OR REPLACE FUNCTION transfer_follows_box_policy(p_transfer bigint) RETURNS void AS $$
+            DECLARE
+                v_traslado RECORD;
+                v_cuenta bigint;
+                v_items integer;
+                v_item RECORD;
+                v_vigentes integer;
+            BEGIN
+                SELECT t.id, t.cash_box_id, t.bank_account_id, t.amount, t.status, b.deposits_whole_receipts, a.currency
+                  INTO v_traslado
+                  FROM cash_to_bank_transfers t
+                  JOIN cash_boxes b ON b.id = t.cash_box_id
+                  JOIN bank_accounts a ON a.id = t.bank_account_id
+                 WHERE t.id = p_transfer;
+
+                IF NOT FOUND OR NOT v_traslado.deposits_whole_receipts THEN
+                    RETURN;
+                END IF;
+
+                SELECT bank_account_id INTO v_cuenta
+                  FROM cash_book_openings
+                 WHERE cash_box_id = v_traslado.cash_box_id AND currency = v_traslado.currency;
+
+                IF v_cuenta IS DISTINCT FROM v_traslado.bank_account_id THEN
+                    RAISE EXCEPTION 'Esta caja deposita en la cuenta con la que opera su libro (%), no en la %.',
+                        v_cuenta, v_traslado.bank_account_id
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT count(*) INTO v_items FROM cash_to_bank_transfer_items WHERE cash_to_bank_transfer_id = p_transfer;
+
+                IF v_items <> 1 THEN
+                    RAISE EXCEPTION 'Un traslado de esta caja lleva un solo cobro, entero: tiene %.', v_items
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT i.fund_receipt_id, i.funding_allocation_id, i.amount, r.amount AS receipt_amount,
+                       r.cash_box_id AS receipt_box, r.origin, r.medium
+                  INTO v_item
+                  FROM cash_to_bank_transfer_items i
+                  JOIN fund_receipts r ON r.id = i.fund_receipt_id
+                 WHERE i.cash_to_bank_transfer_id = p_transfer;
+
+                IF v_item.funding_allocation_id IS NOT NULL
+                    OR v_item.receipt_box IS DISTINCT FROM v_traslado.cash_box_id
+                    OR v_item.origin NOT IN ('received', 'replacement')
+                    OR v_item.medium NOT IN ('cash', 'cheque') THEN
+                    RAISE EXCEPTION 'Esta caja deposita cobros recibidos por su mostrador, sin asignarlos a nadie.'
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF v_item.amount <> v_item.receipt_amount OR v_traslado.amount <> v_item.receipt_amount THEN
+                    RAISE EXCEPTION 'El cobro viaja entero: % y no %.', v_item.receipt_amount, v_item.amount
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                /*
+                 * Serializa a quienes depositan el mismo cobro: el segundo espera
+                 * acá y, al seguir, cuenta ya con el traslado del primero
+                 * confirmado. NO KEY UPDATE y no UPDATE: tiene que convivir con
+                 * el KEY SHARE que la FK del ítem deja en cada escritor; con
+                 * UPDATE, dos escritores se esperarían entre sí.
+                 */
+                PERFORM 1 FROM fund_receipts WHERE id = v_item.fund_receipt_id FOR NO KEY UPDATE;
+
+                SELECT count(DISTINCT t.id) INTO v_vigentes
+                  FROM cash_to_bank_transfer_items i
+                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
+                 WHERE i.fund_receipt_id = v_item.fund_receipt_id AND t.status <> 'cancelled';
+
+                IF v_vigentes > 1 THEN
+                    RAISE EXCEPTION 'Ese cobro ya tiene un traslado vigente: uno solo por cobro.'
+                        USING ERRCODE = 'unique_violation';
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const POLITICA_ORIGINAL = <<<'SQL'
+            CREATE OR REPLACE FUNCTION transfer_follows_box_policy(p_transfer bigint) RETURNS void AS $$
+            DECLARE
+                v_traslado RECORD;
+                v_cuenta bigint;
+                v_items integer;
+                v_item RECORD;
+                v_vigentes integer;
+            BEGIN
+                SELECT t.id, t.cash_box_id, t.bank_account_id, t.amount, t.status, b.deposits_whole_receipts, a.currency
+                  INTO v_traslado
+                  FROM cash_to_bank_transfers t
+                  JOIN cash_boxes b ON b.id = t.cash_box_id
+                  JOIN bank_accounts a ON a.id = t.bank_account_id
+                 WHERE t.id = p_transfer;
+
+                IF NOT FOUND OR NOT v_traslado.deposits_whole_receipts THEN
+                    RETURN;
+                END IF;
+
+                SELECT bank_account_id INTO v_cuenta
+                  FROM cash_book_openings
+                 WHERE cash_box_id = v_traslado.cash_box_id AND currency = v_traslado.currency;
+
+                IF v_cuenta IS DISTINCT FROM v_traslado.bank_account_id THEN
+                    RAISE EXCEPTION 'Esta caja deposita en la cuenta con la que opera su libro (%), no en la %.',
+                        v_cuenta, v_traslado.bank_account_id
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT count(*) INTO v_items FROM cash_to_bank_transfer_items WHERE cash_to_bank_transfer_id = p_transfer;
+
+                IF v_items <> 1 THEN
+                    RAISE EXCEPTION 'Un traslado de esta caja lleva un solo cobro, entero: tiene %.', v_items
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT i.fund_receipt_id, i.funding_allocation_id, i.amount, r.amount AS receipt_amount,
+                       r.cash_box_id AS receipt_box, r.origin, r.medium
+                  INTO v_item
+                  FROM cash_to_bank_transfer_items i
+                  JOIN fund_receipts r ON r.id = i.fund_receipt_id
+                 WHERE i.cash_to_bank_transfer_id = p_transfer;
+
+                IF v_item.funding_allocation_id IS NOT NULL
+                    OR v_item.receipt_box IS DISTINCT FROM v_traslado.cash_box_id
+                    OR v_item.origin <> 'received'
+                    OR v_item.medium NOT IN ('cash', 'cheque') THEN
+                    RAISE EXCEPTION 'Esta caja deposita cobros recibidos por su mostrador, sin asignarlos a nadie.'
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF v_item.amount <> v_item.receipt_amount OR v_traslado.amount <> v_item.receipt_amount THEN
+                    RAISE EXCEPTION 'El cobro viaja entero: % y no %.', v_item.receipt_amount, v_item.amount
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                /*
+                 * Serializa a quienes depositan el mismo cobro: el segundo espera
+                 * acá y, al seguir, cuenta ya con el traslado del primero
+                 * confirmado. NO KEY UPDATE y no UPDATE: tiene que convivir con
+                 * el KEY SHARE que la FK del ítem deja en cada escritor; con
+                 * UPDATE, dos escritores se esperarían entre sí.
+                 */
+                PERFORM 1 FROM fund_receipts WHERE id = v_item.fund_receipt_id FOR NO KEY UPDATE;
+
+                SELECT count(DISTINCT t.id) INTO v_vigentes
+                  FROM cash_to_bank_transfer_items i
+                  JOIN cash_to_bank_transfers t ON t.id = i.cash_to_bank_transfer_id
+                 WHERE i.fund_receipt_id = v_item.fund_receipt_id AND t.status <> 'cancelled';
+
+                IF v_vigentes > 1 THEN
+                    RAISE EXCEPTION 'Ese cobro ya tiene un traslado vigente: uno solo por cobro.'
+                        USING ERRCODE = 'unique_violation';
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const SALDOS_CON_REGULARIZACION = <<<'SQL'
             CREATE OR REPLACE VIEW fine_balances AS
             WITH base AS (
                 SELECT f.id AS fine_id,
@@ -393,7 +848,7 @@ return new class extends Migration
               FROM base;
         SQL;
 
-    private const SALDOS_ORIGINAL = <<<'SQL'
+                private const SALDOS_ORIGINAL = <<<'SQL'
             DROP VIEW fine_balances;
             CREATE OR REPLACE VIEW fine_balances AS
             WITH base AS (
@@ -419,9 +874,9 @@ return new class extends Migration
               FROM base;
         SQL;
 
-    public function up(): void
-    {
-        DB::unprepared(<<<'SQL'
+                public function up(): void
+                {
+                    DB::unprepared(<<<'SQL'
             -- ── Cuentas y hechos ──────────────────────────────────────────────
             ALTER TABLE journal_lines DROP CONSTRAINT journal_lines_account_check;
             ALTER TABLE journal_lines ADD CONSTRAINT journal_lines_account_check
@@ -843,20 +1298,20 @@ return new class extends Migration
                 EXECUTE FUNCTION cheque_rejection_movement_whole();
         SQL);
 
-        DB::unprepared(self::TRASLADO_CON_DEVUELTO);
-        DB::unprepared(self::CHEQUE_SIGUE_AL_TRASLADO);
-        DB::unprepared(self::POLITICA_CON_REEMPLAZOS);
-        DB::unprepared(self::SALDOS_CON_REGULARIZACION);
-    }
+                    DB::unprepared(self::TRASLADO_CON_DEVUELTO);
+                    DB::unprepared(self::CHEQUE_SIGUE_AL_TRASLADO);
+                    DB::unprepared(self::POLITICA_CON_REEMPLAZOS);
+                    DB::unprepared(self::SALDOS_CON_REGULARIZACION);
+                }
 
-    public function down(): void
-    {
-        DB::unprepared(self::SALDOS_ORIGINAL);
-        DB::unprepared(self::POLITICA_ORIGINAL);
-        DB::unprepared(self::CHEQUE_SIGUE_AL_TRASLADO_ORIGINAL);
-        DB::unprepared(self::TRASLADO_ORIGINAL);
+                public function down(): void
+                {
+                    DB::unprepared(self::SALDOS_ORIGINAL);
+                    DB::unprepared(self::POLITICA_ORIGINAL);
+                    DB::unprepared(self::CHEQUE_SIGUE_AL_TRASLADO_ORIGINAL);
+                    DB::unprepared(self::TRASLADO_ORIGINAL);
 
-        DB::unprepared(<<<'SQL'
+                    DB::unprepared(<<<'SQL'
             DROP TRIGGER cheque_rejection_movement_whole ON bank_transaction_allocations;
             DROP FUNCTION cheque_rejection_movement_whole();
             DROP TRIGGER cash_to_bank_transfers_bounced_by_rejection ON cash_to_bank_transfers;
@@ -967,5 +1422,401 @@ return new class extends Migration
                     'COLLECTED_FUNDS', 'PENDING_EXCESS'
                 ));
         SQL);
+                }
+            },
+
+            /**
+             * La evidencia del cierre congela también el formato de su reverso.
+             *
+             * Desde que Multas cierra, cada caja declara qué columnas identifican sus
+             * cheques y qué representa su columna de banco. Si eso se leyera del
+             * módulo al rehacer la planilla, una planilla vieja cambiaría de contenido
+             * el día que cambie la configuración. `schema 2` lo guarda con los datos:
+             * las columnas, que no pueden faltar ni venir vacías, y la aclaración de la
+             * columna de banco, que puede ser nula pero tiene que estar.
+             *
+             * La evidencia de `schema 1` ya existe y es toda de Haberes: se sigue
+             * aceptando tal cual, con sus columnas de siempre.
+             */
+            // Migración original: 2026_10_24_000000_freeze_cash_sheet_format_in_evidence.php
+            new class extends Migration
+            {
+                private const string FUNCION = <<<'SQL'
+        CREATE OR REPLACE FUNCTION closing_evidence_matches_version() RETURNS trigger AS $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM period_closings WHERE id = NEW.period_closing_id
+                AND status = 'closed' AND evidence_version = NEW.version) THEN
+                RAISE EXCEPTION 'La evidencia debe corresponder a la version vigente de un periodo cerrado.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF jsonb_typeof(NEW.payload) IS DISTINCT FROM 'object'
+                OR NEW.payload->>'schema' IS NULL
+                OR NEW.payload->>'schema' NOT IN ('1', '2') THEN
+                RAISE EXCEPTION 'Formato de evidencia de cierre invalido.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF NEW.payload->>'schema' = '2' AND (
+                jsonb_typeof(NEW.payload->'chequeColumns') IS DISTINCT FROM 'array'
+                OR jsonb_array_length(NEW.payload->'chequeColumns') = 0
+                OR NOT (NEW.payload ? 'bankColumnNote')
+                OR jsonb_typeof(NEW.payload->'bankColumnNote') NOT IN ('string', 'null')
+            ) THEN
+                RAISE EXCEPTION 'La evidencia del cierre tiene que congelar las columnas del reverso y la aclaracion de la columna de banco.' USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const string ANTERIOR = <<<'SQL'
+        CREATE OR REPLACE FUNCTION closing_evidence_matches_version() RETURNS trigger AS $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM period_closings WHERE id = NEW.period_closing_id
+                AND status = 'closed' AND evidence_version = NEW.version) THEN
+                RAISE EXCEPTION 'La evidencia debe corresponder a la version vigente de un periodo cerrado.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF jsonb_typeof(NEW.payload) IS DISTINCT FROM 'object' OR NEW.payload->>'schema' IS DISTINCT FROM '1' THEN
+                RAISE EXCEPTION 'Formato de evidencia de cierre invalido.' USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        SQL;
+
+                public function up(): void
+                {
+                    DB::unprepared(self::FUNCION);
+                }
+
+                public function down(): void
+                {
+                    DB::unprepared(self::ANTERIOR);
+                }
+            },
+
+            /**
+             * La evidencia del cierre tiene que poder leerse y dibujarse.
+             *
+             * La guarda anterior comparaba la versión como texto —aceptaba `"2"`, que
+             * el lector rechaza porque espera el número— y solo pedía que las columnas
+             * del reverso fueran una lista no vacía: admitía una columna sin encabezado,
+             * o `null`, y el generador desalineaba datos y encabezados. Ahora la versión
+             * es un número entero admitido y cada columna es un objeto con `key` y `header`
+             * de texto no vacío, sin claves repetidas.
+             *
+             * Solo rige al insertar: la evidencia ya guardada la escribió el sistema con
+             * el formato correcto, y es append-only.
+             */
+            // Migración original: 2026_10_24_010000_validate_frozen_cash_sheet_format.php
+            new class extends Migration
+            {
+                private const string FUNCION = <<<'SQL'
+        CREATE OR REPLACE FUNCTION closing_evidence_matches_version() RETURNS trigger AS $$
+        DECLARE
+            v_columnas jsonb;
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM period_closings WHERE id = NEW.period_closing_id
+                AND status = 'closed' AND evidence_version = NEW.version) THEN
+                RAISE EXCEPTION 'La evidencia debe corresponder a la version vigente de un periodo cerrado.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF jsonb_typeof(NEW.payload) IS DISTINCT FROM 'object'
+                OR jsonb_typeof(NEW.payload->'schema') IS DISTINCT FROM 'number'
+                -- Como texto: `2.0` también es un número, y el lector espera el entero.
+                OR NEW.payload->>'schema' NOT IN ('1', '2') THEN
+                RAISE EXCEPTION 'Formato de evidencia de cierre invalido.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF NEW.payload->>'schema' = '2' THEN
+                v_columnas := NEW.payload->'chequeColumns';
+                IF jsonb_typeof(v_columnas) IS DISTINCT FROM 'array'
+                    OR jsonb_array_length(v_columnas) = 0
+                    OR NOT (NEW.payload ? 'bankColumnNote')
+                    OR jsonb_typeof(NEW.payload->'bankColumnNote') NOT IN ('string', 'null')
+                    OR EXISTS (
+                        SELECT 1 FROM jsonb_array_elements(v_columnas) AS c(col)
+                        WHERE jsonb_typeof(col) IS DISTINCT FROM 'object'
+                           OR jsonb_typeof(col->'key') IS DISTINCT FROM 'string'
+                           OR jsonb_typeof(col->'header') IS DISTINCT FROM 'string'
+                           OR btrim(col->>'key') = ''
+                           OR btrim(col->>'header') = ''
+                    )
+                    OR (SELECT count(DISTINCT col->>'key') FROM jsonb_array_elements(v_columnas) AS c(col))
+                        <> jsonb_array_length(v_columnas)
+                THEN
+                    RAISE EXCEPTION 'La evidencia del cierre tiene que congelar las columnas del reverso y la aclaracion de la columna de banco.' USING ERRCODE = 'check_violation';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        SQL;
+
+                private const string ANTERIOR = <<<'SQL'
+        CREATE OR REPLACE FUNCTION closing_evidence_matches_version() RETURNS trigger AS $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM period_closings WHERE id = NEW.period_closing_id
+                AND status = 'closed' AND evidence_version = NEW.version) THEN
+                RAISE EXCEPTION 'La evidencia debe corresponder a la version vigente de un periodo cerrado.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF jsonb_typeof(NEW.payload) IS DISTINCT FROM 'object'
+                OR NEW.payload->>'schema' IS NULL
+                OR NEW.payload->>'schema' NOT IN ('1', '2') THEN
+                RAISE EXCEPTION 'Formato de evidencia de cierre invalido.' USING ERRCODE = 'check_violation';
+            END IF;
+            IF NEW.payload->>'schema' = '2' AND (
+                jsonb_typeof(NEW.payload->'chequeColumns') IS DISTINCT FROM 'array'
+                OR jsonb_array_length(NEW.payload->'chequeColumns') = 0
+                OR NOT (NEW.payload ? 'bankColumnNote')
+                OR jsonb_typeof(NEW.payload->'bankColumnNote') NOT IN ('string', 'null')
+            ) THEN
+                RAISE EXCEPTION 'La evidencia del cierre tiene que congelar las columnas del reverso y la aclaracion de la columna de banco.' USING ERRCODE = 'check_violation';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        SQL;
+
+                public function up(): void
+                {
+                    DB::unprepared(self::FUNCION);
+                }
+
+                public function down(): void
+                {
+                    DB::unprepared(self::ANTERIOR);
+                }
+            },
+
+            /**
+             * Saca el corte de la cuenta compartida.
+             *
+             * El corte declaraba, una vez y para la cuenta entera, el saldo del banco a
+             * una fecha (`2026_10_21_000000_create_bank_account_openings`). El área no lo
+             * necesita: el saldo de la cuenta de Multas y Aranceles no se reparte, cada
+             * caja reconoce solo lo que identifica, y la frontera entre lo viejo y lo
+             * nuevo ya la pone la apertura de cada caja. El saldo del banco lo trae el
+             * extracto.
+             *
+             * Lo que se va:
+             *
+             * - `bank_account_openings`, con su trigger append-only y su guarda;
+             * - `cash_book_openings_after_bank_cutoff` y
+             *   `journal_lines_opening_without_shared_bank`;
+             * - el tramo de `bank_allocation_after_opening` que miraba el corte: la regla
+             *   de la apertura de cada caja queda como estaba;
+             * - el sujeto `bank_account_opening` de los adjuntos.
+             *
+             * Lo que se queda: `cash_book_openings.bank_account_id`, la cuenta con la que
+             * opera cada libro, que Multas usa con o sin corte.
+             *
+             * Nunca salió en una versión. Si aun así encuentra un corte cargado, no
+             * sigue: borrarlo en silencio perdería el saldo que alguien declaró.
+             */
+            // Migración original: 2026_10_24_020000_drop_bank_account_cutoffs.php
+            new class extends Migration
+            {
+                private const SUJETOS = "'expediente', 'import', 'receipt', 'payment_order',
+                'pase', 'disbursement', 'cash_transfer', 'deposit_ticket',
+                'period_closing', 'legacy_document', 'fine_case', 'fine',
+                'fine_historical_movement', 'fine_payment', 'cheque_rejection'";
+
+                public function up(): void
+                {
+                    if (DB::table('bank_account_openings')->exists()
+                        || DB::table('attachments')->where('subject_type', 'bank_account_opening')->exists()) {
+                        throw new RuntimeException(
+                            'Hay cortes de cuenta cargados: decidí qué hacer con ellos antes de quitar la tabla.',
+                        );
+                    }
+
+                    DB::unprepared(<<<'SQL'
+            DROP TRIGGER journal_lines_opening_without_shared_bank ON journal_lines;
+            DROP FUNCTION journal_lines_opening_without_shared_bank();
+            DROP TRIGGER cash_book_openings_after_bank_cutoff ON cash_book_openings;
+            DROP FUNCTION cash_book_openings_after_bank_cutoff();
+            DROP TRIGGER bank_account_openings_guard ON bank_account_openings;
+            DROP FUNCTION bank_account_openings_guard();
+
+            CREATE OR REPLACE FUNCTION bank_allocation_after_opening() RETURNS trigger AS $$
+            DECLARE caja BIGINT; moneda CHAR(3); fecha DATE; apertura DATE;
+            BEGIN
+                IF NEW.reversal_of_id IS NOT NULL THEN RETURN NEW; END IF;
+                SELECT cash_box_id INTO caja FROM financial_events WHERE id = NEW.financial_event_id;
+                IF caja IS NULL THEN RETURN NEW; END IF;
+                PERFORM 1 FROM cash_boxes WHERE id = caja FOR UPDATE;
+                SELECT b.currency, t.transaction_date INTO moneda, fecha
+                  FROM bank_transactions t JOIN bank_accounts b ON b.id = t.bank_account_id
+                 WHERE t.id = NEW.bank_transaction_id;
+                SELECT opened_on INTO apertura FROM cash_book_openings
+                 WHERE cash_box_id = caja AND currency = moneda;
+                IF fecha < apertura THEN
+                    RAISE EXCEPTION 'El movimiento bancario del % es anterior a la apertura en % del %: corresponde al circuito historico.', fecha, moneda, apertura
+                        USING ERRCODE = 'check_violation';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+
+                    Schema::drop('bank_account_openings');
+
+                    DB::statement('ALTER TABLE attachments DROP CONSTRAINT attachments_subject_type_check');
+                    DB::statement('ALTER TABLE attachments ADD CONSTRAINT attachments_subject_type_check
+            CHECK (subject_type IN ('.self::SUJETOS.'))');
+                }
+
+                /**
+                 * Vuelve a poner el corte tal como lo dejó
+                 * `2026_10_21_000000_create_bank_account_openings`.
+                 */
+                public function down(): void
+                {
+                    Schema::create('bank_account_openings', function (Blueprint $table): void {
+                        $table->id();
+                        $table->foreignId('bank_account_id')->unique()->constrained('bank_accounts')->restrictOnDelete();
+                        $table->date('cutoff_on');
+                        $table->decimal('statement_balance', 19, 2);
+                        $table->foreignId('declared_by')->constrained('users')->restrictOnDelete();
+                        $table->string('notes', 300)->nullable();
+                        $table->timestampTz('created_at')->useCurrent();
+                    });
+
+                    DB::statement('ALTER TABLE attachments DROP CONSTRAINT attachments_subject_type_check');
+                    DB::statement('ALTER TABLE attachments ADD CONSTRAINT attachments_subject_type_check
+            CHECK (subject_type IN ('.self::SUJETOS.", 'bank_account_opening'))");
+
+                    DB::unprepared(<<<'SQL'
+            CREATE TRIGGER bank_account_openings_append_only
+                BEFORE UPDATE OR DELETE ON bank_account_openings
+                FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
+
+            CREATE OR REPLACE FUNCTION bank_account_openings_guard() RETURNS trigger AS $$
+            DECLARE v_fecha DATE;
+            BEGIN
+                PERFORM 1 FROM bank_accounts WHERE id = NEW.bank_account_id FOR UPDATE;
+
+                IF EXISTS (
+                    SELECT 1
+                      FROM journal_lines jl
+                      JOIN financial_events fe ON fe.id = jl.financial_event_id
+                     WHERE fe.event_type = 'opening_balance'
+                       AND fe.status IN ('posted', 'reversed')
+                       AND jl.account_code = 'BANK_ACCOUNT'
+                       AND jl.bank_account_id = NEW.bank_account_id
+                ) THEN
+                    RAISE EXCEPTION 'La apertura de una caja ya declaro el saldo de esta cuenta: no se le declara un corte compartido.'
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT MIN(opened_on) INTO v_fecha
+                  FROM cash_book_openings
+                 WHERE bank_account_id = NEW.bank_account_id;
+
+                IF v_fecha IS NOT NULL AND v_fecha <= NEW.cutoff_on THEN
+                    RAISE EXCEPTION 'Un libro opera con esta cuenta desde el %: el corte tiene que ser anterior.', v_fecha
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                SELECT MIN(t.transaction_date) INTO v_fecha
+                  FROM bank_transactions t
+                 WHERE t.bank_account_id = NEW.bank_account_id
+                   AND t.transaction_date <= NEW.cutoff_on
+                   AND (
+                        SELECT COALESCE(SUM(CASE WHEN a.reversal_of_id IS NULL THEN a.amount ELSE -a.amount END), 0)
+                          FROM bank_transaction_allocations a
+                         WHERE a.bank_transaction_id = t.id
+                       ) > 0;
+
+                IF v_fecha IS NOT NULL THEN
+                    RAISE EXCEPTION 'Hay un movimiento del % ya imputado en un libro: el corte no puede incluirlo.', v_fecha
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER bank_account_openings_guard BEFORE INSERT ON bank_account_openings
+                FOR EACH ROW EXECUTE FUNCTION bank_account_openings_guard();
+
+            CREATE OR REPLACE FUNCTION cash_book_openings_after_bank_cutoff() RETURNS trigger AS $$
+            DECLARE v_corte DATE;
+            BEGIN
+                IF NEW.bank_account_id IS NULL THEN RETURN NEW; END IF;
+
+                PERFORM 1 FROM bank_accounts WHERE id = NEW.bank_account_id FOR UPDATE;
+
+                SELECT cutoff_on INTO v_corte FROM bank_account_openings WHERE bank_account_id = NEW.bank_account_id;
+
+                IF v_corte IS NOT NULL AND v_corte >= NEW.opened_on THEN
+                    RAISE EXCEPTION 'La cuenta tiene corte al %: el libro se abre despues de esa fecha.', v_corte
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER cash_book_openings_after_bank_cutoff BEFORE INSERT ON cash_book_openings
+                FOR EACH ROW EXECUTE FUNCTION cash_book_openings_after_bank_cutoff();
+
+            CREATE OR REPLACE FUNCTION journal_lines_opening_without_shared_bank() RETURNS trigger AS $$
+            BEGIN
+                IF NEW.account_code <> 'BANK_ACCOUNT' OR NEW.bank_account_id IS NULL THEN RETURN NEW; END IF;
+
+                IF NOT EXISTS (
+                    SELECT 1 FROM financial_events
+                     WHERE id = NEW.financial_event_id AND event_type = 'opening_balance'
+                ) THEN
+                    RETURN NEW;
+                END IF;
+
+                PERFORM 1 FROM bank_accounts WHERE id = NEW.bank_account_id FOR UPDATE;
+
+                IF EXISTS (SELECT 1 FROM bank_account_openings WHERE bank_account_id = NEW.bank_account_id) THEN
+                    RAISE EXCEPTION 'La cuenta tiene un corte compartido: su saldo no se declara en la apertura de una caja.'
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER journal_lines_opening_without_shared_bank BEFORE INSERT ON journal_lines
+                FOR EACH ROW EXECUTE FUNCTION journal_lines_opening_without_shared_bank();
+
+            CREATE OR REPLACE FUNCTION bank_allocation_after_opening() RETURNS trigger AS $$
+            DECLARE caja BIGINT; cuenta BIGINT; moneda CHAR(3); fecha DATE; apertura DATE; corte DATE;
+            BEGIN
+                IF NEW.reversal_of_id IS NOT NULL THEN RETURN NEW; END IF;
+
+                SELECT cash_box_id INTO caja FROM financial_events WHERE id = NEW.financial_event_id;
+                IF caja IS NOT NULL THEN
+                    PERFORM 1 FROM cash_boxes WHERE id = caja FOR UPDATE;
+                END IF;
+
+                SELECT t.bank_account_id, b.currency, t.transaction_date INTO cuenta, moneda, fecha
+                  FROM bank_transactions t JOIN bank_accounts b ON b.id = t.bank_account_id
+                 WHERE t.id = NEW.bank_transaction_id;
+
+                PERFORM 1 FROM bank_accounts WHERE id = cuenta FOR SHARE;
+                SELECT cutoff_on INTO corte FROM bank_account_openings WHERE bank_account_id = cuenta;
+
+                IF fecha <= corte THEN
+                    RAISE EXCEPTION 'El movimiento bancario del % esta dentro del saldo informado al corte de la cuenta (%): no entra como dinero nuevo.', fecha, corte
+                        USING ERRCODE = 'check_violation';
+                END IF;
+
+                IF caja IS NULL THEN RETURN NEW; END IF;
+                SELECT opened_on INTO apertura FROM cash_book_openings
+                 WHERE cash_box_id = caja AND currency = moneda;
+                IF fecha < apertura THEN
+                    RAISE EXCEPTION 'El movimiento bancario del % es anterior a la apertura en % del %: corresponde al circuito historico.', fecha, moneda, apertura
+                        USING ERRCODE = 'check_violation';
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        SQL);
+                }
+            },
+        ];
     }
 };

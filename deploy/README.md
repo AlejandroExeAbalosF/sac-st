@@ -518,6 +518,52 @@ sudo deploy/bin/sacst ps
 > contenedor viejo: todo respondía 502 hasta `sudo deploy/bin/sacst restart web`.
 > Desde la 0.1.1 nginx vuelve a resolver `app` en cada pedido y no hace falta.
 
+### 6.1 Reinicio único antes del primer uso real
+
+La versión que consolida las migraciones reemplaza los nombres registrados en
+la tabla `migrations`. Como el servidor se usó solo para pruebas, se recrea el
+esquema **antes** de levantar esa versión. No ejecutar el `up -d` de la versión
+consolidada sobre la base de prueba: intentaría aplicar otra vez operaciones que
+el esquema anterior ya tiene.
+
+El bloque siguiente elimina todas las filas y objetos de la base `sacst`. La
+carpeta de archivos se renombra en vez de borrarse, para poder revisar algo si
+hiciera falta; se puede eliminar después de comprobar el arranque y el primer
+administrador.
+
+```bash
+cd /opt/sacst/sac-st-web
+sudo deploy/bin/sacst down
+
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d sacst <<'SQL'
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public AUTHORIZATION sacst_owner;
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO sacst_app;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+ALTER DEFAULT PRIVILEGES FOR ROLE sacst_owner IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sacst_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE sacst_owner IN SCHEMA public
+    GRANT USAGE, SELECT ON SEQUENCES TO sacst_app;
+SQL
+
+sudo mv /srv/sacst/storage /srv/sacst/storage-pruebas-antes-de-produccion
+sudo install -d -o 33 -g 33 -m 750 /srv/sacst/storage
+
+sudo deploy/bin/sacst up -d
+sudo deploy/bin/sacst ps
+sudo deploy/bin/sacst exec app php artisan usuarios:crear-administrador
+```
+
+Si `SACST_STORAGE_PATH` no es `/srv/sacst/storage`, usar en los dos comandos de
+archivos la ruta configurada en `/etc/sacst/compose.env`. Antes de moverla,
+comprobar esa ruta explícitamente; no usar una variable vacía ni un comodín.
+
+Después del alta, entrar con el administrador nuevo y comprobar que las listas
+de expedientes, multas y caja estén vacías. Recién entonces se elimina la
+carpeta `storage-pruebas-antes-de-produccion`.
+
 **Volver atrás** es lo mismo con la versión anterior, **salvo que la versión
 nueva haya traído migraciones**. En ese caso el esquema ya avanzó, y el código
 viejo puede no entenderlo. Antes de volver atrás, fijarse si hubo migraciones
