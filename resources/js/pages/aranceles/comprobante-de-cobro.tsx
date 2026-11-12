@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FileCheck } from 'lucide-react';
+import { AlertTriangle, FileCheck } from 'lucide-react';
 import { useState } from 'react';
 import AmountInput from '@/components/amount-input';
 import InputError from '@/components/input-error';
@@ -10,7 +10,13 @@ import DepositTicketFields from '@/features/banking/components/deposit-ticket-fi
 import TicketPhotoPanel, {
     useTicketPhoto,
 } from '@/features/banking/components/ticket-photo-panel';
-import { money } from '@/lib/format';
+import {
+    compareAmounts,
+    isNonZero,
+    money,
+    parseAmount,
+    subtractAmounts,
+} from '@/lib/format';
 import { index } from '@/routes/aranceles/cobros';
 import { store } from '@/routes/aranceles/cobros/comprobante';
 
@@ -19,8 +25,6 @@ type Props = {
         id: number;
         payerName: string;
         total: string;
-        missing: string;
-        pending: boolean;
     };
     today: string;
 };
@@ -30,7 +34,8 @@ type Props = {
  * mirándolo, con la foto al lado.
  *
  * El importe se escribe, no viene cargado: tiene que ser el del papel. Puede no
- * coincidir con el cobro, porque el dinero se verifica contra el extracto.
+ * coincidir con el cobro, porque el dinero se verifica contra el extracto; si
+ * difiere se avisa, sin bloquear, para que se note antes de ir al banco.
  */
 export default function ComprobanteDeCobro({ cobro, today }: Props) {
     const {
@@ -54,6 +59,13 @@ export default function ComprobanteDeCobro({ cobro, today }: Props) {
         ticket: null as File | null,
         idempotencyKey: clave,
     });
+
+    const delPapel = parseAmount(form.data.amount);
+    const diferencia =
+        delPapel === '' || !isNonZero(delPapel)
+            ? null
+            : compareAmounts(delPapel, cobro.total);
+    const difiere = diferencia !== null && diferencia !== 0;
 
     const elegirFoto = (file: File | null) => {
         elegirArchivo(file);
@@ -81,7 +93,7 @@ export default function ComprobanteDeCobro({ cobro, today }: Props) {
                         onSubmit={enviar}
                         className="space-y-5 rounded-lg border bg-card p-5 shadow-raised"
                     >
-                        <dl className="grid gap-3 rounded-lg bg-muted/40 p-4 sm:grid-cols-3">
+                        <dl className="grid gap-3 rounded-lg bg-muted/40 p-4 sm:grid-cols-2">
                             <div>
                                 <dt className="text-xs text-field-label">
                                     Quién paga
@@ -96,21 +108,11 @@ export default function ComprobanteDeCobro({ cobro, today }: Props) {
                                     {money(cobro.total)}
                                 </dd>
                             </div>
-                            {cobro.pending && (
-                                <div>
-                                    <dt className="text-xs text-field-label">
-                                        Falta
-                                    </dt>
-                                    <dd className="font-mono text-lg font-semibold tabular-nums">
-                                        {money(cobro.missing)}
-                                    </dd>
-                                </div>
-                            )}
                         </dl>
 
                         <div className="grid gap-2">
                             <Label htmlFor="comprobante-importe">
-                                Importe del comprobante
+                                Importe que figura en el comprobante
                             </Label>
                             <AmountInput
                                 id="comprobante-importe"
@@ -118,7 +120,29 @@ export default function ComprobanteDeCobro({ cobro, today }: Props) {
                                 onChange={(valor) =>
                                     form.setData('amount', valor)
                                 }
+                                aria-describedby={
+                                    difiere
+                                        ? 'comprobante-importe-aviso'
+                                        : undefined
+                                }
                             />
+                            {difiere && (
+                                <p
+                                    id="comprobante-importe-aviso"
+                                    className="flex items-start gap-1.5 text-xs text-warning-strong"
+                                >
+                                    <AlertTriangle
+                                        className="mt-0.5 size-3.5 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    El comprobante dice {money(delPapel)} y el
+                                    cobro es de {money(cobro.total)}:{' '}
+                                    {diferencia < 0
+                                        ? `faltan ${money(subtractAmounts(cobro.total, delPapel))}`
+                                        : `sobran ${money(subtractAmounts(delPapel, cobro.total))}`}
+                                    .
+                                </p>
+                            )}
                             <InputError message={form.errors.amount} />
                         </div>
 

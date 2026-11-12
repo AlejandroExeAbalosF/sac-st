@@ -32,9 +32,8 @@ final class FeeChargeProofController extends Controller
             'cobro' => [
                 'id' => $feeCharge->id,
                 'payerName' => $feeCharge->payer_name,
+                // Contra el total se compara lo que dice el papel: si difiere, la pantalla avisa.
                 'total' => Decimal::scale((string) $saldo->total),
-                'missing' => Decimal::sub((string) $saldo->total, (string) $saldo->funded),
-                'pending' => $feeCharge->status === FeeChargeStatus::Pending,
             ],
             'today' => BusinessDate::today()->toDateString(),
         ]);

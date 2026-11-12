@@ -954,8 +954,7 @@ class PagoPorDepositoDeArancelesTest extends TestCase
                 ->component('aranceles/comprobante-de-cobro', false)
                 ->where('cobro.payerName', 'AG Max SRL')
                 ->where('cobro.total', '120.00')
-                ->where('cobro.missing', '120.00')
-                ->where('cobro.pending', true));
+                ->missing('cobro.missing'));
     }
 
     /** El comprobante es opcional: el dinero se verifica contra el extracto. */

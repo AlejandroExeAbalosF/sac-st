@@ -173,7 +173,8 @@ acciones. También es una decisión del usuario, **sin relevar con el área**.
   pasa a `/aranceles/cobros/{id}/comprobante`, la misma pantalla de las otras cajas: se transcribe
   mirando la foto, que es obligatoria cuando se carga, y se puede dejar para después.
   El importe del papel puede diferir del cobro (**provisorio**): el dinero se verifica contra el
-  extracto. No mueve dinero ni emite el recibo. Ver la foto pide `adjuntos.ver`.
+  extracto. Se escribe mirando el papel, y si difiere del total la pantalla avisa cuánto falta o
+  sobra, sin bloquear. No mueve dinero ni emite el recibo. Ver la foto pide `adjuntos.ver`.
 - **Cambiar el comprobante** agrega otro en un cobro por banco no anulado, aunque ya tenga recibo: vale
   el último, el anterior queda guardado y cada acto queda en la auditoría. Un cobro nacido del crédito
   puede cargarlo después. La corrección crea otro cobro y el comprobante queda en el anulado, a la
