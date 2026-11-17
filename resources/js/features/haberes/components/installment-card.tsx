@@ -465,6 +465,9 @@ export default function InstallmentCard({
                                 puedeValidar={
                                     egreso.permisos.validar && !anulada
                                 }
+                                puedeDarPorFallida={
+                                    egreso.permisos.darPorFallida
+                                }
                             />
                         )}
                     </Seccion>

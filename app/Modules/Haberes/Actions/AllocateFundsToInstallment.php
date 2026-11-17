@@ -14,6 +14,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Support\IncomeEvidence;
 use App\Modules\Haberes\Support\InstallmentFunding;
+use App\Modules\Haberes\Support\InstallmentLock;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Enums\FinancialEventType;
@@ -54,6 +55,7 @@ final class AllocateFundsToInstallment
         private readonly PostJournalEntry $asentar,
         private readonly InstallmentFunding $financiacion,
         private readonly RecordAuditEvent $auditar,
+        private readonly InstallmentLock $bloquear,
     ) {}
 
     /**
@@ -110,18 +112,7 @@ final class AllocateFundsToInstallment
              * cuando dos recepciones distintas compiten por la misma cuota:
              * ambas podrían leer el mismo pendiente y financiarla de más.
              */
-            $haberId = $installment->haber_id;
-            $expedienteId = (int) Haber::query()->whereKey($haberId)->valueOrFail('expediente_id');
-
-            $expedienteBloqueado = Expediente::query()->lockForUpdate()->findOrFail($expedienteId);
-            $haberBloqueado = Haber::query()
-                ->where('expediente_id', $expedienteBloqueado->id)
-                ->lockForUpdate()
-                ->findOrFail($haberId);
-            $cuotaBloqueada = BeneficiaryInstallment::query()
-                ->where('haber_id', $haberBloqueado->id)
-                ->lockForUpdate()
-                ->findOrFail($installment->id);
+            [$expedienteBloqueado, $haberBloqueado, $cuotaBloqueada] = $this->bloquear->lock($installment);
             $recepcionBloqueada = FundReceipt::query()->lockForUpdate()->findOrFail($receipt->id);
 
             $this->assertPuedeRecibirFondos($expedienteBloqueado, $haberBloqueado, $cuotaBloqueada);

@@ -526,6 +526,7 @@ declare namespace App {
                     canLinkDebit: boolean;
                     canUnlinkDebit: boolean;
                     canValidate: boolean;
+                    canFailTransfer: boolean;
                     needsReceipt: boolean;
                 };
                 export type InstallmentLegacyData = {
@@ -841,7 +842,8 @@ declare namespace App {
                     | 'deposit_ticket_unlink'
                     | 'debit_unlink'
                     | 'installment_excess'
-                    | 'installment_excess_removal';
+                    | 'installment_excess_removal'
+                    | 'transfer_failure';
                 export type HaberesReasonCode =
                     | 'data_entry_error'
                     | 'duplicate'
@@ -860,6 +862,8 @@ declare namespace App {
                     | 'wrong_credit'
                     | 'employer_overpaid'
                     | 'employer_settlement_error'
+                    | 'bank_rejected'
+                    | 'transfer_not_made'
                     | 'settlement_voided'
                     | 'other';
                 export type InstallmentStage =

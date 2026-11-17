@@ -6,6 +6,7 @@ namespace App\Modules\Haberes\Actions;
 
 use App\Modules\Haberes\Enums\PaseStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
+use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Support\Reason;
@@ -59,10 +60,17 @@ final class VoidPaymentOrder
             ]);
         }
 
-        $this->assertVoidable($order);
+        return DB::transaction(function () use ($order, $motivo, $actorId): PaymentOrder {
+            /*
+             * Bajo lock y releída: una transferencia que se registra en el
+             * medio bloquea la misma fila (`disbursements_order_active`), así
+             * que una de las dos espera a la otra y ve lo que dejó.
+             */
+            $orden = PaymentOrder::query()->lockForUpdate()->findOrFail($order->id);
 
-        DB::transaction(function () use ($order, $motivo, $actorId): void {
-            $order->forceFill([
+            $this->assertVoidable($orden);
+
+            $orden->forceFill([
                 'status' => PaymentOrderStatus::Voided,
                 'voided_by' => $actorId,
                 'voided_at' => now(),
@@ -70,17 +78,17 @@ final class VoidPaymentOrder
                 'rejection_or_void_reason' => $motivo->detail,
             ])->save();
 
-            $order->loadMissing('pase');
-            $order->pase?->forceFill(['status' => PaseStatus::Voided])->save();
+            $orden->loadMissing('pase');
+            $orden->pase?->forceFill(['status' => PaseStatus::Voided])->save();
+
+            $this->auditar->handle('orden-de-pago.anulada', $orden, after: [
+                'formatted_number' => $orden->formatted_number,
+                'beneficiary_installment_id' => $orden->beneficiary_installment_id,
+                'reason' => $motivo->describe(),
+            ], metadata: ['motivo_codigo' => $motivo->code->value], actorId: $actorId);
+
+            return $orden;
         });
-
-        $this->auditar->handle('orden-de-pago.anulada', $order, after: [
-            'formatted_number' => $order->formatted_number,
-            'beneficiary_installment_id' => $order->beneficiary_installment_id,
-            'reason' => $motivo->describe(),
-        ], metadata: ['motivo_codigo' => $motivo->code->value], actorId: $actorId);
-
-        return $order;
     }
 
     /**
@@ -104,6 +112,18 @@ final class VoidPaymentOrder
             throw ValidationException::withMessages([
                 'orderId' => 'Esa Orden está completada: el egreso ya se validó. '
                     .'Lo que corresponde es revertir el egreso, no anular la Orden.',
+            ]);
+        }
+
+        /*
+         * Con la transferencia en curso, el egreso quedaría atado a una Orden
+         * anulada y la que la reemplace no tendría dónde registrar su pago.
+         * Primero se cierra la transferencia, con su motivo; recién después
+         * cae la Orden. La base lo impide igual (`payment_orders_status_guard`).
+         */
+        if (Disbursement::query()->live()->where('payment_order_id', $order->id)->exists()) {
+            throw ValidationException::withMessages([
+                'orderId' => 'La Orden tiene una transferencia en curso: hay que darla por fallida antes de anular.',
             ]);
         }
     }

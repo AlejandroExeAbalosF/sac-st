@@ -2,6 +2,7 @@ import {
     Banknote,
     CircleCheck,
     CircleDashed,
+    CircleX,
     Eye,
     HandCoins,
     Landmark,
@@ -16,6 +17,7 @@ import StatusBadge from '@/components/status-badge';
 import type { StatusTone } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { date, money } from '@/lib/format';
+import FailTransferDialog from './fail-transfer-dialog';
 import PayBeneficiaryDialog from './pay-beneficiary-dialog';
 import ReceiptViewerDialog from './receipt-viewer-dialog';
 import TransferDebitDialog from './transfer-debit-dialog';
@@ -66,11 +68,13 @@ export default function InstallmentExpense({
     estado,
     puedePagar,
     puedeValidar,
+    puedeDarPorFallida,
 }: {
     cuota: Cuota;
     estado: Estado;
     puedePagar: boolean;
     puedeValidar: boolean;
+    puedeDarPorFallida: boolean;
 }) {
     const [pagando, setPagando] = useState(false);
     const [viendo, setViendo] = useState(false);
@@ -78,6 +82,7 @@ export default function InstallmentExpense({
     const [buscandoDebito, setBuscandoDebito] = useState(false);
     const [validando, setValidando] = useState(false);
     const [desvinculando, setDesvinculando] = useState(false);
+    const [cerrando, setCerrando] = useState(false);
 
     const egreso = estado.disbursement;
     const pagado = egreso?.status === 'confirmed';
@@ -125,6 +130,14 @@ export default function InstallmentExpense({
                     cuotaId={cuota.id}
                     conComision={estado.disbursement?.feeAmount != null}
                     onClose={() => setDesvinculando(false)}
+                />
+            )}
+
+            {cerrando && egreso !== null && (
+                <FailTransferDialog
+                    cuotaId={cuota.id}
+                    egresoId={egreso.id}
+                    onClose={() => setCerrando(false)}
                 />
             )}
 
@@ -215,16 +228,39 @@ export default function InstallmentExpense({
         );
     }
 
+    const botonDarPorFallida = puedeDarPorFallida && estado.canFailTransfer && (
+        <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setCerrando(true)}
+        >
+            <CircleX className="size-3.5" />
+            Dar por fallida
+        </Button>
+    );
+
     /* ── Lo que traba, en cualquiera de los dos circuitos ─────────────── */
     if (estado.blockedReason !== null) {
+        /*
+         * Una traba frena el pago, no el cierre de la transferencia: sin
+         * darla por fallida tampoco se anula su Orden.
+         */
         return (
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                <CircleDashed
-                    className="mt-0.5 size-3.5 shrink-0"
-                    aria-hidden="true"
-                />
-                {estado.blockedReason}
-            </p>
+            <>
+                <div className="space-y-2">
+                    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <CircleDashed
+                            className="mt-0.5 size-3.5 shrink-0"
+                            aria-hidden="true"
+                        />
+                        {estado.blockedReason}
+                    </p>
+                    {botonDarPorFallida}
+                </div>
+
+                {dialogos}
+            </>
         );
     }
 
@@ -333,6 +369,8 @@ export default function InstallmentExpense({
                             Era otro débito
                         </Button>
                     )}
+
+                    {botonDarPorFallida}
 
                     {/*
                      * Validar es del contador y va destacado: es el acto

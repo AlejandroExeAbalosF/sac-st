@@ -116,6 +116,20 @@ final class ValidateTransferDisbursement
                 ]);
             }
 
+            /*
+             * La Orden, bajo lock y vigente. Validar contra una Orden anulada
+             * la devolvía a «completada» y dejaba activa la que la reemplazó;
+             * la base lo impide igual (`disbursements_order_active`).
+             */
+            $orden = PaymentOrder::query()->lockForUpdate()->findOrFail($orden->id);
+
+            if (! $orden->status->isActive()) {
+                throw ValidationException::withMessages([
+                    'installmentId' => "La Orden {$orden->formatted_number} ya no está vigente: "
+                        .'esta transferencia no se valida contra ella.',
+                ]);
+            }
+
             $par = $this->parVigente($egreso, $movimiento, $orden);
             $comision = $par->fee;
 

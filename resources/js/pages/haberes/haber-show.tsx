@@ -73,6 +73,7 @@ type Props = {
     >;
     canPayBeneficiary: boolean;
     canValidateDisbursement: boolean;
+    canFailDisbursement: boolean;
     /** Los papeles y el pago fuera del circuito de cada cuota, por su id. */
     historicos: Record<number, App.Modules.Haberes.Data.InstallmentLegacyData>;
     canRecordLegacy: boolean;
@@ -120,6 +121,7 @@ export default function MostrarHaber({
     egresos,
     canPayBeneficiary,
     canValidateDisbursement,
+    canFailDisbursement,
     historicos,
     canRecordLegacy,
     canVoidLegacy,
@@ -150,6 +152,7 @@ export default function MostrarHaber({
         permisos: {
             registrar: canPayBeneficiary,
             validar: canValidateDisbursement,
+            darPorFallida: canFailDisbursement,
         },
     };
 

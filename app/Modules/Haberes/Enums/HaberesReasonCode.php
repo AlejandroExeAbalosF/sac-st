@@ -35,6 +35,8 @@ enum HaberesReasonCode: string implements ReasonCode
     case WrongCredit = 'wrong_credit';
     case EmployerOverpaid = 'employer_overpaid';
     case EmployerSettlementError = 'employer_settlement_error';
+    case BankRejected = 'bank_rejected';
+    case TransferNotMade = 'transfer_not_made';
     /**
      * Lo pone el sistema: el papel cae porque se anuló el pago fuera del
      * circuito que respaldaba. El motivo de fondo es el del pago.
@@ -62,6 +64,8 @@ enum HaberesReasonCode: string implements ReasonCode
             self::WrongCredit => 'Era otro movimiento del extracto',
             self::EmployerOverpaid => 'El empleador depositó de más',
             self::EmployerSettlementError => 'Error de liquidación del empleador',
+            self::BankRejected => 'El banco rechazó la transferencia',
+            self::TransferNotMade => 'El organismo no la hizo',
             self::SettlementVoided => 'Se anuló el pago que respaldaba',
             self::Other => 'Otro',
         };

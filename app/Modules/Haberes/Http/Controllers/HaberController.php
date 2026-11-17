@@ -791,6 +791,8 @@ final class HaberController extends Controller
              * asiento y deja la cuota pagada. Permiso propio.
              */
             'canValidateDisbursement' => request()->user()?->can('egresos.validar') ?? false,
+            // Cerrar una transferencia que no se pagó, para poder anular su Orden.
+            'canFailDisbursement' => request()->user()?->can('egresos.dar-por-fallido') ?? false,
             // Lo del sistema anterior: los papeles de cada cuota, si se pagó antes de la apertura.
             'historicos' => app(LegacyInstallments::class)->forMany($cuotaIds, request()->user()),
             // El de la moneda del haber: cada caja corta en su propia apertura.

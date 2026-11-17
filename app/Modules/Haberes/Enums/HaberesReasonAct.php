@@ -37,6 +37,11 @@ enum HaberesReasonAct: string implements ReasonAct
     case InstallmentExcess = 'installment_excess';
     /** Quitar un excedente cargado por error. Sin columna: queda en la auditoría. */
     case InstallmentExcessRemoval = 'installment_excess_removal';
+    /**
+     * Dar por fallida una transferencia que no llegó a pagarse. Columna:
+     * `disbursements.failure_reason_code`. Propuesta sin relevar.
+     */
+    case TransferFailure = 'transfer_failure';
 
     /**
      * @return list<HaberesReasonCode>
@@ -58,6 +63,7 @@ enum HaberesReasonAct: string implements ReasonAct
             self::DebitUnlink => [HaberesReasonCode::WrongCredit, HaberesReasonCode::WrongInstallment, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
             self::InstallmentExcess => [HaberesReasonCode::EmployerOverpaid, HaberesReasonCode::EmployerSettlementError, HaberesReasonCode::Other],
             self::InstallmentExcessRemoval => [HaberesReasonCode::DataEntryError, HaberesReasonCode::WrongAmount, HaberesReasonCode::Other],
+            self::TransferFailure => [HaberesReasonCode::WrongBeneficiaryData, HaberesReasonCode::BankRejected, HaberesReasonCode::TransferNotMade, HaberesReasonCode::DataEntryError, HaberesReasonCode::Other],
         };
     }
 

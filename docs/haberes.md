@@ -233,6 +233,13 @@ su Pase. La reemplazante conserva el vínculo y consume un número nuevo.
 
 La anulación de la Orden no revierte el ingreso ni libera sus imputaciones por sí sola.
 
+Con la transferencia en curso, la Orden no se anula: primero se da la transferencia
+por fallida desde la tarjeta del egreso, con motivo, y recién después se anula la
+Orden. Una transferencia con el débito ya reconocido no se da por fallida: si el
+débito era de otra Orden se desvincula antes. Este cierre a mano y sus motivos son
+una propuesta del sistema, pendiente de confirmar con el área. Regla:
+[egreso](haberes-reglas.md#egreso).
+
 Validado el pago, la Orden queda «Completada»: deja de ocupar el lugar de la cuota, pero
 la sección «Documentación de pago» la sigue mostrando para ver la Orden y su Pase, sin
 opción de corregirla ni anularla. En el egreso pagado siguen a la vista el informe y el
@@ -399,6 +406,7 @@ puede cambiar; esta tabla describe las capacidades que consulta el circuito.
 | Emitir recibo de ingreso | `recibos.emitir` (el cobro comprueba además su permiso de recepción) |
 | Emitir / anular Orden | `ordenes.emitir` / `ordenes.anular` |
 | Registrar / validar egreso | `egresos.registrar` / `egresos.validar` |
+| Dar por fallida una transferencia en curso | `egresos.dar-por-fallido` |
 | Registrar una cuota pagada fuera del circuito | `expedientes.registrar-historico` |
 | Anular ese registro | `expedientes.anular` |
 | Apartar fondos del sistema anterior para una cuota | `caja.apartar-anterior` |

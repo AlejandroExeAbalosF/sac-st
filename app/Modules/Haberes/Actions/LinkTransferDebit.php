@@ -145,13 +145,38 @@ final class LinkTransferDebit
             ->first();
 
         if ($existente !== null) {
+            /*
+             * Un egreso vivo es de la Orden con la que nació. Si la vigente es
+             * otra, el egreso quedó de una anterior: registrar el informe o el
+             * débito sobre él los dejaría contra el documento equivocado.
+             */
+            if ((int) $existente->payment_order_id !== (int) $orden->id) {
+                throw ValidationException::withMessages([
+                    'installmentId' => 'La cuota tiene una transferencia de otra Orden en curso: '
+                        .'hay que darla por fallida antes de seguir con esta.',
+                ]);
+            }
+
             return $existente;
         }
 
         /*
          * El débito llegó antes que el informe (§12.4). El egreso nace acá
          * y queda esperando el aviso del organismo.
+         *
+         * Antes, la Orden bajo lock y releída: una anulación concurrente toma
+         * la misma fila, y el operador recibe el motivo en vez de un error de
+         * base (`disbursements_order_active`).
          */
+        $orden = PaymentOrder::query()->lockForUpdate()->findOrFail($orden->id);
+
+        if (! $orden->status->isActive()) {
+            throw ValidationException::withMessages([
+                'installmentId' => "La Orden {$orden->formatted_number} ya no está vigente: "
+                    .'el débito no se reconoce contra ella.',
+            ]);
+        }
+
         return Disbursement::query()->create([
             'beneficiary_installment_id' => $installment->id,
             'payment_order_id' => $orden->id,

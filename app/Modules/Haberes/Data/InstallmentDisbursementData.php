@@ -56,7 +56,7 @@ final class InstallmentDisbursementData extends Data
         /** Qué le falta al egreso bancario para poder validarse. */
         public ?string $pendingStep,
 
-        /* ─── Los cinco actos ────────────────────────────────────────── */
+        /* ─── Los seis actos ────────────────────────────────────────── */
         /** Entregar en mano y emitir el recibo, todo junto. */
         public bool $canPay,
         /** Cargar el aviso del organismo. */
@@ -67,6 +67,8 @@ final class InstallmentDisbursementData extends Data
         public bool $canUnlinkDebit,
         /** Cotejar los tres papeles y dar el pago por hecho. */
         public bool $canValidate,
+        /** Cerrar la transferencia que no se pagó, para poder anular la Orden. */
+        public bool $canFailTransfer,
         /**
          * Emitir el papel de un pago ya confirmado.
          *
@@ -103,6 +105,7 @@ final class InstallmentDisbursementData extends Data
             canLinkDebit: $estado->canLinkDebit(),
             canUnlinkDebit: $estado->canUnlinkDebit(),
             canValidate: $estado->canValidate(),
+            canFailTransfer: $estado->canFailTransfer(),
             needsReceipt: $estado->needsReceipt(),
         );
     }

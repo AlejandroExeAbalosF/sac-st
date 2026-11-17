@@ -17,6 +17,15 @@ use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Banking\Models\CashBoxBankAccount;
 use App\Modules\Banking\Models\CashToBankTransfer;
 use App\Modules\Banking\Models\ChequeRejection;
+use App\Modules\Haberes\Actions\DeliverToBeneficiary;
+use App\Modules\Haberes\Actions\LinkTransferDebit;
+use App\Modules\Haberes\Actions\RegisterTransferReport;
+use App\Modules\Haberes\Actions\UnallocateFunds;
+use App\Modules\Haberes\Actions\VoidPaymentOrder;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
+use App\Modules\Haberes\Models\BeneficiaryInstallment;
+use App\Modules\Haberes\Models\FundingAllocation;
+use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Ledger\Enums\Currency;
 use App\Modules\Ledger\Models\FundReceipt;
 use App\Modules\Multas\Actions\CollectFinePayment;
@@ -201,6 +210,39 @@ try {
                 'funds_exit_event_id' => $revertir($recepcion->financial_event_id),
             ]);
         });
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'haberes-deliver') {
+        // Entregar en mano el dinero de una cuota mientras otro lo libera.
+        $egreso = app(DeliverToBeneficiary::class)->handle(
+            BeneficiaryInstallment::query()->findOrFail($input['installment']), 'worker-deliver-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'disbursement' => $egreso->id];
+    } elseif ($input['mode'] === 'haberes-release') {
+        // Liberar los fondos de una cuota mientras otro los entrega.
+        $asignacion = FundingAllocation::query()->findOrFail($input['allocation']);
+        app(UnallocateFunds::class)->handle(
+            $asignacion, $asignacion->amount, 'worker-release-'.$input['tag'],
+            new Reason(HaberesReasonCode::DataEntryError, null), $input['actor'],
+        );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'haberes-report') {
+        // Registrar el informe de la transferencia mientras otro anula la Orden.
+        $egreso = app(RegisterTransferReport::class)->handle(
+            BeneficiaryInstallment::query()->findOrFail($input['installment']), null, 'W-'.$input['tag'], $input['actor'],
+        );
+        $result = ['status' => 'done', 'disbursement' => $egreso->id];
+    } elseif ($input['mode'] === 'haberes-link-debit') {
+        // Reconocer el débito de la transferencia mientras otro anula la Orden.
+        $egreso = app(LinkTransferDebit::class)->handle(
+            BeneficiaryInstallment::query()->findOrFail($input['installment']),
+            BankTransaction::query()->findOrFail($input['transaction']), $input['actor'],
+        );
+        $result = ['status' => 'done', 'disbursement' => $egreso->id];
+    } elseif ($input['mode'] === 'haberes-void-order') {
+        // Anular la Orden mientras otro registra el informe de su transferencia.
+        app(VoidPaymentOrder::class)->handle(
+            PaymentOrder::query()->findOrFail($input['order']), new Reason(HaberesReasonCode::WrongBeneficiaryData, null), $input['actor'],
+        );
         $result = ['status' => 'done'];
     } elseif ($input['mode'] === 'raw-deposit') {
         // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.

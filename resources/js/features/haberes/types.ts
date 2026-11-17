@@ -134,6 +134,8 @@ export type EgresoProps = {
          * postea el asiento y deja la cuota pagada (§2.3.4).
          */
         validar: boolean;
+        /** Cerrar la transferencia que no se pagó, para poder anular la Orden. */
+        darPorFallida: boolean;
     };
 };
 

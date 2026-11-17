@@ -506,6 +506,16 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     });
 
     /*
+     | Cerrar una transferencia que no se pagó: libera la cuota para anular la
+     | Orden y emitir otra. Decide qué pasó con el dinero pedido, como validar.
+     */
+    Route::middleware('can:egresos.dar-por-fallido')->group(function (): void {
+        Route::post('haberes/cuotas/{installment}/egreso/fallida', [DisbursementController::class, 'fail'])
+            ->whereNumber('installment')
+            ->name('haberes.installments.disbursement.fail');
+    });
+
+    /*
      | Órdenes de Pago y Pases.
      |
      | Se emiten desde la cuota, que es donde se ve que está financiada,

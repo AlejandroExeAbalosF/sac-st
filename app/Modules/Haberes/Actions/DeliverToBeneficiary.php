@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\DisbursementReadiness;
 use App\Modules\Haberes\Support\InstallmentCashBox;
+use App\Modules\Haberes\Support\InstallmentLock;
 use App\Modules\Ledger\Actions\PostJournalEntry;
 use App\Modules\Ledger\Enums\ChequeStatus;
 use App\Modules\Ledger\Enums\LedgerAccount;
@@ -58,6 +59,7 @@ final class DeliverToBeneficiary
         private readonly DisbursementEligibility $elegibilidad,
         private readonly InstallmentCashBox $cajaDeLaCuota,
         private readonly RecordAuditEvent $auditar,
+        private readonly InstallmentLock $bloquear,
     ) {}
 
     /**
@@ -70,31 +72,38 @@ final class DeliverToBeneficiary
         ?CarbonInterface $paymentDate = null,
         ?string $notes = null,
     ): Disbursement {
-        $estado = $this->elegibilidad->for($installment);
+        return DB::transaction(function () use ($installment, $idempotencyKey, $actorId, $paymentDate, $notes): Disbursement {
+            /*
+             * Primero el bloqueo, después la decisión. Leer la elegibilidad
+             * afuera dejaba una ventana: si en el medio otro operador liberaba
+             * los fondos de la cuota, el dinero salía de la caja y a la vez
+             * volvía a «sin identificar». Con la cuota bloqueada la liberación
+             * espera, y al seguir ve el egreso y se rechaza.
+             */
+            [, , $installment] = $this->bloquear->lock($installment);
 
-        /*
-         * Un segundo envío del mismo formulario devuelve el egreso que ya
-         * existe. El asiento es idempotente por su clave, pero la fila del
-         * egreso no podría serlo: el índice único la rechazaría, y el
-         * operador que apretó dos veces vería un error por algo que salió
-         * bien.
-         */
-        if ($estado->disbursement !== null) {
-            return $estado->disbursement;
-        }
+            $estado = $this->elegibilidad->for($installment);
 
-        $this->assertPayable($estado);
+            /*
+             * Un segundo envío del mismo formulario devuelve el egreso que ya
+             * existe. El asiento es idempotente por su clave, pero la fila del
+             * egreso no podría serlo: el índice único la rechazaría, y el
+             * operador que apretó dos veces vería un error por algo que salió
+             * bien.
+             */
+            if ($estado->disbursement !== null) {
+                return $estado->disbursement;
+            }
 
-        /** @var DisbursementMethod $metodo */
-        $metodo = $estado->method;
-        $importe = $estado->amount;
-        $fecha = $paymentDate ?? BusinessDate::today();
-        $caja = $this->cajaDeLaCuota->for($installment);
-        $moneda = $installment->currency();
+            $this->assertPayable($estado);
 
-        return DB::transaction(function () use (
-            $installment, $metodo, $importe, $fecha, $caja, $moneda, $idempotencyKey, $actorId, $notes
-        ): Disbursement {
+            /** @var DisbursementMethod $metodo */
+            $metodo = $estado->method;
+            $importe = $estado->amount;
+            $fecha = $paymentDate ?? BusinessDate::today();
+            $caja = $this->cajaDeLaCuota->for($installment);
+            $moneda = $installment->currency();
+
             $evento = $this->asentar->handle(
                 type: $metodo->eventType(),
                 idempotencyKey: $idempotencyKey,

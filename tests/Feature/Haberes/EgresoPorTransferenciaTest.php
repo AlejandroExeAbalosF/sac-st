@@ -4,28 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Haberes;
 
-use App\Modules\Banking\Actions\ConfirmCashDepositCredit;
+use App\Models\User;
 use App\Modules\Banking\Enums\TransactionDirection;
-use App\Modules\Banking\Models\BankAccount;
-use App\Modules\Banking\Models\BankStatementImport;
 use App\Modules\Banking\Models\BankTransaction;
-use App\Modules\Banking\Models\CashToBankTransfer;
-use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
-use App\Modules\Haberes\Actions\DepositCashToBank;
-use App\Modules\Haberes\Actions\IssuePaymentOrder;
 use App\Modules\Haberes\Data\DisbursementSummaryData;
 use App\Modules\Haberes\Data\InstallmentDisbursementData;
 use App\Modules\Haberes\Data\InstallmentOrderStateData;
-use App\Modules\Haberes\Data\IssuePaymentOrderData;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
-use App\Modules\Haberes\Enums\ReceiptNumberSource;
 use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
-use App\Modules\Haberes\Models\Expediente;
 use App\Modules\Haberes\Models\PaymentOrder;
 use App\Modules\Haberes\Support\DisbursementEligibility;
 use App\Modules\Haberes\Support\PaymentOrderEligibility;
@@ -39,7 +30,6 @@ use App\Modules\Shared\Enums\SharedReasonCode;
 use App\Modules\Shared\Models\Attachment;
 use App\Modules\Shared\Models\AuditEvent;
 use App\Modules\Shared\Models\CashBox;
-use App\Modules\Shared\Models\PersonBankAccount;
 use App\Modules\Shared\Models\Receipt;
 use App\Modules\Shared\Support\Attachments;
 use App\Modules\Shared\Support\Reason;
@@ -47,14 +37,15 @@ use App\Support\BusinessDate;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use Tests\Concerns\BuildsTransferInstallment;
 use Tests\TestCase;
 
 /**
@@ -73,14 +64,8 @@ use Tests\TestCase;
  */
 class EgresoPorTransferenciaTest extends TestCase
 {
+    use BuildsTransferInstallment;
     use RefreshDatabase;
-
-    private const CUENTA_ORGANISMO = '23456789';
-
-    private const CBU_VALIDO = '2850000300000000000017';
-
-    /** La moneda del haber y de la cuenta del organismo en el escenario. */
-    private string $moneda = 'ARS';
 
     protected function setUp(): void
     {
@@ -642,46 +627,229 @@ class EgresoPorTransferenciaTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
-    | Andamiaje
+    | La transferencia que no se pagó
     |--------------------------------------------------------------------------
     */
 
-    /** Una cuota con su Orden emitida, lista para que el organismo pague. */
-    private function cuotaConOrden(): BeneficiaryInstallment
+    /**
+     * El circuito entero de una Orden equivocada con la transferencia en curso.
+     *
+     * Antes la Orden se anulaba igual, el egreso quedaba atado a ella y, al
+     * validarlo, la anulada volvía a «completada» mientras la nueva quedaba
+     * activa sobre una cuota pagada.
+     */
+    public function test_la_orden_con_transferencia_en_curso_se_anula_recien_al_darla_por_fallida(): void
     {
-        $cuota = $this->cuotaConEfectivoAcreditado();
+        $cuota = $this->cuotaConOrden();
+        $ordenA = $this->ordenVigente($cuota);
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egresoA = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
 
-        $cuota->loadMissing('haber.beneficiary');
-        $cuota->haber->beneficiary->forceFill([
-            'document' => '38.357.040',
-            'address' => 'B° San Jorge Mza 54',
-            'phone' => '387-6004216',
-        ])->save();
+        $this->anularOrden($ordenA)->assertSessionHasErrors('orderId');
+        $this->assertSame(PaymentOrderStatus::Draft, $ordenA->refresh()->status);
 
-        PersonBankAccount::query()->create([
-            'person_id' => $cuota->haber->beneficiary->id,
-            'cbu' => self::CBU_VALIDO,
-            'bank_name' => 'Banco Macro',
-            'verification_status' => 'verified',
-            'verified_by' => $this->operador()->id,
-            'verified_at' => now(),
-            'is_active' => true,
-        ]);
+        $this->darPorFallida($cuota, $egresoA)->assertSessionHasNoErrors();
 
-        app(IssuePaymentOrder::class)->handle(
-            $cuota->refresh(),
-            new IssuePaymentOrderData(
-                beneficiaryBankAccountId: null,
-                cbuFolio: '19',
-                incomeReceiptNumberSource: ReceiptNumberSource::System,
-                paseDestination: IssuePaymentOrderData::DEFAULT_DESTINATION,
-                treasurerId: null,
-            ),
-            $this->operador()->id,
+        $egresoA->refresh();
+        $this->assertSame(DisbursementStatus::Failed, $egresoA->status);
+        $this->assertSame('bank_rejected', $egresoA->failure_reason_code);
+        $this->assertTrue(AuditEvent::query()->where('action', 'egreso.fallido')->exists());
+
+        $this->anularOrden($ordenA)->assertSessionHasNoErrors();
+        $this->assertSame(PaymentOrderStatus::Voided, $ordenA->refresh()->status);
+
+        $ordenB = $this->emitirOrden($cuota);
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+        $this->validar($cuota)->assertSessionHasNoErrors();
+
+        $this->assertSame(PaymentOrderStatus::Voided, $ordenA->refresh()->status);
+        $this->assertSame(PaymentOrderStatus::Completed, $ordenB->refresh()->status);
+        $this->assertSame(DisbursementStatus::Failed, $egresoA->refresh()->status);
+        $this->assertSame(
+            $ordenB->id,
+            Disbursement::query()->confirmed()->where('beneficiary_installment_id', $cuota->id)->sole()->payment_order_id,
         );
-
-        return $cuota->refresh();
     }
+
+    /** Con el débito reconocido el dinero salió: no falló. */
+    public function test_no_se_da_por_fallida_con_el_debito_reconocido(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+        $egreso = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $this->darPorFallida($cuota, $egreso)->assertSessionHasErrors('disbursementId');
+        $this->assertSame(DisbursementStatus::ReadyForValidation, $egreso->refresh()->status);
+    }
+
+    /**
+     * Un formulario abierto sobre la transferencia A no cierra la B que nació
+     * después: el pedido nombra el egreso, no «el vivo de la cuota».
+     */
+    public function test_un_pedido_viejo_no_alcanza_a_la_transferencia_nueva(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egresoA = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $this->darPorFallida($cuota, $egresoA)->assertSessionHasNoErrors();
+        $this->anularOrden($this->ordenVigente($cuota))->assertSessionHasNoErrors();
+        $this->emitirOrden($cuota);
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egresoB = Disbursement::query()->live()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $this->darPorFallida($cuota, $egresoA)->assertSessionHasErrors('disbursementId');
+        $this->assertSame(DisbursementStatus::ReportReceived, $egresoB->refresh()->status);
+    }
+
+    /** Darla por fallida es del contador, como validar. */
+    public function test_dar_por_fallida_exige_su_permiso(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egreso = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $this->actingAs($this->operador())
+            ->post(route('haberes.installments.disbursement.fail', $cuota), [
+                'disbursementId' => $egreso->id,
+                'reasonCode' => 'bank_rejected',
+            ])
+            ->assertForbidden();
+    }
+
+    /** La ficha ofrece el botón con la transferencia en curso, y solo a quien puede. */
+    public function test_la_ficha_ofrece_darla_por_fallida_al_contador(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $haber = $cuota->haber;
+        $ficha = route('haberes.haber.show', [$haber->expediente, $haber]);
+
+        $this->actingAs($this->operador('contador'))
+            ->get($ficha)
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canFailDisbursement', true)
+                ->where("egresos.{$cuota->id}.canFailTransfer", true));
+
+        $this->actingAs($this->operador())
+            ->get($ficha)
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('canFailDisbursement', false));
+
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+
+        $this->actingAs($this->operador('contador'))
+            ->get($ficha)
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where("egresos.{$cuota->id}.canFailTransfer", false));
+    }
+
+    /** La base cierra los mismos caminos aunque un Action se equivoque. */
+    public function test_la_base_impone_las_transiciones_del_egreso_y_la_orden(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $orden = $this->ordenVigente($cuota);
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egreso = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $egresos = fn () => DB::table('disbursements')->where('id', $egreso->id);
+        $ordenes = fn () => DB::table('payment_orders')->where('id', $orden->id);
+
+        $this->rechaza(fn () => $egresos()->update(['status' => 'reversed']), 'egreso en curso a revertido');
+        $this->rechaza(fn () => $egresos()->update(['status' => 'failed', 'failure_reason_code' => 'cualquiera']), 'código fuera de la lista');
+        $this->rechaza(fn () => $egresos()->update(['status' => 'failed', 'failure_reason_code' => 'other']), '«Otro» sin detalle');
+        $this->rechaza(fn () => $egresos()->update(['status' => 'failed']), 'fallido sin motivo');
+        $this->rechaza(fn () => $ordenes()->update([
+            'status' => 'voided',
+            'voided_by' => $this->operador()->id,
+            'voided_at' => now(),
+            'rejection_or_void_reason_code' => 'other',
+            'rejection_or_void_reason' => 'x',
+        ]), 'anular la Orden con su transferencia en curso');
+        $this->rechaza(fn () => $ordenes()->update(['status' => 'completed']), 'completar la Orden sin egreso confirmado');
+
+        $this->darPorFallida($cuota, $egreso)->assertSessionHasNoErrors();
+
+        $this->rechaza(fn () => $egresos()->update(['status' => 'pending']), 'egreso fallido que vuelve a estar en curso');
+        $this->rechaza(fn () => $egresos()->update(['failure_reason' => 'otro texto']), 'egreso fallido editado');
+        $this->rechaza(fn () => $egresos()->update(['updated_at' => now()->addDay()]), 'egreso fallido tocado');
+        $this->rechaza(
+            fn () => $egresos()->update(['created_by' => User::factory()->create()->id]),
+            'autor de un egreso fallido cambiado', 'no se modifica',
+        );
+        $this->rechaza(fn () => $egresos()->update(['created_by' => null]), 'autor de un egreso fallido borrado a mano', 'no se modifica');
+
+        // Cerrado se llega por transición, nunca se nace.
+        $nace = fn (array $fila) => DB::table('disbursements')->insert([
+            'beneficiary_installment_id' => $cuota->id,
+            'payment_order_id' => $orden->id,
+            'method' => 'bank_transfer',
+            'amount' => $orden->amount,
+            'created_at' => now(),
+            'updated_at' => now(),
+            ...$fila,
+        ]);
+        $this->rechaza(fn () => $nace(['status' => 'reversed']), 'egreso que nace revertido', 'no nace');
+        $this->rechaza(fn () => $nace([
+            'status' => 'failed',
+            'failure_reason_code' => 'bank_rejected',
+            'bank_transaction_id' => $this->debito($cuota)->id,
+        ]), 'egreso que nace fallido con su débito', 'no nace');
+
+        $this->anularOrden($orden)->assertSessionHasNoErrors();
+
+        $this->rechaza(fn () => $ordenes()->update(['status' => 'draft']), 'Orden anulada que vuelve a circular');
+        $this->rechaza(fn () => DB::table('disbursements')->insert([
+            'beneficiary_installment_id' => $cuota->id,
+            'payment_order_id' => $orden->id,
+            'method' => 'bank_transfer',
+            'amount' => $orden->amount,
+            'status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]), 'egreso contra una Orden anulada');
+    }
+
+    /** Borrar al usuario sigue anulando su autoría, aunque el egreso esté cerrado. */
+    public function test_el_set_null_de_la_fk_alcanza_al_egreso_fallido(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+        $egreso = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+        $autor = User::factory()->create();
+        DB::table('disbursements')->where('id', $egreso->id)->update(['created_by' => $autor->id]);
+
+        $this->darPorFallida($cuota, $egreso)->assertSessionHasNoErrors();
+        $autor->delete();
+
+        $this->assertNull($egreso->refresh()->created_by);
+        $this->assertSame(DisbursementStatus::Failed, $egreso->status);
+    }
+
+    /** Un egreso confirmado no se da por fallido ni por la base. */
+    public function test_la_base_no_deja_cerrar_un_egreso_confirmado(): void
+    {
+        $cuota = $this->cuotaValidada();
+        $egreso = Disbursement::query()->confirmed()->where('beneficiary_installment_id', $cuota->id)->sole();
+
+        $this->rechaza(fn () => DB::table('disbursements')->where('id', $egreso->id)->update([
+            'status' => 'failed',
+            'failure_reason_code' => 'other',
+            'failure_reason' => 'x',
+        ]), 'egreso confirmado a fallido');
+        $this->rechaza(fn () => DB::table('payment_orders')
+            ->where('id', $egreso->payment_order_id)
+            ->update(['status' => 'draft']), 'Orden completada que vuelve a circular');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Andamiaje
+    |--------------------------------------------------------------------------
+    */
 
     /** La misma, ya con el pago validado por el contador. */
     private function cuotaValidada(): BeneficiaryInstallment
@@ -695,155 +863,53 @@ class EgresoPorTransferenciaTest extends TestCase
         return $cuota->refresh();
     }
 
-    /** El circuito completo del efectivo que nadie retiró (§2.4.7). */
-    private function cuotaConEfectivoAcreditado(): BeneficiaryInstallment
+    /**
+     * Que la base rechace la escritura, dentro de un punto de guardado.
+     *
+     * @param  string|null  $motivo  Parte del mensaje, cuando importa qué
+     *                               guarda la frenó y no solo que se frenó.
+     */
+    private function rechaza(callable $escritura, string $caso, ?string $motivo = null): void
     {
-        $cuota = $this->cuotaCobrada();
-        $traslado = $this->depositar($cuota);
+        try {
+            DB::transaction(static function () use ($escritura): void {
+                $escritura();
+                DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+            });
+        } catch (QueryException $e) {
+            if ($motivo !== null) {
+                $this->assertStringContainsString($motivo, $e->getMessage(), $caso);
+            } else {
+                $this->addToAssertionCount(1);
+            }
 
-        app(ConfirmCashDepositCredit::class)->handle(
-            transfer: $traslado,
-            transaction: $this->movimientoDe(
-                $traslado->amount,
-                TransactionDirection::Credit,
-                '2026-05-28',
-            ),
-            idempotencyKey: 'acreditacion-'.Str::random(8),
-            actorId: $this->operador()->id,
-        );
+            return;
+        }
 
-        return $cuota->refresh();
+        $this->fail('La base aceptó: '.$caso);
     }
 
-    private function cuotaCobrada(): BeneficiaryInstallment
+    private function ordenVigente(BeneficiaryInstallment $cuota): PaymentOrder
     {
-        $expediente = Expediente::query()
-            ->whereNotNull('employer_id')
-            ->orderBy('id')
-            ->firstOrFail();
-
-        $expediente->forceFill(['received_date' => '2026-05-15'])->save();
-
-        $cuota = $expediente->haberes()->orderBy('id')->firstOrFail()
-            ->installments()->orderBy('installment_number')->firstOrFail();
-
-        $cuota->forceFill(['expected_medium' => 'cash'])->save();
-        $cuota->haber->forceFill(['currency' => $this->moneda])->save();
-
-        app(CollectAndIssueReceipt::class)->handle(
-            installment: $cuota->refresh(),
-            idempotencyKey: 'cobro-'.Str::random(8),
-            actorId: $this->operador()->id,
-            /*
-             * Sin fecha explícita el cobro queda con la de hoy, y el resto
-             * del escenario transcurre en mayo y junio: el depósito del
-             * 28/05 salía de un cajón cuyo ingreso todavía no había
-             * ocurrido, y el saldo de efectivo daba negativo.
-             */
-            receivedDate: CarbonImmutable::parse('2026-05-20'),
-        );
-
-        return $cuota->refresh();
+        return PaymentOrder::query()->active()->where('beneficiary_installment_id', $cuota->id)->sole();
     }
 
-    private function depositar(BeneficiaryInstallment $cuota): CashToBankTransfer
+    private function anularOrden(PaymentOrder $orden): TestResponse
     {
-        return app(DepositCashToBank::class)->handle(
-            installment: $cuota,
-            ticket: [
-                'bankAccountId' => $this->cuentaDelOrganismo()->id,
-                'depositDate' => now()->parse('2026-05-28'),
-                'depositTime' => '10:35:00',
-                'operationNumber' => '995979830',
-                'terminal' => 'T-014',
-                'notes' => null,
-            ],
-            foto: UploadedFile::fake()->image('ticket.jpg'),
-            idempotencyKey: 'traslado-'.Str::random(8),
-            actorId: $this->operador()->id,
-        );
+        return $this->actingAs($this->operador('contador'))
+            ->post(route('ordenes.void', $orden), [
+                'reasonCode' => 'wrong_beneficiary_data',
+                'reason' => 'El CBU era de otra cuenta.',
+            ]);
     }
 
-    /** El débito con que el organismo pagó, por el importe de la Orden. */
-    private function debito(BeneficiaryInstallment $cuota): BankTransaction
+    private function darPorFallida(BeneficiaryInstallment $cuota, Disbursement $egreso): TestResponse
     {
-        return $this->movimiento($cuota, TransactionDirection::Debit);
-    }
-
-    private function movimiento(
-        BeneficiaryInstallment $cuota,
-        TransactionDirection $direccion,
-    ): BankTransaction {
-        $orden = PaymentOrder::query()
-            ->where('beneficiary_installment_id', $cuota->id)
-            ->firstOrFail();
-
-        /*
-         * El día siguiente a la Orden. El organismo no transfiere antes de
-         * que se le pida, y el Action lo comprueba: una fecha fija se
-         * volvería anterior en cuanto la Orden se emita con `now()`.
-         */
-        return $this->movimientoDe(
-            $orden->amount,
-            $direccion,
-            $orden->order_date->copy()->addDay()->toDateString(),
-        );
-    }
-
-    private function movimientoDe(
-        string $importe,
-        TransactionDirection $direccion,
-        string $fecha,
-    ): BankTransaction {
-        $cuenta = $this->cuentaDelOrganismo();
-
-        return BankTransaction::query()->create([
-            'bank_account_id' => $cuenta->id,
-            'first_seen_import_id' => $this->importacion($cuenta)->id,
-            'transaction_date' => $fecha,
-            'amount' => $importe,
-            'direction' => $direccion,
-            'operation_id' => '83690105',
-            'description' => $direccion === TransactionDirection::Debit
-                ? 'Transferencia a terceros'
-                : 'Deposito en efectivo',
-            'fingerprint' => hash('sha256', uniqid('', true)),
-        ]);
-    }
-
-    private function cuentaDelOrganismo(): BankAccount
-    {
-        return BankAccount::query()->firstOrCreate(
-            ['account_number' => self::CUENTA_ORGANISMO.$this->moneda],
-            [
-                'label' => 'Cta. Cte. 2693 — Haberes en consignación',
-                'bank_name' => 'Banco Macro',
-                'currency' => $this->moneda,
-                'is_active' => true,
-            ],
-        );
-    }
-
-    private function importacion(BankAccount $cuenta): BankStatementImport
-    {
-        return BankStatementImport::query()->create([
-            'bank_account_id' => $cuenta->id,
-            'imported_by' => $this->operador()->id,
-            'original_filename' => 'extracto.csv',
-            'file_size' => 100,
-            'file_sha256' => hash('sha256', uniqid('', true)),
-            'source_format' => 'macro_online_csv',
-            'parser_version' => 'macro-csv-1',
-            'period_from' => '2026-05-28',
-            'period_to' => '2026-06-30',
-            'status' => 'completed',
-            'rows_total' => 1,
-            'rows_valid' => 1,
-            'rows_rejected' => 0,
-            'rows_new' => 1,
-            'rows_duplicate' => 0,
-            'imported_at' => now(),
-        ]);
+        return $this->actingAs($this->operador('contador'))
+            ->post(route('haberes.installments.disbursement.fail', $cuota), [
+                'disbursementId' => $egreso->id,
+                'reasonCode' => 'bank_rejected',
+            ]);
     }
 
     private function informar(BeneficiaryInstallment $cuota): TestResponse

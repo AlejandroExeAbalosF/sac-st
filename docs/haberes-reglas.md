@@ -307,6 +307,13 @@ El enum distingue estados activos de `completed`, `rejected` y `voided`. La emis
 usa `draft`, la anulación `voided` y la validación del egreso `completed`. No se debe
 afirmar que todos los estados intermedios declarados tengan una transición expuesta.
 
+- `completed`, `rejected` y `voided` son finales. **Base:** trigger
+  `payment_orders_status_guard`.
+- No se anula ni rechaza una Orden con un egreso vivo, y no se completa sin su
+  egreso confirmado. **Base:** `payment_orders_status_guard`. **Action:**
+  `VoidPaymentOrder`, que relee la Orden bajo bloqueo y audita dentro de la
+  transacción.
+
 Evidencia: [emisión](../app/Modules/Haberes/Actions/IssuePaymentOrder.php),
 [datos de emisión](../app/Modules/Haberes/Data/IssuePaymentOrderData.php),
 [corrección](../app/Modules/Haberes/Actions/EditPaymentOrderDetails.php),
@@ -342,14 +349,42 @@ se toma del débito. No se debe confundir la etapa del egreso con el estado de l
 PostgreSQL exige Orden en la transferencia y datos de informe, validación y débito
 para confirmarla; impide más de un egreso vivo por cuota. `confirmed` sigue siendo
 un estado vivo para esa unicidad. El recibo de egreso requiere un egreso confirmado
-y solo puede existir uno vigente por cuota. Los estados `reversed` y `failed` están
-declarados; eso no demuestra por sí solo un circuito completo de reversión expuesto.
+y solo puede existir uno vigente por cuota.
+
+Transiciones del egreso:
+
+- `FailTransferDisbursement` da por fallida una transferencia en curso, con motivo.
+  Recibe el id del egreso que eligió el operador y lo relee bajo bloqueo: un pedido
+  sobre un egreso ya cerrado no alcanza al que nació después. Exige que no haya
+  débito reconocido. Permiso `egresos.dar-por-fallido`. Es una propuesta sin
+  relevar, pendiente de confirmar con el área.
+- `failed` y `reversed` son finales y la fila queda congelada; `confirmed` no cambia
+  de estado; a `failed` se llega sin débito. De un egreso cerrado solo cambian sus
+  autores, y solo a nulo por el `SET NULL` de la FK cuando se borra el usuario.
+  **Base:** `disbursements_append_only`.
+- Un egreso no nace `failed` ni `reversed`: a los dos se llega por transición.
+  **Base:** `disbursements_born_open`.
+- A `reversed` no se llega: la reversión con contrapartida no tiene circuito todavía.
+  **Base:** `disbursements_append_only`.
+- La Orden de un egreso no cambia, y el egreso solo nace o se confirma con su Orden
+  activa. **Base:** `disbursements_append_only` y `disbursements_order_active`.
+  **Action:** `ValidateTransferDisbursement`, `RegisterTransferReport` y
+  `LinkTransferDebit` rechazan un egreso vivo de otra Orden. Antes de crear el
+  egreso, los dos últimos bloquean y releen la Orden: frente a una anulación
+  concurrente, el operador recibe el motivo y no un error de base.
+- Un egreso confirmado no supera lo financiado de su cuota. La entrega por mostrador y la
+  liberación de fondos bloquean la cuota antes de decidir. **Base:**
+  `disbursements_within_funding` y `funding_allocations_reversal_without_disbursement`.
+  **Action:** `DeliverToBeneficiary` y `AllocateFundsToInstallment`, por
+  `InstallmentLock` (expediente → haber → cuota).
 
 Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 [validación](../app/Modules/Haberes/Actions/ValidateTransferDisbursement.php),
 [esquema de egresos](../database/migrations/2026_08_30_100000_create_disbursements_table.php),
-[egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php) y
-[egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php).
+[transiciones](../database/migrations/2026_11_17_000000_guard_payment_order_and_disbursement_transitions.php),
+[egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php),
+[egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php) y
+[concurrencia](../tests/Feature/Haberes/EgresoConcurrenteTest.php).
 
 El informe que muestra la cuota es el último **no anulado** (`Disbursement::reportDocument`,
 con las condiciones dentro de `ofMany`). La foto del comprobante de depósito, la de cada
@@ -543,6 +578,7 @@ usa Multas ([Multas](multas-reglas.md#motivos)).
 | Revertir una recepción | `fund_receipts.reversal_reason_code` | CHECK `fund_receipts_reversal_reason_code_check`: exige código y forma, no la lista |
 | Desvincular un comprobante de su movimiento | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
 | Desvincular el débito de un egreso sin validar | Auditoría (`motivo`, `motivo_codigo`) | Form Request; no hay columna |
+| Dar por fallida una transferencia en curso | `disbursements.failure_reason_code`, detalle en `failure_reason` | CHECK `disbursements_failure_check`, con la lista |
 | Descartar un comprobante de depósito | `deposit_tickets.discarded_reason_code` | CHECK `deposit_tickets_discarded_check` |
 
 - Cada columna acepta solo los códigos de su acto, y hay código exactamente

@@ -280,6 +280,17 @@ final class HaberesPermissionCatalog implements PermissionCatalogContributor
                 ['administrador', 'contador'],
                 sensitive: true,
             ),
+            // Cerrar una transferencia que no se pagó libera la cuota para una
+            // Orden nueva. Es del contador, como validar: los dos deciden qué
+            // pasó con el dinero pedido al organismo.
+            new PermissionDefinition(
+                'egresos.dar-por-fallido',
+                'Dar por fallida una transferencia',
+                'Cerrar con motivo una transferencia que no llegó a pagarse, para poder anular su Orden y emitir otra.',
+                'egresos',
+                ['administrador', 'contador'],
+                sensitive: true,
+            ),
         );
     }
 

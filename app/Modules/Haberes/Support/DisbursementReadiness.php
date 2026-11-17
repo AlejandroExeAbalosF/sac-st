@@ -103,6 +103,22 @@ final readonly class DisbursementReadiness
             && $this->disbursement?->bank_transaction_id !== null;
     }
 
+    /**
+     * Si la transferencia en curso se puede dar por fallida.
+     *
+     * No depende de las trabas de la cuota: una etiqueta que retiene el pago
+     * no impide cerrar una transferencia que no se hizo. Sí exige que no
+     * haya débito reconocido, igual que la base.
+     */
+    public function canFailTransfer(): bool
+    {
+        return $this->disbursement !== null
+            && $this->disbursement->method === DisbursementMethod::BankTransfer
+            && $this->disbursement->status->isLive()
+            && $this->disbursement->status !== DisbursementStatus::Confirmed
+            && $this->disbursement->bank_transaction_id === null;
+    }
+
     /** Si el contador puede cotejar y dar el pago por hecho (§2.3.4). */
     public function canValidate(): bool
     {

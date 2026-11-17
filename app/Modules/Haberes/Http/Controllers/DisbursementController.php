@@ -7,6 +7,7 @@ namespace App\Modules\Haberes\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Banking\Models\BankTransaction;
 use App\Modules\Haberes\Actions\DeliverAndIssueExpenseReceipt;
+use App\Modules\Haberes\Actions\FailTransferDisbursement;
 use App\Modules\Haberes\Actions\FindTransferDebitCandidates;
 use App\Modules\Haberes\Actions\IssueExpenseReceipt;
 use App\Modules\Haberes\Actions\LinkTransferDebit;
@@ -279,6 +280,36 @@ final class DisbursementController extends Controller
         );
 
         Toast::success('Débito desvinculado.', 'El egreso vuelve a esperar el movimiento correcto.');
+
+        return back();
+    }
+
+    /**
+     * Cierra una transferencia que no llegó a pagarse, con su motivo.
+     *
+     * El formulario manda qué egreso se decidió cerrar: si mientras tanto
+     * cambió, el pedido falla en vez de alcanzar a otro.
+     */
+    public function fail(
+        Request $request,
+        BeneficiaryInstallment $installment,
+        FailTransferDisbursement $darPorFallida,
+    ): RedirectResponse {
+        $validado = $request->validate([
+            'disbursementId' => ['required', 'integer'],
+            ...Reason::rules(HaberesReasonAct::TransferFailure, max: 300),
+        ], Reason::messages());
+        $motivo = Reason::fromValidated($validado, HaberesReasonAct::TransferFailure)
+            ?? throw new LogicException('El motivo es obligatorio y ya se validó.');
+
+        $darPorFallida->handle(
+            $installment,
+            (int) $validado['disbursementId'],
+            $motivo,
+            $request->user()?->id,
+        );
+
+        Toast::success('Transferencia dada por fallida.', 'La Orden ya se puede anular para emitir otra.');
 
         return back();
     }
