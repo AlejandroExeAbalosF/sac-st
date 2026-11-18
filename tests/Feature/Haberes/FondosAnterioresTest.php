@@ -767,6 +767,7 @@ class FondosAnterioresTest extends TestCase
             $this->linea($evento, LedgerAccount::LegacyFunds, debit: '85000.00'),
             $this->linea($evento, LedgerAccount::CashOnHand, credit: '85000.00'),
         ]);
+        $this->postear($evento);
         DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
     }
 
@@ -995,6 +996,7 @@ class FondosAnterioresTest extends TestCase
         return $cuota;
     }
 
+    /** En borrador: se le cargan las líneas y después se postea. */
     private function eventoCrudo(string $tipo): int
     {
         return (int) DB::table('financial_events')->insertGetId([
@@ -1002,12 +1004,16 @@ class FondosAnterioresTest extends TestCase
             'cash_box_id' => $this->caja(),
             'event_type' => $tipo,
             'event_date' => BusinessDate::today()->toDateString(),
-            'status' => 'posted',
-            'posted_at' => now(),
+            'status' => 'draft',
             'idempotency_key' => 'test-crudo-'.Str::random(8),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function postear(int $evento): void
+    {
+        DB::table('financial_events')->where('id', $evento)->update(['status' => 'posted', 'posted_at' => now()]);
     }
 
     /** Un apartado bien formado, sin recepción ni asignación todavía. */
@@ -1021,6 +1027,7 @@ class FondosAnterioresTest extends TestCase
             'haber_id' => $cuota->haber_id,
             'beneficiary_installment_id' => $cuota->id,
         ]);
+        $this->postear($evento);
 
         return $evento;
     }
@@ -1035,6 +1042,7 @@ class FondosAnterioresTest extends TestCase
             'haber_id' => $cuota->haber_id,
             'beneficiary_installment_id' => $cuota->id,
         ]);
+        $this->postear($evento);
 
         return $evento;
     }

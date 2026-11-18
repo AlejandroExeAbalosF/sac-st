@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
+use Tests\Support\RawJournalEntry;
 use Tests\TestCase;
 
 /**
@@ -600,7 +601,7 @@ class AperturaObligatoriaTest extends TestCase
     /** Un asiento escrito por SQL, salteándose el Action. */
     private function asientoCrudo(string $fecha, Currency $moneda): void
     {
-        $evento = DB::table('financial_events')->insertGetId([
+        RawJournalEntry::insert([
             'public_id' => (string) Str::ulid(),
             'cash_box_id' => $this->caja(),
             'event_type' => FinancialEventType::FundsReceived->value,
@@ -610,11 +611,8 @@ class AperturaObligatoriaTest extends TestCase
             'idempotency_key' => 'crudo-'.Str::random(10),
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
-
-        DB::table('journal_lines')->insert([
+        ], [
             [
-                'financial_event_id' => $evento,
                 'account_code' => LedgerAccount::CashOnHand->value,
                 'currency' => $moneda->value,
                 'debit' => '25.00',
@@ -623,7 +621,6 @@ class AperturaObligatoriaTest extends TestCase
                 'created_at' => now(),
             ],
             [
-                'financial_event_id' => $evento,
                 'account_code' => LedgerAccount::UnassignedFunds->value,
                 'currency' => $moneda->value,
                 'debit' => '0.00',

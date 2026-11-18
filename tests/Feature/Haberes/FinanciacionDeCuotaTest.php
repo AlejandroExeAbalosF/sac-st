@@ -473,6 +473,7 @@ class FinanciacionDeCuotaTest extends TestCase
                 EntryLine::credit(LedgerAccount::BeneficiaryFunds, '1000.00'),
             ],
             date: now(),
+            cashBoxId: $this->cajaHaberes(),
         )->id;
     }
 

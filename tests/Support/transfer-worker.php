@@ -53,6 +53,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Support\RawCashDeposit;
+use Tests\Support\RawJournalEntry;
 
 // Proceso independiente para concurrencia real sobre un traslado; recibe credenciales solo por stdin.
 $input = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
@@ -197,12 +198,16 @@ try {
             $pago = FinePayment::query()->findOrFail($input['payment']);
             $aplicacion = $pago->application()->firstOrFail();
             $recepcion = $aplicacion->fundReceipt()->firstOrFail();
-            $revertir = fn (int $evento): int => (int) DB::table('financial_events')->insertGetId([
+            // Una reversión de verdad, con las líneas del original invertidas: la guarda que se prueba es la de la anulación.
+            $revertir = fn (int $evento): int => RawJournalEntry::insert([
                 'public_id' => (string) Str::ulid(), 'cash_box_id' => $recepcion->cash_box_id, 'event_type' => 'reversal',
                 'event_date' => BusinessDate::today()->toDateString(), 'status' => 'posted', 'idempotency_key' => (string) Str::uuid(),
                 'reversal_of_id' => $evento, 'reversal_reason' => 'Worker', 'created_by' => $input['actor'], 'posted_by' => $input['actor'],
-                'posted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
-            ]);
+                'created_at' => now(), 'updated_at' => now(),
+            ], DB::table('journal_lines')->where('financial_event_id', $evento)->get()->map(fn (object $linea): array => [
+                ...array_diff_key((array) $linea, ['id' => true, 'financial_event_id' => true, 'created_at' => true]),
+                'debit' => $linea->credit, 'credit' => $linea->debit,
+            ])->all());
 
             DB::table('fine_payment_voids')->insert([
                 'fine_payment_id' => $pago->id, 'fine_id' => $pago->fine_id, 'reason_code' => 'data_entry_error',
@@ -243,6 +248,26 @@ try {
         app(VoidPaymentOrder::class)->handle(
             PaymentOrder::query()->findOrFail($input['order']), new Reason(HaberesReasonCode::WrongBeneficiaryData, null), $input['actor'],
         );
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'raw-journal-lines') {
+        // Un par balanceado sobre un asiento mientras otro lo postea: la base sola decide.
+        DB::transaction(function () use ($input): void {
+            foreach ([['debit' => $input['amount'], 'credit' => '0.00', 'account_code' => 'CASH_ON_HAND'],
+                ['debit' => '0.00', 'credit' => $input['amount'], 'account_code' => 'UNASSIGNED_FUNDS']] as $linea) {
+                DB::table('journal_lines')->insert([
+                    ...$linea, 'financial_event_id' => $input['event'], 'cash_box_id' => $input['box'],
+                    'currency' => 'ARS', 'created_at' => now(),
+                ]);
+            }
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        });
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'raw-post-event') {
+        // Postear un borrador mientras otro todavía le carga líneas.
+        DB::transaction(function () use ($input): void {
+            DB::table('financial_events')->where('id', $input['event'])->update(['status' => 'posted', 'posted_at' => now()]);
+            DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        });
         $result = ['status' => 'done'];
     } elseif ($input['mode'] === 'raw-deposit') {
         // Un escritor que no pasa por el Action: la base sola tiene que frenarlo.

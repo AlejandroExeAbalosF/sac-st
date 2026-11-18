@@ -32,6 +32,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\RawJournalEntry;
 use Tests\TestCase;
 
 /**
@@ -566,7 +567,12 @@ class CajaArqueoYCierreTest extends TestCase
         );
     }
 
-    /** SQL directo tampoco puede agregar líneas tardías a un período cerrado. */
+    /**
+     * SQL directo tampoco puede agregar líneas tardías a un período cerrado.
+     *
+     * Lo frena primero el sellado del asiento (`journal_lines_sealed`): un
+     * evento posteado no admite líneas, esté o no en un período cerrado.
+     */
     public function test_la_base_rechaza_lineas_agregadas_a_un_evento_posteado_y_cerrado(): void
     {
         $this->abrirLibros(efectivo: '1000.00', cheques: '0.00', fecha: '2026-06-01');
@@ -591,7 +597,7 @@ class CajaArqueoYCierreTest extends TestCase
             ->firstOrFail();
 
         $this->expectException(QueryException::class);
-        $this->expectExceptionMessage('cambiaria el saldo inicial');
+        $this->expectExceptionMessage('no admite líneas nuevas');
 
         DB::table('journal_lines')->insert([
             [
@@ -1290,7 +1296,7 @@ class CajaArqueoYCierreTest extends TestCase
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('cambiaria el saldo inicial');
 
-        $evento = DB::table('financial_events')->insertGetId([
+        RawJournalEntry::insert([
             'public_id' => (string) Str::ulid(),
             'cash_box_id' => $this->caja(),
             'event_type' => FinancialEventType::FundsReceived->value,
@@ -1300,11 +1306,8 @@ class CajaArqueoYCierreTest extends TestCase
             'posted_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
-
-        DB::table('journal_lines')->insert([
+        ], [
             [
-                'financial_event_id' => $evento,
                 'account_code' => LedgerAccount::CashOnHand->value,
                 'currency' => Currency::Ars->value,
                 'debit' => '100.00',
@@ -1313,7 +1316,6 @@ class CajaArqueoYCierreTest extends TestCase
                 'created_at' => now(),
             ],
             [
-                'financial_event_id' => $evento,
                 'account_code' => LedgerAccount::UnassignedFunds->value,
                 'currency' => Currency::Ars->value,
                 'debit' => '0.00',
@@ -1359,9 +1361,8 @@ class CajaArqueoYCierreTest extends TestCase
     /**
      * Un asiento a medio escribir, puesto sin pasar por ningún Action.
      *
-     * `PostJournalEntry` siempre asienta; para tener un borrador hay que
-     * escribirlo a mano, que es igual lo que hace la pantalla que los
-     * guarda a medio cargar.
+     * `PostJournalEntry` arma el borrador y lo postea en la misma
+     * transacción; para que quede uno hay que escribirlo a mano.
      */
     private function borradorCrudo(string $fecha, Currency $moneda): void
     {

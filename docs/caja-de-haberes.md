@@ -604,6 +604,19 @@ legible; el trigger impide el desastre.
 
 - `journal_lines` y `financial_events` son **append-only**; un asiento se revierte,
   no se edita.
+- **El asiento se sella al postear.** `PostJournalEntry` crea el evento en
+  borrador, le carga las líneas y lo postea en la misma transacción. Un evento
+  nace en borrador (`financial_events_born_draft`), solo pasa de borrador a
+  posteado y de posteado a revertido, y posteado no admite líneas nuevas
+  (`journal_lines_sealed`, que lee el evento con `FOR SHARE` para no cruzarse
+  con un posteo concurrente). Fuera de borrador quedan fijos su autor, quién y
+  cuándo lo posteó, la descripción y el motivo de reversión; de los autores
+  solo se admite el `SET NULL` de la FK al borrar el usuario
+  (`financial_events_append_only`).
+- **Todo asiento es de una caja**, y sus líneas, de la misma: `cash_box_id` es
+  obligatorio en el evento y en la línea, con FK compuesta de la línea al
+  evento (`journal_lines_event_cash_box_foreign`). Sin caja, un evento se
+  salteaba la apertura y el cierre.
 - **Un libro sin apertura no admite movimientos, arqueos ni cierres**, y nada con
   fecha anterior a ella (`journal_lines_require_opening`,
   `cash_counts_require_opening`, `period_closings_require_opening`). Pesos y

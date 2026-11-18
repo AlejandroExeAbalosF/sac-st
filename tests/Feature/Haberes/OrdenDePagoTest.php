@@ -1346,9 +1346,10 @@ class OrdenDePagoTest extends TestCase
          */
         $eventoId = DB::table('financial_events')->insertGetId([
             'public_id' => (string) Str::ulid(),
+            'cash_box_id' => DB::table('fund_receipts')->where('id', $asignacion->fund_receipt_id)->value('cash_box_id'),
             'event_type' => 'funds_allocated',
             'event_date' => BusinessDate::today()->toDateString(),
-            'status' => 'posted',
+            'status' => 'draft',
             'idempotency_key' => 'excedente-'.Str::random(10),
             'created_at' => now(),
             'updated_at' => now(),

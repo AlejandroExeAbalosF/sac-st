@@ -26,7 +26,7 @@ final class RawCashDeposit
     {
         $ahora = now();
 
-        $evento = DB::table('financial_events')->insertGetId([
+        $evento = RawJournalEntry::insert([
             'public_id' => (string) Str::ulid(),
             'cash_box_id' => $box,
             'event_type' => 'cash_deposited_to_bank',
@@ -38,10 +38,8 @@ final class RawCashDeposit
             'posted_at' => $ahora,
             'created_at' => $ahora,
             'updated_at' => $ahora,
-        ]);
-
-        DB::table('journal_lines')->insert(array_map(
-            fn (EntryLine $linea): array => [...$linea->toRow($evento), 'created_at' => $ahora],
+        ], array_map(
+            fn (EntryLine $linea): array => [...$linea->toRow(0), 'created_at' => $ahora],
             [
                 EntryLine::debit(LedgerAccount::CashInTransit, $amount)->in(Currency::Ars)->onBankAccount($account)->onCashBox($box),
                 EntryLine::credit(LedgerAccount::CashOnHand, $amount)->in(Currency::Ars)->onCashBox($box),

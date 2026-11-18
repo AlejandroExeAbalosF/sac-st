@@ -21,6 +21,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Asienta un hecho monetario.
@@ -34,6 +35,15 @@ use Illuminate\Validation\ValidationException;
  * que el operador entienda, y en la base con un trigger diferido, que es
  * el que realmente lo impide. Si algún día alguien escribe un asiento
  * salteándose este Action, la base lo va a rechazar igual.
+ *
+ * **El asiento se arma en borrador y se sella al postear.** El evento nace
+ * `draft`, recibe sus líneas y recién entonces pasa a `posted`. Desde ahí la
+ * base no admite líneas nuevas (`journal_lines_sealed`): un asiento posteado
+ * se corrige con su reversión, nunca agregándole renglones.
+ *
+ * **Todo asiento es de una caja**, y sus líneas, de la misma: la base lo
+ * impone con la FK compuesta de `journal_lines` a `financial_events`. Sin
+ * caja un evento se salteaba la apertura y el cierre del período.
  */
 final class PostJournalEntry
 {
@@ -47,7 +57,7 @@ final class PostJournalEntry
         string $idempotencyKey,
         array $lines,
         CarbonInterface $date,
-        ?int $cashBoxId = null,
+        int $cashBoxId,
         ?string $description = null,
         ?int $actorId = null,
         /*
@@ -63,6 +73,7 @@ final class PostJournalEntry
         ?string $reversalReason = null,
     ): FinancialEvent {
         $this->assertBalances($lines);
+        $this->assertSameCashBox($lines, $cashBoxId);
         $currencies = array_values(array_unique(array_map(
             static fn (EntryLine $line): string => $line->currency->value,
             $lines,
@@ -90,10 +101,8 @@ final class PostJournalEntry
                     return $yaAsentado;
                 }
 
-                if ($cashBoxId !== null) {
-                    /* Ver el comentario equivalente en ClosePeriod. */
-                    CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
-                }
+                /* Ver el comentario equivalente en ClosePeriod. */
+                CashBox::query()->lockForUpdate()->findOrFail($cashBoxId);
 
                 $this->assertBooksOpen($type, $cashBoxId, $date, $currencies);
                 $this->assertPeriodOpen($cashBoxId, $date, $currencies);
@@ -102,25 +111,34 @@ final class PostJournalEntry
                     'cash_box_id' => $cashBoxId,
                     'event_type' => $type,
                     'event_date' => $date,
-                    'status' => FinancialEventStatus::Posted,
+                    'status' => FinancialEventStatus::Draft,
                     'idempotency_key' => $idempotencyKey,
                     'description' => $description,
                     'reversal_of_id' => $reversalOfId,
                     'reversal_reason' => $reversalReason,
                     'created_by' => $actorId,
-                    'posted_by' => $actorId,
-                    'posted_at' => now(),
                 ]);
 
                 JournalLine::query()->insert(
                     array_map(
                         fn (EntryLine $linea): array => [
                             ...$linea->toRow((int) $evento->id),
+                            'cash_box_id' => $cashBoxId,
                             'created_at' => now(),
                         ],
                         $lines,
                     )
                 );
+
+                /*
+                 * Postear es lo que lo sella: los triggers del balance, la
+                 * apertura y el cierre miran también esta transición.
+                 */
+                $evento->forceFill([
+                    'status' => FinancialEventStatus::Posted,
+                    'posted_by' => $actorId,
+                    'posted_at' => now(),
+                ])->save();
 
                 return $evento;
             });
@@ -145,16 +163,15 @@ final class PostJournalEntry
      * base lo impide con `journal_lines_require_opening`; esto lo dice con
      * la salida a mano.
      *
-     * El asiento de apertura no la pide —es ella—, y un evento sin caja no
-     * tiene libro que mirar, igual que en el trigger.
+     * El asiento de apertura no la pide: es ella.
      *
      * @param  list<string>  $currencies
      *
      * @throws CashBookNotOpenedException
      */
-    private function assertBooksOpen(FinancialEventType $type, ?int $cashBoxId, CarbonInterface $date, array $currencies): void
+    private function assertBooksOpen(FinancialEventType $type, int $cashBoxId, CarbonInterface $date, array $currencies): void
     {
-        if ($cashBoxId === null || $type === FinancialEventType::OpeningBalance) {
+        if ($type === FinancialEventType::OpeningBalance) {
             return;
         }
 
@@ -176,19 +193,12 @@ final class PostJournalEntry
      * impide el desastre—, con la vuelta de tuerca de que acá el mensaje
      * lleva el cierre entero: la pantalla necesita poder llevar hasta él.
      *
-     * Un evento sin caja no se comprueba, igual que en el trigger: no hay
-     * forma de saber a qué cierre pertenecería.
-     *
      * @param  list<string>  $currencies
      *
      * @throws ClosedPeriodException
      */
-    private function assertPeriodOpen(?int $cashBoxId, CarbonInterface $date, array $currencies): void
+    private function assertPeriodOpen(int $cashBoxId, CarbonInterface $date, array $currencies): void
     {
-        if ($cashBoxId === null) {
-            return;
-        }
-
         $cierre = PeriodClosing::query()
             ->where('cash_box_id', $cashBoxId)
             ->whereIn('currency', $currencies)
@@ -227,6 +237,26 @@ final class PostJournalEntry
 
         if ($posteriores->isNotEmpty()) {
             throw ClosedPeriodException::invalidatedBy($posteriores->first(), $date, $posteriores->count());
+        }
+    }
+
+    /**
+     * Una línea que nombra otra caja es un error del llamador, no del
+     * operador: el asiento entero es de la caja del evento.
+     *
+     * @param  list<EntryLine>  $lines
+     */
+    private function assertSameCashBox(array $lines, int $cashBoxId): void
+    {
+        foreach ($lines as $linea) {
+            if ($linea->cashBoxId !== null && $linea->cashBoxId !== $cashBoxId) {
+                throw new LogicException(sprintf(
+                    'La línea %s nombra la caja %d en un asiento de la caja %d.',
+                    $linea->account->value,
+                    $linea->cashBoxId,
+                    $cashBoxId,
+                ));
+            }
         }
     }
 

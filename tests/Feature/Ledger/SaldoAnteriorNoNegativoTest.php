@@ -136,8 +136,7 @@ class SaldoAnteriorNoNegativoTest extends TestCase
                 'cash_box_id' => $this->caja(),
                 'event_type' => FinancialEventType::LegacyFundsAllocated->value,
                 'event_date' => '2026-06-02',
-                'status' => 'posted',
-                'posted_at' => now(),
+                'status' => 'draft',
                 'idempotency_key' => 'test-concurrencia-anterior',
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -145,6 +144,7 @@ class SaldoAnteriorNoNegativoTest extends TestCase
 
             DB::table('journal_lines')->insert($this->linea($evento, LedgerAccount::LegacyFunds, debit: '300.00'));
             DB::table('journal_lines')->insert($this->lineaDeCuota($evento, '300.00'));
+            DB::table('financial_events')->where('id', $evento)->update(['status' => 'posted', 'posted_at' => now()]);
             DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
 
             $this->assertFalse($this->otraConexionPuedeConsumir($otra), 'La guarda tiene que retener el bloqueo hasta confirmar.');
