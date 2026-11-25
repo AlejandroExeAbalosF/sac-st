@@ -29,7 +29,8 @@ final class ResetUserPasswordFromConsole extends Command
 
     public function handle(ResetUserPassword $reset): int
     {
-        $username = Str::lower(trim((string) $this->argument('username')));
+        $argumento = $this->argument('username');
+        $username = Str::lower(trim(is_scalar($argumento) ? (string) $argumento : ''));
 
         $user = User::query()->where('username', $username)->first();
 
