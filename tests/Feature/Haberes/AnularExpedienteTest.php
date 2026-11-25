@@ -178,17 +178,20 @@ class AnularExpedienteTest extends TestCase
     /**
      * Reactivar devuelve cada cosa a donde estaba, no a «activo».
      *
-     * Es el punto delicado: el expediente de Bulacio tiene tres haberes
-     * cerrados y dos activos, con cuotas pagadas y pendientes mezcladas.
-     * Restaurar todo como activo dejaría cinco haberes abiertos y cuotas
-     * pagadas volviendo a figurar por cobrar.
+     * Es el punto delicado: en el expediente de Bulacio quedan un haber cerrado
+     * y cuatro activos, con una cuota suspendida. Restaurar todo como activo
+     * abriría el cerrado y levantaría la suspensión.
      */
     public function test_reactivating_restores_the_previous_state_of_everything(): void
     {
         $expediente = $this->expediente('120326/2019');
+        $haber = $expediente->haberes()->orderBy('id')->firstOrFail();
+        $haber->update(['workflow_status' => HaberWorkflowStatus::Closed]);
+        $haber->installments()->update(['workflow_status' => 'suspended']);
         $antes = $this->fotoDeEstados($expediente);
 
         $this->assertGreaterThan(1, collect($antes['haberes'])->unique()->count());
+        $this->assertGreaterThan(1, collect($antes['cuotas'])->unique()->count());
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [
@@ -236,8 +239,7 @@ class AnularExpedienteTest extends TestCase
     public function test_a_closed_expediente_comes_back_closed(): void
     {
         $expediente = $this->expediente('45905/2018');
-
-        $this->assertSame('closed', $expediente->status->value);
+        $expediente->update(['status' => 'closed']);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('expedientes.cancel', $expediente), [

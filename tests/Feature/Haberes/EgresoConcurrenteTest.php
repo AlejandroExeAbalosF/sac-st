@@ -9,7 +9,9 @@ use App\Modules\Haberes\Actions\RegisterTransferReport;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\VoidPaymentOrder;
 use App\Modules\Haberes\Enums\HaberesReasonCode;
+use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
+use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\Disbursement;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\PaymentOrder;
@@ -35,6 +37,8 @@ use Tests\TestCase;
  * - Anular la Orden y registrar el informe de su transferencia: los dos
  *   toman la fila de la Orden, y nunca queda un egreso vivo atado a una
  *   Orden anulada.
+ * - Anular una cuota y registrar su egreso, por SQL directo: los dos toman la
+ *   fila de la cuota, y nunca queda una anulada con un egreso vivo.
  *
  * Sin `RefreshDatabase`, como `AnulacionConcurrenteDeMultasTest`: el segundo
  * proceso necesita ver los datos confirmados.
@@ -178,6 +182,60 @@ class EgresoConcurrenteTest extends TestCase
         expect($resultado['status'])->toBe('validation')
             ->and($resultado['errors'])->toHaveKey('orderId')
             ->and($orden->refresh()->status)->toBe(PaymentOrderStatus::Draft);
+    }
+
+    /** Mientras se registra un egreso, anular la cuota espera y lo encuentra. */
+    public function test_cancelling_the_installment_while_paying_waits_and_is_refused(): void
+    {
+        $cuota = BeneficiaryInstallment::query()->orderBy('id')->firstOrFail();
+
+        DB::beginTransaction();
+        DB::table('disbursements')->insert([
+            'beneficiary_installment_id' => $cuota->id, 'method' => 'cash', 'amount' => $cuota->expected_amount, 'status' => 'pending',
+        ]);
+
+        $worker = $this->esperando(['mode' => 'raw-cancel-installment', 'installment' => $cuota->id]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('database')
+            ->and($resultado['message'])->toContain('tiene un egreso registrado: no se puede anular')
+            ->and($cuota->refresh()->workflow_status)->not->toBe(InstallmentWorkflowStatus::Cancelled);
+    }
+
+    /** Mientras se anula la cuota, registrar un egreso espera y la encuentra anulada. */
+    public function test_paying_while_the_installment_is_cancelled_waits_and_is_refused(): void
+    {
+        $cuota = BeneficiaryInstallment::query()->orderBy('id')->firstOrFail();
+
+        DB::beginTransaction();
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'cancelled']);
+
+        $worker = $this->esperando(['mode' => 'raw-disbursement', 'installment' => $cuota->id, 'amount' => $cuota->expected_amount]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('database')
+            ->and($resultado['message'])->toContain('está anulada: no admite un egreso')
+            ->and(Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->count())->toBe(0);
+    }
+
+    /** La migración espera la escritura en curso antes de revisar los datos. */
+    public function test_the_migration_waits_for_a_pending_write_and_then_checks_it(): void
+    {
+        $cuota = BeneficiaryInstallment::query()->orderBy('id')->firstOrFail();
+        $migracion = 'migrations/2026_11_25_000000_guard_installment_status_against_disbursements.php';
+        (require database_path($migracion))->down();
+
+        DB::beginTransaction();
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']);
+
+        $worker = $this->esperando(['mode' => 'migrate-up', 'migration' => $migracion]);
+        DB::commit();
+        $resultado = $this->resultado($worker);
+
+        expect($resultado['status'])->toBe('database')
+            ->and($resultado['message'])->toContain('cuotas pagadas sin egreso confirmado');
     }
 
     /** @param  array<string, mixed>  $datos */

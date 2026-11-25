@@ -99,18 +99,19 @@ class AnularHaberTest extends TestCase
     }
 
     /**
-     * Reactivar devuelve todo a donde estaba. El haber de Tinte tiene sus
-     * dos cuotas pagadas: restaurarlas como activas las haría figurar por
-     * cobrar otra vez.
+     * Reactivar devuelve todo a donde estaba, no a «activo»: el haber cerrado
+     * vuelve cerrado y la cuota suspendida vuelve suspendida.
      */
     public function test_reactivating_restores_the_previous_state(): void
     {
         $haber = $this->haberDe('45905/2018');
+        $haber->update(['workflow_status' => HaberWorkflowStatus::Closed]);
+        $haber->installments()->orderBy('id')->firstOrFail()->update(['workflow_status' => 'suspended']);
         $antes = $haber->installments()->orderBy('id')->pluck('workflow_status', 'id')
             ->map(fn ($estado): string => is_string($estado) ? $estado : $estado->value)
             ->all();
 
-        $this->assertContains('paid', $antes);
+        $this->assertContains('suspended', $antes);
 
         $this->actingAs($this->operador('contador'))
             ->patch(route('haberes.haber.cancel', [$haber->expediente, $haber]), [

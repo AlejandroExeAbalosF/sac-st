@@ -12,6 +12,7 @@ use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\PaysInstallments;
 use Tests\TestCase;
 
 /**
@@ -27,6 +28,7 @@ use Tests\TestCase;
  */
 class HaberListTest extends TestCase
 {
+    use PaysInstallments;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -123,6 +125,9 @@ class HaberListTest extends TestCase
             ->get(route('expedientes.index', ['vista' => 'haberes', 'q' => $documento]))
             ->viewData('page')['props']['haberes'][0]['paymentStatus'];
 
+        $this->pagarCuotas('25114780', 2);
+        $this->pagarCuotas('22908114', 1);
+
         // Dos cuotas pendientes que cubren el importe.
         $this->assertSame('unpaid', $situacion('28114902'));
         // Dos de tres cuotas pagadas.
@@ -132,21 +137,31 @@ class HaberListTest extends TestCase
     }
 
     /**
-     * Pagar la última cuota completa el haber, y deshacer el pago lo
-     * devuelve atrás: no hay un estado guardado que pueda quedar viejo.
+     * Pagar la última cuota completa el haber: la situación se lee de las
+     * cuotas, no hay un estado guardado que pueda quedar viejo.
      */
     public function test_the_payment_status_follows_its_installments()
     {
-        $haber = Haber::query()
-            ->whereRelation('beneficiary', 'document', '25114780')
-            ->firstOrFail();
-        $pendiente = $haber->installments()->where('workflow_status', 'active')->firstOrFail();
-
-        $pendiente->update(['workflow_status' => 'paid']);
-        $this->assertSame('fully_paid', $haber->fresh()?->situacionDePago()->value);
-
-        $pendiente->update(['workflow_status' => 'active']);
+        $haber = $this->pagarCuotas('25114780', 2);
         $this->assertSame('partially_paid', $haber->fresh()?->situacionDePago()->value);
+
+        $this->pagarPorMostrador($haber->installments()->where('workflow_status', 'active')->sole());
+        $this->assertSame('fully_paid', $haber->fresh()?->situacionDePago()->value);
+    }
+
+    /** Paga las primeras cuotas del haber de esa persona. */
+    private function pagarCuotas(string $documento, int $cantidad): Haber
+    {
+        if (! DB::table('cash_book_openings')->exists()) {
+            $this->abrirLibrosSinSaldo();
+        }
+
+        $haber = Haber::query()->whereRelation('beneficiary', 'document', $documento)->firstOrFail();
+
+        $haber->installments()->orderBy('installment_number')->limit($cantidad)->get()
+            ->each(fn (BeneficiaryInstallment $cuota) => $this->pagarPorMostrador($cuota));
+
+        return $haber;
     }
 
     /**

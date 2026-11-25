@@ -30,6 +30,9 @@ use Illuminate\Database\Seeder;
  * ```
  *
  * Es aditivo y no borra nada: si ya hay expedientes cargados, no hace nada.
+ *
+ * Ninguna cuota nace pagada: la base exige su egreso confirmado, y eso es
+ * recorrer el circuito con los libros abiertos.
  */
 final class HaberesDemoSeeder extends Seeder
 {
@@ -138,7 +141,6 @@ final class HaberesDemoSeeder extends Seeder
      */
     private function casos(): array
     {
-        $pagada = InstallmentWorkflowStatus::Paid;
         $activa = InstallmentWorkflowStatus::Active;
 
         return [
@@ -177,35 +179,35 @@ final class HaberesDemoSeeder extends Seeder
                 'haberes' => [
                     [
                         'document' => '22908114', 'amount' => '682000.00', 'expected' => 1,
-                        'status' => HaberWorkflowStatus::Closed,
-                        'installments' => [['amount' => '682000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada]],
+                        'status' => HaberWorkflowStatus::Active,
+                        'installments' => [['amount' => '682000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa]],
                     ],
                     [
                         'document' => '25114780', 'amount' => '954000.00', 'expected' => 3,
                         'status' => HaberWorkflowStatus::Active,
                         'installments' => [
-                            ['amount' => '318000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada],
-                            ['amount' => '318000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada],
+                            ['amount' => '318000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa],
+                            ['amount' => '318000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa],
                             ['amount' => '318000.00', 'label' => 'T.CONOC.', 'concept' => 'Indemnización', 'status' => $activa],
                         ],
                     ],
                     [
                         'document' => '20887431', 'amount' => '745000.00', 'expected' => 1,
-                        'status' => HaberWorkflowStatus::Closed,
-                        'installments' => [['amount' => '745000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada]],
+                        'status' => HaberWorkflowStatus::Active,
+                        'installments' => [['amount' => '745000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa]],
                     ],
                     [
                         'document' => '24551209', 'amount' => '620000.00', 'expected' => 2,
                         'status' => HaberWorkflowStatus::Active,
                         'installments' => [
-                            ['amount' => '310000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada],
+                            ['amount' => '310000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa],
                             ['amount' => '310000.00', 'label' => 'T.CONOC.', 'concept' => 'Indemnización', 'status' => $activa],
                         ],
                     ],
                     [
                         'document' => '18774300', 'amount' => '409000.00', 'expected' => 1,
-                        'status' => HaberWorkflowStatus::Closed,
-                        'installments' => [['amount' => '409000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $pagada]],
+                        'status' => HaberWorkflowStatus::Active,
+                        'installments' => [['amount' => '409000.00', 'label' => 'PAGAR', 'concept' => 'Indemnización', 'status' => $activa]],
                     ],
                 ],
             ],
@@ -215,7 +217,7 @@ final class HaberesDemoSeeder extends Seeder
                 'subject' => 'Tinte Olga Isabel c/ Frigorífico del Norte SA',
                 'employer' => 'Frigorífico del Norte SA',
                 'declared' => '5790.06',
-                'status' => ExpedienteStatus::Closed,
+                'status' => ExpedienteStatus::Active,
                 'receivedDate' => '2018-03-22',
                 // El caso que confirmó que el concepto vive en la cuota:
                 // dos cuotas del mismo haber con conceptos distintos.
@@ -223,10 +225,10 @@ final class HaberesDemoSeeder extends Seeder
                     'document' => '13998220',
                     'amount' => '5790.06',
                     'expected' => 2,
-                    'status' => HaberWorkflowStatus::Closed,
+                    'status' => HaberWorkflowStatus::Active,
                     'installments' => [
-                        ['amount' => '2895.03', 'label' => 'T.CONOC.', 'concept' => 'Haberes adeudados', 'status' => $pagada, 'medium' => 'cash'],
-                        ['amount' => '2895.03', 'label' => 'PAGAR', 'concept' => 'Sac proporcional', 'status' => $pagada, 'medium' => 'cheque'],
+                        ['amount' => '2895.03', 'label' => 'T.CONOC.', 'concept' => 'Haberes adeudados', 'status' => $activa, 'medium' => 'cash'],
+                        ['amount' => '2895.03', 'label' => 'PAGAR', 'concept' => 'Sac proporcional', 'status' => $activa, 'medium' => 'cheque'],
                     ],
                 ]],
             ],

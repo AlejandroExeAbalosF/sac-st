@@ -13,6 +13,7 @@ use App\Modules\Haberes\Models\BeneficiaryInstallment;
 use App\Modules\Haberes\Models\FundingAllocation;
 use App\Modules\Haberes\Models\Haber;
 use App\Modules\Haberes\Models\LegacyDocument;
+use App\Modules\Haberes\Support\CancellableInstallments;
 use App\Modules\Shared\Actions\RecordAuditEvent;
 use App\Modules\Shared\Enums\ReceiptType;
 use App\Modules\Shared\Models\Receipt;
@@ -32,7 +33,10 @@ use Illuminate\Validation\ValidationException;
  */
 final class CancelHaber
 {
-    public function __construct(private readonly RecordAuditEvent $auditar) {}
+    public function __construct(
+        private readonly RecordAuditEvent $auditar,
+        private readonly CancellableInstallments $cuotasAnulables,
+    ) {}
 
     public function handle(Haber $haber, Reason $motivo): Haber
     {
@@ -51,6 +55,7 @@ final class CancelHaber
                 ]);
             }
 
+            $this->cuotasAnulables->assertWithoutDisbursements($bloqueado->installments()->pluck('id'), 'el haber');
             $this->assertSinDineroImputado($bloqueado->installments()->pluck('id'));
             $this->assertSinPagosFueraDelCircuito($bloqueado->installments()->pluck('id'));
             $this->assertSinRecibosVigentes($bloqueado->installments()->pluck('id'));

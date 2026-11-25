@@ -121,10 +121,28 @@ final class VoidPaymentOrder
          * Primero se cierra la transferencia, con su motivo; recién después
          * cae la Orden. La base lo impide igual (`payment_orders_status_guard`).
          */
-        if (Disbursement::query()->live()->where('payment_order_id', $order->id)->exists()) {
+        $egreso = Disbursement::query()->live()->where('payment_order_id', $order->id)->first();
+
+        if ($egreso === null) {
+            return;
+        }
+
+        // Con el débito reconocido no se da por fallida (`FailTransferDisbursement`),
+        // y sin el informe tampoco se valida (`TransferStage::missing`).
+        if ($egreso->bank_transaction_id !== null) {
+            $paso = $egreso->report_received_at === null
+                ? 'registrar el informe del organismo y validar el pago'
+                : 'validar el pago';
+
             throw ValidationException::withMessages([
-                'orderId' => 'La Orden tiene una transferencia en curso: hay que darla por fallida antes de anular.',
+                'orderId' => 'La Orden tiene una transferencia con el débito ya vinculado. '
+                    ."Si corresponde a esta Orden, hay que {$paso}; si se vinculó por error, "
+                    .'desvincularlo y darla por fallida antes de anular.',
             ]);
         }
+
+        throw ValidationException::withMessages([
+            'orderId' => 'La Orden tiene una transferencia en curso: hay que darla por fallida antes de anular.',
+        ]);
     }
 }

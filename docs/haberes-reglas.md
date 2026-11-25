@@ -366,6 +366,16 @@ Transiciones del egreso:
   **Base:** `disbursements_born_open`.
 - A `reversed` no se llega: la reversión con contrapartida no tiene circuito todavía.
   **Base:** `disbursements_append_only`.
+- Una cuota solo figura pagada con su egreso confirmado: la entrega por mostrador o
+  la validación de la transferencia, no el vínculo del débito ni el recibo de egreso.
+  **Action:** `DeliverToBeneficiary` y `ValidateTransferDisbursement`. **Base:**
+  `beneficiary_installments_paid_with_disbursement`.
+- Una cuota con un egreso vivo no se anula, y sobre una anulada no nace un egreso.
+  Pagada, el haber y el expediente no se anulan; con la transferencia en curso, se da
+  por fallida antes, y con su débito vinculado se completa el informe si falta y se
+  valida, o se desvincula. **Action:** `CancelHaber` y `CancelExpediente`, por
+  `CancellableInstallments`. **Base:** `beneficiary_installments_cancel_without_disbursement`
+  y `disbursements_not_on_cancelled`, que se serializan sobre la fila de la cuota.
 - La Orden de un egreso no cambia, y el egreso solo nace o se confirma con su Orden
   activa. **Base:** `disbursements_append_only` y `disbursements_order_active`.
   **Action:** `ValidateTransferDisbursement`, `RegisterTransferReport` y
@@ -382,6 +392,7 @@ Evidencia: [etapas](../app/Modules/Haberes/Support/TransferStage.php),
 [validación](../app/Modules/Haberes/Actions/ValidateTransferDisbursement.php),
 [esquema de egresos](../database/migrations/2026_08_30_100000_create_disbursements_table.php),
 [transiciones](../database/migrations/2026_11_17_000000_guard_payment_order_and_disbursement_transitions.php),
+[estado de la cuota y su egreso](../database/migrations/2026_11_25_000000_guard_installment_status_against_disbursements.php),
 [egreso por transferencia](../tests/Feature/Haberes/EgresoPorTransferenciaTest.php),
 [egreso por mostrador](../tests/Feature/Haberes/EgresoPorMostradorTest.php) y
 [concurrencia](../tests/Feature/Haberes/EgresoConcurrenteTest.php).

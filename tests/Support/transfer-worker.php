@@ -249,6 +249,21 @@ try {
             PaymentOrder::query()->findOrFail($input['order']), new Reason(HaberesReasonCode::WrongBeneficiaryData, null), $input['actor'],
         );
         $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'raw-cancel-installment') {
+        // Anular una cuota mientras otro registra su egreso: la base sola decide.
+        DB::table('beneficiary_installments')->where('id', $input['installment'])->update(['workflow_status' => 'cancelled']);
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'migrate-up') {
+        // Correr una migración, en su transacción como el migrador, mientras otro escribe.
+        $migracion = require database_path($input['migration']);
+        DB::transaction(fn () => $migracion->up());
+        $result = ['status' => 'done'];
+    } elseif ($input['mode'] === 'raw-disbursement') {
+        // Registrar un egreso mientras otro anula la cuota.
+        DB::table('disbursements')->insert([
+            'beneficiary_installment_id' => $input['installment'], 'method' => 'cash', 'amount' => $input['amount'], 'status' => 'pending',
+        ]);
+        $result = ['status' => 'done'];
     } elseif ($input['mode'] === 'raw-journal-lines') {
         // Un par balanceado sobre un asiento mientras otro lo postea: la base sola decide.
         DB::transaction(function () use ($input): void {

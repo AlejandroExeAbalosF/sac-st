@@ -145,7 +145,10 @@ con su motivo: liberar la imputación deja el dinero en la recepción, sin dueñ
 desde ahí puede asignarse a otra cuota; anular el haber exige que ya no haya dinero
 imputado ni recibo de ingreso vigente; revertir la recepción saca el dinero de los
 libros y deja libre el crédito. Una cuota con egreso registrado no se desarma: ni se
-libera su dinero ni se anula su cobro, así que su haber tampoco se anula.
+libera su dinero ni se anula su cobro, así que su haber tampoco se anula: pagada, el
+sistema lo dice y no hay otro paso; con la transferencia en curso, pide darla por
+fallida antes. Si su débito ya está vinculado, pide validarla —con el informe del
+organismo, si falta— o desvincularlo. Vale igual para anular el expediente.
 Con la recepción revertida, el comprobante puede volver a cobrar la cuota o
 desvincularse para que el crédito se cruce con otro.
 
@@ -235,9 +238,10 @@ La anulación de la Orden no revierte el ingreso ni libera sus imputaciones por 
 
 Con la transferencia en curso, la Orden no se anula: primero se da la transferencia
 por fallida desde la tarjeta del egreso, con motivo, y recién después se anula la
-Orden. Una transferencia con el débito ya reconocido no se da por fallida: si el
-débito era de otra Orden se desvincula antes. Este cierre a mano y sus motivos son
-una propuesta del sistema, pendiente de confirmar con el área. Regla:
+Orden. Una transferencia con el débito ya reconocido no se da por fallida, y al anular
+la Orden se pide revisarlo: si le corresponde, se valida el pago —con el informe del
+organismo, si falta—; si se vinculó por error, se desvincula antes. Este cierre a mano
+y sus motivos son una propuesta del sistema, pendiente de confirmar con el área. Regla:
 [egreso](haberes-reglas.md#egreso).
 
 Validado el pago, la Orden queda «Completada»: deja de ocupar el lugar de la cuota, pero

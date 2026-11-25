@@ -7,11 +7,13 @@ namespace Tests\Feature\Haberes;
 use App\Models\User;
 use App\Modules\Banking\Enums\TransactionDirection;
 use App\Modules\Banking\Models\BankTransaction;
+use App\Modules\Haberes\Actions\LinkTransferDebit;
 use App\Modules\Haberes\Data\DisbursementSummaryData;
 use App\Modules\Haberes\Data\InstallmentDisbursementData;
 use App\Modules\Haberes\Data\InstallmentOrderStateData;
 use App\Modules\Haberes\Enums\DisbursementMethod;
 use App\Modules\Haberes\Enums\DisbursementStatus;
+use App\Modules\Haberes\Enums\HaberesReasonCode;
 use App\Modules\Haberes\Enums\InstallmentWorkflowStatus;
 use App\Modules\Haberes\Enums\PaymentChannel;
 use App\Modules\Haberes\Enums\PaymentOrderStatus;
@@ -45,6 +47,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\BuildsTransferInstallment;
 use Tests\TestCase;
 
@@ -270,6 +273,14 @@ class EgresoPorTransferenciaTest extends TestCase
         $this->assertSame(
             DisbursementStatus::ReadyForValidation,
             Disbursement::query()->firstOrFail()->status,
+        );
+
+        // Con el informe y el débito todavía no está pagada, tampoco para la base.
+        $this->assertSame(InstallmentWorkflowStatus::Active, $cuota->refresh()->workflow_status);
+        $this->rechaza(
+            fn () => DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']),
+            'cuota pagada antes de validar',
+            'no tiene un egreso confirmado',
         );
 
         $this->validar($cuota)->assertSessionHasNoErrors();
@@ -845,6 +856,43 @@ class EgresoPorTransferenciaTest extends TestCase
             ->update(['status' => 'draft']), 'Orden completada que vuelve a circular');
     }
 
+    /** Con el pago validado, ni el haber ni el expediente se anulan. */
+    public function test_no_se_anula_el_haber_de_una_cuota_pagada_por_transferencia(): void
+    {
+        $cuota = $this->cuotaValidada();
+        $haber = $cuota->haber;
+
+        $this->anularHaber($cuota)->assertSessionHasErrors([
+            'reason' => 'Una cuota ya se le pagó al beneficiario: el haber no se puede anular.',
+        ]);
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('expedientes.cancel', $haber->expediente), ['reasonCode' => 'data_entry_error'])
+            ->assertSessionHasErrors([
+                'reason' => 'Una cuota ya se le pagó al beneficiario: el expediente no se puede anular.',
+            ]);
+
+        $this->assertSame(InstallmentWorkflowStatus::Paid, $cuota->refresh()->workflow_status);
+        $this->assertNotSame('cancelled', $haber->refresh()->workflow_status->value);
+    }
+
+    /** En curso todavía no se pagó: pide darla por fallida, y cerrada ya no la nombra. */
+    public function test_anular_el_haber_con_transferencia_en_curso_pide_darla_por_fallida(): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $this->informar($cuota)->assertSessionHasNoErrors();
+
+        $this->anularHaber($cuota)->assertSessionHasErrors([
+            'reason' => 'Una cuota tiene una transferencia en curso. Hay que darla por fallida antes.',
+        ]);
+
+        $this->darPorFallida($cuota, Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole())
+            ->assertSessionHasNoErrors();
+
+        $this->anularHaber($cuota)->assertSessionHasErrors([
+            'reason' => 'Una cuota todavía tiene dinero imputado. Hay que liberarlo o anular su cobro antes.',
+        ]);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Andamiaje
@@ -909,6 +957,84 @@ class EgresoPorTransferenciaTest extends TestCase
             ->post(route('haberes.installments.disbursement.fail', $cuota), [
                 'disbursementId' => $egreso->id,
                 'reasonCode' => 'bank_rejected',
+            ]);
+    }
+
+    /** Con el débito vinculado no se da por fallida: pide revisar el débito. */
+    #[DataProvider('debitoConOSinInforme')]
+    public function test_anular_el_haber_con_el_debito_vinculado_pide_revisarlo(bool $conInforme): void
+    {
+        $cuota = $this->cuotaConOrden();
+
+        if ($conInforme) {
+            $this->informar($cuota)->assertSessionHasNoErrors();
+        }
+
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+
+        $revisar = 'Una cuota tiene una transferencia con el débito ya vinculado. Si corresponde a su Orden, '
+            .($conInforme ? 'hay que validar el pago' : 'hay que registrar el informe del organismo y validar el pago')
+            .'; si se vinculó por error, desvincularlo.';
+
+        $this->anularHaber($cuota)->assertSessionHasErrors(['reason' => $revisar]);
+        $this->actingAs($this->operador('contador'))
+            ->patch(route('expedientes.cancel', $cuota->haber->expediente), ['reasonCode' => 'data_entry_error'])
+            ->assertSessionHasErrors(['reason' => $revisar]);
+
+        // Desvinculado, vuelve a ser una transferencia en curso que se cierra a mano.
+        app(LinkTransferDebit::class)->undo(
+            Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole(),
+            new Reason(HaberesReasonCode::DataEntryError),
+        );
+
+        $this->anularHaber($cuota)->assertSessionHasErrors([
+            'reason' => 'Una cuota tiene una transferencia en curso. Hay que darla por fallida antes.',
+        ]);
+    }
+
+    /** Anular la Orden tampoco manda a un paso que se rechaza. */
+    #[DataProvider('debitoConOSinInforme')]
+    public function test_anular_la_orden_con_el_debito_vinculado_pide_revisarlo(bool $conInforme): void
+    {
+        $cuota = $this->cuotaConOrden();
+        $orden = $this->ordenVigente($cuota);
+
+        if ($conInforme) {
+            $this->informar($cuota)->assertSessionHasNoErrors();
+        }
+
+        $this->vincularDebito($cuota, $this->debito($cuota))->assertSessionHasNoErrors();
+
+        $this->anularOrden($orden)->assertSessionHasErrors([
+            'orderId' => 'La Orden tiene una transferencia con el débito ya vinculado. Si corresponde a esta Orden, '
+                .($conInforme ? 'hay que validar el pago' : 'hay que registrar el informe del organismo y validar el pago')
+                .'; si se vinculó por error, desvincularlo y darla por fallida antes de anular.',
+        ]);
+        $this->assertSame(PaymentOrderStatus::Draft, $orden->refresh()->status);
+
+        // El camino que indica termina en la Orden anulada.
+        $egreso = Disbursement::query()->where('beneficiary_installment_id', $cuota->id)->sole();
+        app(LinkTransferDebit::class)->undo($egreso, new Reason(HaberesReasonCode::DataEntryError));
+
+        $this->anularOrden($orden)->assertSessionHasErrors([
+            'orderId' => 'La Orden tiene una transferencia en curso: hay que darla por fallida antes de anular.',
+        ]);
+        $this->darPorFallida($cuota, $egreso)->assertSessionHasNoErrors();
+        $this->anularOrden($orden)->assertSessionHasNoErrors();
+        $this->assertSame(PaymentOrderStatus::Voided, $orden->refresh()->status);
+    }
+
+    /** @return array<string, array{bool}> */
+    public static function debitoConOSinInforme(): array
+    {
+        return ['con el informe, lista para validar' => [true], 'sin el informe' => [false]];
+    }
+
+    private function anularHaber(BeneficiaryInstallment $cuota): TestResponse
+    {
+        return $this->actingAs($this->operador('contador'))
+            ->patch(route('haberes.haber.cancel', [$cuota->haber->expediente, $cuota->haber->haber_number]), [
+                'reasonCode' => 'data_entry_error',
             ]);
     }
 

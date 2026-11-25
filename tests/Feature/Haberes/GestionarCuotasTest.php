@@ -10,11 +10,13 @@ use App\Modules\Haberes\Models\HaberManagementLabel;
 use Database\Seeders\HaberesDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\PaysInstallments;
 use Tests\TestCase;
 
 /** Operaciones incrementales sobre las cuotas desde el detalle del expediente. */
 final class GestionarCuotasTest extends TestCase
 {
+    use PaysInstallments;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -219,8 +221,9 @@ final class GestionarCuotasTest extends TestCase
 
     public function test_a_paid_installment_is_read_only(): void
     {
-        $haber = $this->haber('120326/2019', withPaidInstallment: true);
-        $installment = $haber->installments()->where('workflow_status', 'paid')->firstOrFail();
+        $this->abrirLibrosSinSaldo();
+        $haber = $this->haber('120326/2019');
+        $installment = $this->pagarPorMostrador($haber->installments()->orderBy('id')->firstOrFail());
 
         $this->actingAs($this->operador())
             ->patch(route('haberes.installments.update', [$haber->expediente, $haber, $installment]), [
@@ -275,19 +278,14 @@ final class GestionarCuotasTest extends TestCase
         )->assertForbidden();
     }
 
-    private function haber(string $expediente, bool $withPaidInstallment = false): Haber
+    private function haber(string $expediente): Haber
     {
-        $query = Expediente::query()
+        return Expediente::query()
             ->where('display_number', $expediente)
             ->firstOrFail()
-            ->haberes();
-
-        if ($withPaidInstallment) {
-            $query->whereHas('installments', fn ($installments) => $installments
-                ->where('workflow_status', 'paid'));
-        }
-
-        return $query->where('workflow_status', 'active')->firstOrFail();
+            ->haberes()
+            ->where('workflow_status', 'active')
+            ->firstOrFail();
     }
 
     /** @return array<string, mixed> */

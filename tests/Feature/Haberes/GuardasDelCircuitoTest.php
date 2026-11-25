@@ -14,6 +14,8 @@ use App\Modules\Haberes\Actions\CancelHaber;
 use App\Modules\Haberes\Actions\CollectAndIssueReceipt;
 use App\Modules\Haberes\Actions\DeliverToBeneficiary;
 use App\Modules\Haberes\Actions\DepositCashToBank;
+use App\Modules\Haberes\Actions\ReactivateExpediente;
+use App\Modules\Haberes\Actions\ReactivateHaber;
 use App\Modules\Haberes\Actions\UnallocateFunds;
 use App\Modules\Haberes\Actions\VoidCashCollection;
 use App\Modules\Haberes\Enums\AllocationKind;
@@ -34,12 +36,14 @@ use App\Modules\Shared\Support\Reason;
 use App\Support\BusinessDate;
 use App\Support\Money\Decimal;
 use Database\Seeders\HaberesDemoSeeder;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -332,14 +336,143 @@ class GuardasDelCircuitoTest extends TestCase
         ]);
     }
 
-    /** Y el haber sigue sin poder anularse. */
+    /** Y el haber no se anula: el mensaje no manda a liberar, que tampoco se puede. */
     public function test_no_se_anula_un_haber_con_una_cuota_entregada(): void
     {
         $cuota = $this->cuotaEntregada();
 
-        $this->expectExceptionMessageMatches('/dinero imputado/u');
+        try {
+            app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
+            $this->fail('Anuló un haber con una cuota ya pagada.');
+        } catch (ValidationException $e) {
+            $this->assertSame(
+                'Una cuota ya se le pagó al beneficiario: el haber no se puede anular.',
+                $e->errors()['reason'][0],
+            );
+        }
 
+        $this->assertSame('paid', $cuota->refresh()->workflow_status->value);
+        $this->assertSame('active', $cuota->haber->refresh()->workflow_status->value);
+    }
+
+    /** Ni el expediente. */
+    public function test_no_se_anula_un_expediente_con_una_cuota_entregada(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        $this->expectExceptionMessageMatches('/ya se le pagó al beneficiario: el expediente no se puede anular/u');
+
+        app(CancelExpediente::class)->handle($cuota->haber->expediente, new Reason(HaberesReasonCode::DataEntryError));
+    }
+
+    /** La base no deja anular la cuota pagada aunque el recibo ya no la proteja. */
+    public function test_la_base_rechaza_anular_una_cuota_pagada_sin_la_guarda_del_recibo(): void
+    {
+        $cuota = $this->cuotaEntregada();
+
+        // El DDL es transaccional: `RefreshDatabase` lo deshace.
+        DB::statement('DROP TRIGGER beneficiary_installments_cancel_without_receipt ON beneficiary_installments');
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/tiene un egreso registrado: no se puede anular/u');
+
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'cancelled']);
+    }
+
+    /** Cobrada no es pagada: sin egreso confirmado la base no deja marcarla. */
+    public function test_la_base_rechaza_una_cuota_pagada_sin_egreso_confirmado(): void
+    {
+        $cuota = $this->cuotaCobrada();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/no tiene un egreso confirmado: no puede figurar pagada/u');
+
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']);
+    }
+
+    /** Ni nacer pagada. */
+    public function test_la_base_rechaza_que_una_cuota_nazca_pagada(): void
+    {
+        $cuota = $this->cuotaEnEfectivo();
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/no tiene un egreso confirmado: no puede figurar pagada/u');
+
+        DB::table('beneficiary_installments')->insert([
+            'haber_id' => $cuota->haber_id,
+            'installment_number' => 99,
+            'expected_amount' => '1.00',
+            'expected_medium' => 'cash',
+            'workflow_status' => 'paid',
+        ]);
+    }
+
+    /** La migración no se instala sobre una cuota pagada sin egreso. */
+    public function test_la_migracion_se_detiene_con_una_cuota_pagada_sin_egreso(): void
+    {
+        $cuota = $this->cuotaEnEfectivo();
+        $migracion = $this->sinGuardaDeEstado();
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']);
+
+        $this->expectExceptionMessageMatches('/Hay 1 cuotas pagadas sin egreso confirmado/u');
+        $this->instalar($migracion);
+    }
+
+    /**
+     * Ni sobre una anulada que estaba pagada sin egreso: reactivarla
+     * restauraría `paid` desde la auditoría y la base lo rechazaría.
+     */
+    #[DataProvider('anulaciones')]
+    public function test_la_migracion_se_detiene_con_una_anulada_que_no_podria_reactivarse(string $anula): void
+    {
+        $cuota = $this->cuotaEnEfectivo();
+        $migracion = $this->sinGuardaDeEstado();
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']);
+        $this->anularConAccion($anula, $cuota);
+
+        $this->expectExceptionMessageMatches('/Hay 1 cuotas anuladas que estaban pagadas sin egreso confirmado/u');
+        $this->instalar($migracion);
+    }
+
+    /** Ya reactivada y corregida, la anulación vieja de la auditoría no la detiene. */
+    #[DataProvider('anulaciones')]
+    public function test_la_migracion_ignora_una_anulacion_ya_reactivada(string $anula): void
+    {
+        $cuota = $this->cuotaEnEfectivo();
+        $migracion = $this->sinGuardaDeEstado();
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'paid']);
+        $this->anularConAccion($anula, $cuota);
+        $this->reactivarConAccion($anula, $cuota);
+        DB::table('beneficiary_installments')->where('id', $cuota->id)->update(['workflow_status' => 'active']);
+        $this->anularConAccion($anula, $cuota);
+
+        $this->instalar($migracion);
+        $this->reactivarConAccion($anula, $cuota);
+
+        $this->assertSame('active', $cuota->refresh()->workflow_status->value);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function anulaciones(): array
+    {
+        return ['el haber' => ['haber'], 'el expediente' => ['expediente']];
+    }
+
+    /** Ni registrar un egreso sobre una cuota anulada. */
+    public function test_la_base_rechaza_un_egreso_sobre_una_cuota_anulada(): void
+    {
+        $cuota = $this->cuotaEnEfectivo();
         app(CancelHaber::class)->handle($cuota->haber, new Reason(HaberesReasonCode::DataEntryError));
+
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessageMatches('/está anulada: no admite un egreso/u');
+
+        DB::table('disbursements')->insert([
+            'beneficiary_installment_id' => $cuota->id,
+            'method' => 'cash',
+            'amount' => $cuota->expected_amount,
+            'status' => 'pending',
+        ]);
     }
 
     /*
@@ -522,6 +655,44 @@ class GuardasDelCircuitoTest extends TestCase
         $cuota->forceFill(['expected_medium' => 'cash'])->save();
 
         return $cuota->refresh();
+    }
+
+    /** Quita las guardas de la migración, como una base que todavía no la corrió. */
+    private function sinGuardaDeEstado(): Migration
+    {
+        /** @var Migration&object{up: callable, down: callable} $migracion */
+        $migracion = require database_path('migrations/2026_11_25_000000_guard_installment_status_against_disbursements.php');
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        $migracion->down();
+
+        return $migracion;
+    }
+
+    private function instalar(Migration $migracion): void
+    {
+        DB::statement('SET CONSTRAINTS ALL IMMEDIATE');
+        $migracion->up();
+    }
+
+    private function anularConAccion(string $anula, BeneficiaryInstallment $cuota): void
+    {
+        $motivo = new Reason(HaberesReasonCode::DataEntryError);
+
+        $anula === 'haber'
+            ? app(CancelHaber::class)->handle($cuota->haber()->firstOrFail(), $motivo)
+            : app(CancelExpediente::class)->handle($cuota->haber()->firstOrFail()->expediente, $motivo);
+    }
+
+    private function reactivarConAccion(string $anula, BeneficiaryInstallment $cuota): void
+    {
+        $motivo = new Reason(HaberesReasonCode::CancelledByMistake);
+
+        $anula === 'haber'
+            ? app(ReactivateHaber::class)->handle($cuota->haber()->firstOrFail(), $motivo)
+            : app(ReactivateExpediente::class)->handle($cuota->haber()->firstOrFail()->expediente, $motivo);
+
+        // La anulación siguiente queda después en la auditoría, que se ordena por fecha.
+        $this->travel(1)->minutes();
     }
 
     private function cuotaCobrada(): BeneficiaryInstallment
