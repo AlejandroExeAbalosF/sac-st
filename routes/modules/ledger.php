@@ -9,6 +9,7 @@ use App\Modules\Ledger\Http\Controllers\CashCountController;
 use App\Modules\Ledger\Http\Controllers\LegacyFundsBalanceController;
 use App\Modules\Ledger\Http\Controllers\OpeningBalanceController;
 use App\Modules\Ledger\Http\Controllers\PeriodClosingController;
+use Illuminate\Routing\RedirectController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,8 +48,12 @@ Route::middleware(['auth', 'verified', 'caja:haberes'])->prefix('caja')->name('c
          */
         Route::get('saldo-anterior', [LegacyFundsBalanceController::class, 'index'])
             ->name('saldo-anterior.index');
-        // La dirección de cuando la pantalla también pagaba.
-        Route::redirect('pagos-anteriores', '/caja/saldo-anterior')->name('pagos-anteriores');
+        // La dirección de cuando la pantalla también pagaba. Solo en GET:
+        // `Route::redirect` responde a todos los verbos.
+        Route::get('pagos-anteriores', RedirectController::class)
+            ->defaults('destination', '/caja/saldo-anterior')
+            ->defaults('status', 302)
+            ->name('pagos-anteriores');
     });
 
     /*

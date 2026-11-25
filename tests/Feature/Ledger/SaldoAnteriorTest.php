@@ -62,7 +62,7 @@ class SaldoAnteriorTest extends TestCase
                 'amount' => '300000.00',
                 'legacyReference' => '131010/2023',
             ])
-            ->assertRedirect('/caja/saldo-anterior');
+            ->assertMethodNotAllowed();
 
         $this->assertSame('1000000.00', app(CashBalance::class)->of(LedgerAccount::LegacyFunds, $this->caja()));
     }
