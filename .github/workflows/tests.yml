@@ -83,7 +83,7 @@ jobs:
         run: composer setup
 
       - name: Audit Dependencies
-        run: composer audit && pnpm audit --audit-level high
+        run: composer ci:audit
 
       # Las mismas etapas de ci:check, visibles por separado con sus tiempos.
       - name: Check Frontend

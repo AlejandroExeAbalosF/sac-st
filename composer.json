@@ -74,9 +74,15 @@
         ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
+            "@ci:audit",
+            "pnpm run build",
             "@ci:frontend",
             "@ci:php",
             "@test:parallel"
+        ],
+        "ci:audit": [
+            "@composer audit",
+            "pnpm audit --audit-level high"
         ],
         "ci:frontend": [
             "Composer\\Config::disableProcessTimeout",

@@ -2,9 +2,13 @@
 
 `composer ci:check` conserva todos los controles y corta ante el primer error:
 
-1. `composer ci:frontend`: ESLint, Prettier, TypeScript y Vitest.
-2. `composer ci:php`: limpieza de configuración, Pint y PHPStan.
-3. `composer test:parallel`: toda la suite PHP, dividida como se describe abajo.
+1. `composer ci:audit`: avisos de seguridad de las dependencias. Necesita internet,
+   y un aviso nuevo lo hace fallar aunque el código no haya cambiado.
+2. `pnpm run build`: compila el front y regenera los archivos de Wayfinder, que no se
+   versionan. Sin eso, TypeScript puede revisar rutas viejas.
+3. `composer ci:frontend`: ESLint, Prettier, TypeScript y Vitest.
+4. `composer ci:php`: limpieza de configuración, Pint y PHPStan.
+5. `composer test:parallel`: toda la suite PHP, dividida como se describe abajo.
 
 Los comandos por módulo sirven para iterar mientras se desarrolla.
 Al modificar infraestructura compartida también hay que probar sus consumidores:
@@ -17,6 +21,7 @@ Para trabajar en un área sin repetir todos los controles:
 
 | Comando | Alcance |
 | --- | --- |
+| `composer ci:audit` | Avisos de seguridad de Composer y pnpm |
 | `composer ci:frontend` | ESLint, Prettier, TypeScript y Vitest |
 | `composer ci:php` | Limpieza de configuración, Pint y PHPStan |
 | `composer test:haberes` | Pruebas de Haberes, incluidas las unitarias |
